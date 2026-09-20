@@ -5,7 +5,9 @@ const result = validatePlaces(
   Object.entries(modules).map(([path, data]) => ({ file: path.split('/').at(-1)!, data })),
 );
 if (result.errors.length) throw new Error(`The city could not load:\n${result.errors.join('\n')}`);
-export const places = result.places.sort((a, b) => a.plot.localeCompare(b.plot));
+export const places = result.places.sort((a, b) =>
+  a.plot.localeCompare(b.plot, 'en', { numeric: true }),
+);
 export const repository = /^[\w.-]+\/[\w.-]+$/.test(import.meta.env.VITE_GITHUB_REPOSITORY ?? '')
   ? (import.meta.env.VITE_GITHUB_REPOSITORY as string)
   : '';

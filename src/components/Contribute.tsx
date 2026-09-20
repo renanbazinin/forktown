@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
   Check,
   Copy,
   Download,
   ExternalLink,
+  FolderOpen,
   Paintbrush,
   Save,
   Sparkles,
@@ -22,6 +23,7 @@ import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
 import BuildingPreview from './BuildingPreview';
 import Modal from './Modal';
+import HouseFiles from './HouseFiles';
 import ResidentPreview from './ResidentPreview';
 import { HomeDetails, NeighborDetails, SignDetails } from './Customization';
 
@@ -52,7 +54,7 @@ function availableId(name: string, places: Place[]) {
   return id;
 }
 
-export default function Contribute({
+const Contribute = memo(function Contribute({
   plot,
   places,
   onClose,
@@ -84,7 +86,8 @@ export default function Contribute({
   });
   const [panel, setPanel] = useState<'home' | 'neighbor' | 'sign'>('home');
   const [customId, setCustomId] = useState(() => draft.id !== availableId(draft.name, places));
-  const [step, setStep] = useState<'design' | 'submit'>('design');
+  const [step, setStep] = useState<'design' | 'submit' | 'files'>('design');
+  const [filesReturn, setFilesReturn] = useState<'design' | 'submit'>('design');
   const [attempted, setAttempted] = useState(false);
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState('');
@@ -92,7 +95,11 @@ export default function Contribute({
   const [saving, setSaving] = useState(false);
   const [savedFile, setSavedFile] = useState('');
   const saveInProgress = useRef(false);
-  const parsed = placeSchema.safeParse(draft);
+  const parsed = useMemo(() => placeSchema.safeParse(draft), [draft]);
+  const buildingChoices = useMemo(
+    () => BUILDING_TYPES.map((building) => ({ ...draft, building })),
+    [draft],
+  );
   const errors: Record<string, string> = {};
   if (!parsed.success)
     parsed.error.issues.forEach((issue) => {
@@ -198,20 +205,34 @@ export default function Contribute({
     ) : null;
   return (
     <Modal
-      title={step === 'design' ? 'Make yourself at home.' : 'Your place starts here.'}
+      title={
+        step === 'files'
+          ? 'The files that make a town.'
+          : step === 'design'
+            ? 'Make yourself at home.'
+            : 'Your place starts here.'
+      }
       onClose={onClose}
       wide
     >
-      <div className="contribute-progress">
-        <span className={step === 'design' ? 'current' : 'done'}>
-          <b>{step === 'submit' ? <Check size={12} /> : 1}</b> Make it yours
-        </span>
-        <i />
-        <span className={step === 'submit' ? 'current' : ''}>
-          <b>2</b> Share with the town
-        </span>
-      </div>
-      {step === 'design' ? (
+      {step !== 'files' && (
+        <div className="contribute-progress">
+          <span className={step === 'design' ? 'current' : 'done'}>
+            <b>{step === 'submit' ? <Check size={12} /> : 1}</b> Make it yours
+          </span>
+          <i />
+          <span className={step === 'submit' ? 'current' : ''}>
+            <b>2</b> Share with the town
+          </span>
+        </div>
+      )}
+      {step === 'files' ? (
+        <HouseFiles
+          initialId={savedFile ? draft.id : undefined}
+          saved={savedFile ? { id: draft.id, name: draft.name, json } : undefined}
+          onBack={() => setStep(filesReturn)}
+        />
+      ) : step === 'design' ? (
         <div className="builder-layout">
           <div className="builder-preview">
             <span className="eyebrow">YOUR LITTLE CORNER</span>
@@ -333,7 +354,10 @@ export default function Contribute({
                       aria-pressed={draft.building === type}
                       onClick={() => update('building', type)}
                     >
-                      <BuildingPreview place={{ ...draft, building: type }} size={62} />
+                      <BuildingPreview
+                        place={buildingChoices.find((place) => place.building === type)!}
+                        size={62}
+                      />
                       <span>{TYPE_LABELS[type]}</span>
                     </button>
                   ))}
@@ -438,6 +462,16 @@ export default function Contribute({
                 type="button"
                 className="text-button"
                 onClick={() => {
+                  setFilesReturn('design');
+                  setStep('files');
+                }}
+              >
+                <FolderOpen size={15} /> Browse house files
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
                   setAttempted(true);
                   if (valid) {
                     onPreview(parsed.success ? parsed.data : draft);
@@ -462,6 +496,21 @@ export default function Contribute({
                 ? 'Save your place straight into the project running on this computer. Then share it with the town through your pull request.'
                 : 'Your building is ready for its first pull request. Here’s how to give it a permanent home.'}
             </p>
+            <div className="house-file-actions">
+              <button
+                className="button button-secondary"
+                onClick={() => {
+                  setFilesReturn('submit');
+                  setStep('files');
+                }}
+              >
+                <FolderOpen size={15} /> {savedFile ? 'See my saved JSON' : 'Browse house files'}
+              </button>
+              <p className="house-files-note">
+                Previewing or downloading a house does not add it to the shared town. Your pull
+                request is the contribution.
+              </p>
+            </div>
             <ol className="contribution-steps">
               <li>
                 <span>1</span>
@@ -612,4 +661,5 @@ export default function Contribute({
       )}
     </Modal>
   );
-}
+});
+export default Contribute;

@@ -5,13 +5,17 @@ export { drawHouse as drawBuilding } from './houses';
 import type { Place } from '../lib/schema';
 import {
   PLOTS,
-  WORLD_SIZE,
-  ROAD_MAX,
+  STREETLIGHTS,
+  WORLD_WIDTH,
+  WORLD_HEIGHT,
+  ROAD_MAX_X,
+  ROAD_MAX_Y,
   BLOCK_SIZE,
   hash,
   isRoad,
   plotCenter,
   project,
+  type Plot,
   type Point,
 } from '../lib/world';
 
@@ -30,6 +34,8 @@ type Palette = {
   ink: string;
 };
 export type Camera = { x: number; y: number; zoom: number };
+const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
+const residentDepth = (resident: ResidentState) => resident.position.x + resident.position.y;
 export const DAY: Palette = {
   grass: '#B9CF9B',
   grassAlt: '#B4CA94',
@@ -216,9 +222,9 @@ export function renderCity({
   ctx.scale(camera.zoom, camera.zoom);
   const byPlot = new Map(places.map((place) => [place.plot, place]));
   const terrainPoint = (x: number, y: number) => project(x, y);
-  const b = terrainPoint(WORLD_SIZE, 0),
-    c = terrainPoint(WORLD_SIZE, WORLD_SIZE),
-    d = terrainPoint(0, WORLD_SIZE);
+  const b = terrainPoint(WORLD_WIDTH, 0),
+    c = terrainPoint(WORLD_WIDTH, WORLD_HEIGHT),
+    d = terrainPoint(0, WORLD_HEIGHT);
   poly(
     ctx,
     [
@@ -239,13 +245,22 @@ export function renderCity({
     ],
     p.edge,
   );
-  diamond(ctx, 0, c.y / 2, WORLD_SIZE * 38, WORLD_SIZE * 19, p.grass);
-  for (let x = 0; x < WORLD_SIZE; x++)
-    for (let y = 0; y < WORLD_SIZE; y++) {
+  poly(
+    ctx,
+    [
+      [0, 0],
+      [b.x, b.y],
+      [c.x, c.y],
+      [d.x, d.y],
+    ],
+    p.grass,
+  );
+  for (let x = 0; x < WORLD_WIDTH; x++)
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
       const pt = project(x + 0.5, y + 0.5);
       const seed = hash(`${x},${y}`);
       if (seed % 4 === 0) diamond(ctx, pt.x, pt.y, 38, 19, p.grassAlt);
-      if (x === WORLD_SIZE - 2 || (x === WORLD_SIZE - 1 && y < 8)) {
+      if (x === WORLD_WIDTH - 2 || (x === WORLD_WIDTH - 1 && y < 8)) {
         diamond(ctx, pt.x, pt.y, 38, 19, p.water);
         rect(ctx, pt.x - 12 + (seed % 16), pt.y, 12, 1, p.waterLight);
         if (y % 3 === 0) rect(ctx, pt.x + 3, pt.y + 6, 7, 1, p.waterLight);
@@ -304,12 +319,12 @@ export function renderCity({
     }
   }
   const objects: { depth: number; paint: () => void }[] = [];
-  for (let x = 0; x < WORLD_SIZE; x++)
-    for (let y = 0; y < WORLD_SIZE; y++) {
+  for (let x = 0; x < WORLD_WIDTH; x++)
+    for (let y = 0; y < WORLD_HEIGHT; y++) {
       const seed = hash(`tree${x},${y}`);
       const pt = project(x + 0.5, y + 0.5);
       if (
-        (x === 0 || y === 0 || y >= WORLD_SIZE - 2 || (x === WORLD_SIZE - 1 && y >= 9)) &&
+        (x === 0 || y === 0 || y >= WORLD_HEIGHT - 2 || (x === WORLD_WIDTH - 1 && y >= 9)) &&
         seed % 3 !== 0
       ) {
         objects.push({
@@ -318,8 +333,8 @@ export function renderCity({
         });
       }
       if (
-        x < ROAD_MAX &&
-        y < ROAD_MAX &&
+        x < ROAD_MAX_X &&
+        y < ROAD_MAX_Y &&
         !isRoad(x, y) &&
         x % BLOCK_SIZE === 0 &&
         y % BLOCK_SIZE === 2 &&
@@ -333,16 +348,11 @@ export function renderCity({
     if (!plot) continue;
     const pt = plotCenter(plot);
     objects.push({
-      depth: plot.x + plot.y + 0.8,
+      depth: houseDepth(plot),
       paint: () => drawHouse(ctx, place, pt.x, pt.y, night, 1.12),
     });
   }
-  for (const [x, y] of [
-    [1 + BLOCK_SIZE, 1 + BLOCK_SIZE * 2],
-    [1 + BLOCK_SIZE * 3, 1 + BLOCK_SIZE],
-    [1 + BLOCK_SIZE * 4, 1 + BLOCK_SIZE * 3],
-    [1 + BLOCK_SIZE * 2, 1 + BLOCK_SIZE * 4],
-  ]) {
+  for (const { x, y } of STREETLIGHTS) {
     const pt = project(x + 0.5, y + 0.5);
     objects.push({
       depth: x + y,
@@ -364,7 +374,7 @@ export function renderCity({
     if (resident.activity !== 'stroll') continue;
     const pt = project(resident.position.x, resident.position.y);
     objects.push({
-      depth: resident.position.x + resident.position.y,
+      depth: residentDepth(resident),
       paint: () => {
         if (followed === resident.id)
           diamond(ctx, pt.x, pt.y + 2, 10, 5, night ? '#F0DBA575' : '#FFF7D5');
@@ -388,4 +398,28 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
     if (point.x >= p.x - 55 && point.x <= p.x + 55 && point.y >= p.y - tall && point.y <= p.y + 20)
       return plot.id;
   }
+}
+
+type CityHit = { kind: 'place' | 'resident'; id: string };
+
+export function cityHit(
+  point: Point,
+  places: Place[],
+  residents: ResidentState[],
+): CityHit | undefined {
+  const plotId = buildingHit(point, places);
+  const plot = PLOTS.find((plot) => plot.id === plotId);
+  let depth = plot ? houseDepth(plot) : -Infinity;
+  let target: CityHit | undefined = plot ? { kind: 'place', id: plot.id } : undefined;
+  // Match the painter's order: residents follow houses at equal depth, and
+  // the last resident in the input wins ties (the drawing sort is stable).
+  for (const resident of residents) {
+    if (resident.activity !== 'stroll' || residentDepth(resident) < depth) continue;
+    const p = project(resident.position.x, resident.position.y);
+    if (Math.abs(point.x - p.x) < 9 && point.y > p.y - 28 && point.y < p.y + 5) {
+      target = { kind: 'resident', id: resident.id };
+      depth = residentDepth(resident);
+    }
+  }
+  return target;
 }

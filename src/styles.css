@@ -1,6 +1,82 @@
 @layer reset, base, components, responsive;
 
 @layer components {
+  .house-files {
+    padding: 24px 30px 30px;
+  }
+  .house-files > .modal-intro {
+    margin: 16px 0;
+  }
+  .house-files-layout {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(0, 2fr);
+    gap: 20px;
+    margin: 20px 0;
+  }
+  .house-file-list {
+    display: flex;
+    flex-direction: column;
+    max-height: 480px;
+    overflow-y: auto;
+    border: 1px solid #e2e7d6;
+    border-radius: 7px;
+  }
+  .house-file-list > strong {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 14px;
+    font-size: 13px;
+  }
+  .house-file-list > strong > span {
+    font-weight: 400;
+  }
+  .house-file-list > button {
+    padding: 12px 14px;
+    text-align: left;
+    border-top: 1px solid #e2e7d6;
+    overflow-wrap: anywhere;
+  }
+  .house-file-list > button[aria-pressed='true'] {
+    background: #e5eddb;
+  }
+  .house-file-list > button > span {
+    display: block;
+    font: 11px var(--mono);
+  }
+  .house-file-list small {
+    display: block;
+    margin-top: 5px;
+    color: #65715c;
+  }
+  .house-files .code-export pre {
+    max-height: 440px;
+    overflow-y: auto;
+  }
+  .house-files-note {
+    font-size: 12px;
+    line-height: 1.7;
+    color: #65715c;
+    margin: 12px 0;
+  }
+  .house-file-actions {
+    margin: 18px 0;
+  }
+  .builder-actions {
+    flex-wrap: wrap;
+  }
+  @media (max-width: 600px) {
+    .house-files {
+      padding: 18px;
+    }
+    .house-files-layout {
+      grid-template-columns: 1fr;
+    }
+    .house-file-list {
+      max-height: 200px;
+    }
+  }
   .sr-only {
     position: absolute;
     width: 1px;

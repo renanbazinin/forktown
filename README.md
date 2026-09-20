@@ -4,7 +4,7 @@
 
 Make your first open-source contribution a place of your own. Design a home, give its resident a simple daily rhythm, and add your own outdoor sign with one JSON file. After review and merging, the shared city rebuilds with your place, your name, and a link to share.
 
-Forktown begins with eight clearly labeled starter places on a 25-plot map. Those starter places use `creator: "forktown"` as a project credit; they are not real community contributions or a GitHub account endorsement.
+Forktown begins with eight clearly labeled starter places on a 50-plot map. Those starter places use `creator: "forktown"` as a project credit; they are not real community contributions or a GitHub account endorsement.
 
 ## Take a look locally
 
@@ -19,13 +19,13 @@ Open `http://localhost:5173`. No accounts, API keys, database, or remote service
 
 ## Make your first contribution
 
-1. Open the city and choose **Build a place**.
-2. Make a home with the Home, Neighbor, and Outdoor sign tabs. Choose an empty plot; the builder suggests an available file id.
-3. In your local checkout, choose **Continue to save → Save to my project**. The builder creates your JSON in `places/` and updates the local city. On a hosted site, download the JSON instead.
-4. Commit the new file on a branch in your fork. If you downloaded it, first add it to `places/`.
+1. Fork and clone the repository, create a contribution branch, and run your local town using the commands above.
+2. Choose **Build a place**. Use Home, Neighbor, and Outdoor sign to customize it.
+3. Choose **Continue to save → Save to my project** to create your JSON in `places/`.
+4. Open **See my saved JSON** to learn from your file, then commit and push it.
 5. Open a pull request against the original repository.
 
-Read the [step-by-step contribution guide](CONTRIBUTING.md). You can do the whole contribution through GitHub’s browser interface. A builder preview is private to your current visit; it becomes part of the public city only after a pull request is reviewed, merged, and deployed. The builder saves draft details on your device, including unfinished text, for your next visit.
+Read the [step-by-step contribution guide](CONTRIBUTING.md). The published GitHub Pages site is for exploring and reading house files; its builder is disabled. A local preview stays in your own town until a pull request is reviewed, merged, and deployed. Local builder drafts are saved on your device for your next visit.
 
 ## What works
 
@@ -91,3 +91,7 @@ The living edition keeps the first contribution small. Morning, afternoon, and e
 See [architecture and extension points](docs/ARCHITECTURE.md) and [the roadmap](docs/ROADMAP.md).
 
 Be kind, stay curious, and help the next person find their way in. [Code of conduct](CODE_OF_CONDUCT.md) · [MIT license](LICENSE)
+
+## Growing the town
+
+Change the row and column counts in `src/lib/town-config.ts` to add plots without moving existing homes. Roads, validation, the builder, and camera framing follow automatically. See [Expanding the town](docs/EXPANDING_THE_TOWN.md) for examples and compatibility rules.

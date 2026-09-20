@@ -18,7 +18,7 @@ Schema validation does not prove creator identity, story suitability, or authori
 
 ### Stable world positions
 
-`world.ts` owns 25 named plots on a four-tile street grid. Each block has a three-by-three grass plot with the house centered inside, a wider lawn, and a short entrance path. Road bounds, resident entrances, plot selection, shoreline, and camera framing follow the shared world dimensions. The pre-release spacing upgrade keeps plot ids and share links but expands their coordinates. A place’s location depends only on its `plot`. Adding a file, changing names, or sorting a directory does not move other buildings. Empty plots can be selected on the map or through the directory.
+`town-config.ts` sets the row and column counts; `world-layout.ts` derives 50 named plots on a four-tile street grid. Each block has a three-by-three grass plot with the house centered inside, a wider lawn, and a short entrance path. Road bounds, resident entrances, plot selection, shoreline, and camera framing follow the shared world dimensions. Expanding the row or column counts preserves existing plot ids, coordinates, and share links. A place’s location depends only on its `plot`. Adding a file, changing names, or sorting a directory does not move other buildings. Empty plots can be selected on the map or through the directory.
 
 Plots are not reservations. Concurrent pull requests can conflict; re-run checks against the current main branch before merging. Enable required status checks and require branches to be up to date (or use GitHub’s merge queue) when you publish.
 
@@ -38,7 +38,7 @@ Share links use `#place=id`, so static hosting needs no rewrite rules. Deep link
 
 During `npm run dev`, `scripts/local-places.ts` adds a development-only POST endpoint. The builder’s **Save to my project** action writes a new, formatted `places/<id>.json` in the checkout running the server. Vite discovers the file and refreshes the city. The save creates no commits, branches, pushes, or PRs; those remain the contributor’s next steps. A completed save clears the browser draft.
 
-The endpoint accepts loopback connections with a matching local Origin and a per-server token, requires JSON, and limits request size. It validates against the shared schema and the current files on disk, serializes saves to avoid simultaneous plot claims, rejects redirected places directories, and uses exclusive file creation to avoid overwriting existing files. Errors identify the conflict in the builder. The server token and save UI are disabled in production builds, and the endpoint is not installed in the production preview server. Hosted sites keep the download/copy contribution route.
+The endpoint accepts loopback connections with a matching local Origin and a per-server token, requires JSON, and limits request size. It validates against the shared schema and the current files on disk, serializes saves to avoid simultaneous plot claims, rejects redirected places directories, and uses exclusive file creation to avoid overwriting existing files. Errors identify the conflict in the builder. The server token and save UI are disabled in production builds, and the endpoint is not installed in the production preview server. Hosted sites are read-only: contribution actions open a fork-and-local-development guide, and the builder is not mounted. The shared source browser shows the actual bundled JSON files; local users can also open a newly saved file before it is pushed.
 
 ### A deliberately small simulation
 
@@ -50,17 +50,17 @@ Morning is 06:00-12:00, afternoon 12:00-18:00, evening 18:00-22:00, and night 22
 
 Residents derive facing from their current route segment: southeast, southwest, northeast, or northwest. Front and back artwork is mirrored for left/right travel, with matching hats, glasses, hair, and limb layering. A distance-based walk phase drives alternating foot lifts, arm swing, and a small torso bob; resting residents have no gait animation. The ground shadow and greeting text are not mirrored or bounced.
 
-Path and sign caches are bounded. The current 25-plot world does not require a game engine or worker. Before expanding to large districts, profile rendering, path allocation, and the pairwise greeting check.
+Path and sign caches are bounded. The current 50-plot world does not require a game engine or worker. Before expanding to large districts, profile rendering, path allocation, and the pairwise greeting check.
 
 ## Where to extend it
 
 - **Building family:** add an enum member and label in `schema.ts`, add its geometry in `houses.ts`, and consider its selection bounds in `buildingHit`. The editor discovers enum values automatically.
 - **Decoration:** extend the enum and renderer.
-- **District:** define a versioned plot convention before extending beyond the first 25 plots. Keep existing ids and coordinates stable. Update the schema, available plot list, and tests together.
+- **Town size:** increase the counts in `town-config.ts`; see [Expanding the town](EXPANDING_THE_TOWN.md). Plots, validation, roads, and framing derive from that configuration. Separate districts can be designed later without renumbering these addresses.
 - **Custom art or interactive interiors:** introduce a separately reviewed, bounded interface; do not execute arbitrary contributor files in the shared application.
 - **Languages:** move UI strings to locale dictionaries while leaving place stories as their authors wrote them.
 - **PR previews:** CI currently uploads a build artifact. A hosting service may add per-PR preview URLs later. No temporary public preview infrastructure is assumed.
 
 ## Current boundaries
 
-One neighborhood, 25 plots, six building families, four decorations, and one resident per place. House customization and restricted exterior signs are supported; arbitrary HTML pages are not. Mobile supports touch drag and zoom buttons; multi-touch pinch zoom is not implemented. The contributor directory is the accessible way to browse Canvas content. There is no long-term plot reservation, automated account verification, multiplayer, persistent user backend, or content moderation service.
+One neighborhood, 50 plots, six building families, four decorations, and one resident per place. House customization and restricted exterior signs are supported; arbitrary HTML pages are not. Mobile supports touch drag and zoom buttons; multi-touch pinch zoom is not implemented. The contributor directory is the accessible way to browse Canvas content. There is no long-term plot reservation, automated account verification, multiplayer, persistent user backend, or content moderation service.

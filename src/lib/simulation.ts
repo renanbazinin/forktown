@@ -1,5 +1,14 @@
 import type { Place } from './schema';
-import { getPlot, hash, isRoad, plotEntrance, ROAD_MIN, ROAD_MAX, type Point } from './world';
+import {
+  getPlot,
+  hash,
+  isRoad,
+  plotEntrance,
+  ROAD_MIN,
+  ROAD_MAX_X,
+  ROAD_MAX_Y,
+  type Point,
+} from './world';
 
 export type ResidentState = {
   id: string;
@@ -17,8 +26,8 @@ export function facingAlong(from: Point, to: Point): ResidentState['facing'] {
   return to.y >= from.y ? 'sw' : 'ne';
 }
 const roadNodes: Point[] = [];
-for (let x = ROAD_MIN; x <= ROAD_MAX; x++)
-  for (let y = ROAD_MIN; y <= ROAD_MAX; y++)
+for (let x = ROAD_MIN; x <= ROAD_MAX_X; x++)
+  for (let y = ROAD_MIN; y <= ROAD_MAX_Y; y++)
     if (isRoad(x, y)) roadNodes.push({ x: x + 0.5, y: y + 0.5 });
 const key = (point: Point) => `${point.x},${point.y}`;
 const graph = new Map(roadNodes.map((point) => [key(point), point]));

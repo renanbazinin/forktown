@@ -8,7 +8,8 @@ import {
   plotEntrance,
   isRoad,
   ROAD_MIN,
-  ROAD_MAX,
+  ROAD_MAX_X,
+  ROAD_MAX_Y,
   project,
   unproject,
 } from '../src/lib/world';
@@ -54,7 +55,7 @@ describe('The contribution contract', () => {
     expect(errors).toHaveLength(3);
     expect(errors.join('\n')).toContain('without the @');
     expect(errors.join('\n')).toContain('six-digit hex color');
-    expect(errors.join('\n')).toContain('between A1 and E5');
+    expect(errors.join('\n')).toContain('existing plot from the town map');
   });
   it('rejects duplicate plot claims without silently replacing another place', () => {
     const { errors } = validatePlaces([
@@ -112,8 +113,8 @@ describe('The world stays predictable as people contribute', () => {
     expect(shade('#FFFFFF', 30)).toBe('#ffffff');
     expect(shade('#000000', -30)).toBe('#000000');
   });
-  it('has 25 unique plots, all accepted by the contribution schema', () => {
-    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(25);
+  it('has 50 unique plots, all accepted by the contribution schema', () => {
+    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(50);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(true);
   });
@@ -150,8 +151,8 @@ describe('The world stays predictable as people contribute', () => {
       expect(isRoad(Math.floor(entrance.x), Math.floor(entrance.y))).toBe(true);
       expect(findPlotAt(entrance.x, entrance.y)).toBeUndefined();
     }
-    for (let x = ROAD_MIN; x <= ROAD_MAX; x++)
-      for (let y = ROAD_MIN; y <= ROAD_MAX; y++) {
+    for (let x = ROAD_MIN; x <= ROAD_MAX_X; x++)
+      for (let y = ROAD_MIN; y <= ROAD_MAX_Y; y++) {
         if (isRoad(x, y)) expect(findPlotAt(x + 0.5, y + 0.5)).toBeUndefined();
       }
   });

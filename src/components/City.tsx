@@ -1,12 +1,16 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Crosshair, Minus, Plus, MapPin } from 'lucide-react';
-import { buildingHit, renderCity, type Camera } from '../city/render';
+import { cityHit, renderCity, type Camera } from '../city/render';
 import { findPlotAt, getPlot, plotCenter, unproject } from '../lib/world';
 import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
-import { project, WORLD_SIZE, TILE_W, TILE_H } from '../lib/world';
+import { project, WORLD_BOUNDS } from '../lib/world';
 
-export type CityHandle = { focus: (plotId: string) => void; reset: () => void };
+export type CityHandle = {
+  focus: (plotId: string) => void;
+  reset: () => void;
+  stopFollowing: () => void;
+};
 type Props = {
   places: Place[];
   selectedPlot: string | null;
@@ -62,34 +66,43 @@ const City = forwardRef<CityHandle, Props>(function City(
   cameraRef.current = renderedCamera;
   const defaultCamera = useCallback((width: number, height: number): Camera => {
     const zoom = Math.max(
-      0.26,
+      0.01,
       Math.min(
-        (width - 52) / (WORLD_SIZE * TILE_W + 36),
-        (height - 85) / (WORLD_SIZE * TILE_H + 98),
+        (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
+        (height - 85) / (WORLD_BOUNDS.bottom + 98),
       ),
     );
     fit.current = zoom;
-    return { x: width / 2, y: (height - WORLD_SIZE * TILE_H * zoom) / 2 + 28, zoom };
+    return {
+      x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
+      y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
+      zoom,
+    };
   }, []);
   useEffect(() => {
     if (followed) {
       setHover(null);
-      setCamera((old) => ({ ...old, zoom: Math.max(old.zoom, fit.current * 1.8) }));
+      setCamera((old) => ({ ...old, zoom: Math.max(old.zoom, 0.6, fit.current * 1.8) }));
     }
   }, [followed]);
   const reset = useCallback(
     () => setCamera(defaultCamera(size.width, size.height)),
     [defaultCamera, size],
   );
+  const stopFollowing = useCallback(() => {
+    setCamera(cameraRef.current);
+    onStopFollowing();
+  }, [onStopFollowing]);
   useImperativeHandle(
     ref,
     () => ({
       reset,
+      stopFollowing,
       focus: (id) => {
         const plot = getPlot(id);
         if (!plot) return;
         const pt = plotCenter(plot);
-        const zoom = Math.max(fit.current, Math.min(0.85, fit.current * 1.35));
+        const zoom = Math.max(fit.current, 0.65);
         setCamera({
           x: size.width / 2 - pt.x * zoom,
           y: size.height / 2 - (pt.y - 35) * zoom,
@@ -97,7 +110,7 @@ const City = forwardRef<CityHandle, Props>(function City(
         });
       },
     }),
-    [reset, size],
+    [reset, size, stopFollowing],
   );
   useEffect(() => {
     if (!wrapper.current) return;
@@ -113,7 +126,10 @@ const City = forwardRef<CityHandle, Props>(function City(
   const zoomBy = useCallback(
     (factor: number, anchor?: { x: number; y: number }) => {
       setCamera((old) => {
-        const zoom = Math.max(fit.current * 0.65, Math.min(fit.current * 3.5, old.zoom * factor));
+        const zoom = Math.max(
+          fit.current * 0.65,
+          Math.min(Math.max(1.2, fit.current * 3.5), old.zoom * factor),
+        );
         const a = anchor ?? { x: size.width / 2, y: size.height / 2 };
         return {
           x: a.x - ((a.x - old.x) * zoom) / old.zoom,
@@ -171,18 +187,10 @@ const City = forwardRef<CityHandle, Props>(function City(
       y: (local.y - current.y) / current.zoom,
     };
     const ground = unproject(world.x, world.y);
-    const resident = residents.find((r) => {
-      const p = project(r.position.x, r.position.y);
-      return (
-        r.activity === 'stroll' &&
-        Math.abs(world.x - p.x) < 9 &&
-        world.y > p.y - 28 &&
-        world.y < p.y + 5
-      );
-    });
+    const target = cityHit(world, places, residents);
     return {
-      id: buildingHit(world, places) ?? findPlotAt(ground.x, ground.y)?.id ?? null,
-      residentId: resident?.id,
+      id: target?.kind === 'place' ? target.id : (findPlotAt(ground.x, ground.y)?.id ?? null),
+      residentId: target?.kind === 'resident' ? target.id : undefined,
       local,
     };
   };
@@ -229,8 +237,7 @@ const City = forwardRef<CityHandle, Props>(function City(
           if (pointer.current || event.button !== 0) return;
           const actual = cameraRef.current;
           if (followed) {
-            setCamera(actual);
-            onStopFollowing();
+            stopFollowing();
           }
           pointer.current = {
             id: event.pointerId,
@@ -293,14 +300,7 @@ const City = forwardRef<CityHandle, Props>(function City(
                   ? 'Working at home'
                   : 'Out for a stroll'}
           </span>
-          <button
-            onClick={() => {
-              setCamera(cameraRef.current);
-              onStopFollowing();
-            }}
-          >
-            Stop following
-          </button>
+          <button onClick={stopFollowing}>Stop following</button>
         </div>
       )}
       <div className="compass" aria-hidden="true">
