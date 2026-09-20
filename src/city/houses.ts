@@ -383,18 +383,74 @@ export function drawHouse(
     box(ctx, -9, 12, 2, 14, trim);
   }
   if (place.decoration === 'bench') {
+    const wood = tint(trim, 24),
+      frame = tint(trim, -18);
+    // Keep the feet and shadow inside the lawn's front-right edge.
     polygon(
       ctx,
       [
-        [25, 20],
-        [44, 29],
-        [39, 32],
-        [20, 23],
+        [18, 14],
+        [37, 23],
+        [30, 26],
+        [11, 17],
+      ],
+      '#23341B25',
+    );
+    box(ctx, 18, -4, 2, 18, frame);
+    box(ctx, 34, 4, 2, 18, frame);
+    box(ctx, 13, 10, 2, 7, frame);
+    box(ctx, 29, 18, 2, 7, frame);
+    // A raised seat with a visible front edge and two backrest slats.
+    polygon(
+      ctx,
+      [
+        [18, 7],
+        [36, 16],
+        [30, 19],
+        [12, 10],
+      ],
+      wood,
+    );
+    polygon(
+      ctx,
+      [
+        [12, 10],
+        [30, 19],
+        [30, 21],
+        [12, 12],
       ],
       trim,
     );
-    box(ctx, 23, 23, 2, 7, trim);
-    box(ctx, 39, 31, 2, 6, trim);
+    polygon(
+      ctx,
+      [
+        [30, 19],
+        [36, 16],
+        [36, 18],
+        [30, 21],
+      ],
+      frame,
+    );
+    polygon(
+      ctx,
+      [
+        [18, -4],
+        [36, 5],
+        [36, 8],
+        [18, -1],
+      ],
+      wood,
+    );
+    polygon(
+      ctx,
+      [
+        [18, 1],
+        [36, 10],
+        [36, 13],
+        [18, 4],
+      ],
+      wood,
+    );
   }
   if (place.decoration === 'mailbox') {
     box(ctx, 34, 13, 2, 14, trim);
