@@ -24,7 +24,7 @@ Plots are not reservations. Concurrent pull requests can conflict; re-run checks
 
 ### Rendering
 
-`render.ts` composes terrain, `houses.ts` draws customizable homes and cached sign textures, and `residents.ts` draws resident sprites and greetings. Depth sorting follows isometric coordinates; house selection bounds account for extra floors. The canvas uses a capped device pixel ratio and only resizes its backing buffer when dimensions change. The clock updates at 10 Hz while playing and stops advancing in hidden tabs. A paused town redraws only on other state or input changes. Reduced-motion users start paused.
+`render.ts` composes terrain, `houses.ts` draws customizable homes and cached sign textures, and `residents.ts` draws resident sprites and greetings. Depth sorting follows isometric coordinates; house selection bounds account for extra floors. The canvas uses a capped device pixel ratio and only resizes its backing buffer when dimensions change. Animation uses requestAnimationFrame capped at 30 updates per second while the page is visible. Hidden tabs stop painting; returning immediately resynchronizes to UTC time. A paused town redraws only on other state or input changes. Reduced-motion users start paused.
 
 `City.tsx` owns the camera and input. The directory is an equivalent keyboard route to the places and empty plots; the map itself supports arrow keys, plus/minus, and Home. Canvas artwork is supplementary to textual place details.
 
@@ -46,7 +46,9 @@ The endpoint accepts loopback connections with a matching local Origin and a per
 
 Morning is 06:00-12:00, afternoon 12:00-18:00, evening 18:00-22:00, and night 22:00-06:00. The three configured choices are stroll, work at home, and relax at home. Working, sleeping, and relaxing residents are inside: their sprites are hidden and cannot be selected on the map. Their activity remains visible in the directory and follow status. Nearby walkers occasionally exchange their configured greeting. No resident depends on another contributor's id or an appointment.
 
-`use-town-clock.ts` starts each visit at 09:00. At 1x, one real second equals one town minute: a day takes 24 minutes. Visitors control their own clock with pause, 1x/4x/12x speed, and a time slider. Time scrubbing intentionally jumps to the corresponding state and pauses playback. The state is reproducible at the same time, not persisted or synchronized across visitors. Night lighting starts at 20:00.
+`town-time.ts` maps UTC epoch milliseconds to town minutes using a 1,440,000ms cycle. One real minute equals one town hour; sixty cycles fit exactly into one UTC day. At 00:00 UTC the town reads 00:00; 00:01 UTC is 01:00 in town, and 00:24 UTC begins another town day. This is a compressed clock, not the literal UTC hour. Every render derives time from Date.now(), so reloads, time zones, and suspended tabs do not reset the phase or accumulate timer drift. Synchronization assumes reasonably accurate device clocks; there is no network time service. Pause freezes only the current view, and resume catches up to live time. The slider, variable speed, and manual day/night controls are removed. Night lighting starts at town time 20:00.
+
+Residents derive facing from their current route segment: southeast, southwest, northeast, or northwest. Front and back artwork is mirrored for left/right travel, with matching hats, glasses, hair, and limb layering. A distance-based walk phase drives alternating foot lifts, arm swing, and a small torso bob; resting residents have no gait animation. The ground shadow and greeting text are not mirrored or bounced.
 
 Path and sign caches are bounded. The current 25-plot world does not require a game engine or worker. Before expanding to large districts, profile rendering, path allocation, and the pairwise greeting check.
 

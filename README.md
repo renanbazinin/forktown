@@ -33,8 +33,8 @@ Read the [step-by-step contribution guide](CONTRIBUTING.md). You can do the whol
 - Mouse and touch panning, zoom buttons, scroll zoom, and keyboard map controls.
 - Custom floors, roof shapes, wall and trim colors, window styles, gardens, porches, and balconies.
 - Residents with names, outfits, accessories, greetings, and three simple daily choices.
-- Road-following strolls, occasional neighbor greetings, bedtime, and a camera that follows a resident.
-- A local town clock with pause, time scrubbing, speed controls, day/night lighting, and reduced-motion support.
+- Road-following strolls with four directional walking views, distance-based footsteps, occasional neighbor greetings, bedtime, and a camera that follows a resident.
+- A shared UTC-based 24-minute town day, automatic day/night lighting, pause/resume-live, and reduced-motion support.
 - Exterior signs: simple text or a restricted HTML/CSS artwork language, drawn as noninteractive canvas textures.
 - Searchable place directory and open-plot directory, including a keyboard-accessible alternative to the map.
 - Place stories, contributor credit, and shareable `#place=id` links without server routing.
@@ -86,7 +86,7 @@ See [publishing](docs/PUBLISHING.md). Creating this local project does not creat
 
 ## A foundation for more
 
-The living edition keeps the first contribution small. Morning, afternoon, and evening each use one choice: stroll, work at home, or relax at home. Nights are for sleeping. Every visitor has their own controllable clock; this is a small local simulation. There are no accounts, leaderboards, real-time multiplayer, or automatic merges. Every place has a bounded plot and reviewed data. New districts, original sprites, more building types, and richer interactions can follow the community’s needs.
+The living edition keeps the first contribution small. Morning, afternoon, and evening each use one choice: stroll, work at home, or relax at home. Nights are for sleeping. The clock follows UTC: one real minute is one town hour, with a new town day every 24 real minutes. Visitors at the same moment see the same daily phase when their device clocks agree. There are no accounts, leaderboards, real-time multiplayer, or automatic merges. Every place has a bounded plot and reviewed data. New districts, original sprites, more building types, and richer interactions can follow the community’s needs.
 
 See [architecture and extension points](docs/ARCHITECTURE.md) and [the roadmap](docs/ROADMAP.md).
 

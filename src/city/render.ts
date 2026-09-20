@@ -194,7 +194,6 @@ type RenderOptions = {
   night: boolean;
   showPlots: boolean;
   residents?: ResidentState[];
-  minutes?: number;
   followed?: string | null;
 };
 export function renderCity({
@@ -208,7 +207,6 @@ export function renderCity({
   night,
   showPlots,
   residents = [],
-  minutes = 0,
   followed,
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
@@ -370,7 +368,7 @@ export function renderCity({
       paint: () => {
         if (followed === resident.id)
           diamond(ctx, pt.x, pt.y + 2, 10, 5, night ? '#F0DBA575' : '#FFF7D5');
-        drawResident(ctx, resident.resident, pt.x, pt.y, 1.25, resident, minutes);
+        drawResident(ctx, resident.resident, pt.x, pt.y, 1.25, resident);
       },
     });
   }

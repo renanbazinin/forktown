@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
-import { getPlot, isRoad, plotEntrance, ROAD_MAX } from '../src/lib/world';
+import { getPlot, isRoad, plotEntrance, project, ROAD_MAX } from '../src/lib/world';
 
 const places = readdirSync('places')
   .filter((file) => file.endsWith('.json'))
@@ -58,6 +58,24 @@ describe('Exterior artwork is data, not a webpage', () => {
 });
 
 describe('A small predictable daily life', () => {
+  it('faces in the direction of movement on all four isometric road directions', () => {
+    const seen = new Set<string>();
+    for (let time = 361; time < 1319; time += 2.37) {
+      const now = simulateResidents(places, time),
+        next = simulateResidents(places, time + 0.0001);
+      now.forEach((state, index) => {
+        expect(state.walkPhase).toBeGreaterThanOrEqual(0);
+        expect(state.walkPhase).toBeLessThan(1);
+        if (!state.moving || !next[index].moving || state.facing !== next[index].facing) return;
+        const a = project(state.position.x, state.position.y),
+          b = project(next[index].position.x, next[index].position.y);
+        const direction = `${b.y > a.y ? 's' : 'n'}${b.x > a.x ? 'e' : 'w'}`;
+        expect(state.facing).toBe(direction);
+        seen.add(direction);
+      });
+    }
+    expect([...seen].sort()).toEqual(['ne', 'nw', 'se', 'sw']);
+  });
   it('derives the same state regardless of visit order and replay direction', () => {
     const before = simulateResidents(places, 810.25);
     simulateResidents(places, 1300);

@@ -1,31 +1,32 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { townMinutesAt } from './town-time';
+
 export function useTownClock() {
-  const [minutes, setMinutes] = useState(9 * 60);
+  const [minutes, setMinutes] = useState(() => townMinutesAt(Date.now()));
   const [playing, setPlaying] = useState(
-    !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
-  const [speed, setSpeed] = useState(1);
-  const previous = useRef(0);
   useEffect(() => {
     if (!playing) return;
-    previous.current = performance.now();
-    const timer = window.setInterval(() => {
-      const now = performance.now(),
-        delta = Math.min((now - previous.current) / 1000, 1);
-      previous.current = now;
-      if (!document.hidden) setMinutes((value) => (value + delta * speed) % 1440);
-    }, 100);
-    return () => clearInterval(timer);
-  }, [playing, speed]);
-  return {
-    minutes,
-    playing,
-    speed,
-    setPlaying,
-    setSpeed,
-    seek: (value: number) => {
-      setPlaying(false);
-      setMinutes(Math.max(0, Math.min(1439, value)));
-    },
-  };
+    let frame = 0,
+      lastPaint = -Infinity;
+    const tick = (now: number) => {
+      if (!document.hidden && now - lastPaint >= 1000 / 30) {
+        setMinutes(townMinutesAt(Date.now()));
+        lastPaint = now;
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    const sync = () => {
+      if (!document.hidden) setMinutes(townMinutesAt(Date.now()));
+    };
+    sync();
+    frame = requestAnimationFrame(tick);
+    document.addEventListener('visibilitychange', sync);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener('visibilitychange', sync);
+    };
+  }, [playing]);
+  return { minutes, playing, setPlaying };
 }

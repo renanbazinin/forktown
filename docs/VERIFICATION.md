@@ -4,7 +4,7 @@ Verified locally on September 20, 2026 with Node.js 24.19.0.
 
 ## Automated checks
 
-- `npm run check`: 75 tests passed; all nine places (eight starters and the first contribution) validated; TypeScript and the production build passed.
+- `npm run check`: 79 tests passed; all nine places (eight starters and the first contribution) validated; TypeScript and the production build passed.
 - `npm run format:check`: passed.
 - Contribution tests cover duplicate plots and ids, invalid fields, filename conventions, international text, incomplete drafts, stable coordinates, hit detection, and composed night colors.
 - Publishing tests cover project paths, user-site roots, custom-domain overrides, and malformed configuration.
@@ -34,10 +34,10 @@ The founding edition was deployed and verified at https://renanbazinin.github.io
 - Sign tests cover inherited styles and entity decoding, source/nesting/text bounds, and rejection of scripts, events, links, images, SVG, iframes, forms, external CSS, and unsupported layout properties.
 - Verified the three-tab builder in the browser: three-floor house, shutters, named resident, hat, morning stroll, and an HTML welcome sign. Unsupported link markup showed a useful error and blocked continuing.
 - Saved the complete test contribution through the local builder. Verified its nested JSON on the confirmation screen, its appearance in the town, and its resident in the directory. Removed only that temporary `lantern-lane.json` test file afterward; the nine real places remain.
-- Checked following a resident, closer camera framing, pause, speed selection, time slider, and sleeping status at 23:59. No named meetings are part of the contribution format.
+- Earlier checks covered following a resident, closer camera framing, pause, speed selection, time slider, and sleeping status at 23:59. The slider and speed controls were subsequently replaced by the shared UTC clock. No named meetings are part of the contribution format.
 - Inspected the 390px mobile builder and sign editor; the dialog's scroll width matched its client width. Checked mobile night lighting and clock layout. Reset the temporary browser viewport after inspection.
 - Verified the production build in a fresh browser tab: no console errors or warnings, readable Moonbeam sign artwork in its home details, and the hosted JSON-download flow. Closed the temporary preview afterward.
-- This is a deterministic local simulation, not a persistent or synchronized multiplayer world. Larger districts, screen-reader testing with a human participant, and public fork onboarding remain future work.
+- This is a deterministic simulation with a shared UTC-based time phase, not a persistent multiplayer world. Larger districts, screen-reader testing with a human participant, and public fork onboarding remain future work.
 
 ## Wider lawns
 
@@ -45,3 +45,10 @@ The founding edition was deployed and verified at https://renanbazinin.github.io
 - Updated plot hit areas, road routes, shoreline, lighting positions, and camera framing for the larger world. House artwork retains its scale.
 - Geometry checks cover all 25 lawns and ensure every road stays outside selectable plots; routine and greeting tests also pass on the new road grid.
 - Visually checked the expanded town and builder at desktop and 390px widths. Small screens start close enough to read the houses, with zoom-out available for the full map.
+
+## Directional walking and the UTC clock
+
+- Automated checks cover all four screen-space travel directions, bounded walk phase, UTC-midnight anchoring, one real minute per town hour, 24-minute rollover, timezone equivalence, and catch-up after absence.
+- Inspected a temporary animated contact sheet containing all four directions with no accessory, a hat, and glasses. The view checks front/back artwork, mirroring, and stepping; the temporary page is removed afterward.
+- Town time derives from the current timestamp, with rendering capped at 30 Hz. Pause remains available for accessibility and resumes directly to live time. Manual time slider, speed selection, and day/night toggles are removed.
+- Browser verification confirmed no remaining time slider, a frozen paused clock, and immediate catch-up on resume. Checked the live follow view and the 390px clock layout without horizontal overflow; restored the normal viewport.

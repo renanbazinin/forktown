@@ -8,8 +8,14 @@ export type ResidentState = {
   position: Point;
   activity: 'stroll' | 'work' | 'home' | 'sleep';
   moving: boolean;
+  facing: 'se' | 'sw' | 'ne' | 'nw';
+  walkPhase: number;
   greeting: boolean;
 };
+export function facingAlong(from: Point, to: Point): ResidentState['facing'] {
+  if (to.x !== from.x) return to.x > from.x ? 'se' : 'nw';
+  return to.y >= from.y ? 'sw' : 'ne';
+}
 const roadNodes: Point[] = [];
 for (let x = ROAD_MIN; x <= ROAD_MAX; x++)
   for (let y = ROAD_MIN; y <= ROAD_MAX; y++)
@@ -72,6 +78,8 @@ export function simulateResidents(places: Place[], minutes: number): ResidentSta
     const activity = period === 'night' ? 'sleep' : home.resident.routine[period];
     let position = doorstep,
       moving = false;
+    let facing: ResidentState['facing'] = 'se',
+      walkPhase = 0;
     if (activity === 'stroll') {
       const seed = hash(home.id),
         a = roadNodes[seed % roadNodes.length],
@@ -87,6 +95,7 @@ export function simulateResidents(places: Place[], minutes: number): ResidentSta
       const phase = ((time - start) / duration) * loopLength * cycles;
       // Finish each walk at home, take a short break, and wander out again.
       const step = phase % (route.length - 1 + 12);
+      if (route.length > 1) facing = facingAlong(route[route.length - 2], route[route.length - 1]);
       if (step < route.length - 1) {
         const index = Math.floor(step),
           fraction = step - index;
@@ -95,10 +104,22 @@ export function simulateResidents(places: Place[], minutes: number): ResidentSta
           y: route[index].y + (route[index + 1].y - route[index].y) * fraction,
         };
         moving = true;
+        facing = facingAlong(route[index], route[index + 1]);
+        walkPhase = (step * 3) % 1;
       }
     }
     return [
-      { id: home.id, resident: home.resident, home, position, activity, moving, greeting: false },
+      {
+        id: home.id,
+        resident: home.resident,
+        home,
+        position,
+        activity,
+        moving,
+        facing,
+        walkPhase,
+        greeting: false,
+      },
     ];
   });
   for (let i = 0; i < states.length; i++)

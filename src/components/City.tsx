@@ -14,7 +14,6 @@ type Props = {
   night: boolean;
   showPlots: boolean;
   residents: ResidentState[];
-  minutes: number;
   followed: string | null;
   onStopFollowing: () => void;
   onResidentSelect: (id: string) => void;
@@ -28,7 +27,6 @@ const City = forwardRef<CityHandle, Props>(function City(
     night,
     showPlots,
     residents,
-    minutes,
     followed,
     onStopFollowing,
     onResidentSelect,
@@ -161,10 +159,9 @@ const City = forwardRef<CityHandle, Props>(function City(
       night,
       showPlots,
       residents,
-      minutes,
       followed,
     });
-  }, [size, camera, places, selectedPlot, hover, night, showPlots, residents, minutes, followed]);
+  }, [size, camera, places, selectedPlot, hover, night, showPlots, residents, followed]);
   const hit = (clientX: number, clientY: number) => {
     const bounds = canvas.current!.getBoundingClientRect();
     const local = { x: clientX - bounds.left, y: clientY - bounds.top };

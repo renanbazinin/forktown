@@ -18,13 +18,11 @@ import {
   GitFork,
   Heart,
   MapPin,
-  Moon,
   Plus,
   Search,
   Share2,
   Sparkles,
   Sprout,
-  Sun,
   Users,
   X,
 } from 'lucide-react';
@@ -54,7 +52,6 @@ export default function App() {
   const [selectedPlot, setSelectedPlot] = useState<string | null>(initialSelection);
   const clock = useTownClock();
   const night = clock.minutes < 360 || clock.minutes >= 1200;
-  const setNight = (value: boolean) => clock.seek(value ? 1260 : 540);
   const [followed, setFollowed] = useState<string | null>(null);
   const [showPlots, setShowPlots] = useState(false);
   const [search, setSearch] = useState('');
@@ -261,26 +258,6 @@ export default function App() {
                 <span className="toggle-track" />
                 <span>Plot labels</span>
               </label>
-              <div className="day-switch" aria-label="Time of day">
-                <button
-                  className={!night ? 'selected' : ''}
-                  aria-label="Daytime"
-                  aria-pressed={!night}
-                  onClick={() => setNight(false)}
-                >
-                  <Sun size={14} />
-                  <span>Day</span>
-                </button>
-                <button
-                  className={night ? 'selected' : ''}
-                  aria-label="Nighttime"
-                  aria-pressed={night}
-                  onClick={() => setNight(true)}
-                >
-                  <Moon size={14} />
-                  <span>Night</span>
-                </button>
-              </div>
             </div>
           </div>
           <TownClock clock={clock} />
@@ -314,7 +291,6 @@ export default function App() {
               night={night}
               showPlots={showPlots}
               residents={residents}
-              minutes={clock.minutes}
               followed={followed}
               onStopFollowing={() => setFollowed(null)}
               onResidentSelect={(id) => {

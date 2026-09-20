@@ -59,7 +59,7 @@ The eight basic fields above still work: omitted `design`, `resident`, and `sign
 
 One place brings one resident. A resident can be fictional; the creator credit should be your GitHub username. To change your own home or daily routine later, edit your existing JSON file and submit another PR.
 
-Visitors can pause, speed up, or scrub through the town's day. Following a neighbor keeps the camera with them; dragging the map or pressing Stop following returns to exploring.
+The town follows a shared UTC-based day: one real minute equals one town hour. The cycle repeats every 24 minutes, starting at UTC midnight. Visitors can pause their view; returning to live catches up to the current town time. Following a neighbor keeps the camera with them; dragging the map or pressing Stop following returns to exploring.
 
 ## If two people choose the same plot
 

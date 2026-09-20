@@ -18,7 +18,7 @@
 - [x] Custom floors, roofs, windows, gardens, and house details
 - [x] One resident per contribution with a personal look and greeting
 - [x] Three simple routine choices, road strolls, and incidental greetings
-- [x] Pause, time scrubbing, speed controls, and follow-a-neighbor view
+- [x] Shared UTC-based 24-minute day, pause/resume-live, and follow-a-neighbor view
 - [x] Exterior signs using text or restricted HTML/CSS artwork
 - [x] Builder, local saves, examples, validation, and security tests
 - [ ] Owner review of the living edition before deployment

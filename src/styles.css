@@ -49,17 +49,20 @@
     border-radius: 50%;
     background: var(--green-pale);
   }
-  .clock-playback select {
-    font-size: 12px;
-    background: transparent;
-    border: 0;
-    padding: 5px;
+
+  .clock-sync {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
     color: var(--green);
+    white-space: nowrap;
   }
-  .clock-scrubber input {
-    width: 150px;
-    accent-color: var(--green);
-    display: block;
+  .paused-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--muted);
   }
   .clock-hint {
     font-size: 10px;
@@ -334,14 +337,9 @@
     .clock-playback {
       justify-content: space-between;
     }
-    .clock-scrubber {
-      flex: 1;
-    }
-    .clock-scrubber input {
-      width: 100%;
-    }
+
     .clock-hint {
-      display: none;
+      font-size: 9px;
     }
     .neighbor-grid {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -859,29 +857,7 @@
     outline: 2px solid #739b76;
     outline-offset: 3px;
   }
-  .day-switch {
-    display: flex;
-    background: #f0f1e9;
-    border: 1px solid #e7e8df;
-    border-radius: 5px;
-    padding: 3px;
-    gap: 2px;
-  }
-  .day-switch button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 5px 9px;
-    border-radius: 3px;
-    font-size: 10px;
-    color: #919686;
-  }
-  .day-switch button.selected {
-    background: #fffef9;
-    color: #64744f;
-    box-shadow: 0 1px 3px #00000010;
-  }
+
   .town-layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr) 290px;
@@ -2517,15 +2493,11 @@
     .plot-toggle {
       font-size: 9px;
     }
-    .day-switch button {
-      padding: 6px;
-    }
+
     .town-toolbar {
       padding: 11px 14px;
     }
-    .day-switch button span {
-      display: none;
-    }
+
     .map-location {
       font-size: 8px;
     }
@@ -3016,10 +2988,7 @@
       min-width: 44px;
       min-height: 44px;
     }
-    .day-switch button {
-      min-width: 32px;
-      min-height: 32px;
-    }
+
     .directory-tabs button {
       min-height: 40px;
     }
