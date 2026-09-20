@@ -1,3 +1,9 @@
+import TownClock from './components/TownClock';
+import Neighbors, { ACTIVITY_LABELS } from './components/Neighbors';
+import ResidentPreview from './components/ResidentPreview';
+import SignPreview from './components/SignPreview';
+import { useTownClock } from './lib/use-town-clock';
+import { simulateResidents } from './lib/simulation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDown,
@@ -46,7 +52,10 @@ function initialSelection() {
 export default function App() {
   const city = useRef<CityHandle>(null);
   const [selectedPlot, setSelectedPlot] = useState<string | null>(initialSelection);
-  const [night, setNight] = useState(false);
+  const clock = useTownClock();
+  const night = clock.minutes < 360 || clock.minutes >= 1200;
+  const setNight = (value: boolean) => clock.seek(value ? 1260 : 540);
+  const [followed, setFollowed] = useState<string | null>(null);
   const [showPlots, setShowPlots] = useState(false);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'places' | 'empty'>('places');
@@ -62,12 +71,16 @@ export default function App() {
         : places,
     [draft, places],
   );
+  const residents = useMemo(
+    () => simulateResidents(displayPlaces, clock.minutes),
+    [displayPlaces, clock.minutes],
+  );
   const starterCount = places.filter(isFoundingPlace).length;
   const communityCount = places.length - starterCount;
   const selected = displayPlaces.find((place) => place.plot === selectedPlot);
   const available = PLOTS.filter((plot) => !places.some((place) => place.plot === plot.id));
   const filteredPlaces = displayPlaces.filter((place) =>
-    `${place.name} ${place.creator} ${TYPE_LABELS[place.building]} ${place.plot}`
+    `${place.name} ${place.creator} ${place.resident.name} ${TYPE_LABELS[place.building]} ${place.plot}`
       .toLowerCase()
       .includes(search.toLowerCase()),
   );
@@ -75,6 +88,7 @@ export default function App() {
     `${plot.id} empty plot`.toLowerCase().includes(search.toLowerCase()),
   );
   function select(plotId: string | null, focus = false) {
+    setFollowed(null);
     setSelectedPlot(plotId);
     setShared(false);
     const place = places.find((p) => p.plot === plotId);
@@ -199,16 +213,17 @@ export default function App() {
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
             <span className="eyebrow">
-              <span className="tiny-star">✳</span> A LITTLE WORLD, BUILT TOGETHER
+              <span className="tiny-star">✳</span> A LIVING TOWN, BUILT TOGETHER
             </span>
             <h1 id="hero-title">
               Small town.
               <br />
-              <em>Endless possibilities.</em>
+              <em>Little lives. Big stories.</em>
             </h1>
             <p>
-              A cozy corner of the internet, built one pull request at a time.
-              <br className="desktop-break" /> Come explore. Leave a little piece of yourself.
+              A home of your own. A neighbor with a life. A town we make together.
+              <br className="desktop-break" /> Design a place, give someone a daily rhythm, and let
+              them wander.
             </p>
           </div>
           <div className="hero-invitation">
@@ -234,7 +249,7 @@ export default function App() {
                 <MapPin size={18} />
               </span>
               <h2>The neighborhood</h2>
-              <span className="edition-tag">FOUNDING EDITION</span>
+              <span className="edition-tag">LIVING EDITION</span>
             </div>
             <div className="town-settings">
               <label className="plot-toggle">
@@ -268,6 +283,7 @@ export default function App() {
               </div>
             </div>
           </div>
+          <TownClock clock={clock} />
           {draft && (
             <div className="preview-banner">
               <Sparkles size={15} />
@@ -297,6 +313,14 @@ export default function App() {
               onSelect={(plot) => select(plot)}
               night={night}
               showPlots={showPlots}
+              residents={residents}
+              minutes={clock.minutes}
+              followed={followed}
+              onStopFollowing={() => setFollowed(null)}
+              onResidentSelect={(id) => {
+                setSelectedPlot(null);
+                setFollowed(id);
+              }}
             />
             <aside
               className="neighborhood-panel"
@@ -340,6 +364,31 @@ export default function App() {
                           )}
                         </div>
                         <p className="place-story">“{selected.story}”</p>
+                        <div className="detail-resident">
+                          <ResidentPreview resident={selected.resident} size={48} />
+                          <div>
+                            <strong>{selected.resident.name} lives here</strong>
+                            <span>
+                              {
+                                ACTIVITY_LABELS[
+                                  residents.find((r) => r.id === selected.id)?.activity ?? 'home'
+                                ]
+                              }
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          className="text-button"
+                          onClick={() => {
+                            setFollowed(selected.id);
+                            setSelectedPlot(null);
+                          }}
+                        >
+                          Follow {selected.resident.name} <ArrowRight size={13} />
+                        </button>
+                        <div className="detail-sign">
+                          <SignPreview sign={selected.sign} />
+                        </div>
                         <div className="detail-divider" />
                         <div className="place-facts">
                           <span>Little home, big personality</span>
@@ -547,6 +596,29 @@ export default function App() {
             </span>
           </div>
         </section>
+        <Neighbors
+          residents={residents}
+          followed={followed}
+          onFollow={(id) => {
+            setFollowed(id);
+            setSelectedPlot(null);
+            document.getElementById('neighborhood')?.scrollIntoView({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ? 'instant'
+                : 'smooth',
+              block: 'start',
+            });
+          }}
+          onHome={(plot) => {
+            select(plot, true);
+            document.getElementById('neighborhood')?.scrollIntoView({
+              behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+                ? 'instant'
+                : 'smooth',
+              block: 'start',
+            });
+          }}
+        />
         <section className="welcome-strip" aria-label="Your first contribution">
           <div className="welcome-title">
             <span className="eyebrow">YOU DON’T HAVE TO BE AN EXPERT</span>

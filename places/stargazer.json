@@ -6,5 +6,34 @@
   "building": "observatory",
   "color": "#8392B1",
   "decoration": "bench",
-  "story": "Looking up is a good way to find perspective. Tonight's forecast: a sky full of possibilities."
+  "story": "Looking up is a good way to find perspective. Tonight's forecast: a sky full of possibilities.",
+  "design": {
+    "wall": "#D1DDE0",
+    "trim": "#687451",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "vegetables",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Sol",
+    "skin": "#885E45",
+    "hair": "#DBD0AA",
+    "outfit": "#8392B1",
+    "accessory": "none",
+    "greeting": "Keep looking up.",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "STARGAZER STATION",
+    "color": "#FFF4D4",
+    "background": "#735557",
+    "html": ""
+  }
 }

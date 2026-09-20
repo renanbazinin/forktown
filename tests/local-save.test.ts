@@ -1,3 +1,4 @@
+import { placeSchema } from '../src/lib/schema';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -68,7 +69,7 @@ describe('Save a place to the local checkout', () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({ file: 'places/tiny-library.json' });
     const content = await readFile(join(root, 'places/tiny-library.json'), 'utf8');
-    expect(content).toBe(JSON.stringify({ ...place, name: 'Tiny Library' }, null, 2) + '\n');
+    expect(content).toBe(JSON.stringify(placeSchema.parse(place), null, 2) + '\n');
     expect(await readdir(root)).toEqual(['places']);
   });
 

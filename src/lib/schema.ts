@@ -1,4 +1,82 @@
 import { z } from 'zod';
+import { compileSign } from './sign.ts';
+
+const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color.');
+export const ACTIVITIES = ['stroll', 'work', 'home'] as const;
+export const DEFAULT_DESIGN = {
+  wall: '#F0E5C8',
+  trim: '#846C56',
+  floors: 1 as const,
+  roof: 'classic' as const,
+  windows: 'cross' as const,
+  garden: 'wildflowers' as const,
+  feature: 'none' as const,
+};
+export const DEFAULT_RESIDENT = {
+  name: 'New neighbor',
+  skin: '#D9B68B',
+  hair: '#675A48',
+  outfit: '#789B76',
+  accessory: 'none' as const,
+  greeting: 'Hello!',
+  routine: { morning: 'work' as const, afternoon: 'stroll' as const, evening: 'home' as const },
+};
+export const DEFAULT_SIGN = {
+  mode: 'text' as const,
+  text: 'HELLO',
+  color: '#FFF4D4',
+  background: '#35554A',
+  html: '',
+};
+export const designSchema = z
+  .object({
+    wall: color,
+    trim: color,
+    floors: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    roof: z.enum(['classic', 'flat', 'gable']),
+    windows: z.enum(['cross', 'round', 'shutters']),
+    garden: z.enum(['wildflowers', 'paving', 'vegetables']),
+    feature: z.enum(['none', 'porch', 'balcony']),
+  })
+  .strict();
+export const residentSchema = z
+  .object({
+    name: z.string().trim().min(2, 'Give your resident a name.').max(24),
+    skin: color,
+    hair: color,
+    outfit: color,
+    accessory: z.enum(['none', 'hat', 'glasses']),
+    greeting: z.string().trim().min(1).max(24),
+    routine: z
+      .object({
+        morning: z.enum(ACTIVITIES),
+        afternoon: z.enum(ACTIVITIES),
+        evening: z.enum(ACTIVITIES),
+      })
+      .strict(),
+  })
+  .strict();
+export const signSchema = z
+  .object({
+    mode: z.enum(['none', 'text', 'html']),
+    text: z.string().max(18),
+    color,
+    background: color,
+    html: z.string().max(2000),
+  })
+  .strict()
+  .superRefine((sign, context) => {
+    if (sign.mode === 'html')
+      try {
+        compileSign(sign.html);
+      } catch (error) {
+        context.addIssue({
+          code: 'custom',
+          path: ['html'],
+          message: error instanceof Error ? error.message : 'Check your sign artwork.',
+        });
+      }
+  });
 
 export const BUILDING_TYPES = [
   'cottage',
@@ -47,6 +125,9 @@ export const placeSchema = z
       .trim()
       .min(10, 'Tell us a little about your place (at least 10 characters).')
       .max(180, 'Keep the story to 180 characters or fewer.'),
+    design: designSchema.default(DEFAULT_DESIGN),
+    resident: residentSchema.default(DEFAULT_RESIDENT),
+    sign: signSchema.default(DEFAULT_SIGN),
   })
   .strict();
 
@@ -56,13 +137,39 @@ export const draftSchema = placeSchema.extend({
   name: z.string().max(32),
   creator: z.string().max(39),
   story: z.string().max(180),
+  resident: residentSchema
+    .extend({ name: z.string().max(24), greeting: z.string().max(24) })
+    .default(DEFAULT_RESIDENT),
+  sign: z
+    .object({
+      mode: z.enum(['none', 'text', 'html']),
+      text: z.string().max(18),
+      color,
+      background: color,
+      html: z.string().max(2000),
+    })
+    .strict()
+    .default(DEFAULT_SIGN),
 });
 
 export type Place = z.infer<typeof placeSchema>;
+export type HouseDesign = Place['design'];
+export type Resident = Place['resident'];
 export type BuildingType = (typeof BUILDING_TYPES)[number];
 export type Decoration = (typeof DECORATIONS)[number];
 export type PlaceEntry = { file: string; data: unknown };
 export type ValidationResult = { places: Place[]; errors: string[] };
+
+const STARTER_IDS = new Set([
+  'after-hours',
+  'evergreen',
+  'hello-world',
+  'little-workshop',
+  'moonbeam-cafe',
+  'plot-twist',
+  'stargazer',
+  'sunday-morning',
+]);
 
 export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
   const errors: string[] = [];
@@ -77,6 +184,13 @@ export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
       continue;
     }
     const place = result.data;
+    if (
+      place.creator.toLowerCase() === 'forktown' &&
+      (!STARTER_IDS.has(place.id) || place.creator !== 'forktown')
+    )
+      errors.push(
+        `${file}: The creator "forktown" is reserved for the original starter places. Use your GitHub username.`,
+      );
     if (file !== `${place.id}.json`)
       errors.push(`${file}: Rename this file to ${place.id}.json so its name matches the id.`);
     if (ids.has(place.id))

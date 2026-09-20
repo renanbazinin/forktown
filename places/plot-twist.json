@@ -6,5 +6,34 @@
   "building": "bookshop",
   "color": "#759BAF",
   "decoration": "bench",
-  "story": "A bookshop for unfinished stories and unexpected ideas. The best chapter is the one you haven't written yet."
+  "story": "A bookshop for unfinished stories and unexpected ideas. The best chapter is the one you haven't written yet.",
+  "design": {
+    "wall": "#DBCBDC",
+    "trim": "#715E51",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "round",
+    "garden": "paving",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Nia",
+    "skin": "#F0C9A8",
+    "hair": "#A46E45",
+    "outfit": "#759BAF",
+    "accessory": "hat",
+    "greeting": "One more chapter?",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "home",
+      "evening": "home"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "PLOT TWIST BOOKS",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
 }

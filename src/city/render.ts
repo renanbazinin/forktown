@@ -1,4 +1,8 @@
-import type { Place, BuildingType } from '../lib/schema';
+import { drawHouse, houseBounds } from './houses';
+import { drawResident } from './residents';
+import type { ResidentState } from '../lib/simulation';
+export { drawHouse as drawBuilding } from './houses';
+import type { Place } from '../lib/schema';
 import { PLOTS, WORLD_SIZE, hash, isRoad, plotCenter, project, type Point } from '../lib/world';
 
 type Ctx = CanvasRenderingContext2D;
@@ -169,447 +173,6 @@ function tree(ctx: Ctx, x: number, y: number, s: number, p: Palette, variant = 0
   }
   ctx.restore();
 }
-function flowers(ctx: Ctx, x: number, y: number, seed: number) {
-  const colors = ['#F0E6B1', '#E3A39A', '#F8F2D8'];
-  for (let i = 0; i < 6; i++) {
-    const px = x + (i % 3) * 5,
-      py = y + Math.floor(i / 3) * 4;
-    rect(ctx, px, py, 1, 4, '#78965D');
-    rect(ctx, px - 1, py - 1, 3, 2, colors[(seed + i) % 3]);
-  }
-}
-function bench(ctx: Ctx, x: number, y: number) {
-  poly(
-    ctx,
-    [
-      [x - 11, y - 6],
-      [x + 8, y + 4],
-      [x + 8, y + 8],
-      [x - 11, y - 2],
-    ],
-    '#A08460',
-  );
-  poly(
-    ctx,
-    [
-      [x - 11, y],
-      [x + 8, y + 10],
-      [x + 13, y + 7],
-      [x - 6, y - 3],
-    ],
-    '#C7A87A',
-  );
-  rect(ctx, x - 9, y + 1, 2, 6, '#66725A');
-  rect(ctx, x + 7, y + 9, 2, 6, '#66725A');
-}
-function windowPane(
-  ctx: Ctx,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  side: number,
-  night: boolean,
-) {
-  const s = side * 0.5;
-  poly(
-    ctx,
-    [
-      [x, y],
-      [x + w, y + w * s],
-      [x + w, y + w * s + h],
-      [x, y + h],
-    ],
-    night ? '#EDCE85' : '#628B92',
-  );
-  poly(
-    ctx,
-    [
-      [x + 1, y + 1],
-      [x + w - 1, y + (w - 1) * s + 1],
-      [x + w - 1, y + (w - 1) * s + 3],
-      [x + 1, y + 3],
-    ],
-    night ? '#FFEDB8' : '#A8C5BB',
-  );
-  ctx.strokeStyle = '#F0E7CE';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(x + w / 2, y + (w / 2) * s);
-  ctx.lineTo(x + w / 2, y + (w / 2) * s + h);
-  ctx.stroke();
-}
-export function drawBuilding(
-  ctx: Ctx,
-  place: Pick<Place, 'building' | 'color' | 'decoration' | 'id'>,
-  x: number,
-  y: number,
-  night = false,
-  scale = 1,
-) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(scale, scale);
-  const p = night ? NIGHT : DAY;
-  const h = (
-    {
-      cottage: 29,
-      cafe: 31,
-      bookshop: 49,
-      greenhouse: 27,
-      studio: 35,
-      observatory: 39,
-    } satisfies Record<BuildingType, number>
-  )[place.building];
-  const roof = night ? shade(place.color, -30) : place.color;
-  const wall = night ? '#B9B6A0' : '#F0E5C8';
-  diamond(ctx, 5, 7, 43, 20, '#38582E25');
-  diamond(ctx, 0, 5, 34, 18, night ? '#8C9682' : '#DDD3B0');
-  poly(
-    ctx,
-    [
-      [-29, -h],
-      [0, 15 - h],
-      [0, 17],
-      [-29, 2],
-    ],
-    place.building === 'greenhouse' ? (night ? '#7AACA0' : '#AED1BE') : wall,
-  );
-  poly(
-    ctx,
-    [
-      [0, 15 - h],
-      [29, -h],
-      [29, 2],
-      [0, 17],
-    ],
-    place.building === 'greenhouse'
-      ? night
-        ? '#507F7B'
-        : '#8EB9AA'
-      : night
-        ? '#9B9E8E'
-        : '#D6CCAC',
-  );
-  poly(
-    ctx,
-    [
-      [-29, 1],
-      [0, 16],
-      [0, 19],
-      [-29, 4],
-    ],
-    '#A99474',
-  );
-  poly(
-    ctx,
-    [
-      [0, 16],
-      [29, 1],
-      [29, 4],
-      [0, 19],
-    ],
-    '#988767',
-  );
-  if (place.building === 'studio') {
-    poly(
-      ctx,
-      [
-        [0, -h - 18],
-        [33, -h - 1],
-        [0, 16 - h],
-        [-33, -h - 1],
-      ],
-      shade(roof, 8),
-    );
-    poly(
-      ctx,
-      [
-        [-33, -h - 1],
-        [0, 16 - h],
-        [0, 20 - h],
-        [-33, 3 - h],
-      ],
-      roof,
-    );
-    poly(
-      ctx,
-      [
-        [0, 16 - h],
-        [33, -h - 1],
-        [33, 3 - h],
-        [0, 20 - h],
-      ],
-      shade(roof, -23),
-    );
-    poly(
-      ctx,
-      [
-        [-12, -h - 12],
-        [1, -h - 5],
-        [13, -h - 11],
-        [0, -h - 18],
-      ],
-      '#BDD0C4',
-    );
-    windowPane(ctx, -24, -h + 10, 17, 17, 1, night);
-    windowPane(ctx, 9, -h + 15, 13, 12, -1, night);
-    rect(ctx, 19, -h - 14, 4, 12, '#A6A392');
-    rect(ctx, 17, -h - 16, 8, 3, '#D2CAB3');
-  } else if (place.building === 'observatory') {
-    poly(
-      ctx,
-      [
-        [0, -h - 16],
-        [32, -h],
-        [0, 17 - h],
-        [-32, -h],
-      ],
-      shade(roof, -10),
-    );
-    poly(
-      ctx,
-      [
-        [-26, -h],
-        [-26, -h - 14],
-        [-20, -h - 14],
-        [-20, -h - 25],
-        [-10, -h - 25],
-        [-10, -h - 30],
-        [6, -h - 30],
-        [6, -h - 26],
-        [18, -h - 26],
-        [18, -h - 17],
-        [26, -h - 17],
-        [26, -h],
-        [13, -h + 7],
-        [-9, -h + 7],
-      ],
-      roof,
-    );
-    poly(
-      ctx,
-      [
-        [-26, -h],
-        [-26, -h - 14],
-        [-20, -h - 14],
-        [-20, -h - 25],
-        [-10, -h - 25],
-        [-10, -h - 30],
-        [0, -h - 30],
-        [0, -h + 7],
-        [-9, -h + 7],
-      ],
-      shade(roof, 20),
-    );
-    rect(ctx, 1, -h - 26, 4, 30, shade(roof, -25));
-    poly(
-      ctx,
-      [
-        [8, -h - 27],
-        [30, -h - 44],
-        [35, -h - 38],
-        [14, -h - 20],
-      ],
-      '#CACFC3',
-    );
-    poly(
-      ctx,
-      [
-        [29, -h - 45],
-        [35, -h - 40],
-        [38, -h - 43],
-        [32, -h - 48],
-      ],
-      '#576F73',
-    );
-    windowPane(ctx, -24, -h + 13, 9, 12, 1, night);
-    windowPane(ctx, 13, -h + 17, 8, 12, -1, night);
-  } else {
-    poly(
-      ctx,
-      [
-        [-32, -h],
-        [0, 17 - h],
-        [17, 8 - h - 21],
-        [-15, -9 - h - 21],
-      ],
-      shade(roof, 14),
-    );
-    poly(
-      ctx,
-      [
-        [0, -17 - h],
-        [32, -h],
-        [17, 8 - h - 21],
-        [-15, -9 - h - 21],
-      ],
-      shade(roof, -16),
-    );
-    poly(
-      ctx,
-      [
-        [0, 17 - h],
-        [32, -h],
-        [17, 8 - h - 21],
-      ],
-      roof,
-    );
-    poly(
-      ctx,
-      [
-        [-32, -h],
-        [-32, 3 - h],
-        [0, 20 - h],
-        [0, 17 - h],
-      ],
-      shade(roof, -12),
-    );
-    ctx.strokeStyle = shade(roof, -5);
-    ctx.lineWidth = 1;
-    for (let i = 1; i < 5; i++) {
-      const t = i / 5;
-      ctx.beginPath();
-      ctx.moveTo(-32 + 17 * t, -h - 30 * t);
-      ctx.lineTo(32 * t, -h + 17 - 30 * t);
-      ctx.stroke();
-    }
-    if (place.building === 'greenhouse') {
-      for (let i = 0; i < 3; i++) {
-        windowPane(ctx, -26 + i * 9, -h + 8 + i * 4.5, 7, 17, 1, night);
-        windowPane(ctx, 3 + i * 8, 15 - h - i * 4, 6, 17, -1, night);
-      }
-      for (let i = 0; i < 3; i++) {
-        rect(ctx, -22 + i * 10, 2 + i * 4, 5, 4, '#AA8964');
-        rect(ctx, -21 + i * 10, -3 + i * 4, 3, 5, '#769A59');
-      }
-    } else {
-      windowPane(ctx, -24, -h + 11, 8, 10, 1, night);
-      windowPane(ctx, 12, -h + 17, 10, 11, -1, night);
-      if (place.building === 'bookshop') {
-        windowPane(ctx, -24, -h + 28, 9, 10, 1, night);
-        windowPane(ctx, 12, -h + 33, 10, 11, -1, night);
-        poly(
-          ctx,
-          [
-            [-30, -9],
-            [-5, 4],
-            [-5, 9],
-            [-30, -4],
-          ],
-          roof,
-        );
-        for (let i = 0; i < 5; i++)
-          rect(ctx, -26 + i * 4, -5 + i * 2, 2, 3, ['#D1BC87', '#8CA49A', '#BD8080'][i % 3]);
-      }
-      poly(
-        ctx,
-        [
-          [-12, -2],
-          [-4, 2],
-          [-4, 15],
-          [-12, 11],
-        ],
-        '#8B7960',
-      );
-      rect(ctx, -7, 6, 1, 2, '#F1DCAF');
-      if (place.building === 'cafe') {
-        for (let i = 0; i < 7; i++) {
-          const ax = -31 + i * 4.6,
-            ay = -10 + i * 2.3;
-          poly(
-            ctx,
-            [
-              [ax, ay],
-              [ax + 4.6, ay + 2.3],
-              [ax + 0.6, ay + 8.3],
-              [ax - 4, ay + 6],
-            ],
-            i % 2 ? wall : roof,
-          );
-          poly(
-            ctx,
-            [
-              [ax - 4, ay + 6],
-              [ax + 0.6, ay + 8.3],
-              [ax + 0.6, ay + 12.3],
-              [ax - 4, ay + 10],
-            ],
-            i % 2 ? '#E4D7BA' : shade(roof, -10),
-          );
-        }
-        diamond(ctx, -33, 19, 8, 4, '#BCAB85');
-        rect(ctx, -34, 19, 2, 8, '#8C7A5B');
-        rect(ctx, -43, 17, 4, 4, roof);
-        rect(ctx, -29, 26, 4, 4, roof);
-      }
-      if (place.building === 'cottage') {
-        poly(
-          ctx,
-          [
-            [-16, -h - 22],
-            [-10, -h - 19],
-            [-10, -h - 35],
-            [-16, -h - 38],
-          ],
-          '#C4A487',
-        );
-        poly(
-          ctx,
-          [
-            [-10, -h - 19],
-            [-5, -h - 22],
-            [-5, -h - 38],
-            [-10, -h - 35],
-          ],
-          '#AA8C74',
-        );
-        poly(
-          ctx,
-          [
-            [-17, -h - 38],
-            [-10, -h - 34],
-            [-4, -h - 38],
-            [-11, -h - 42],
-          ],
-          '#DBC5A1',
-        );
-      }
-    }
-  }
-  if (place.decoration === 'tree') tree(ctx, 38, 15, 0.68, p, hash(place.id));
-  if (place.decoration === 'flowers') {
-    flowers(ctx, -27, 19, hash(place.id));
-    flowers(ctx, 17, 15, hash(place.id) + 1);
-  }
-  if (place.decoration === 'bench') bench(ctx, 30, 24);
-  if (place.decoration === 'mailbox') {
-    rect(ctx, 31, 15, 2, 12, '#967957');
-    poly(
-      ctx,
-      [
-        [27, 12],
-        [34, 15],
-        [38, 12],
-        [31, 9],
-      ],
-      roof,
-    );
-    poly(
-      ctx,
-      [
-        [27, 12],
-        [34, 15],
-        [34, 20],
-        [27, 17],
-      ],
-      shade(roof, -10),
-    );
-    rect(ctx, 34, 10, 1, 6, '#BD8170');
-  }
-  ctx.restore();
-}
-
 type RenderOptions = {
   ctx: Ctx;
   width: number;
@@ -620,6 +183,9 @@ type RenderOptions = {
   hoveredPlot: string | null;
   night: boolean;
   showPlots: boolean;
+  residents?: ResidentState[];
+  minutes?: number;
+  followed?: string | null;
 };
 export function renderCity({
   ctx,
@@ -631,6 +197,9 @@ export function renderCity({
   hoveredPlot,
   night,
   showPlots,
+  residents = [],
+  minutes = 0,
+  followed,
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
   const p = night ? NIGHT : DAY;
@@ -739,7 +308,7 @@ export function renderCity({
     const pt = plotCenter(plot);
     objects.push({
       depth: plot.x + plot.y + 0.8,
-      paint: () => drawBuilding(ctx, place, pt.x, pt.y, night, 1.12),
+      paint: () => drawHouse(ctx, place, pt.x, pt.y, night, 1.12),
     });
   }
   for (const [x, y] of [
@@ -765,23 +334,15 @@ export function renderCity({
       },
     });
   }
-  // A few residents and objects make the founding neighborhood feel inhabited.
-  for (const [x, y, color] of [
-    [7.3, 5.1, '#B46F69'],
-    [10.2, 9.5, '#8186AA'],
-    [4.3, 9, '#D4AA64'],
-    [12, 7.4, '#719199'],
-  ] as const) {
-    const pt = project(x, y);
+  for (const resident of residents) {
+    if (resident.activity === 'sleep' || resident.activity === 'home') continue;
+    const pt = project(resident.position.x, resident.position.y);
     objects.push({
-      depth: x + y,
+      depth: resident.position.x + resident.position.y,
       paint: () => {
-        diamond(ctx, pt.x, pt.y + 1, 4, 2, '#31442E30');
-        rect(ctx, pt.x - 2, pt.y - 8, 4, 6, color);
-        rect(ctx, pt.x - 2, pt.y - 12, 4, 4, '#D9B68B');
-        rect(ctx, pt.x - 2, pt.y - 13, 4, 2, '#675A48');
-        rect(ctx, pt.x - 2, pt.y - 2, 1, 3, '#5C6554');
-        rect(ctx, pt.x + 1, pt.y - 2, 1, 3, '#5C6554');
+        if (followed === resident.id)
+          diamond(ctx, pt.x, pt.y + 2, 10, 5, night ? '#F0DBA575' : '#FFF7D5');
+        drawResident(ctx, resident.resident, pt.x, pt.y, 1.25, resident, minutes);
       },
     });
   }
@@ -797,8 +358,8 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
     .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
   for (const { place, plot } of ordered) {
     const p = plotCenter(plot);
-    const tall = place.building === 'observatory' ? 104 : place.building === 'bookshop' ? 88 : 76;
-    if (point.x >= p.x - 38 && point.x <= p.x + 38 && point.y >= p.y - tall && point.y <= p.y + 20)
+    const tall = houseBounds(place).top * 1.12;
+    if (point.x >= p.x - 55 && point.x <= p.x + 55 && point.y >= p.y - tall && point.y <= p.y + 20)
       return plot.id;
   }
 }

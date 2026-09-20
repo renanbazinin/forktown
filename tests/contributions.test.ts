@@ -3,7 +3,7 @@ import { draftSchema, placeSchema, validatePlaces, type Place } from '../src/lib
 import { PLOTS, findPlotAt, getPlot, plotCenter, project, unproject } from '../src/lib/world';
 import { buildingHit, shade } from '../src/city/render';
 
-const sample: Place = {
+const sample: Place = placeSchema.parse({
   id: 'tiny-library',
   name: 'Tiny Library',
   creator: 'new-neighbor',
@@ -12,7 +12,7 @@ const sample: Place = {
   color: '#759BAF',
   decoration: 'bench',
   story: 'A little library for very big ideas.',
-};
+});
 
 describe('The contribution contract', () => {
   it('preserves unfinished text in a draft while requiring valid rendering options', () => {

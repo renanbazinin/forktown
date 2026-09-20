@@ -6,5 +6,34 @@
   "building": "studio",
   "color": "#b88e19",
   "decoration": "bench",
-  "story": "A small corner of the internet, made with curiosity and a little courage."
+  "story": "A small corner of the internet, made with curiosity and a little courage.",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#795C58",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Renan",
+    "skin": "#A97652",
+    "hair": "#3F3735",
+    "outfit": "#b88e19",
+    "accessory": "glasses",
+    "greeting": "Hey, neighbor!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "MAKE SOMETHING",
+    "color": "#FFF4D4",
+    "background": "#4C5E6C",
+    "html": ""
+  }
 }

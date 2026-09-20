@@ -1,13 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { drawBuilding } from '../city/render';
-import type { Place } from '../lib/schema';
+import { houseBounds, type HouseAppearance } from '../city/houses';
 
 export default function BuildingPreview({
   place,
   size = 140,
   night = false,
 }: {
-  place: Pick<Place, 'id' | 'building' | 'color' | 'decoration'>;
+  place: HouseAppearance;
   size?: number;
   night?: boolean;
 }) {
@@ -22,16 +22,8 @@ export default function BuildingPreview({
     if (!ctx) return;
     ctx.scale(ratio, ratio);
     ctx.imageSmoothingEnabled = false;
-    const top = {
-      cottage: 71,
-      cafe: 62,
-      bookshop: 80,
-      greenhouse: 58,
-      studio: 55,
-      observatory: 88,
-    }[place.building];
-    const bottom = place.decoration === 'bench' ? 40 : 30;
-    const scale = size / Math.max(115, top + bottom + 14);
+    const { top, bottom, left, right } = houseBounds(place);
+    const scale = size / Math.max(left + right + 10, top + bottom + 14);
     const baseline = (size - (top + bottom) * scale) / 2 + top * scale;
     drawBuilding(ctx, place, size / 2, baseline, night, scale);
   }, [place, size, night]);

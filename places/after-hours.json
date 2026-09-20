@@ -6,5 +6,34 @@
   "building": "studio",
   "color": "#AD88AE",
   "decoration": "tree",
-  "story": "An open studio for tiny experiments and big what-ifs. Come as you are. Make something a little weird."
+  "story": "An open studio for tiny experiments and big what-ifs. Come as you are. Make something a little weird.",
+  "design": {
+    "wall": "#E9D1BE",
+    "trim": "#715E51",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "round",
+    "garden": "paving",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Juno",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#AD88AE",
+    "accessory": "hat",
+    "greeting": "Still a little awake?",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "home",
+      "evening": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "AFTER HOURS STUDIO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
 }

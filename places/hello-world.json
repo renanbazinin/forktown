@@ -6,5 +6,34 @@
   "building": "cottage",
   "color": "#789B76",
   "decoration": "mailbox",
-  "story": "Every adventure starts somewhere. This little cottage is a reminder that your first contribution belongs here."
+  "story": "Every adventure starts somewhere. This little cottage is a reminder that your first contribution belongs here.",
+  "design": {
+    "wall": "#F0DCB4",
+    "trim": "#795C58",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Pip",
+    "skin": "#F0C9A8",
+    "hair": "#A46E45",
+    "outfit": "#789B76",
+    "accessory": "glasses",
+    "greeting": "Hello, world!",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "stroll",
+      "evening": "home"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO, WORLD!",
+    "color": "#FFF4D4",
+    "background": "#4C5E6C",
+    "html": ""
+  }
 }

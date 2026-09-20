@@ -6,5 +6,34 @@
   "building": "studio",
   "color": "#BE8E68",
   "decoration": "mailbox",
-  "story": "Where loose ideas become real things. Borrow a tool, ask a question, and leave the door open for the next person."
+  "story": "Where loose ideas become real things. Borrow a tool, ask a question, and leave the door open for the next person.",
+  "design": {
+    "wall": "#DDCFBE",
+    "trim": "#715E51",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "round",
+    "garden": "paving",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Otto",
+    "skin": "#885E45",
+    "hair": "#DBD0AA",
+    "outfit": "#BE8E68",
+    "accessory": "hat",
+    "greeting": "Made anything lately?",
+    "routine": {
+      "morning": "work",
+      "afternoon": "home",
+      "evening": "home"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "MADE HERE",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
 }

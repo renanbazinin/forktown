@@ -6,5 +6,34 @@
   "building": "greenhouse",
   "color": "#7DAB95",
   "decoration": "flowers",
-  "story": "A quiet place to grow something new. Water the plants, make a little progress, and remember to take a break."
+  "story": "A quiet place to grow something new. Water the plants, make a little progress, and remember to take a break.",
+  "design": {
+    "wall": "#E1E6CE",
+    "trim": "#687451",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "vegetables",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Fern",
+    "skin": "#A97652",
+    "hair": "#3F3735",
+    "outfit": "#7DAB95",
+    "accessory": "none",
+    "greeting": "Looking lovely today!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "EVERGREEN HOUSE",
+    "color": "#FFF4D4",
+    "background": "#735557",
+    "html": ""
+  }
 }

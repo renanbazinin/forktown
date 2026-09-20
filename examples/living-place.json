@@ -1,8 +1,8 @@
 {
-  "id": "moonbeam-cafe",
-  "name": "Moonbeam Caf\u00e9",
-  "creator": "forktown",
-  "plot": "B2",
+  "id": "sam-moon-cafe",
+  "name": "Sam's Moon Cafe",
+  "creator": "your-github-username",
+  "plot": "A2",
   "building": "cafe",
   "color": "#C97878",
   "decoration": "flowers",
@@ -17,7 +17,7 @@
     "feature": "none"
   },
   "resident": {
-    "name": "Milo",
+    "name": "Sam",
     "skin": "#D9B68B",
     "hair": "#675A48",
     "outfit": "#C97878",

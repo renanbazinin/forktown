@@ -6,5 +6,34 @@
   "building": "cottage",
   "color": "#D0AA65",
   "decoration": "tree",
-  "story": "Slow mornings, warm light, and absolutely no meetings. Leave a good thought in the mailbox on your way past."
+  "story": "Slow mornings, warm light, and absolutely no meetings. Leave a good thought in the mailbox on your way past.",
+  "design": {
+    "wall": "#F1DCBF",
+    "trim": "#795C58",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Bea",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#D0AA65",
+    "accessory": "glasses",
+    "greeting": "Take your time.",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "stroll",
+      "evening": "home"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "SLOW DAYS",
+    "color": "#FFF4D4",
+    "background": "#4C5E6C",
+    "html": ""
+  }
 }

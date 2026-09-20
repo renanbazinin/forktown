@@ -5,7 +5,7 @@ You don’t need to be an expert to contribute to Forktown. A thoughtful first c
 ## The easiest route: use your browser
 
 1. Visit the city and click **Build a place**, or select a plot from **Open plots**.
-2. Add your GitHub username without `@`, choose a building, and make it yours. Choose a unique file id such as `sam-moon-cafe`.
+2. Add your GitHub username without `@`. Use **Home** to customize the building, **Neighbor** for a name, look, and routine, and **Outdoor sign** for a little display. The builder suggests an available file id; you can change it.
 3. Click **Get my place file**, then **Download**. Keep this file for the next steps.
 4. On the original GitHub repository, click **Fork** to create your own copy.
 5. In your fork, open the `places` folder. Choose **Add file → Upload files**, upload your downloaded `.json` file, and commit the change with a message such as `Add Sam's Moon Cafe`.
@@ -47,6 +47,19 @@ Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not cha
 | `story`      | A personal description of 10–180 characters.                                                                                       |
 
 Add only your own place file. There is no shared list to edit. Plot positions remain fixed as the town grows.
+
+## Make it more personal
+
+The eight basic fields above still work: omitted `design`, `resident`, and `sign` objects get friendly defaults. Use the builder or `examples/living-place.json` when you want to customize them. If you include an object, include all its fields.
+
+- **Home:** `design` sets wall and trim hex colors, 1-3 floors, a `classic` / `flat` / `gable` roof, `cross` / `round` / `shutters` windows, `wildflowers` / `paving` / `vegetables` garden, and an optional `porch` or `balcony` feature (`none` is also valid). The top-level `color` sets the roof color. `classic` uses the building family's original roof.
+- **Neighbor:** `resident` sets a name (2-24 characters), skin/hair/outfit hex colors, `none` / `hat` / `glasses` accessory, and a greeting (1-24 characters).
+- **Routine:** morning (06:00-12:00), afternoon (12:00-18:00), and evening (18:00-22:00) each choose `stroll`, `work`, or `home`. The last two mean working and relaxing at home. Everyone sleeps from 22:00 to 06:00. No meetings, destinations, or other residents' names to configure.
+- **Outdoor sign:** choose `none`, `text`, or `html`. Text signs have up to 18 characters plus `color` and `background`. HTML artwork uses the small language described in [sign artwork](docs/SIGN_ARTWORK.md).
+
+One place brings one resident. A resident can be fictional; the creator credit should be your GitHub username. To change your own home or daily routine later, edit your existing JSON file and submit another PR.
+
+Visitors can pause, speed up, or scrub through the town's day. Following a neighbor keeps the camera with them; dragging the map or pressing Stop following returns to exploring.
 
 ## If two people choose the same plot
 
