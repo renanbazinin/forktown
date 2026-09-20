@@ -4,7 +4,7 @@ import { buildingHit, renderCity, type Camera } from '../city/render';
 import { findPlotAt, getPlot, plotCenter, unproject } from '../lib/world';
 import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
-import { project } from '../lib/world';
+import { project, WORLD_SIZE, TILE_W, TILE_H } from '../lib/world';
 
 export type CityHandle = { focus: (plotId: string) => void; reset: () => void };
 type Props = {
@@ -63,9 +63,15 @@ const City = forwardRef<CityHandle, Props>(function City(
     : camera;
   cameraRef.current = renderedCamera;
   const defaultCamera = useCallback((width: number, height: number): Camera => {
-    const zoom = Math.max(0.3, Math.min((width - 52) / 1480, (height - 85) / 820));
+    const zoom = Math.max(
+      0.26,
+      Math.min(
+        (width - 52) / (WORLD_SIZE * TILE_W + 36),
+        (height - 85) / (WORLD_SIZE * TILE_H + 98),
+      ),
+    );
     fit.current = zoom;
-    return { x: width / 2, y: (height - 722 * zoom) / 2 + 28, zoom };
+    return { x: width / 2, y: (height - WORLD_SIZE * TILE_H * zoom) / 2 + 28, zoom };
   }, []);
   useEffect(() => {
     if (followed) {

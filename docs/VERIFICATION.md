@@ -4,7 +4,7 @@ Verified locally on September 20, 2026 with Node.js 24.19.0.
 
 ## Automated checks
 
-- `npm run check`: 74 tests passed; all nine places (eight starters and the first contribution) validated; TypeScript and the production build passed.
+- `npm run check`: 75 tests passed; all nine places (eight starters and the first contribution) validated; TypeScript and the production build passed.
 - `npm run format:check`: passed.
 - Contribution tests cover duplicate plots and ids, invalid fields, filename conventions, international text, incomplete drafts, stable coordinates, hit detection, and composed night colors.
 - Publishing tests cover project paths, user-site roots, custom-domain overrides, and malformed configuration.
@@ -38,3 +38,10 @@ The founding edition was deployed and verified at https://renanbazinin.github.io
 - Inspected the 390px mobile builder and sign editor; the dialog's scroll width matched its client width. Checked mobile night lighting and clock layout. Reset the temporary browser viewport after inspection.
 - Verified the production build in a fresh browser tab: no console errors or warnings, readable Moonbeam sign artwork in its home details, and the hosted JSON-download flow. Closed the temporary preview afterward.
 - This is a deterministic local simulation, not a persistent or synchronized multiplayer world. Larger districts, screen-reader testing with a human participant, and public fork onboarding remain future work.
+
+## Wider lawns
+
+- Expanded street spacing from three to four tiles, giving each house a three-by-three grass plot, a wider lawn border, and stepping stones toward the street.
+- Updated plot hit areas, road routes, shoreline, lighting positions, and camera framing for the larger world. House artwork retains its scale.
+- Geometry checks cover all 25 lawns and ensure every road stays outside selectable plots; routine and greeting tests also pass on the new road grid.
+- Visually checked the expanded town and builder at desktop and 390px widths. Small screens start close enough to read the houses, with zoom-out available for the full map.

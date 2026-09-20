@@ -46,7 +46,7 @@ export function houseBounds(place: HouseAppearance) {
       : place.design.roof === 'flat'
         ? 14
         : 34;
-  return { height, top: height + roof + 8, bottom: 42, left: 52, right: 55 };
+  return { height, top: height + roof + 8, bottom: 46, left: 72, right: 72 };
 }
 const signs = new Map<string, HTMLCanvasElement>();
 export function signTexture(sign: Place['sign']): HTMLCanvasElement | null {
@@ -112,12 +112,12 @@ export function drawHouse(
   polygon(
     ctx,
     [
-      [-45, 5],
-      [0, -18],
-      [47, 7],
-      [0, 32],
+      [-70, 7],
+      [0, -28],
+      [70, 7],
+      [0, 42],
     ],
-    night ? '#657A60' : '#A9C38A',
+    night ? '#5A7667' : '#BFD5A4',
   );
   polygon(
     ctx,
@@ -141,6 +141,21 @@ export function drawHouse(
       box(ctx, gx, gy - 3, 1, 5, '#668654');
       box(ctx, gx - 1, gy - 4, 3, 2, ['#EDC88B', '#D18F87', '#B3A5CD'][i % 3]);
     }
+  }
+  // Stepping stones cross the lawn from the front door toward the street.
+  for (let step = 0; step < 3; step++) {
+    const sx = -18 - step * 8.5,
+      sy = 9 + step * 4.25;
+    polygon(
+      ctx,
+      [
+        [sx, sy - 3],
+        [sx + 6, sy],
+        [sx, sy + 3],
+        [sx - 6, sy],
+      ],
+      night ? '#899483' : '#E3DABF',
+    );
   }
   polygon(
     ctx,

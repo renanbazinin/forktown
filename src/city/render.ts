@@ -3,7 +3,17 @@ import { drawResident } from './residents';
 import type { ResidentState } from '../lib/simulation';
 export { drawHouse as drawBuilding } from './houses';
 import type { Place } from '../lib/schema';
-import { PLOTS, WORLD_SIZE, hash, isRoad, plotCenter, project, type Point } from '../lib/world';
+import {
+  PLOTS,
+  WORLD_SIZE,
+  ROAD_MAX,
+  BLOCK_SIZE,
+  hash,
+  isRoad,
+  plotCenter,
+  project,
+  type Point,
+} from '../lib/world';
 
 type Ctx = CanvasRenderingContext2D;
 type Palette = {
@@ -237,7 +247,7 @@ export function renderCity({
       const pt = project(x + 0.5, y + 0.5);
       const seed = hash(`${x},${y}`);
       if (seed % 4 === 0) diamond(ctx, pt.x, pt.y, 38, 19, p.grassAlt);
-      if (x === 17 || (x === 18 && y < 8)) {
+      if (x === WORLD_SIZE - 2 || (x === WORLD_SIZE - 1 && y < 8)) {
         diamond(ctx, pt.x, pt.y, 38, 19, p.water);
         rect(ctx, pt.x - 12 + (seed % 16), pt.y, 12, 1, p.waterLight);
         if (y % 3 === 0) rect(ctx, pt.x + 3, pt.y + 6, 7, 1, p.waterLight);
@@ -259,13 +269,21 @@ export function renderCity({
     const occupied = byPlot.has(plot.id);
     const active = selectedPlot === plot.id;
     const hover = hoveredPlot === plot.id;
-    if (active || hover) diamond(ctx, pt.x, pt.y + 3, 57, 28, night ? '#B5C59B70' : '#F4EDCD');
+    if (occupied) {
+      diamond(ctx, pt.x, pt.y, 105, 52.5, night ? '#577468' : '#BFD5A4');
+      // A short footpath connects the front of the lawn to the street.
+      for (let step = 0; step < 5; step++) {
+        const stone = project(plot.x + 0.5, plot.y + 1.02 + step * 0.25);
+        diamond(ctx, stone.x, stone.y, 7, 3.5, night ? '#899483' : '#E3DABF');
+      }
+    }
+    if (active || hover) diamond(ctx, pt.x, pt.y, 108, 54, night ? '#B5C59B40' : '#F4EDCD80');
     if (!occupied) {
       const corners = [
-        [pt.x, pt.y - 19],
-        [pt.x + 38, pt.y],
-        [pt.x, pt.y + 19],
-        [pt.x - 38, pt.y],
+        [pt.x, pt.y - 49],
+        [pt.x + 98, pt.y],
+        [pt.x, pt.y + 49],
+        [pt.x - 98, pt.y],
       ];
       ctx.save();
       ctx.setLineDash([4, 5]);
@@ -292,13 +310,23 @@ export function renderCity({
     for (let y = 0; y < WORLD_SIZE; y++) {
       const seed = hash(`tree${x},${y}`);
       const pt = project(x + 0.5, y + 0.5);
-      if ((x === 0 || y === 0 || y >= 17 || (x === 18 && y >= 9)) && seed % 3 !== 0) {
+      if (
+        (x === 0 || y === 0 || y >= WORLD_SIZE - 2 || (x === WORLD_SIZE - 1 && y >= 9)) &&
+        seed % 3 !== 0
+      ) {
         objects.push({
           depth: x + y,
           paint: () => tree(ctx, pt.x + (seed % 15) - 7, pt.y, 1 + (seed % 5) * 0.12, p, seed),
         });
       }
-      if (x < 17 && y < 17 && !isRoad(x, y) && x % 3 === 0 && y % 3 === 0 && seed % 2) {
+      if (
+        x < ROAD_MAX &&
+        y < ROAD_MAX &&
+        !isRoad(x, y) &&
+        x % BLOCK_SIZE === 0 &&
+        y % BLOCK_SIZE === 2 &&
+        seed % 2
+      ) {
         objects.push({ depth: x + y, paint: () => tree(ctx, pt.x, pt.y, 0.65, p, seed) });
       }
     }
@@ -312,10 +340,10 @@ export function renderCity({
     });
   }
   for (const [x, y] of [
-    [4, 7],
-    [10, 4],
-    [13, 10],
-    [7, 13],
+    [1 + BLOCK_SIZE, 1 + BLOCK_SIZE * 2],
+    [1 + BLOCK_SIZE * 3, 1 + BLOCK_SIZE],
+    [1 + BLOCK_SIZE * 4, 1 + BLOCK_SIZE * 3],
+    [1 + BLOCK_SIZE * 2, 1 + BLOCK_SIZE * 4],
   ]) {
     const pt = project(x + 0.5, y + 0.5);
     objects.push({

@@ -1,5 +1,5 @@
 import type { Place } from './schema';
-import { getPlot, hash, isRoad, type Point } from './world';
+import { getPlot, hash, isRoad, plotEntrance, ROAD_MIN, ROAD_MAX, type Point } from './world';
 
 export type ResidentState = {
   id: string;
@@ -11,8 +11,9 @@ export type ResidentState = {
   greeting: boolean;
 };
 const roadNodes: Point[] = [];
-for (let x = 1; x <= 16; x++)
-  for (let y = 1; y <= 16; y++) if (isRoad(x, y)) roadNodes.push({ x: x + 0.5, y: y + 0.5 });
+for (let x = ROAD_MIN; x <= ROAD_MAX; x++)
+  for (let y = ROAD_MIN; y <= ROAD_MAX; y++)
+    if (isRoad(x, y)) roadNodes.push({ x: x + 0.5, y: y + 0.5 });
 const key = (point: Point) => `${point.x},${point.y}`;
 const graph = new Map(roadNodes.map((point) => [key(point), point]));
 const paths = new Map<string, Point[]>();
@@ -67,7 +68,7 @@ export function simulateResidents(places: Place[], minutes: number): ResidentSta
   const states = places.flatMap((home): ResidentState[] => {
     const plot = getPlot(home.plot);
     if (!plot) return [];
-    const doorstep = { x: plot.x - 0.5, y: plot.y + 0.5 };
+    const doorstep = plotEntrance(plot);
     const activity = period === 'night' ? 'sleep' : home.resident.routine[period];
     let position = doorstep,
       moving = false;

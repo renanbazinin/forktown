@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
-import { getPlot, isRoad } from '../src/lib/world';
+import { getPlot, isRoad, plotEntrance, ROAD_MAX } from '../src/lib/world';
 
 const places = readdirSync('places')
   .filter((file) => file.endsWith('.json'))
@@ -81,7 +81,7 @@ describe('A small predictable daily life', () => {
       for (const state of simulateResidents(wanderers, minute)) {
         expect(isRoad(Math.floor(state.position.x), Math.floor(state.position.y))).toBe(true);
         expect(state.position.x).toBeGreaterThanOrEqual(1.5);
-        expect(state.position.y).toBeLessThanOrEqual(16.5);
+        expect(state.position.y).toBeLessThanOrEqual(ROAD_MAX + 0.5);
       }
   });
   it('finishes walks at home before routine changes and bedtime', () => {
@@ -100,7 +100,7 @@ describe('A small predictable daily life', () => {
     for (const boundary of [720, 1080, 1320]) {
       const before = simulateResidents([wanderer], boundary - 0.001)[0];
       const after = simulateResidents([wanderer], boundary)[0];
-      expect(before.position).toEqual({ x: plot.x - 0.5, y: plot.y + 0.5 });
+      expect(before.position).toEqual(plotEntrance(plot));
       expect(after.position).toEqual(before.position);
     }
   });
@@ -148,8 +148,8 @@ describe('A small predictable daily life', () => {
     expect(found).toBe(true);
   });
   it('finds connected road routes and wraps clock labels', () => {
-    const route = roadPath({ x: 1.5, y: 1.5 }, { x: 16.5, y: 16.5 });
-    expect(route.at(-1)).toEqual({ x: 16.5, y: 16.5 });
+    const route = roadPath({ x: 1.5, y: 1.5 }, { x: ROAD_MAX + 0.5, y: ROAD_MAX + 0.5 });
+    expect(route.at(-1)).toEqual({ x: ROAD_MAX + 0.5, y: ROAD_MAX + 0.5 });
     for (let i = 1; i < route.length; i++)
       expect(Math.abs(route[i].x - route[i - 1].x) + Math.abs(route[i].y - route[i - 1].y)).toBe(1);
     expect(timeLabel(1440)).toBe('00:00');
