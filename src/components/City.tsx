@@ -171,8 +171,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     const resident = residents.find((r) => {
       const p = project(r.position.x, r.position.y);
       return (
-        r.activity !== 'home' &&
-        r.activity !== 'sleep' &&
+        r.activity === 'stroll' &&
         Math.abs(world.x - p.x) < 9 &&
         world.y > p.y - 28 &&
         world.y < p.y + 5

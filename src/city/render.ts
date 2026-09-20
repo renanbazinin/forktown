@@ -335,7 +335,7 @@ export function renderCity({
     });
   }
   for (const resident of residents) {
-    if (resident.activity === 'sleep' || resident.activity === 'home') continue;
+    if (resident.activity !== 'stroll') continue;
     const pt = project(resident.position.x, resident.position.y);
     objects.push({
       depth: resident.position.x + resident.position.y,
