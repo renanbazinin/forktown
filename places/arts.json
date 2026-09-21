@@ -1,0 +1,40 @@
+{
+  "id": "arts",
+  "name": "arts",
+  "creator": "renanbazinin",
+  "plot": "E5",
+  "building": "observatory",
+  "color": "#789B76",
+  "decoration": "flowers",
+  "story": "A small corner of the internet, made with curiosity and a little courage.",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 3,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "New neighbor",
+    "skin": "#ffffff",
+    "hair": "#05ff8a",
+    "outfit": "#60838a",
+    "accessory": "hat",
+    "greeting": "Go with honor, friend!",
+    "routine": {
+      "morning": "home",
+      "afternoon": "home",
+      "evening": "stroll",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "<div style=\"background-color: #291B38; text-align: center\">\n  <strong style=\"color: #FFACC5; font-size: 28px\">▄██▄ ▄██▄</strong>\n  <strong style=\"color: #FF729F; font-size: 28px\">▀███████▀</strong>\n  <strong style=\"color: #FFC296; font-size: 28px\">▀███▀</strong>\n</div>"
+  }
+}
