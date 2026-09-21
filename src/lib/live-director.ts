@@ -1,51 +1,104 @@
 import type { Camera } from '../city/render';
-import { eventsForDay, isEventLive } from './events';
+import { eventsForDay, isEventLive, type TownEvent } from './events';
+import { ducksAt } from './ducks';
 import { FOOTBALL_CENTER, footballAt } from './football';
 import type { Place } from './schema';
 import { simulateResidents, type ResidentState } from './simulation';
 import { townCatAt, TOWN_CAT_NAME, TOWN_CAT_ID } from './town-cat';
-import { getPlot, plotCenter, project, type Point } from './world';
+import { getPlot, hash, plotCenter, project, type Point } from './world';
 
 export type LiveShot = {
   id: string;
-  kind: 'neighbor' | 'event' | 'home' | 'cat';
+  kind: 'neighbor' | 'event' | 'home' | 'cat' | 'ducks';
   label: string;
   center: Point;
   width: number;
   height: number;
   residentId?: string;
 };
-export type LiveProgram = ReturnType<typeof liveProgram>;
+const HIGHLIGHTS = ['ducks', 'football', 'afternoon', 'evening', 'night'] as const;
+type Highlight = (typeof HIGHLIGHTS)[number];
+export type LiveProgram = {
+  day: number;
+  homes: Place[];
+  cast: string[][];
+  events: TownEvent[];
+  highlights: Highlight[];
+  previousHighlights: Highlight[];
+};
 const cycle = (value: number, length: number) => ((value % length) + length) % length;
 export const SCENERY_START = 300;
 export const SCENERY_SECONDS = 60;
 export const FOLLOW_SECONDS = 45;
 
-export function liveProgram(places: Place[], day: number) {
-  const homes = [...places].sort((a, b) => a.id.localeCompare(b.id));
-  const order = homes.map((_, index) => homes[cycle(index + day, homes.length)].id);
-  const lastFeatured = new Map<string, number>();
-  // Hold short, steady clips and give less recently featured neighbors the next turn.
-  // Keep the entire ranked cast so an indoor subject never falls back to the same first home.
-  const cast = Array.from({ length: 1440 / FOLLOW_SECONDS }, (_, chapter) => {
-    const outdoors = simulateResidents(homes, chapter * FOLLOW_SECONDS, day).filter(
-      (resident) => resident.activity === 'stroll',
-    );
-    const walkers = new Set(
-      outdoors
-        .filter((resident) => resident.event?.phase !== 'attending')
-        .map((resident) => resident.id),
-    );
-    const ranked = [...order].sort(
-      (a, b) =>
-        (lastFeatured.get(a) ?? -1) - (lastFeatured.get(b) ?? -1) ||
-        Number(walkers.has(b)) - Number(walkers.has(a)),
-    );
-    const next = ranked.find((id) => outdoors.some((resident) => resident.id === id));
-    if (next) lastFeatured.set(next, chapter);
-    return ranked;
+function shuffled<T>(items: readonly T[], seed: string): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = hash(`${seed}:${i}`) % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+/** Three broadcast highlights; the town's actual activities continue every day. */
+export function liveHighlights(day: number): Highlight[] {
+  return shuffled(HIGHLIGHTS, `live-highlights:${day}`).slice(0, 3);
+}
+
+function features(program: LiveProgram, highlight: Highlight, time: number): boolean {
+  // A selected disco remains selected until it ends, even when the town day rolls over.
+  const selected =
+    highlight === 'night' && time < 360 ? program.previousHighlights : program.highlights;
+  return selected.includes(highlight);
+}
+
+function followable(program: LiveProgram, residents: ResidentState[], time: number) {
+  return residents.filter((resident) => {
+    if (resident.activity !== 'stroll') return false;
+    if (resident.event?.phase !== 'attending') return true;
+    const highlight =
+      resident.event.id === 'football'
+        ? 'football'
+        : program.events.find((event) => event.id === resident.event?.id)?.period;
+    // Don't turn a skipped show into the same show through an audience close-up.
+    return highlight !== undefined && features(program, highlight, time);
   });
-  return { day, homes, cast, events: eventsForDay(day) };
+}
+
+export function liveProgram(places: Place[], day: number): LiveProgram {
+  const homes = [...places].sort((a, b) => a.id.localeCompare(b.id));
+  const program: LiveProgram = {
+    day,
+    homes,
+    cast: [],
+    events: eventsForDay(day),
+    highlights: liveHighlights(day),
+    previousHighlights: liveHighlights(day - 1),
+  };
+  const appearances = new Map<string, number>();
+  let previous: string | undefined;
+  // Shuffle every clip, favor less-seen people, and avoid consecutive follows when possible.
+  // Keep replacements ranked too, so an indoor subject never means falling back to one home.
+  for (let chapter = 0; chapter < 1440 / FOLLOW_SECONDS; chapter++) {
+    const time = chapter * FOLLOW_SECONDS;
+    const residents = simulateResidents(homes, time, day);
+    const ranked = shuffled(
+      homes.map((home) => home.id),
+      `live-cast:${day}:${chapter}`,
+    ).sort(
+      (a, b) =>
+        Number(a === previous) - Number(b === previous) ||
+        (appearances.get(a) ?? 0) - (appearances.get(b) ?? 0),
+    );
+    program.cast.push(ranked);
+    // Only charge screen time for a follow, not a clip covered by an event or scenery.
+    const shot = liveShotAt(program, time, residents);
+    if (shot.kind === 'neighbor' && shot.residentId) {
+      previous = shot.residentId;
+      appearances.set(previous, (appearances.get(previous) ?? 0) + 1);
+    }
+  }
+  return program;
 }
 
 export function liveShotAt(
@@ -70,6 +123,7 @@ export function liveShotAt(
 
   const event = program.events.find(
     (event) =>
+      features(program, event.period, time) &&
       isEventLive(event, time) &&
       (event.venue.kind === 'stage' ||
         residents.some(
@@ -90,6 +144,22 @@ export function liveShotAt(
   }
 
   const football = footballAt(time, program.day);
+  // Only visit the duck family on days when their walk makes the broadcast lineup.
+  const ducks = features(program, 'ducks', time) && time >= 600 && time < 640 ? ducksAt(time) : [];
+  if (ducks.length) {
+    const points = ducks.map((duck) => project(duck.position.x, duck.position.y));
+    return {
+      id: `ducks:${program.day}`,
+      kind: 'ducks',
+      label: 'The daily duck walk',
+      center: {
+        x: points.reduce((sum, point) => sum + point.x, 0) / points.length,
+        y: points.reduce((sum, point) => sum + point.y, 0) / points.length - 12,
+      },
+      width: 360,
+      height: 260,
+    };
+  }
   const matchShot = (): LiveShot => ({
     id: `football:${program.day}:${football.match}`,
     kind: 'event',
@@ -98,16 +168,16 @@ export function liveShotAt(
     width: 850,
     height: 540,
   });
-  // Stay for one full match each day; other matches fill gaps when everyone is indoors/seated.
-  if (football.live && time >= 640 && time < 780) return matchShot();
+  // A selected football day gets one full match, never an automatic all-day fallback.
+  if (features(program, 'football', time) && football.live && time >= 640 && time < 780)
+    return matchShot();
 
-  const outdoors = residents.filter((resident) => resident.activity === 'stroll');
-  const walking = outdoors.filter((resident) => resident.event?.phase !== 'attending');
+  const outdoors = followable(program, residents, time);
   const chapter = Math.floor(time / FOLLOW_SECONDS);
   const neighbor = program.cast[chapter]
     .map((id) => outdoors.find((resident) => resident.id === id))
     .find((resident) => resident !== undefined);
-  if (neighbor && (walking.length || !football.live)) {
+  if (neighbor) {
     const point = project(neighbor.position.x, neighbor.position.y);
     return {
       id: `neighbor:${program.day}:${neighbor.id}`,
@@ -119,7 +189,6 @@ export function liveShotAt(
       height: 320,
     };
   }
-  if (football.live) return matchShot();
 
   if (!cat.outside) {
     const home = plotCenter(getPlot(cat.homePlot)!);
@@ -155,7 +224,7 @@ export function liveCamera(shot: LiveShot, width: number, height: number, second
     ),
   );
   // Shared-clock cycles divide the town day, so the motion survives midnight and reloads.
-  const moving = shot.kind !== 'neighbor' && shot.kind !== 'cat';
+  const moving = shot.kind !== 'neighbor' && shot.kind !== 'cat' && shot.kind !== 'ducks';
   const sway = moving ? Math.sin((cycle(seconds, 90) / 90) * Math.PI * 2) : 0;
   const breath = moving ? (1 - Math.cos((cycle(seconds, 120) / 120) * Math.PI * 2)) / 2 : 0;
   const zoom = baseZoom * (1 + breath * 0.04);

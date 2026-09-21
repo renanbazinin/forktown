@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Forktown daily duck walk</title>
+    <style>
+      body {
+        margin: 20px;
+        font: 15px system-ui;
+        background: #f8f6ee;
+        color: #304c40;
+      }
+      button,
+      input {
+        margin: 5px;
+        padding: 8px;
+      }
+      canvas {
+        display: block;
+        max-width: 100%;
+        background: #dfe7cf;
+        margin-top: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>The daily duck walk</h1>
+    <p>
+      Mother duck and five ducklings · 08:00–12:30 town time · River → Lunch Green street → first
+      houses → river
+    </p>
+    <button data-time="492">Leaving the river</button>
+    <button data-time="550">Walking past the green</button>
+    <button data-time="586">The little dawdler</button>
+    <button data-time="615">Turning near the houses</button>
+    <button data-time="720">Going home</button>
+    <button data-time="745">Last ducklings in the water</button>
+    <button id="love">Heart bubble</button>
+    <button id="play">Play</button>
+    <label><input id="wide" type="checkbox" /> Whole route</label>
+    <label>Town minute <input id="time" type="number" min="0" max="1439" value="550" /></label>
+    <p id="status" role="status"></p>
+    <canvas width="1200" height="680" aria-label="Daily duck walk preview"></canvas>
+    <script type="module">
+      import { renderCity } from '/src/city/render.ts';
+      import { ducksAt, DUCK_RIVER_X, DUCK_TURN_X, DUCK_STREET_Y } from '/src/lib/ducks.ts';
+      import { eventsForDay } from '/src/lib/events.ts';
+      import { places } from '/src/lib/places.ts';
+      import { simulateResidents, timeLabel } from '/src/lib/simulation.ts';
+      import { project } from '/src/lib/world.ts';
+      const canvas = document.querySelector('canvas');
+      const timeInput = document.querySelector('#time');
+      let time = 550,
+        playing = false,
+        previous = 0;
+      function paint() {
+        const ducks = ducksAt(time);
+        const residents = simulateResidents(places, time, 0);
+        const points = ducks.map((duck) => project(duck.position.x, duck.position.y));
+        const wide = document.querySelector('#wide').checked;
+        const center =
+          wide || !ducks.length
+            ? project((DUCK_RIVER_X + DUCK_TURN_X) / 2, DUCK_STREET_Y)
+            : {
+                x: points.reduce((sum, p) => sum + p.x, 0) / points.length,
+                y: points.reduce((sum, p) => sum + p.y, 0) / points.length - 20,
+              };
+        const zoom = wide ? 0.65 : 2.4;
+        renderCity({
+          ctx: canvas.getContext('2d'),
+          width: 1200,
+          height: 680,
+          camera: { x: 600 - center.x * zoom, y: 340 - center.y * zoom, zoom },
+          places,
+          residents,
+          events: eventsForDay(0),
+          minutes: time,
+          day: 0,
+          night: time < 360 || time >= 1200,
+          selectedPlot: null,
+          hoveredPlot: null,
+          showPlots: false,
+        });
+        document.querySelector('#status').textContent =
+          `${timeLabel(time)} · ${ducks.length} ducks on their daily walk` +
+          residents
+            .filter((resident) => resident.duckLove)
+            .map((resident) => ` · ${resident.resident.name} loves the ducklings ♥`)
+            .join('');
+      }
+      document.querySelector('#love').onclick = () => {
+        for (let at = 480; at < 750; at += 0.5) {
+          if (simulateResidents(places, at, 0).some((resident) => resident.duckLove)) {
+            time = at + 1;
+            timeInput.value = time;
+            paint();
+            break;
+          }
+        }
+      };
+      for (const button of document.querySelectorAll('[data-time]'))
+        button.onclick = () => {
+          time = Number(button.dataset.time);
+          timeInput.value = time;
+          paint();
+        };
+      timeInput.oninput = () => {
+        time = Number(timeInput.value);
+        paint();
+      };
+      document.querySelector('#wide').onchange = paint;
+      document.querySelector('#play').onclick = () => {
+        playing = !playing;
+        document.querySelector('#play').textContent = playing ? 'Pause' : 'Play';
+      };
+      function tick(now) {
+        if (playing) {
+          time = (time + (now - previous) / 1000) % 1440;
+          timeInput.value = time.toFixed(2);
+          paint();
+        }
+        previous = now;
+        requestAnimationFrame(tick);
+      }
+      paint();
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>

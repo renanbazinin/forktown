@@ -33,6 +33,7 @@ Read the [step-by-step contribution guide](CONTRIBUTING.md). The published GitHu
 
 - An original isometric city renderer, with trees, roads, a river, little residents, and six building styles.
 - Wildflower patches on open plots, small daytime flocks, and chimney smoke and evening window silhouettes when neighbors are home. Ambient movement pauses with the town.
+- A daily 08:00–12:30 duck walk: a mother and five ducklings leave the river, follow the street beside the Lunch Green to the first houses, turn around, and return to the water. The last duckling briefly dawdles and catches up. Nearby wandering residents stop for four seconds, turn toward the ducks, and show a heart bubble before resuming their walk. The family appears in both town and live views, without needing resident participation.
 - Mouse and touch panning, zoom buttons, scroll zoom, and keyboard map controls.
 - Custom floors, roof shapes, wall and trim colors, window styles, gardens, porches, and balconies.
 - Residents with names, outfits, accessories, greetings, and simple day and night routines.

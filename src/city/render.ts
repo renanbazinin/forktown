@@ -4,6 +4,8 @@ import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
 import { drawFootball } from './football';
 import { drawTownCat } from './cat';
+import { drawDuck } from './ducks';
+import { ducksAt } from '../lib/ducks';
 import { townCatAt, TOWN_CAT_ID } from '../lib/town-cat';
 import {
   footballAt,
@@ -446,6 +448,11 @@ export function renderCity({
     });
   }
   const cat = townCatAt(places, minutes, day);
+  for (const duck of ducksAt(minutes))
+    objects.push({
+      depth: duck.position.x + duck.position.y,
+      paint: () => drawDuck(ctx, duck, night),
+    });
   if (cat.outside)
     objects.push({
       depth: cat.position.x + cat.position.y,

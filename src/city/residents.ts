@@ -8,7 +8,7 @@ export function drawResident(
   x: number,
   y: number,
   scale = 1,
-  state?: Pick<ResidentState, 'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose'>,
+  state?: Pick<ResidentState, 'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove'>,
 ) {
   const facing = state?.facing ?? 'se';
   const back = facing === 'ne' || facing === 'nw';
@@ -174,7 +174,20 @@ export function drawResident(
     ctx.fillRect(12, -34 - rise, 4, 2);
   }
   // Speech stays readable when the sprite is mirrored.
-  if (state?.greeting) {
+  if (state?.duckLove) {
+    // A pixel heart stays crisp at town zoom and does not depend on an emoji font.
+    ctx.fillStyle = '#FCFAEF';
+    ctx.fillRect(-10, -45, 20, 15);
+    ctx.fillRect(-12, -43, 24, 11);
+    ctx.fillRect(-1, -30, 3, 3);
+    ctx.fillStyle = '#D77683';
+    ctx.fillRect(-6, -42, 4, 2);
+    ctx.fillRect(2, -42, 4, 2);
+    ctx.fillRect(-7, -40, 14, 3);
+    ctx.fillRect(-5, -37, 10, 2);
+    ctx.fillRect(-3, -35, 6, 2);
+    ctx.fillRect(-1, -33, 2, 1);
+  } else if (state?.greeting) {
     ctx.font = '10px "Space Mono", monospace';
     const width = ctx.measureText(resident.greeting).width + 12;
     ctx.fillStyle = '#FCFAEF';

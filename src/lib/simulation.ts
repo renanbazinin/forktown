@@ -1,4 +1,5 @@
 import type { Place } from './schema';
+import { duckAwareWalk } from './duck-reactions';
 import { FOOTBALL_ENTRANCE, spectatorSpot, footballAt } from './football';
 import {
   EVENT_SPOTS,
@@ -29,6 +30,7 @@ export type ResidentState = {
   facing: 'se' | 'sw' | 'ne' | 'nw';
   walkPhase: number;
   greeting: boolean;
+  duckLove?: boolean;
   nightWalk?: boolean;
   pose?: EventPose;
   event?: { name: string; id: string; phase: 'going' | 'attending' | 'returning' };
@@ -168,6 +170,7 @@ function eventWalk(home: Place, event: TownEvent, seat: number, time: number) {
 }
 
 export function residentActivityLabel(state: ResidentState): string {
+  if (state.duckLove) return 'Stopped to admire the ducklings';
   if (state.event?.id === 'football')
     return state.event.phase === 'going'
       ? 'Walking to the football'
@@ -259,6 +262,7 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
       moving = false;
     let facing: ResidentState['facing'] = 'se',
       walkPhase = 0;
+    let duckLove: boolean | undefined;
     if (nightWalk) {
       const nearby = roadNodes.filter((point) => {
         const distance = Math.abs(point.x - doorstep.x) + Math.abs(point.y - doorstep.y);
@@ -281,21 +285,47 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
       const duration = period === 'evening' ? 240 : 360;
       const loopLength = route.length - 1 + 12;
       const cycles = Math.max(1, Math.floor((duration * 0.32) / loopLength));
-      const phase = ((time - start) / duration) * loopLength * cycles;
-      // Finish each walk at home, take a short break, and wander out again.
-      const step = phase % (route.length - 1 + 12);
-      if (route.length > 1) facing = facingAlong(route[route.length - 2], route[route.length - 1]);
-      if (step < route.length - 1) {
-        const index = Math.floor(step),
-          fraction = step - index;
-        position = {
-          x: route[index].x + (route[index + 1].x - route[index].x) * fraction,
-          y: route[index].y + (route[index + 1].y - route[index].y) * fraction,
+      const sample = (
+        at: number,
+      ): Pick<ResidentState, 'position' | 'moving' | 'facing' | 'walkPhase' | 'duckLove'> => {
+        const phase = ((at - start) / duration) * loopLength * cycles;
+        // Finish each walk at home, take a short break, and wander out again.
+        const step = phase % loopLength;
+        if (step < route.length - 1) {
+          const index = Math.floor(step),
+            fraction = step - index;
+          return {
+            position: {
+              x: route[index].x + (route[index + 1].x - route[index].x) * fraction,
+              y: route[index].y + (route[index + 1].y - route[index].y) * fraction,
+            },
+            moving: true,
+            facing: facingAlong(route[index], route[index + 1]),
+            walkPhase: (step * 3) % 1,
+          };
+        }
+        return {
+          position: doorstep,
+          moving: false,
+          facing:
+            route.length > 1
+              ? facingAlong(route[route.length - 2], route[route.length - 1])
+              : facing,
+          walkPhase: 0,
         };
-        moving = true;
-        facing = facingAlong(route[index], route[index + 1]);
-        walkPhase = (step * 3) % 1;
-      }
+      };
+      const movement =
+        seat === -1
+          ? duckAwareWalk(
+              `${home.id}:${home.plot}:${period}`,
+              time,
+              start,
+              start + duration,
+              sample,
+            )
+          : sample(time);
+      ({ position, moving, facing, walkPhase } = movement);
+      duckLove = movement.duckLove;
     }
     let footballVisit: Partial<ResidentState> = {};
     if (footballSeat !== -1) {
@@ -335,6 +365,7 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         facing,
         walkPhase,
         greeting: false,
+        ...(duckLove ? { duckLove: true } : {}),
         ...footballVisit,
         ...(nightWalk ? { nightWalk: true } : {}),
         ...(event && seat !== -1 && (period !== 'night' || partyTrip)
@@ -352,6 +383,8 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         b.activity === 'stroll' &&
         !a.event &&
         !b.event &&
+        !a.duckLove &&
+        !b.duckLove &&
         Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) < 1.4
       ) {
         // Occasional greetings, with no named meetings or shared mutable state.
