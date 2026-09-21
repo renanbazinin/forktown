@@ -1,0 +1,40 @@
+{
+  "id": "jons-arcade",
+  "name": "Arcade",
+  "creator": "SomeJon",
+  "plot": "E2",
+  "building": "studio",
+  "color": "#BE185D",
+  "decoration": "bench",
+  "story": "Downstairs is a retro arcade with neon duel stations and coin-op fighting games. Upstairs is Jon's cozy living loft.",
+  "design": {
+    "wall": "#FFFBEB",
+    "trim": "#D97706",
+    "floors": 2,
+    "roof": "flat",
+    "windows": "round",
+    "garden": "paving",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Jon",
+    "skin": "#D9B68B",
+    "hair": "#451A03",
+    "outfit": "#BE185D",
+    "accessory": "glasses",
+    "greeting": "Time to d-d-d-duel!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "ARCADE",
+    "color": "#F472B6",
+    "background": "#311333",
+    "html": "<div style=\"background-color: #311333; color: #F472B6; text-align: center\"><strong style=\"font-size: 24px\">🎮 ARCADE 🎮</strong><p style=\"font-size: 12px; color: #FBBF24\">Time to Duel!</p></div>"
+  }
+}
