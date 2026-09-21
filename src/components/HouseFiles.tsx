@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Copy, FolderOpen, ExternalLink } from 'lucide-react';
 import { places, repositoryUrl } from '../lib/places';
-import { localSaveAvailable } from '../lib/local-save';
+import { localSaveAvailable, revealLocalHouse } from '../lib/local-save';
 import JsonGuide from './JsonGuide';
 
 // Show the actual contribution files, including omitted defaults and formatting.
@@ -30,6 +30,7 @@ export default function HouseFiles({
   if (saved && !files.some((file) => file.id === saved.id)) files.push(saved);
   const [selectedId, setSelectedId] = useState(initialId ?? files[0]?.id);
   const [notice, setNotice] = useState('');
+  const [revealing, setRevealing] = useState(false);
   const selected = files.find((file) => file.id === selectedId) ?? files[0];
   return (
     <div className="house-files">
@@ -76,6 +77,29 @@ export default function HouseFiles({
               <code>{selected.json}</code>
             </pre>
             <div className="export-actions">
+              {localSaveAvailable && (
+                <button
+                  className="button button-secondary"
+                  disabled={revealing}
+                  onClick={async () => {
+                    const id = selected.id;
+                    setRevealing(true);
+                    setNotice('');
+                    try {
+                      await revealLocalHouse(id);
+                      setNotice(`Opening the folder containing ${id}.json.`);
+                    } catch (error) {
+                      setNotice(
+                        error instanceof Error ? error.message : 'Could not show this file.',
+                      );
+                    } finally {
+                      setRevealing(false);
+                    }
+                  }}
+                >
+                  <FolderOpen size={14} /> {revealing ? 'Opening folder…' : 'Show on my computer'}
+                </button>
+              )}
               <button
                 className="button button-secondary"
                 onClick={async () => {

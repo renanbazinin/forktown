@@ -30,6 +30,8 @@ import Contribute from './components/Contribute';
 import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
 import TownEvents from './components/TownEvents';
+import Soundtrack from './components/Soundtrack';
+import { trackForTown } from './music/score';
 import { HOUSE_PLOTS, eventsForDay, venueAt, eventStatus } from './lib/events';
 import { isFoundingPlace, places, repositoryUrl } from './lib/places';
 import { TYPE_LABELS, type Place } from './lib/schema';
@@ -293,6 +295,7 @@ export default function App() {
           <Music2 size={19} />
           {liveEvent && <i className="event-indicator" />}
         </button>
+        <Soundtrack track={trackForTown(clock.minutes, events)} playing={clock.playing} />
       </nav>
 
       {draft && (

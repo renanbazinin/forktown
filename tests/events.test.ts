@@ -19,7 +19,7 @@ const walker = {
   ...sample,
   resident: {
     ...sample.resident,
-    routine: { morning: 'stroll', afternoon: 'stroll', evening: 'stroll' } as const,
+    routine: { morning: 'stroll', afternoon: 'stroll', evening: 'stroll', night: 'sleep' } as const,
   },
 };
 
@@ -53,7 +53,12 @@ describe('Shared town events', () => {
         ...sample,
         resident: {
           ...sample.resident,
-          routine: { morning: activity, afternoon: activity, evening: activity },
+          routine: {
+            morning: activity,
+            afternoon: activity,
+            evening: activity,
+            night: 'sleep' as const,
+          },
         },
       };
       for (const minute of [720, 850, 1080, 1200, 1319, 1320]) {

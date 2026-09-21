@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Forktown FM — the first five</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f4f1e7;
+        color: #314a3e;
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 900px;
+        margin: auto;
+        padding: 60px 24px;
+      }
+      .eyebrow {
+        font: 11px monospace;
+        letter-spacing: 3px;
+        color: #77866e;
+      }
+      h1 {
+        font:
+          56px Georgia,
+          serif;
+        letter-spacing: -2px;
+        margin: 18px 0;
+      }
+      .intro {
+        max-width: 550px;
+        line-height: 1.8;
+        color: #71816b;
+      }
+      #tracks {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 16px;
+        margin: 36px 0;
+      }
+      article {
+        border: 1px solid #dedfd2;
+        background: #fffcf4;
+        padding: 24px;
+        border-radius: 18px;
+      }
+      .art {
+        height: 105px;
+        border-radius: 10px;
+        margin-bottom: 22px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 45px;
+        background: var(--cover);
+        color: #fffdf3;
+      }
+      h2 {
+        font:
+          25px Georgia,
+          serif;
+        margin: 10px 0;
+      }
+      article p {
+        min-height: 36px;
+        font-size: 12px;
+        color: #7e856f;
+      }
+      button {
+        border: 0;
+        border-radius: 24px;
+        padding: 12px 20px;
+        color: #fdfcf4;
+        background: #486344;
+        cursor: pointer;
+        font: inherit;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid #b49151;
+        outline-offset: 3px;
+      }
+      .controls {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      input {
+        accent-color: #486344;
+        max-width: 140px;
+      }
+      #status {
+        min-height: 25px;
+        margin: 20px 0;
+      }
+      #checks {
+        white-space: pre-wrap;
+        font: 12px/1.8 monospace;
+      }
+      a {
+        color: #486344;
+      }
+      .note {
+        font-size: 12px;
+        color: #7e856f;
+        line-height: 1.8;
+      }
+      @media (max-width: 500px) {
+        main {
+          padding-top: 32px;
+        }
+        h1 {
+          font-size: 42px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">FORKTOWN FM / VOL. 01</div>
+      <h1>A soundtrack for<br />a little place.</h1>
+      <p class="intro">
+        Five original miniatures. Warm keys, wooden plucks, soft pixel bells, and a tiny band with
+        somewhere to be. Pick a record. Stay a while.
+      </p>
+      <div id="tracks"></div>
+      <div class="controls">
+        <button id="stop">Stop music</button
+        ><label>Volume <input id="volume" type="range" min="0" max="100" value="55" /></label
+        ><button id="check">Check all mixes</button>
+      </div>
+      <p id="status" role="status">Choose a tune to listen.</p>
+      <pre id="checks"></pre>
+      <p class="note">
+        Each tune has a 16-bar arrangement and loops seamlessly. This listening room is only in the
+        local development build. In town, music follows the day and the evening concert.
+      </p>
+      <a href="/">Back to the town →</a>
+    </main>
+    <script type="module">
+      import { TRACKS, durationOf } from '/src/music/score.ts';
+      import { TownPlayer } from '/src/music/player.ts';
+      import { renderTrack } from '/src/music/synth.ts';
+      const colors = ['#93ae7e', '#566b80', '#ba8064', '#c2a56f', '#798784'];
+      const glyphs = ['♫', '☾', 'ϟ', '♬', '♪'];
+      const list = document.querySelector('#tracks');
+      const status = document.querySelector('#status');
+      let player,
+        revision = 0;
+      Object.entries(TRACKS).forEach(([id, track], index) => {
+        const article = document.createElement('article');
+        article.innerHTML = `<div class="art" style="--cover:${colors[index]}">${glyphs[index]}</div><span class="eyebrow">0${index + 1} / ${id}</span><h2>${track.title}</h2><p>${track.subtitle} · ${Math.round(durationOf(id))} seconds</p><button>Play ${track.title}</button>`;
+        article.querySelector('button').addEventListener('click', async () => {
+          const current = ++revision;
+          try {
+            player ??= new TownPlayer();
+            await player.resume();
+            player.volume(Number(document.querySelector('#volume').value) / 100);
+            status.textContent = `Warming up ${track.title}…`;
+            await player.play(id);
+            if (current === revision) status.textContent = `Now playing: ${track.title}`;
+          } catch (error) {
+            status.textContent = `Could not play: ${error.message}`;
+          }
+        });
+        list.append(article);
+      });
+      document.querySelector('#stop').onclick = () => {
+        ++revision;
+        player?.stop();
+        status.textContent = 'Music stopped.';
+      };
+      document.querySelector('#volume').oninput = (event) =>
+        player?.volume(Number(event.target.value) / 100);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) void player?.suspend();
+        else void player?.resume();
+      });
+      window.addEventListener('pagehide', () => {
+        ++revision;
+        player?.dispose();
+      });
+      document.querySelector('#check').onclick = async (event) => {
+        event.target.disabled = true;
+        const report = document.querySelector('#checks');
+        report.textContent = 'Rendering and measuring all five mixes…\n';
+        try {
+          for (const id of Object.keys(TRACKS)) {
+            const buffer = await renderTrack(id);
+            let peak = 0,
+              sum = 0,
+              seam = 0;
+            for (let c = 0; c < 2; c++) {
+              const data = buffer.getChannelData(c);
+              seam = Math.max(seam, Math.abs(data[0] - data[data.length - 1]));
+              for (const value of data) {
+                peak = Math.max(peak, Math.abs(value));
+                sum += value * value;
+              }
+            }
+            const rms = Math.sqrt(sum / (buffer.length * 2));
+            const ok =
+              Number.isFinite(peak + rms + seam) && peak < 0.98 && rms > 0.005 && seam < 0.08;
+            report.textContent += `${ok ? 'PASS' : 'CHECK'} ${id}: peak ${peak.toFixed(3)}, RMS ${rms.toFixed(3)}, loop seam ${seam.toFixed(4)}\n`;
+          }
+        } catch (error) {
+          report.textContent += `ERROR: ${error.message}`;
+        }
+        event.target.disabled = false;
+      };
+    </script>
+  </body>
+</html>

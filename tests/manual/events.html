@@ -45,6 +45,7 @@
     <button data-time="1200">Evening concert</button>
     <button data-time="1290">After the show</button>
     <button data-time="1350">Bedtime</button>
+    <button data-time="60">Moonlit walks</button>
     <label><input type="checkbox" id="crowd" /> Full venue + overflow</label>
     <button id="animate">Animate preview</button>
     <p id="status"></p>
@@ -55,7 +56,7 @@
       import { eventsForDay, HOUSE_PLOTS } from '/src/lib/events.ts';
       import { places } from '/src/lib/places.ts';
       import { simulateResidents, residentActivityLabel, timeLabel } from '/src/lib/simulation.ts';
-      import { getPlot, plotCenter } from '/src/lib/world.ts';
+      import { getPlot, plotCenter, project } from '/src/lib/world.ts';
       let minutes = 1200;
       const canvas = document.querySelector('canvas');
       function paint() {
@@ -67,14 +68,24 @@
               plot: plot.id,
               resident: {
                 ...places[index % places.length].resident,
-                routine: { morning: 'stroll', afternoon: 'stroll', evening: 'stroll' },
+                routine: {
+                  morning: 'stroll',
+                  afternoon: 'stroll',
+                  evening: 'stroll',
+                  night: 'stroll',
+                },
               },
             }))
           : places;
         const events = eventsForDay(day),
           residents = simulateResidents(homes, minutes, day);
         const event = events[minutes < 1080 ? 0 : 1];
-        const center = plotCenter(getPlot(event.venue.plot));
+        const nightRoutine = minutes < 360 || minutes >= 1320;
+        const walker = residents.find((resident) => resident.nightWalk);
+        const center =
+          nightRoutine && walker
+            ? project(walker.position.x, walker.position.y)
+            : plotCenter(getPlot(event.venue.plot));
         renderCity({
           ctx: canvas.getContext('2d'),
           width: 960,
@@ -84,12 +95,13 @@
           residents,
           events,
           minutes,
-          night: minutes >= 1200,
-          selectedPlot: event.venue.plot,
+          night: minutes < 360 || minutes >= 1200,
+          selectedPlot: nightRoutine ? null : event.venue.plot,
           hoveredPlot: null,
           showPlots: false,
         });
-        document.querySelector('#status').textContent = `${timeLabel(minutes)} · ${event.name}`;
+        document.querySelector('#status').textContent =
+          `${timeLabel(minutes)} · ${nightRoutine ? (walker ? 'Moonlit walks' : 'Sleeping town') : event.name}`;
         document.querySelector('#residents').replaceChildren(
           ...residents.map((resident) => {
             const item = document.createElement('li');

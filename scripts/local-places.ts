@@ -1,11 +1,13 @@
 import { randomBytes } from 'node:crypto';
-import { readdir, readFile, realpath, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import { readdir, readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Connect, Plugin } from 'vite';
 import { placeSchema, validatePlaces } from '../src/lib/schema.ts';
 
 const endpoint = '/__forktown/places';
+const revealEndpoint = '/__forktown/reveal-place';
 const maxBodyBytes = 8192;
 const loopback = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
@@ -120,35 +122,93 @@ async function savePlace(root: string, data: unknown) {
   return { file: `places/${filename}`, place };
 }
 
-export function localPlacesMiddleware(root: string, token: string): Connect.NextHandleFunction {
+// Pass arguments directly, never through a shell. Linux opens the containing folder.
+function revealInFileManager(file: string): Promise<void> {
+  const command =
+    process.platform === 'win32'
+      ? 'explorer.exe'
+      : process.platform === 'darwin'
+        ? 'open'
+        : 'xdg-open';
+  const args =
+    process.platform === 'win32'
+      ? ['/select,', file]
+      : process.platform === 'darwin'
+        ? ['-R', file]
+        : [dirname(file)];
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { shell: false, windowsHide: true, stdio: 'ignore' });
+    child.once('error', reject);
+    child.once('close', (code) => {
+      // Explorer can return 1 when it hands the request to an existing window.
+      if (code === 0 || (process.platform === 'win32' && code === 1)) resolve();
+      else reject(new Error('The file manager could not open.'));
+    });
+  });
+}
+
+async function revealPlace(root: string, data: unknown, reveal: (file: string) => Promise<void>) {
+  const parsed = placeSchema.shape.id.safeParse(
+    data && typeof data === 'object' && 'id' in data ? data.id : undefined,
+  );
+  if (!parsed.success) throw new SaveError(400, 'Choose a house file from the list.');
+  const directory = join(await realpath(root), 'places');
+  const file = join(directory, `${parsed.data}.json`);
+  try {
+    if ((await realpath(directory)) !== directory || (await realpath(file)) !== file)
+      throw new SaveError(
+        409,
+        'The house file must be a regular file in this project’s places folder.',
+      );
+    if (!(await stat(file)).isFile())
+      throw new SaveError(409, 'This house file is not a regular file.');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT')
+      throw new SaveError(404, 'This file is no longer in your places folder. Refresh the town.');
+    throw error;
+  }
+  await reveal(file);
+  return { file: `places/${parsed.data}.json` };
+}
+
+export function localPlacesMiddleware(
+  root: string,
+  token: string,
+  reveal: (file: string) => Promise<void> = revealInFileManager,
+): Connect.NextHandleFunction {
   // Serialize validation + creation so two tabs cannot claim the same plot at once.
   let pending: Promise<unknown> = Promise.resolve();
   return (req, res, next) => {
-    if (req.url?.split('?')[0] !== endpoint) return next();
+    const route = req.url?.split('?')[0];
+    if (route !== endpoint && route !== revealEndpoint) return next();
+    const revealing = route === revealEndpoint;
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
-      return reply(res, 405, { error: 'Use the builder’s Save to my project button.' });
+      return reply(res, 405, { error: 'Use the local town’s file buttons.' });
     }
     if (!trustedRequest(req, token))
       return reply(res, 403, {
-        error: 'Open the builder on this computer and refresh before saving.',
+        error: 'Open the town on this computer and refresh before trying again.',
       });
     if (req.headers['content-type']?.split(';')[0].trim() !== 'application/json')
       return reply(res, 415, { error: 'The place must be sent as JSON.' });
 
     void readBody(req)
       .then((data) => {
+        if (revealing) return revealPlace(root, data, reveal);
         const saving = pending.then(() => savePlace(root, data));
         pending = saving.catch(() => undefined);
         return saving;
       })
-      .then((saved) => reply(res, 201, saved))
+      .then((saved) => reply(res, revealing ? 200 : 201, saved))
       .catch((error: unknown) => {
         const known = error instanceof SaveError;
         reply(res, known ? error.status : 500, {
           error: known
             ? error.message
-            : 'Could not save the file. Check that the places folder is writable, then try again.',
+            : revealing
+              ? 'Could not open your file manager. Find this file in your project’s places folder.'
+              : 'Could not save the file. Check that the places folder is writable, then try again.',
         });
       });
   };

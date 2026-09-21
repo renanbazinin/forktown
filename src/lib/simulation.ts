@@ -21,6 +21,7 @@ export type ResidentState = {
   facing: 'se' | 'sw' | 'ne' | 'nw';
   walkPhase: number;
   greeting: boolean;
+  nightWalk?: boolean;
   pose?: EventPose;
   event?: { name: string; id: string; phase: 'going' | 'attending' | 'returning' };
 };
@@ -157,6 +158,7 @@ function eventWalk(home: Place, event: TownEvent, seat: number, time: number) {
 }
 
 export function residentActivityLabel(state: ResidentState): string {
+  if (state.nightWalk) return 'Out for a moonlit stroll';
   if (state.event)
     return state.event.phase === 'going'
       ? `Walking to ${state.event.name}`
@@ -194,12 +196,32 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
     const plot = getPlot(home.plot);
     if (!plot) return [];
     const doorstep = plotEntrance(plot);
-    const activity = period === 'night' ? 'sleep' : home.resident.routine[period];
+    // One quiet, local walk, with departures spread from 22:00 to 02:00.
+    // Anchor to the evening across midnight; a new UTC town day must not teleport walkers.
+    const nightTime = (time - 1320 + 1440) % 1440;
+    const nightDeparture = hash(`night:${home.id}`) % 240;
+    const nightWalk =
+      period === 'night' &&
+      home.resident.routine.night === 'stroll' &&
+      nightTime >= nightDeparture &&
+      nightTime < nightDeparture + 180;
+    const activity =
+      period === 'night' ? (nightWalk ? 'stroll' : 'sleep') : home.resident.routine[period];
     let position = doorstep,
       moving = false;
     let facing: ResidentState['facing'] = 'se',
       walkPhase = 0;
-    if (activity === 'stroll') {
+    if (nightWalk) {
+      const nearby = roadNodes.filter((point) => {
+        const distance = Math.abs(point.x - doorstep.x) + Math.abs(point.y - doorstep.y);
+        return distance >= 4 && distance <= 8;
+      });
+      const destination = nearby[hash(`moon:${home.id}`) % nearby.length] ?? doorstep;
+      const outward = roadPath(doorstep, destination);
+      const route = [...outward, ...outward.slice(0, -1).reverse()];
+      const movement = alongRoute(route, (nightTime - nightDeparture) / 180);
+      ({ position, moving, facing, walkPhase } = movement);
+    } else if (activity === 'stroll') {
       const seed = hash(home.id),
         a = roadNodes[seed % roadNodes.length],
         b = roadNodes[(seed * 7 + 43) % roadNodes.length];
@@ -238,6 +260,7 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         facing,
         walkPhase,
         greeting: false,
+        ...(nightWalk ? { nightWalk: true } : {}),
         ...(event && attendees.includes(home.id)
           ? eventWalk(home, event, attendees.indexOf(home.id), time)
           : {}),

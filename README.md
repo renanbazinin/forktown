@@ -32,10 +32,11 @@ Read the [step-by-step contribution guide](CONTRIBUTING.md). The published GitHu
 - An original isometric city renderer, with trees, roads, a river, little residents, and six building styles.
 - Mouse and touch panning, zoom buttons, scroll zoom, and keyboard map controls.
 - Custom floors, roof shapes, wall and trim colors, window styles, gardens, porches, and balconies.
-- Residents with names, outfits, accessories, greetings, and three simple daily choices.
+- Residents with names, outfits, accessories, greetings, and simple day and night routines.
 - Road-following strolls with four directional walking views, distance-based footsteps, occasional neighbor greetings, bedtime, and a camera that follows a resident.
 - Shared daily events: picnics, books, and lawn games at the Lunch Green; rock, acoustic, and jazz evenings at the Little Stage. Strolling neighbors can join a small audience and walk home afterward. Both venues are reserved public plots.
 - A shared UTC-based 24-minute town day, automatic day/night lighting, pause/resume-live, and reduced-motion support.
+- Optional original music: day and night themes plus three concert arrangements, with a volume control, soft transitions, and automatic pause when the tab is hidden. See [Forktown FM](docs/MUSIC.md) for the listening preview and score guide.
 - Exterior signs: simple text or a restricted HTML/CSS artwork language, drawn as noninteractive canvas textures.
 - A full-screen town with compact controls. Explore opens searchable places and open plots; the neighbor and music buttons reveal residents and events. All directories work with a keyboard.
 - Place stories, contributor credit, and shareable `#place=id` links without server routing.
@@ -87,7 +88,7 @@ See [publishing](docs/PUBLISHING.md). Creating this local project does not creat
 
 ## A foundation for more
 
-The living edition keeps the first contribution small. Morning, afternoon, and evening each use one choice: stroll, work at home, or relax at home. Nights are for sleeping. The clock follows UTC: one real minute is one town hour, with a new town day every 24 real minutes. Visitors at the same moment see the same daily phase when their device clocks agree. There are no accounts, leaderboards, real-time multiplayer, or automatic merges. Every place has a bounded plot and reviewed data. New districts, original sprites, more building types, and richer interactions can follow the community’s needs.
+The living edition keeps the first contribution small. Morning, afternoon, and evening each use one choice: stroll, work at home, or relax at home. At night, choose sleep or a moonlit stroll. Night owls take one three-hour walk near home, with departures spread between 22:00 and 02:00, then sleep indoors until morning. Omitted night choices default to sleep. The clock follows UTC: one real minute is one town hour, with a new town day every 24 real minutes. Visitors at the same moment see the same daily phase when their device clocks agree. There are no accounts, leaderboards, real-time multiplayer, or automatic merges. Every place has a bounded plot and reviewed data. New districts, original sprites, more building types, and richer interactions can follow the community’s needs.
 
 See [architecture and extension points](docs/ARCHITECTURE.md) and [the roadmap](docs/ROADMAP.md).
 

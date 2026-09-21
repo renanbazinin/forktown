@@ -173,7 +173,24 @@ export function NeighborDetails({
             </select>
           </label>
         ))}
-        <small>At 22:00, everyone heads to bed. No appointments needed.</small>
+        <label className="field">
+          <span>
+            Night <small>22:00–06:00</small>
+          </span>
+          <select
+            value={resident.routine.night}
+            onChange={(e) =>
+              change('routine', {
+                ...resident.routine,
+                night: e.target.value as 'sleep' | 'stroll',
+              })
+            }
+          >
+            <option value="sleep">Sleep through the night</option>
+            <option value="stroll">Take a moonlit stroll</option>
+          </select>
+        </label>
+        <small>Night owls take a quiet walk, then head home to sleep. We pick the time.</small>
       </div>
     </div>
   );

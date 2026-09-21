@@ -26,7 +26,8 @@
     "routine": {
       "morning": "stroll",
       "afternoon": "stroll",
-      "evening": "home"
+      "evening": "home",
+      "night": "stroll"
     }
   },
   "sign": {

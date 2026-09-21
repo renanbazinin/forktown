@@ -1,7 +1,7 @@
 import { placeSchema } from '../src/lib/schema';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, rmdir, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { localPlacesMiddleware, localPlacesPlugin } from '../scripts/local-places';
@@ -21,11 +21,13 @@ const token = 'test-session-token';
 let root: string;
 let server: Server;
 let origin: string;
+const reveal = vi.fn<(file: string) => Promise<void>>();
 
 beforeEach(async () => {
   root = await mkdtemp(join(tmpdir(), 'forktown-save-test-'));
   await mkdir(join(root, 'places'));
-  const middleware = localPlacesMiddleware(root, token);
+  reveal.mockReset().mockResolvedValue(undefined);
+  const middleware = localPlacesMiddleware(root, token, reveal);
   server = createServer((req, res) =>
     middleware(req, res, () => {
       res.writeHead(404);
@@ -153,5 +155,77 @@ describe('Save a place to the local checkout', () => {
       'build',
     );
     expect(config.define?.__FORKTOWN_LOCAL_SAVE_TOKEN__).toBe('""');
+  });
+});
+
+function showFile(id: string, headers: Record<string, string> = {}) {
+  return fetch(`${origin}/__forktown/reveal-place`, {
+    method: 'POST',
+    headers: {
+      Origin: origin,
+      'Content-Type': 'application/json',
+      'X-Forktown-Token': token,
+      ...headers,
+    },
+    body: JSON.stringify({ id }),
+  });
+}
+
+describe('Reveal a local house file', () => {
+  it('reveals the existing project file without changing it', async () => {
+    await save();
+    const file = join(root, 'places', 'tiny-library.json');
+    const before = await readFile(file, 'utf8');
+    const response = await showFile('tiny-library');
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ file: 'places/tiny-library.json' });
+    expect(reveal).toHaveBeenCalledExactlyOnceWith(file);
+    expect(await readFile(file, 'utf8')).toBe(before);
+  });
+
+  it.each(['../package', '..\\package', '/tmp/file', 'house.json', 'house;calc', ''])(
+    'rejects unsafe file ids: %s',
+    async (id) => {
+      expect((await showFile(id)).status).toBe(400);
+      expect(reveal).not.toHaveBeenCalled();
+    },
+  );
+
+  it('handles missing files and directories without opening anything', async () => {
+    expect((await showFile('missing')).status).toBe(404);
+    await mkdir(join(root, 'places', 'directory.json'));
+    expect((await showFile('directory')).status).toBe(409);
+    expect(reveal).not.toHaveBeenCalled();
+  });
+
+  it('rejects a replaced places folder pointing outside the checkout', async () => {
+    const outside = join(root, 'outside');
+    await mkdir(outside);
+    await writeFile(join(outside, 'tiny-library.json'), '{}');
+    await rmdir(join(root, 'places'));
+    await symlink(outside, join(root, 'places'), process.platform === 'win32' ? 'junction' : 'dir');
+    expect((await showFile('tiny-library')).status).toBe(409);
+    expect(reveal).not.toHaveBeenCalled();
+  });
+
+  it.each<Record<string, string>>([
+    { Origin: 'https://another-site.example' },
+    { 'X-Forktown-Token': '' },
+    { 'Sec-Fetch-Site': 'cross-site' },
+  ])('requires the trusted local session: %j', async (headers) => {
+    await save();
+    expect((await showFile('tiny-library', headers)).status).toBe(403);
+    expect(reveal).not.toHaveBeenCalled();
+  });
+
+  it('requires a JSON POST and reports a file manager failure', async () => {
+    await save();
+    expect((await fetch(`${origin}/__forktown/reveal-place`)).status).toBe(405);
+    expect((await showFile('tiny-library', { 'Content-Type': 'text/plain' })).status).toBe(415);
+    expect(reveal).not.toHaveBeenCalled();
+    reveal.mockRejectedValueOnce(new Error('Unavailable'));
+    const response = await showFile('tiny-library');
+    expect(response.status).toBe(500);
+    expect((await response.json()).error).toContain('places folder');
   });
 });

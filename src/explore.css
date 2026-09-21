@@ -573,3 +573,94 @@ body,
     padding: 18px 22px 25px;
   }
 }
+
+.town-sound {
+  position: relative;
+}
+.explore-dock .town-sound > button {
+  padding: 0;
+  width: 42px;
+}
+.sound-popover {
+  position: fixed;
+  bottom: 90px;
+  left: 28px;
+  width: 280px;
+  padding: 20px;
+  border: 1px solid #e5e8d9;
+  border-radius: 18px;
+  background: #fdfcf7;
+  color: #3b5534;
+  box-shadow: 0 12px 45px #1d392426;
+  font-size: 13px;
+}
+.sound-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.sound-heading > span {
+  font: 10px var(--mono);
+  letter-spacing: 2px;
+  color: #829272;
+}
+.explore-dock .sound-heading button {
+  padding: 0;
+  min-width: 24px;
+  height: 24px;
+}
+.sound-popover > strong {
+  font: 500 22px var(--serif);
+}
+.sound-popover > p {
+  font-size: 12px;
+  margin: 7px 0 17px;
+  color: #7b866d;
+}
+.explore-dock .sound-toggle {
+  width: 100%;
+  background: #e8eddc;
+  font-size: 12px;
+}
+.sound-volume {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 18px 0;
+  font-size: 11px;
+}
+.sound-volume input {
+  width: 100%;
+  accent-color: #59764a;
+}
+.sound-popover > small {
+  display: block;
+  font-size: 10px;
+  line-height: 1.6;
+  color: #7b866d;
+}
+@media (max-width: 600px) {
+  .sound-popover {
+    left: 14px;
+    bottom: 84px;
+    width: min(280px, calc(100vw - 28px));
+  }
+  .explore-dock .town-sound > button {
+    width: 34px;
+    min-width: 34px;
+  }
+}
+@media (max-width: 440px) {
+  .explore-dock > button:first-child > span {
+    display: none;
+  }
+  .explore-dock > button:first-child {
+    padding: 0;
+  }
+}
+@media (max-width: 360px) {
+  .town-app .map-controls button {
+    width: 36px;
+  }
+}

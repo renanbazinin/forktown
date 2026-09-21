@@ -1,0 +1,138 @@
+import { useEffect, useRef, useState } from 'react';
+import { Volume2, VolumeX, X } from 'lucide-react';
+import { TRACKS, type TrackId } from '../music/score';
+import { TownPlayer } from '../music/player';
+
+export default function Soundtrack({ track, playing }: { track: TrackId; playing: boolean }) {
+  const player = useRef<TownPlayer | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [volume, setVolume] = useState(0.55);
+  const [hidden, setHidden] = useState(document.hidden);
+  const request = useRef(0);
+  useEffect(() => {
+    const visibility = () => setHidden(document.hidden);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      document.removeEventListener('visibilitychange', visibility);
+      ++request.current;
+      player.current?.dispose();
+      player.current = null;
+    };
+  }, []);
+  useEffect(() => {
+    if (!player.current) return;
+    let cancelled = false;
+    if (!enabled) {
+      player.current.stop();
+      setLoading(false);
+      return;
+    }
+    if (hidden || !playing) {
+      void player.current.suspend().catch(() => {});
+      return;
+    }
+    setLoading(true);
+    void player.current
+      .resume()
+      .then(() => {
+        if (!cancelled) return player.current?.play(track);
+      })
+      .then(() => {
+        if (!cancelled) setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('Sound could not start. Try turning it on again.');
+          setEnabled(false);
+          setLoading(false);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [track, enabled, playing, hidden]);
+  const toggle = async () => {
+    if (enabled) {
+      ++request.current;
+      setEnabled(false);
+      return;
+    }
+    const revision = ++request.current;
+    setError('');
+    try {
+      player.current ??= new TownPlayer();
+      // Resume inside the click, including on browsers with strict autoplay rules.
+      await player.current.resume();
+      if (revision !== request.current) return;
+      player.current.volume(volume);
+      setEnabled(true);
+    } catch {
+      setError('Sound is unavailable in this browser.');
+    }
+  };
+  return (
+    <div className="town-sound">
+      <button
+        aria-label="Town sound"
+        aria-expanded={open}
+        title={enabled ? TRACKS[track].title : 'Turn on town sound'}
+        onClick={() => setOpen(!open)}
+      >
+        {enabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+      </button>
+      {open && (
+        <section
+          className="sound-popover"
+          aria-label="Town soundtrack"
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.stopPropagation();
+              setOpen(false);
+            }
+          }}
+        >
+          <div className="sound-heading">
+            <span>FORKTOWN FM</span>
+            <button aria-label="Close sound controls" onClick={() => setOpen(false)}>
+              <X size={14} />
+            </button>
+          </div>
+          <strong>{TRACKS[track].title}</strong>
+          <p>{TRACKS[track].subtitle}</p>
+          <button className="sound-toggle" onClick={() => void toggle()} aria-pressed={enabled}>
+            {enabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
+            {enabled ? 'Sound on' : 'Turn sound on'}
+          </button>
+          <label className="sound-volume">
+            Volume
+            <input
+              aria-label="Music volume"
+              type="range"
+              min="0"
+              max="100"
+              value={Math.round(volume * 100)}
+              onChange={(event) => {
+                const value = Number(event.target.value) / 100;
+                setVolume(value);
+                player.current?.volume(value);
+              }}
+            />
+          </label>
+          <small role="status">
+            {error ||
+              (enabled
+                ? !playing
+                  ? 'Paused with the town'
+                  : loading
+                    ? 'Warming up the band…'
+                    : 'Original music, made for this little town.'
+                : 'A little music, when you want it.')}
+          </small>
+        </section>
+      )}
+    </div>
+  );
+}

@@ -1,5 +1,5 @@
 import type { Place } from '../lib/schema';
-import { compileSign, type SignArtwork } from '../lib/sign';
+import { drawSign } from './signs';
 
 type Ctx = CanvasRenderingContext2D;
 export type HouseAppearance = Pick<
@@ -47,51 +47,6 @@ export function houseBounds(place: HouseAppearance) {
         ? 14
         : 34;
   return { height, top: height + roof + 8, bottom: 46, left: 72, right: 72 };
-}
-const signs = new Map<string, HTMLCanvasElement>();
-export function signTexture(sign: Place['sign']): HTMLCanvasElement | null {
-  if (sign.mode === 'none') return null;
-  const key = JSON.stringify(sign);
-  if (signs.has(key)) return signs.get(key)!;
-  let art: SignArtwork;
-  try {
-    art =
-      sign.mode === 'html'
-        ? compileSign(sign.html)
-        : {
-            background: sign.background,
-            lines: [{ text: sign.text, color: sign.color, size: 24, bold: true, align: 'center' }],
-          };
-  } catch {
-    art = {
-      background: '#5C534E',
-      lines: [{ text: 'Your sign', color: '#FFF4D4', size: 20, bold: false, align: 'center' }],
-    };
-  }
-  const canvas = document.createElement('canvas');
-  canvas.width = 240;
-  canvas.height = 100;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  ctx.fillStyle = art.background;
-  ctx.fillRect(0, 0, 240, 100);
-  let y = (100 - art.lines.reduce((sum, line) => sum + line.size + 6, 0)) / 2;
-  for (const line of art.lines) {
-    ctx.fillStyle = line.color;
-    ctx.font = `${line.bold ? 700 : 400} ${line.size}px monospace`;
-    ctx.textAlign = line.align;
-    ctx.textBaseline = 'top';
-    ctx.fillText(
-      line.text,
-      line.align === 'left' ? 10 : line.align === 'right' ? 230 : 120,
-      y,
-      220,
-    );
-    y += line.size + 6;
-  }
-  if (signs.size > 150) signs.clear();
-  signs.set(key, canvas);
-  return canvas;
 }
 export function drawHouse(
   ctx: Ctx,
@@ -478,13 +433,14 @@ export function drawHouse(
       box(ctx, 29 + i * 4, 19 + i, 1, 6, '#6C915B');
       box(ctx, 28 + i * 4, 17 + i, 3, 3, '#EABD8A');
     }
-  const sign = signTexture(place.sign);
-  if (sign) {
+  if (place.sign.mode !== 'none') {
     ctx.save();
-    ctx.transform(1, -0.5, 0, 1, 3, 8 - h);
+    ctx.transform(1, -0.5, 0, 1, 1.5, 5 - h);
+    ctx.fillStyle = '#263B3540';
+    ctx.fillRect(-1, 0, 29, 15);
     ctx.fillStyle = trim;
-    ctx.fillRect(-1, -1, 24, 12);
-    ctx.drawImage(sign, 0, 0, 22, 10);
+    ctx.fillRect(-1, -1, 28, 14);
+    drawSign(ctx, place.sign, 26, 12);
     ctx.restore();
   }
   ctx.restore();

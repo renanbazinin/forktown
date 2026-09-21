@@ -59,7 +59,7 @@ The eight basic fields above still work: omitted `design`, `resident`, and `sign
 
 - **Home:** `design` sets wall and trim hex colors, 1-3 floors, a `classic` / `flat` / `gable` roof, `cross` / `round` / `shutters` windows, `wildflowers` / `paving` / `vegetables` garden, and an optional `porch` or `balcony` feature (`none` is also valid). The top-level `color` sets the roof color. `classic` uses the building family's original roof.
 - **Neighbor:** `resident` sets a name (2-24 characters), skin/hair/outfit hex colors, `none` / `hat` / `glasses` accessory, and a greeting (1-24 characters).
-- **Routine:** morning (06:00-12:00), afternoon (12:00-18:00), and evening (18:00-22:00) each choose `stroll`, `work`, or `home`. The last two mean working and relaxing at home. Everyone sleeps from 22:00 to 06:00. No meetings, destinations, or other residents' names to configure.
+- **Routine:** morning (06:00-12:00), afternoon (12:00-18:00), and evening (18:00-22:00) each choose `stroll`, `work`, or `home`. The last two mean working and relaxing at home. Night (22:00-06:00) chooses `sleep` (the default) or `stroll`. Night owls take one three-hour walk near home, starting automatically between 22:00 and 02:00, and are back asleep by 05:00. No meetings, destinations, or other residents' names to configure.
 - **Outdoor sign:** choose `none`, `text`, or `html`. Text signs have up to 18 characters plus `color` and `background`. HTML artwork uses the small language described in [sign artwork](docs/SIGN_ARTWORK.md).
 
 One place brings one resident. A resident can be fictional; the creator credit should be your GitHub username. To change your own home or daily routine later, edit your existing JSON file and submit another PR.

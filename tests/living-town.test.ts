@@ -93,6 +93,7 @@ describe('A small predictable daily life', () => {
           morning: 'stroll' as const,
           afternoon: 'stroll' as const,
           evening: 'stroll' as const,
+          night: 'sleep' as const,
         },
       },
     }));
@@ -116,6 +117,7 @@ describe('A small predictable daily life', () => {
           morning: 'stroll' as const,
           afternoon: 'stroll' as const,
           evening: 'stroll' as const,
+          night: 'sleep' as const,
         },
       },
     };
@@ -127,9 +129,12 @@ describe('A small predictable daily life', () => {
       expect(after.position).toEqual(before.position);
     }
   });
-  it('sleeps at night and follows only the three simple activity choices', () => {
+  it('keeps sleepers indoors and follows daytime activity choices', () => {
     expect(
-      simulateResidents(places, 0).every((state) => state.activity === 'sleep' && !state.moving),
+      simulateResidents(
+        places.filter((place) => place.resident.routine.night === 'sleep'),
+        0,
+      ).every((state) => state.activity === 'sleep' && !state.moving),
     ).toBe(true);
     for (const [time, period] of [
       [540, 'morning'],

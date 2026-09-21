@@ -26,8 +26,8 @@ export default function JsonGuide() {
         <dd>Wall and trim colors, floors, roof, windows, garden, and extra house details.</dd>
         <dt>resident / routine</dt>
         <dd>
-          Your one neighbor's appearance, greeting, and morning, afternoon, and evening activities.
-          Working or resting keeps them indoors.
+          Your one neighbor's appearance, greeting, and daily activities. At night, choose sleep or
+          a moonlit stroll. Working or resting keeps them indoors.
         </dd>
         <dt>sign</dt>
         <dd>

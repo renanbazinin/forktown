@@ -21,7 +21,12 @@ export const DEFAULT_RESIDENT = {
   outfit: '#789B76',
   accessory: 'none' as const,
   greeting: 'Hello!',
-  routine: { morning: 'work' as const, afternoon: 'stroll' as const, evening: 'home' as const },
+  routine: {
+    morning: 'work' as const,
+    afternoon: 'stroll' as const,
+    evening: 'home' as const,
+    night: 'sleep' as const,
+  },
 };
 export const DEFAULT_SIGN = {
   mode: 'text' as const,
@@ -54,6 +59,7 @@ export const residentSchema = z
         morning: z.enum(ACTIVITIES),
         afternoon: z.enum(ACTIVITIES),
         evening: z.enum(ACTIVITIES),
+        night: z.enum(['sleep', 'stroll']).default('sleep'),
       })
       .strict(),
   })

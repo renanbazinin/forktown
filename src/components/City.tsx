@@ -179,7 +179,7 @@ const City = forwardRef<CityHandle, Props>(function City(
       setCamera((old) => {
         const zoom = Math.max(
           fit.current * 0.65,
-          Math.min(Math.max(1.2, fit.current * 3.5), old.zoom * factor),
+          Math.min(Math.max(6, fit.current * 3.5), old.zoom * factor),
         );
         const a = anchor ?? { x: size.width / 2, y: size.height / 2 };
         return {
