@@ -17,6 +17,8 @@ npm run dev
 
 Open `http://localhost:5173`. No accounts, API keys, database, or remote services are required.
 
+For a clean recording view, open `http://localhost:5173/live/`: automatic camera direction, a daily neighbor story and featured event, automatic sound where permitted, and only the Forktown symbol on screen. See [the live broadcast script and recording notes](docs/LIVE.md).
+
 ## Make your first contribution
 
 1. Fork and clone the repository, create a contribution branch, and run your local town using the commands above.

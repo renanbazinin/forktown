@@ -10,11 +10,15 @@ export default function Soundtrack({
   playing,
   football,
   listening,
+  autoStart = false,
+  hideControls = false,
 }: {
   track: TrackId;
   playing: boolean;
   football: FootballState;
   listening: { gain: number; pan: number };
+  autoStart?: boolean;
+  hideControls?: boolean;
 }) {
   const player = useRef<TownPlayer | null>(null);
   const [enabled, setEnabled] = useState(false);
@@ -45,6 +49,27 @@ export default function Soundtrack({
       player.current = null;
     };
   }, []);
+  useEffect(() => {
+    if (!autoStart) return;
+    // Capture pages request sound immediately. Browsers may defer resume until a gesture.
+    const start = () => {
+      try {
+        player.current ??= new TownPlayer();
+        player.current.volume(volume);
+        setEnabled(true);
+        void player.current.resume().catch(() => {});
+      } catch {
+        // Leave the gesture listener installed so a later attempt can recover.
+      }
+    };
+    start();
+    window.addEventListener('pointerdown', start);
+    window.addEventListener('keydown', start);
+    return () => {
+      window.removeEventListener('pointerdown', start);
+      window.removeEventListener('keydown', start);
+    };
+  }, [autoStart, volume]);
   useEffect(() => {
     if (!player.current) return;
     let cancelled = false;
@@ -96,6 +121,7 @@ export default function Soundtrack({
       setError('Sound is unavailable in this browser.');
     }
   };
+  if (hideControls) return null;
   return (
     <div className="town-sound">
       <button

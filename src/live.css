@@ -1,0 +1,32 @@
+.live-stream {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: #edf0e3;
+  cursor: none;
+}
+.live-stream-night {
+  background: #263c3c;
+}
+.live-stream > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.live-watermark {
+  position: absolute;
+  z-index: 1;
+  top: max(28px, env(safe-area-inset-top));
+  left: max(30px, env(safe-area-inset-left));
+  opacity: 0.9;
+  pointer-events: none;
+  filter: drop-shadow(1px 0 0 #f7f6e8) drop-shadow(-1px 0 0 #f7f6e8) drop-shadow(0 1px 0 #f7f6e8)
+    drop-shadow(0 -1px 0 #f7f6e8);
+}
+.live-stream-night .live-watermark {
+  filter: drop-shadow(0 2px 8px #142826);
+}
+.live-stream-night .brand-mark i:nth-child(-n + 3) {
+  background: #c0d0ac;
+}

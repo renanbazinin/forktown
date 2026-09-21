@@ -14,7 +14,7 @@ export class TownPlayer {
   private effects = new Map<AudioBufferSourceNode, { gain: GainNode; pan: StereoPannerNode }>();
   private effectBuffers = new Map<FootballSound['kind'], AudioBuffer>();
   constructor() {
-    // Construct only from the sound button's user gesture.
+    // Interactive mode starts from a gesture; the live route also attempts permitted autoplay.
     this.context = new AudioContext();
     this.output = this.context.createGain();
     this.output.gain.value = 0.55;

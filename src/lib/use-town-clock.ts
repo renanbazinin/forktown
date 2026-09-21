@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { townDayAt, townMinutesAt } from './town-time';
 
-export function useTownClock() {
+export function useTownClock({ autoPlay = false }: { autoPlay?: boolean } = {}) {
   // Keep day and minute in one snapshot, also while paused across midnight.
   const [timestamp, setTimestamp] = useState(() => Date.now());
   const [playing, setPlaying] = useState(
-    () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => autoPlay || !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
   useEffect(() => {
     if (!playing) return;
