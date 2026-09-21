@@ -13,6 +13,7 @@ import {
 import {
   BUILDING_TYPES,
   DECORATIONS,
+  DEFAULT_RESIDENT,
   TYPE_LABELS,
   draftSchema,
   placeSchema,
@@ -21,6 +22,7 @@ import {
 import { HOUSE_PLOTS as PLOTS } from '../lib/events';
 import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
+import { pickDraftNames } from '../lib/draft-names';
 import BuildingPreview from './BuildingPreview';
 import Modal from './Modal';
 import HouseFiles from './HouseFiles';
@@ -29,17 +31,20 @@ import ResidentPreview from './ResidentPreview';
 import { HomeDetails, NeighborDetails, SignDetails } from './Customization';
 
 const COLORS = ['#789B76', '#C97878', '#759BAF', '#AD88AE', '#D0AA65', '#BE8E68'];
-const initial = (plot: string, places: Place[]): Place =>
-  draftSchema.parse({
-    id: availableId('my-little-place', places),
-    name: 'My Little Place',
+const initial = (plot: string, places: Place[]): Place => {
+  const { placeName, residentName } = pickDraftNames(places);
+  return draftSchema.parse({
+    id: availableId(placeName, places),
+    name: placeName,
     creator: '',
     plot,
     building: 'cottage',
     color: COLORS[0],
     decoration: 'flowers',
     story: 'A small corner of the internet, made with curiosity and a little courage.',
+    resident: { ...DEFAULT_RESIDENT, name: residentName },
   });
+};
 const storageKey = 'forktown-draft-v2';
 function availableId(name: string, places: Place[]) {
   const base =
@@ -73,13 +78,25 @@ const Contribute = memo(function Contribute({
     try {
       const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
       const result = draftSchema.safeParse(saved);
-      if (result.success)
+      if (result.success) {
+        const restored = result.data;
+        if (restored.name === 'My Little Place' || restored.resident.name === 'New neighbor') {
+          const { placeName, residentName } = pickDraftNames(places);
+          if (restored.name === 'My Little Place') {
+            if (/^my-little-place(?:-\d+)?$/.test(restored.id))
+              restored.id = availableId(placeName, places);
+            restored.name = placeName;
+          }
+          if (restored.resident.name === 'New neighbor')
+            restored.resident = { ...restored.resident, name: residentName };
+        }
         return {
-          ...result.data,
+          ...restored,
           plot:
             plot ??
             (occupied.has(result.data.plot) ? (available[0]?.id ?? 'A1') : result.data.plot),
         };
+      }
     } catch {
       /* A stale draft should never prevent a new contribution. */
     }

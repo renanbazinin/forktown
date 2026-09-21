@@ -1,13 +1,14 @@
 import type { Camera } from '../city/render';
-import { eventsForDay, VENUES } from './events';
-import { FOOTBALL_CENTER } from './football';
+import { eventsForDay, isEventLive } from './events';
+import { FOOTBALL_CENTER, footballAt } from './football';
 import type { Place } from './schema';
 import { simulateResidents, type ResidentState } from './simulation';
+import { townCatAt, TOWN_CAT_NAME, TOWN_CAT_ID } from './town-cat';
 import { getPlot, plotCenter, project, type Point } from './world';
 
 export type LiveShot = {
   id: string;
-  kind: 'neighbor' | 'event' | 'home' | 'venue';
+  kind: 'neighbor' | 'event' | 'home' | 'cat';
   label: string;
   center: Point;
   width: number;
@@ -16,47 +17,35 @@ export type LiveShot = {
 };
 export type LiveProgram = ReturnType<typeof liveProgram>;
 const cycle = (value: number, length: number) => ((value % length) + length) % length;
-
-/** One feature per town day; the midnight feature belongs to the preceding evening. */
-export function liveFeature(day: number) {
-  const choice = cycle(day, 4);
-  if (choice === 3)
-    return {
-      id: 'football',
-      label: 'An afternoon at the Meadow Ground',
-      start: 640,
-      end: 780,
-      center: project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y),
-      width: 850,
-      height: 540,
-    };
-  const event = eventsForDay(day)[choice];
-  const center = plotCenter(getPlot(event.venue.plot)!);
-  return {
-    id: event.id,
-    label: event.name,
-    start: event.start,
-    end: event.end,
-    center: { x: center.x, y: center.y - 35 },
-    width: 520,
-    height: 370,
-  };
-}
+export const SCENERY_START = 300;
+export const SCENERY_SECONDS = 60;
+export const FOLLOW_SECONDS = 45;
 
 export function liveProgram(places: Place[], day: number) {
-  // Prefer a real walker over a seated football spectator. Keep this casting stable all day.
-  const morning = simulateResidents(places, 450, day);
-  const walkers = morning.filter((resident) => resident.activity === 'stroll' && !resident.event);
-  const candidates = (
-    walkers.length ? walkers : morning.filter((r) => r.activity === 'stroll')
-  ).sort((a, b) => a.id.localeCompare(b.id));
-  return {
-    day,
-    neighborId: candidates.length ? candidates[cycle(day, candidates.length)].id : undefined,
-    feature: liveFeature(day),
-    previousFeature: liveFeature(day - 1),
-    homes: [...places].sort((a, b) => a.id.localeCompare(b.id)),
-  };
+  const homes = [...places].sort((a, b) => a.id.localeCompare(b.id));
+  const order = homes.map((_, index) => homes[cycle(index + day, homes.length)].id);
+  const lastFeatured = new Map<string, number>();
+  // Hold short, steady clips and give less recently featured neighbors the next turn.
+  // Keep the entire ranked cast so an indoor subject never falls back to the same first home.
+  const cast = Array.from({ length: 1440 / FOLLOW_SECONDS }, (_, chapter) => {
+    const outdoors = simulateResidents(homes, chapter * FOLLOW_SECONDS, day).filter(
+      (resident) => resident.activity === 'stroll',
+    );
+    const walkers = new Set(
+      outdoors
+        .filter((resident) => resident.event?.phase !== 'attending')
+        .map((resident) => resident.id),
+    );
+    const ranked = [...order].sort(
+      (a, b) =>
+        (lastFeatured.get(a) ?? -1) - (lastFeatured.get(b) ?? -1) ||
+        Number(walkers.has(b)) - Number(walkers.has(a)),
+    );
+    const next = ranked.find((id) => outdoors.some((resident) => resident.id === id));
+    if (next) lastFeatured.set(next, chapter);
+    return ranked;
+  });
+  return { day, homes, cast, events: eventsForDay(day) };
 }
 
 export function liveShotAt(
@@ -65,54 +54,83 @@ export function liveShotAt(
   residents: ResidentState[],
 ): LiveShot {
   const time = cycle(minutes, 1440);
-  const feature = time < 360 ? program.previousFeature : program.feature;
-  const featureTime = time < 360 ? time + 1440 : time;
-  if (featureTime >= feature.start && featureTime < feature.end)
+  const cat = townCatAt(program.homes, time);
+  // Exactly one real minute per town day for context, with the cat still outside in the frame.
+  if (time >= SCENERY_START && time < SCENERY_START + SCENERY_SECONDS) {
+    const home = plotCenter(getPlot(cat.homePlot)!);
+    const point = project(cat.position.x, cat.position.y);
     return {
-      ...feature,
-      id: `event:${time < 360 ? program.day - 1 : program.day}:${feature.id}`,
-      kind: 'event',
+      id: `postcard:${program.day}`,
+      kind: 'home',
+      label: 'The neighborhood waking up',
+      center: { x: (home.x + point.x) / 2, y: (home.y - 40 + point.y) / 2 },
+      width: 600,
+      height: 420,
     };
+  }
 
-  const neighbor = residents.find((resident) => resident.id === program.neighborId);
-  if (time >= 450 && time < 630 && neighbor?.activity === 'stroll') {
+  const event = program.events.find(
+    (event) =>
+      isEventLive(event, time) &&
+      (event.venue.kind === 'stage' ||
+        residents.some(
+          (r) =>
+            r.activity === 'stroll' && r.event?.id === event.id && r.event.phase === 'attending',
+        )),
+  );
+  if (event) {
+    const point = plotCenter(getPlot(event.venue.plot)!);
+    return {
+      id: `event:${event.period === 'night' && time < 360 ? program.day - 1 : program.day}:${event.id}`,
+      kind: 'event',
+      label: event.name,
+      center: { x: point.x, y: point.y - 35 },
+      width: 520,
+      height: 370,
+    };
+  }
+
+  const football = footballAt(time, program.day);
+  const matchShot = (): LiveShot => ({
+    id: `football:${program.day}:${football.match}`,
+    kind: 'event',
+    label: 'Live at the Meadow Ground',
+    center: project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y),
+    width: 850,
+    height: 540,
+  });
+  // Stay for one full match each day; other matches fill gaps when everyone is indoors/seated.
+  if (football.live && time >= 640 && time < 780) return matchShot();
+
+  const outdoors = residents.filter((resident) => resident.activity === 'stroll');
+  const walking = outdoors.filter((resident) => resident.event?.phase !== 'attending');
+  const chapter = Math.floor(time / FOLLOW_SECONDS);
+  const neighbor = program.cast[chapter]
+    .map((id) => outdoors.find((resident) => resident.id === id))
+    .find((resident) => resident !== undefined);
+  if (neighbor && (walking.length || !football.live)) {
     const point = project(neighbor.position.x, neighbor.position.y);
     return {
       id: `neighbor:${program.day}:${neighbor.id}`,
       kind: 'neighbor',
-      label: `A morning with ${neighbor.resident.name}`,
+      label: `Following ${neighbor.resident.name}`,
       residentId: neighbor.id,
       center: { x: point.x, y: point.y - 22 },
-      width: 540,
-      height: 380,
+      width: 430,
+      height: 320,
     };
   }
+  if (football.live) return matchShot();
 
-  // Every postcard is anchored to an occupied home, never empty land or a map edge.
-  const beat = Math.floor(time / 90);
-  const id = `postcard:${program.day}:${beat}`;
-  const home = program.homes[cycle(program.day + beat, program.homes.length)];
-  if (home) {
-    const point = plotCenter(getPlot(home.plot)!);
-    return {
-      id,
-      kind: 'home',
-      label: home.name,
-      center: { x: point.x, y: point.y - 40 },
-      width: 460,
-      height: 340,
-    };
-  }
-  // A new town with no homes still has a real public landmark to film.
-  const venue = VENUES[1];
-  const point = plotCenter(getPlot(venue.plot)!);
+  const point = project(cat.position.x, cat.position.y);
   return {
-    id,
-    kind: 'venue',
-    label: venue.name,
-    center: { x: point.x, y: point.y - 35 },
-    width: 520,
-    height: 370,
+    id: 'town-cat',
+    kind: 'cat',
+    label: `Following ${TOWN_CAT_NAME}, the town cat`,
+    residentId: TOWN_CAT_ID,
+    center: { x: point.x, y: point.y - 16 },
+    width: 340,
+    height: 260,
   };
 }
 
@@ -120,14 +138,13 @@ export function liveCamera(shot: LiveShot, width: number, height: number, second
   const baseZoom = Math.max(
     0.01,
     Math.min(
-      shot.kind === 'home' ? 2.4 : 1.8,
+      shot.kind === 'event' || shot.kind === 'home' ? 1.8 : 2.4,
       (width * 0.9) / shot.width,
       (height * 0.86) / shot.height,
     ),
   );
-  // Shared-clock cycles divide the 24-minute day, so the motion survives midnight
-  // and reloads. Keep it inside the framing margin; never zoom out toward empty land.
-  const moving = shot.kind !== 'neighbor';
+  // Shared-clock cycles divide the town day, so the motion survives midnight and reloads.
+  const moving = shot.kind !== 'neighbor' && shot.kind !== 'cat';
   const sway = moving ? Math.sin((cycle(seconds, 90) / 90) * Math.PI * 2) : 0;
   const breath = moving ? (1 - Math.cos((cycle(seconds, 120) / 120) * Math.PI * 2)) / 2 : 0;
   const zoom = baseZoom * (1 + breath * 0.04);
