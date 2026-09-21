@@ -7,6 +7,7 @@ import {
   liveShotAt,
   SCENERY_START,
   SCENERY_SECONDS,
+  FOLLOW_SECONDS,
 } from '../src/lib/live-director';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
@@ -87,6 +88,71 @@ describe('Live broadcast director', () => {
       r.id === shot.residentId ? { ...r, activity: 'sleep' as const } : r,
     );
     expect(liveShotAt(program, 510, indoors).residentId).not.toBe(shot.residentId);
+  });
+
+  it('shares 45-second clips among outdoor neighbors, including spectators instead of repeating a lone walker', () => {
+    const homes = places.slice(0, 3).map((home) => ({
+      ...home,
+      resident: {
+        ...home.resident,
+        routine: {
+          morning: 'stroll',
+          afternoon: 'stroll',
+          evening: 'stroll',
+          night: 'sleep',
+        } as const,
+      },
+    }));
+    for (let day = 0; day < 4; day++) {
+      const program = liveProgram(homes, day);
+      const featured: string[] = [];
+      for (let time = 450; time < 630; time += FOLLOW_SECONDS) {
+        const residents = simulateResidents(homes, time, day);
+        expect(residents.filter((r) => r.event?.phase !== 'attending')).toHaveLength(1);
+        const shot = liveShotAt(program, time, residents);
+        expect(shot.kind).toBe('neighbor');
+        expect(shot.residentId).not.toBe(featured.at(-1));
+        featured.push(shot.residentId!);
+        for (const offset of [0.1, 20, FOLLOW_SECONDS - 0.01]) {
+          expect(
+            liveShotAt(program, time + offset, simulateResidents(homes, time + offset, day))
+              .residentId,
+          ).toBe(shot.residentId);
+        }
+        expect(liveShotAt(program, time, [...residents].reverse())).toEqual(shot);
+      }
+      expect(new Set(featured).size).toBe(3);
+    }
+  });
+
+  it('rotates replacements too, and keeps an only available resident on screen', () => {
+    const homes = places.slice(0, 4).map((home) => ({
+      ...home,
+      resident: {
+        ...home.resident,
+        routine: {
+          morning: 'stroll',
+          afternoon: 'stroll',
+          evening: 'home',
+          night: 'sleep',
+        } as const,
+      },
+    }));
+    const program = liveProgram(homes, 12);
+    const replacements = new Set<string>();
+    for (let time = 450; time < 630; time += FOLLOW_SECONDS) {
+      const residents = simulateResidents(homes, time, 12);
+      const original = liveShotAt(program, time, residents);
+      const remaining = residents
+        .filter((r) => r.id !== original.residentId)
+        .map((r) => ({ ...r, event: undefined }));
+      const replacement = liveShotAt(program, time, remaining);
+      expect(replacement.kind).toBe('neighbor');
+      expect(replacement.residentId).not.toBe(original.residentId);
+      replacements.add(replacement.residentId!);
+      expect(liveShotAt(program, time, [remaining[0]]).residentId).toBe(remaining[0].id);
+    }
+    expect(replacements.size).toBeGreaterThan(1);
   });
 
   it('keeps the party continuous at midnight and follows its guests home afterward', () => {

@@ -19,15 +19,31 @@ export type LiveProgram = ReturnType<typeof liveProgram>;
 const cycle = (value: number, length: number) => ((value % length) + length) % length;
 export const SCENERY_START = 300;
 export const SCENERY_SECONDS = 60;
+export const FOLLOW_SECONDS = 45;
 
 export function liveProgram(places: Place[], day: number) {
   const homes = [...places].sort((a, b) => a.id.localeCompare(b.id));
-  // Cast once per three-minute chapter; don't switch subjects on every footstep or greeting.
-  const cast = Array.from({ length: 8 }, (_, chapter) => {
-    const outdoors = simulateResidents(homes, chapter * 180, day).filter(
-      (resident) => resident.activity === 'stroll' && resident.event?.phase !== 'attending',
+  const order = homes.map((_, index) => homes[cycle(index + day, homes.length)].id);
+  const lastFeatured = new Map<string, number>();
+  // Hold short, steady clips and give less recently featured neighbors the next turn.
+  // Keep the entire ranked cast so an indoor subject never falls back to the same first home.
+  const cast = Array.from({ length: 1440 / FOLLOW_SECONDS }, (_, chapter) => {
+    const outdoors = simulateResidents(homes, chapter * FOLLOW_SECONDS, day).filter(
+      (resident) => resident.activity === 'stroll',
     );
-    return outdoors.length ? outdoors[cycle(day + chapter, outdoors.length)].id : undefined;
+    const walkers = new Set(
+      outdoors
+        .filter((resident) => resident.event?.phase !== 'attending')
+        .map((resident) => resident.id),
+    );
+    const ranked = [...order].sort(
+      (a, b) =>
+        (lastFeatured.get(a) ?? -1) - (lastFeatured.get(b) ?? -1) ||
+        Number(walkers.has(b)) - Number(walkers.has(a)),
+    );
+    const next = ranked.find((id) => outdoors.some((resident) => resident.id === id));
+    if (next) lastFeatured.set(next, chapter);
+    return ranked;
   });
   return { day, homes, cast, events: eventsForDay(day) };
 }
@@ -88,10 +104,10 @@ export function liveShotAt(
 
   const outdoors = residents.filter((resident) => resident.activity === 'stroll');
   const walking = outdoors.filter((resident) => resident.event?.phase !== 'attending');
-  const candidates = (walking.length ? walking : outdoors).sort((a, b) => a.id.localeCompare(b.id));
-  const chapter = Math.floor(time / 180);
-  const neighbor =
-    candidates.find((resident) => resident.id === program.cast[chapter]) ?? candidates[0];
+  const chapter = Math.floor(time / FOLLOW_SECONDS);
+  const neighbor = program.cast[chapter]
+    .map((id) => outdoors.find((resident) => resident.id === id))
+    .find((resident) => resident !== undefined);
   if (neighbor && (walking.length || !football.live)) {
     const point = project(neighbor.position.x, neighbor.position.y);
     return {
