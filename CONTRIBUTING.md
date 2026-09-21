@@ -51,6 +51,8 @@ Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not cha
 
 Add only your own place file. There is no shared list to edit. Plot positions remain fixed as the town grows.
 
+Each pull request may add **at most one new house**, with **one neighbor** in that house's JSON file. Submit additional houses in separate PRs. The **Contribution policy** check counts new `places/*.json` filenames across the whole PR; deleting an old house does not give you another slot, and a rename counts as a new filename. Code/documentation PRs and updates to existing houses may add zero houses. This is a per-PR limit, not a lifetime limit per GitHub account.
+
 ## Make it more personal
 
 The eight basic fields above still work: omitted `design`, `resident`, and `sign` objects get friendly defaults. Use the builder or `examples/living-place.json` when you want to customize them. If you include an object, include all its fields.
@@ -93,9 +95,11 @@ npm run check
 
 You can also run only `npm run validate` for a quick data check. The check points to the exact file and field that needs attention.
 
+After committing, run `npm run check:pr -- origin/main HEAD` to check the house allowance locally (fetch the target branch first). On GitHub, **Contribution policy** uses trusted default-branch policy and API data without executing code from the PR. It checks credit and ownership too; see [Contribution policy and merge protection](docs/CONTRIBUTION_POLICY.md).
+
 ## A few things that help everyone
 
-- Give credit honestly. Maintainers check the username against the pull request author; the JSON validator cannot verify account ownership.
+- Give credit honestly. GitHub checks new-house creator credit against the PR author. Collaborative credit, renamed accounts, and changes to another person's house need a different maintainer's approval of the current commit.
 - Start with one place. You can propose another thoughtful addition or improve the shared world later.
 - Keep names and stories welcoming. Avoid advertising, harassment, and personal information about other people.
 - Don’t overwrite someone else’s place. For a collaborative change, explain it and get the creator involved.

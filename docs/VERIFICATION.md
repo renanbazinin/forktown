@@ -2,7 +2,7 @@
 
 Verified locally on September 20, 2026 with Node.js 24.19.0.
 
-## Automated checks
+## Historical implementation checks (September 20)
 
 - `npm run check`: 79 tests passed; all nine places (eight starters and the first contribution) validated; TypeScript and the production build passed.
 - `npm run format:check`: passed.
@@ -26,7 +26,7 @@ Verified locally on September 20, 2026 with Node.js 24.19.0.
 
 The initial foundation was pushed to the private `renanbazinin/forktown` repository. Its first **Check town** workflow passed; **Publish town** was skipped because publishing is opt-in. The local-save follow-up and `renanbazinin`’s first contribution, **My Little Place** on plot A1, have passed the local checks above.
 
-The founding edition was deployed and verified at https://renanbazinin.github.io/forktown/. The repository remains private. The living edition is developed on `living-neighborhood` and has not been deployed; an external beginner fork-to-PR cycle is still a release check.
+The living edition was merged in PR #2 and deployed on September 20, 2026 at https://renanbazinin.github.io/forktown/. That release passed 94 tests, validated nine places, and passed type checking, formatting, and build checks. The map now has 50 plots. Hosted pages allow exploration and JSON browsing; building and saving require local development. The repository remains private. An external beginner trial is pending; see [External contributor trial](EXTERNAL_CONTRIBUTOR_TRIAL.md).
 
 ## Living edition checks
 
@@ -52,3 +52,11 @@ The founding edition was deployed and verified at https://renanbazinin.github.io
 - Inspected a temporary animated contact sheet containing all four directions with no accessory, a hat, and glasses. The view checks front/back artwork, mirroring, and stepping; the temporary page is removed afterward.
 - Town time derives from the current timestamp, with rendering capped at 30 Hz. Pause remains available for accessibility and resumes directly to live time. Manual time slider, speed selection, and day/night toggles are removed.
 - Browser verification confirmed no remaining time slider, a frozen paused clock, and immediate catch-up on resume. Checked the live follow view and the 390px clock layout without horizontal overflow; restored the normal viewport.
+
+## Contribution work (September 21, 2026)
+
+The initial local allowance work passed 103 tests but was not deployed. Review found an incompatible fork checkout in its proposed workflow. The replacement uses trusted default-branch code and paginated GitHub API data, with credit/ownership checks and statuses on the inspected PR commit. The expanded suite passed 122 tests during implementation; final release results are recorded in the associated PR.
+
+The September 20 observation covered a fixed 24-minute town day using sampled screenshots. Walking, greetings, indoor hiding, day/night lighting and the map appeared intact; no new console errors were observed. Town hours 18 and 21 were missed, the final check arrived late, and exact transitions/continuous frame rate were not established.
+
+Earlier sections are historical checks, including the former 25-plot layout and old controls. They are not claims about the current hosted UI. External beginner testing and public launch remain pending.

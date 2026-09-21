@@ -4,7 +4,7 @@ Tell us a little about your place or your improvement.
 
 ## For a new place
 
-- [ ] I added one JSON file in `places/`, and its filename matches its `id`.
+- [ ] This PR adds only one house JSON file in `places/`, containing one neighbor, and its filename matches its `id`.
 - [ ] The creator is my GitHub username, without `@`.
 - [ ] My plot is open in the current city. I understand that a preview does not reserve it.
 - [ ] The name and story are welcoming and the work is mine to contribute.

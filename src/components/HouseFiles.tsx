@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowLeft, Copy, FolderOpen, ExternalLink } from 'lucide-react';
 import { places, repositoryUrl } from '../lib/places';
 import { localSaveAvailable } from '../lib/local-save';
+import JsonGuide from './JsonGuide';
 
 // Show the actual contribution files, including omitted defaults and formatting.
 const sources = import.meta.glob<string>('../../places/*.json', {
@@ -99,6 +100,7 @@ export default function HouseFiles({
           </div>
         )}
       </div>
+      <JsonGuide />
       {repositoryUrl && (
         <a
           className="text-button"

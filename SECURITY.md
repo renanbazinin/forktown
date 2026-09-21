@@ -2,7 +2,7 @@
 
 Please use GitHub’s private vulnerability reporting feature when it is enabled on the public repository. Until a private channel is configured, do not post exploit details, private information, or credentials in a public issue. Ask the maintainer for a private contact without disclosing the sensitive details.
 
-The living edition is a static site. Contributions contain only bounded JSON data, and no user-provided HTML or JavaScript is executed. Pull request automation has read-only repository permissions and does not receive deployment secrets. Publishing runs separately on trusted main-branch code and only after the owner enables it.
+The living edition is a static site. Contributions contain bounded JSON data, and no contributed sign HTML or JavaScript executes in the site. The PR build uses read-only repository permissions without deployment secrets. A separate trusted contribution policy reads PR data through the GitHub API and can write commit statuses; it never checks out or runs contributor code. Publishing runs separately on trusted main-branch code and only after the owner enables it.
 
 Maintainers should keep dependencies current, review workflow changes carefully, review creator credit and content, and require current validation checks before merging.
 

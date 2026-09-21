@@ -1,0 +1,44 @@
+name: Contribution policy
+
+# Only trusted default-branch code runs. PR contents are read through the API.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  issue_comment:
+    types: [created]
+  workflow_run:
+    workflows: [Contribution review signal]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to check again after maintainer review
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  statuses: write
+
+concurrency:
+  group: contribution-policy-${{ (github.event_name == 'issue_comment' && github.event.comment.body != '/check-contribution' && github.run_id) || github.event.pull_request.number || github.event.issue.number || inputs.pr || github.event.workflow_run.head_sha }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    name: Evaluate contribution
+    if: github.event_name != 'issue_comment' || (github.event.issue.pull_request && github.event.comment.body == '/check-contribution')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read trusted policy
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Check contribution and report status on the PR commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number || inputs.pr }}
+        run: node scripts/check-github-pr.mjs

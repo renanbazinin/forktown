@@ -21,7 +21,7 @@
 - [x] Shared UTC-based 24-minute day, pause/resume-live, and follow-a-neighbor view
 - [x] Exterior signs using text or restricted HTML/CSS artwork
 - [x] Builder, local saves, examples, validation, and security tests
-- [ ] Owner review of the living edition before deployment
+- [x] Owner review and deployment of the living edition (PR #2, September 20, 2026)
 - [ ] Open the repository to public contributors when the owner is ready
 
 ## Good early community contributions

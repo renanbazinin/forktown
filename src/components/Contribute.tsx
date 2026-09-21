@@ -24,6 +24,7 @@ import { localSaveAvailable, saveToProject } from '../lib/local-save';
 import BuildingPreview from './BuildingPreview';
 import Modal from './Modal';
 import HouseFiles from './HouseFiles';
+import JsonGuide from './JsonGuide';
 import ResidentPreview from './ResidentPreview';
 import { HomeDetails, NeighborDetails, SignDetails } from './Customization';
 
@@ -282,6 +283,10 @@ const Contribute = memo(function Contribute({
             }}
             noValidate
           >
+            <p className="local-note">
+              <strong>One house + one neighbor per PR.</strong> Want to add another? Start a
+              separate contribution branch and PR for it. This is not a lifetime limit.
+            </p>
             <div className="builder-tabs" role="group" aria-label="Customize your place">
               {(['home', 'neighbor', 'sign'] as const).map((value, index) => (
                 <button
@@ -491,6 +496,10 @@ const Contribute = memo(function Contribute({
       ) : (
         <div className="submit-layout">
           <div className="submit-guide">
+            <p className="local-note">
+              <strong>One house + one neighbor per PR.</strong> Review only this house's new file
+              before committing. Saving locally does not publish it.
+            </p>
             <p className="modal-intro">
               {localSaveAvailable
                 ? 'Save your place straight into the project running on this computer. Then share it with the town through your pull request.'
@@ -611,6 +620,7 @@ const Contribute = memo(function Contribute({
             )}
           </div>
           <div className="code-export">
+            <JsonGuide />
             <div className="code-heading">
               <span>{draft.id}.json</span>
               <span>JSON</span>

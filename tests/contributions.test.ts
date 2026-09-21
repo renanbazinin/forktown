@@ -96,6 +96,18 @@ describe('The contribution contract', () => {
     expect(placeSchema.safeParse({ ...sample, story: 'a'.repeat(181) }).success).toBe(false);
     expect(placeSchema.safeParse({ ...sample, building: 'anything-goes' }).success).toBe(false);
   });
+  it('allows exactly one resident object per house, never a list or extra residents', () => {
+    expect(
+      placeSchema.safeParse({ ...sample, resident: [sample.resident, sample.resident] }).success,
+    ).toBe(false);
+    expect(placeSchema.safeParse({ ...sample, residents: [sample.resident] }).success).toBe(false);
+    expect(
+      placeSchema.safeParse({
+        ...sample,
+        resident: { ...sample.resident, roommate: sample.resident },
+      }).success,
+    ).toBe(false);
+  });
   it('trims names and stories while retaining international characters', () => {
     const result = placeSchema.parse({
       ...sample,

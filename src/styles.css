@@ -3103,3 +3103,27 @@
     }
   }
 }
+.json-guide {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid var(--border, #dce1d2);
+  border-radius: 8px;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.json-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.json-guide summary:focus-visible {
+  outline: 2px solid #526b43;
+  outline-offset: 4px;
+}
+.json-guide dt {
+  font-weight: 600;
+  margin-top: 0.7rem;
+}
+.json-guide dd {
+  margin: 0;
+}
