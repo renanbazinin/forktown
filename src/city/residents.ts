@@ -8,39 +8,59 @@ export function drawResident(
   x: number,
   y: number,
   scale = 1,
-  state?: Pick<ResidentState, 'moving' | 'facing' | 'walkPhase' | 'greeting'>,
+  state?: Pick<ResidentState, 'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose'>,
 ) {
   const facing = state?.facing ?? 'se';
   const back = facing === 'ne' || facing === 'nw';
   const left = facing === 'sw' || facing === 'nw';
-  const stride = state?.moving ? Math.sin((state.walkPhase ?? 0) * Math.PI * 2) : 0;
+  const seated = !!state?.pose && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
+  const cheering = state?.pose === 'cheer';
+  const dancing = cheering || state?.pose === 'sway';
+  const stride = state?.moving || dancing ? Math.sin((state.walkPhase ?? 0) * Math.PI * 2) : 0;
   const swing = Math.round(stride * 2);
-  const bob = state?.moving ? -Math.round(Math.abs(stride) * 0.8) : 0;
-  const nearLift = Math.max(0, Math.round(stride * 2));
-  const farLift = Math.max(0, Math.round(-stride * 2));
+  const bob = seated ? 5 : state?.moving || dancing ? -Math.round(Math.abs(stride) * 0.8) : 0;
+  const nearLift = state?.moving ? Math.max(0, Math.round(stride * 2)) : 0;
+  const farLift = state?.moving ? Math.max(0, Math.round(-stride * 2)) : 0;
+  const footSwing = state?.moving ? swing : 0;
   const outfitShadow = tint(resident.outfit, -24);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
   ctx.fillStyle = '#23341B30';
   ctx.beginPath();
-  ctx.ellipse(0, 1, 5, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 1, seated ? 7 : 5, 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.save();
   if (left) ctx.scale(-1, 1);
   // The far arm and foot sit behind the body; feet lift rather than stretch.
   ctx.fillStyle = outfitShadow;
-  ctx.fillRect(-4, -11 + bob - swing, 2, 6);
-  ctx.fillStyle = resident.skin;
-  ctx.fillRect(-4, -6 + bob - swing, 2, 2);
-  ctx.fillStyle = '#3C4744';
-  ctx.fillRect(-2 - swing, -6, 2, 6 - farLift);
-  ctx.fillRect(-2 - swing, -1 - farLift, 4, 2);
-  ctx.fillStyle = '#53605A';
-  ctx.fillRect(1 + swing, -6, 2, 6 - nearLift);
-  ctx.fillStyle = '#35413D';
-  ctx.fillRect(1 + swing, -1 - nearLift, 4, 2);
+  if (cheering) {
+    ctx.fillRect(-6, -15 + bob, 4, 4);
+    ctx.fillRect(-7, -22 + bob - Math.max(0, swing), 3, 10);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(-7, -25 + bob - Math.max(0, swing), 3, 3);
+  } else {
+    ctx.fillRect(-4, -11 + bob - swing, 2, 6);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(-4, -6 + bob - swing, 2, 2);
+  }
+  if (seated) {
+    // Folded legs, with shoes tucked to the sides instead of standing feet.
+    ctx.fillStyle = '#53605A';
+    ctx.fillRect(-6, -2, 13, 4);
+    ctx.fillStyle = '#35413D';
+    ctx.fillRect(-7, 0, 4, 2);
+    ctx.fillRect(4, 0, 4, 2);
+  } else {
+    ctx.fillStyle = '#3C4744';
+    ctx.fillRect(-2 - footSwing, -6, 2, 6 - farLift);
+    ctx.fillRect(-2 - footSwing, -1 - farLift, 4, 2);
+    ctx.fillStyle = '#53605A';
+    ctx.fillRect(1 + footSwing, -6, 2, 6 - nearLift);
+    ctx.fillStyle = '#35413D';
+    ctx.fillRect(1 + footSwing, -1 - nearLift, 4, 2);
+  }
 
   ctx.fillStyle = resident.outfit;
   ctx.fillRect(-3, -13 + bob, 7, 9);
@@ -56,9 +76,16 @@ export function drawResident(
     ctx.fillRect(1, -14 + bob, 2, 2);
   }
   ctx.fillStyle = resident.outfit;
-  ctx.fillRect(3, -11 + bob + swing, 2, 6);
-  ctx.fillStyle = resident.skin;
-  ctx.fillRect(3, -6 + bob + swing, 2, 2);
+  if (cheering) {
+    ctx.fillRect(3, -15 + bob, 4, 4);
+    ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(5, -24 + bob + Math.min(0, swing), 3, 3);
+  } else {
+    ctx.fillRect(3, -11 + bob + swing, 2, 6);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(3, -6 + bob + swing, 2, 2);
+  }
 
   ctx.fillStyle = resident.skin;
   ctx.fillRect(-3, -21 + bob, 7, 8);
@@ -100,7 +127,50 @@ export function drawResident(
       ctx.fillRect(0, -16 + bob, 5, 1);
     }
   }
+  if (state?.pose === 'read') {
+    ctx.fillStyle = '#567F79';
+    ctx.fillRect(-5, -9 + bob, 11, 7);
+    ctx.fillStyle = '#F3E7C5';
+    ctx.fillRect(-4, -8 + bob, 4, 5);
+    ctx.fillRect(1, -8 + bob, 4, 5);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(-6, -6 + bob, 2, 2);
+    ctx.fillRect(5, -6 + bob, 2, 2);
+  }
+  if (state?.pose === 'sip') {
+    const lift = (state.walkPhase ?? 0) < 0.45 ? 4 : 0;
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(3, -8 + bob - lift, 4, 2);
+    ctx.fillStyle = '#F2DC8F';
+    ctx.fillRect(5, -10 + bob - lift, 4, 5);
+    ctx.fillStyle = '#FAF2D6';
+    ctx.fillRect(5, -11 + bob - lift, 4, 1);
+    ctx.fillStyle = '#81956E';
+    ctx.fillRect(7, -14 + bob - lift, 1, 4);
+  }
   ctx.restore();
+  if (state?.pose === 'play') {
+    const bounce = Math.abs(Math.sin((state.walkPhase ?? 0) * Math.PI * 2));
+    ctx.fillStyle = '#D7AA63';
+    ctx.fillRect(7, -3 - Math.round(bounce * 10), 4, 4);
+    ctx.fillStyle = '#F5DFA4';
+    ctx.fillRect(7, -3 - Math.round(bounce * 10), 2, 1);
+  }
+  if (state?.pose === 'chat' && (state.walkPhase ?? 0) < 0.4) {
+    ctx.fillStyle = '#FCFAEF';
+    ctx.fillRect(-7, -31, 15, 9);
+    ctx.fillRect(0, -22, 2, 3);
+    ctx.fillStyle = '#7B8A69';
+    for (const x of [-4, 0, 4]) ctx.fillRect(x, -27, 2, 2);
+  }
+  if (dancing && (state?.walkPhase ?? 0) < 0.3) {
+    // A small pixel music note, only occasionally, so a full crowd stays readable.
+    const rise = Math.round((state?.walkPhase ?? 0) * 12);
+    ctx.fillStyle = '#E0B768';
+    ctx.fillRect(10, -34 - rise, 2, 9);
+    ctx.fillRect(7, -27 - rise, 4, 3);
+    ctx.fillRect(12, -34 - rise, 4, 2);
+  }
   // Speech stays readable when the sprite is mirrored.
   if (state?.greeting) {
     ctx.font = '10px "Space Mono", monospace';

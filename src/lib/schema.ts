@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { compileSign } from './sign.ts';
 import { getPlot } from './world.ts';
+import { venueAt } from './events.ts';
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color.');
 export const ACTIVITIES = ['stroll', 'work', 'home'] as const;
@@ -117,7 +118,13 @@ export const placeSchema = z
       .min(1, 'Add your GitHub username so we can credit your contribution.')
       .max(39, 'A GitHub username can have at most 39 characters.')
       .regex(/^[a-z\d](?:[a-z\d]|-(?=[a-z\d]))*$/i, 'Use your GitHub username, without the @.'),
-    plot: z.string().refine((id) => !!getPlot(id), 'Choose an existing plot from the town map.'),
+    plot: z
+      .string()
+      .refine((id) => !!getPlot(id), 'Choose an existing plot from the town map.')
+      .refine(
+        (id) => !venueAt(id),
+        'This plot is reserved for a public town venue. Choose a house plot.',
+      ),
     building: z.enum(BUILDING_TYPES),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color, e.g. #A578BD.'),
     decoration: z.enum(DECORATIONS),

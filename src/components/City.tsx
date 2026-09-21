@@ -4,6 +4,8 @@ import { cityHit, renderCity, type Camera } from '../city/render';
 import { findPlotAt, getPlot, plotCenter, unproject } from '../lib/world';
 import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
+import { residentActivityLabel } from '../lib/simulation';
+import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { project, WORLD_BOUNDS } from '../lib/world';
 
 export type CityHandle = {
@@ -18,6 +20,8 @@ type Props = {
   night: boolean;
   showPlots: boolean;
   residents: ResidentState[];
+  events: TownEvent[];
+  minutes: number;
   followed: string | null;
   onStopFollowing: () => void;
   onResidentSelect: (id: string) => void;
@@ -31,6 +35,8 @@ const City = forwardRef<CityHandle, Props>(function City(
     night,
     showPlots,
     residents,
+    events,
+    minutes,
     followed,
     onStopFollowing,
     onResidentSelect,
@@ -53,6 +59,9 @@ const City = forwardRef<CityHandle, Props>(function City(
     moved: boolean;
   } | null>(null);
   const fit = useRef(0.57);
+  const initialPlaces = useRef(places);
+  const selectedRef = useRef(selectedPlot);
+  selectedRef.current = selectedPlot;
   const cameraRef = useRef(camera);
   const tracked = residents.find((resident) => resident.id === followed);
   const trackedPoint = tracked ? project(tracked.position.x, tracked.position.y) : null;
@@ -82,12 +91,44 @@ const City = forwardRef<CityHandle, Props>(function City(
   useEffect(() => {
     if (followed) {
       setHover(null);
+      canvas.current?.focus({ preventScroll: true });
       setCamera((old) => ({ ...old, zoom: Math.max(old.zoom, 0.6, fit.current * 1.8) }));
     }
   }, [followed]);
   const reset = useCallback(
     () => setCamera(defaultCamera(size.width, size.height)),
     [defaultCamera, size],
+  );
+  const neighborhoodCamera = useCallback(
+    (width: number, height: number): Camera => {
+      const overview = defaultCamera(width, height);
+      const points = [
+        ...initialPlaces.current.map((place) => place.plot),
+        ...VENUES.map((venue) => venue.plot),
+      ].flatMap((id) => {
+        const plot = getPlot(id);
+        return plot ? [plotCenter(plot)] : [];
+      });
+      if (!points.length) return overview;
+      const left = Math.min(...points.map((point) => point.x)) - 110;
+      const right = Math.max(...points.map((point) => point.x)) + 110;
+      const top = Math.min(...points.map((point) => point.y)) - 145;
+      const bottom = Math.max(...points.map((point) => point.y)) + 80;
+      const zoom = Math.max(
+        overview.zoom,
+        Math.min(
+          0.85,
+          (width < 600 ? width * 1.6 : width - 150) / (right - left),
+          (height - 160) / (bottom - top),
+        ),
+      );
+      return {
+        x: width / 2 - ((left + right) / 2) * zoom,
+        y: height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom,
+        zoom,
+      };
+    },
+    [defaultCamera],
   );
   const stopFollowing = useCallback(() => {
     setCamera(cameraRef.current);
@@ -102,10 +143,10 @@ const City = forwardRef<CityHandle, Props>(function City(
         const plot = getPlot(id);
         if (!plot) return;
         const pt = plotCenter(plot);
-        const zoom = Math.max(fit.current, 0.65);
+        const zoom = Math.max(fit.current, 0.85, cameraRef.current.zoom);
         setCamera({
           x: size.width / 2 - pt.x * zoom,
-          y: size.height / 2 - (pt.y - 35) * zoom,
+          y: size.height * (size.width < 600 ? 0.33 : 0.5) - (pt.y - 35) * zoom,
           zoom,
         });
       },
@@ -118,11 +159,21 @@ const City = forwardRef<CityHandle, Props>(function City(
       const width = entry.contentRect.width,
         height = entry.contentRect.height;
       setSize({ width, height });
-      setCamera(defaultCamera(width, height));
+      const initial = neighborhoodCamera(width, height);
+      const selected = getPlot(selectedRef.current ?? '');
+      if (selected) {
+        const point = plotCenter(selected),
+          zoom = Math.max(initial.zoom, 0.85);
+        setCamera({
+          x: width / 2 - point.x * zoom,
+          y: height * (width < 600 ? 0.33 : 0.5) - (point.y - 35) * zoom,
+          zoom,
+        });
+      } else setCamera(initial);
     });
     observer.observe(wrapper.current);
     return () => observer.disconnect();
-  }, [defaultCamera]);
+  }, [neighborhoodCamera]);
   const zoomBy = useCallback(
     (factor: number, anchor?: { x: number; y: number }) => {
       setCamera((old) => {
@@ -175,9 +226,23 @@ const City = forwardRef<CityHandle, Props>(function City(
       night,
       showPlots,
       residents,
+      events,
+      minutes,
       followed,
     });
-  }, [size, camera, places, selectedPlot, hover, night, showPlots, residents, followed]);
+  }, [
+    size,
+    camera,
+    places,
+    selectedPlot,
+    hover,
+    night,
+    showPlots,
+    residents,
+    followed,
+    events,
+    minutes,
+  ]);
   const hit = (clientX: number, clientY: number) => {
     const bounds = canvas.current!.getBoundingClientRect();
     const local = { x: clientX - bounds.left, y: clientY - bounds.top };
@@ -204,7 +269,7 @@ const City = forwardRef<CityHandle, Props>(function City(
         ref={canvas}
         role="img"
         tabIndex={0}
-        aria-label="Interactive Forktown map. Drag to pan, scroll or use plus and minus to zoom. Arrow keys move the map; Home resets it. Use the neighborhood list to select places with a keyboard."
+        aria-label="Interactive Forktown map. Drag to pan, scroll or use plus and minus to zoom. Arrow keys move the map; Home shows the whole town. Use Explore places to select a house with a keyboard."
         onKeyDown={(event) => {
           const moves: Record<string, [number, number]> = {
             ArrowLeft: [35, 0],
@@ -284,29 +349,15 @@ const City = forwardRef<CityHandle, Props>(function City(
         }}
         onPointerLeave={() => setHover(null)}
       />
-      <div className="map-location">
-        <span className="live-dot" />{' '}
-        {tracked ? `Following ${tracked.resident.name}` : 'The living neighborhood'}{' '}
-        <span className="map-location-divider">/</span> <span>01</span>
-      </div>
       {tracked && (
         <div className="follow-status">
           <span>
-            {tracked.activity === 'sleep'
-              ? 'Sleeping at home'
-              : tracked.activity === 'home'
-                ? 'Relaxing at home'
-                : tracked.activity === 'work'
-                  ? 'Working at home'
-                  : 'Out for a stroll'}
+            <strong>{tracked.resident.name}</strong>
+            {residentActivityLabel(tracked)}
           </span>
           <button onClick={stopFollowing}>Stop following</button>
         </div>
       )}
-      <div className="compass" aria-hidden="true">
-        <span>N</span>
-        <div>↑</div>
-      </div>
       {hover && !dragging && (
         <div
           className="map-tooltip"
@@ -316,13 +367,11 @@ const City = forwardRef<CityHandle, Props>(function City(
           }}
         >
           <MapPin size={13} />
-          <span>{hoveredPlace?.name ?? `Plot ${hover} · Make it yours`}</span>
+          <span>
+            {hoveredPlace?.name ?? venueAt(hover)?.name ?? `Plot ${hover} · Make it yours`}
+          </span>
         </div>
       )}
-      <div className="map-help">
-        <span className="mouse-mark" aria-hidden="true" /> Drag to wander <span>·</span> Scroll to
-        zoom
-      </div>
       <div className="map-controls">
         <button aria-label="Zoom in" onClick={() => zoomBy(1.2)}>
           <Plus size={17} />

@@ -1,4 +1,5 @@
 export const TOWN_DAY_MS = 24 * 60 * 1000;
+export const townDayAt = (utcTimestamp: number) => Math.floor(utcTimestamp / TOWN_DAY_MS);
 
 // Sixty 24-minute cycles fit exactly into a UTC day. Epoch-based arithmetic
 // keeps the phase identical across time zones, reloads, and suspended tabs.

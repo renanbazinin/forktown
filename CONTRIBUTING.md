@@ -10,7 +10,7 @@ The published GitHub Pages town is read-only: explore houses and their JSON ther
 
 1. On GitHub, fork the repository and clone your fork to your computer. Create a contribution branch.
 2. Follow [Develop locally](#develop-locally) below to install dependencies and start your local town.
-3. Choose **Build a place**, add your GitHub username, and use the Home, Neighbor, and Outdoor sign tabs to design it.
+3. Choose **Find your way in → Build a place**, add your GitHub username, and use the Home, Neighbor, and Outdoor sign tabs to design it.
 4. Choose **Continue to save → Save to my project**. This creates `places/<your-id>.json` in your local fork.
 5. Click **See my saved JSON** to inspect the file. Commit it and push your contribution branch.
 6. Open a pull request from your fork to the original repository, complete the checklist, and submit it.
@@ -64,6 +64,8 @@ The eight basic fields above still work: omitted `design`, `resident`, and `sign
 
 One place brings one resident. A resident can be fictional; the creator credit should be your GitHub username. To change your own home or daily routine later, edit your existing JSON file and submit another PR.
 
+The Little Stage (B5) and Lunch Green (C5) are public venues, reserved for everyone. Choose another plot for your house. Neighbors who choose `stroll` in the afternoon or evening may walk to a town event, enjoy it, and walk home. There is no extra scheduling to configure, and work/home routines stay indoors. Lunch events run 13:00–16:00; evening shows run 19:00–21:00, in town time. Everyone sees the same daily lineup when their device clocks agree.
+
 The town follows a shared UTC-based day: one real minute equals one town hour. The cycle repeats every 24 minutes, starting at UTC midnight. Visitors can pause their view; returning to live catches up to the current town time. Following a neighbor keeps the camera with them; dragging the map or pressing Stop following returns to exploring.
 
 ## If two people choose the same plot
@@ -83,7 +85,7 @@ npm run dev
 
 Add your file to `places/`, and the city reloads automatically.
 
-You can also let the builder create the file: choose **Build a place → Continue to save → Save to my project**. It writes `places/<your-file-id>.json` into the checkout running `npm run dev`, and the local city updates. Existing files are never overwritten; choose a new id or edit an existing file yourself. Review the new file, commit it, push your branch, and open your PR. Saving does not make commits, switch branches, push, or create a PR.
+You can also let the builder create the file: choose **Find your way in → Build a place → Continue to save → Save to my project**. It writes `places/<your-file-id>.json` into the checkout running `npm run dev`, and the local city updates. Existing files are never overwritten; choose a new id or edit an existing file yourself. Review the new file, commit it, push your branch, and open your PR. Saving does not make commits, switch branches, push, or create a PR.
 
 The builder and save button are available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy.
 

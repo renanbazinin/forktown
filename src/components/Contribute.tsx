@@ -18,7 +18,7 @@ import {
   placeSchema,
   type Place,
 } from '../lib/schema';
-import { PLOTS } from '../lib/world';
+import { HOUSE_PLOTS as PLOTS } from '../lib/events';
 import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
 import BuildingPreview from './BuildingPreview';

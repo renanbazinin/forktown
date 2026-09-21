@@ -125,10 +125,12 @@ describe('The world stays predictable as people contribute', () => {
     expect(shade('#FFFFFF', 30)).toBe('#ffffff');
     expect(shade('#000000', -30)).toBe('#000000');
   });
-  it('has 50 unique plots, all accepted by the contribution schema', () => {
+  it('has 50 unique plots with the two public venues reserved', () => {
     expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(50);
     for (const plot of PLOTS)
-      expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(true);
+      expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
+        !['B5', 'C5'].includes(plot.id),
+      );
   });
   it('keeps the same coordinates for an existing plot regardless of other places', () => {
     expect(getPlot('B2')).toEqual({ id: 'B2', col: 1, row: 1, x: 7, y: 7 });

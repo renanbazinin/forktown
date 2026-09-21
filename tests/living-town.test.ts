@@ -4,6 +4,7 @@ import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
 import { getPlot, isRoad, plotEntrance, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
+import { eventsForDay, insideVenue } from '../src/lib/events';
 
 const places = readdirSync('places')
   .filter((file) => file.endsWith('.json'))
@@ -83,7 +84,7 @@ describe('A small predictable daily life', () => {
     expect(simulateResidents([...places].reverse(), 810.25).reverse()).toEqual(before);
     expect(simulateResidents(places, 810.25 + 1440)).toEqual(before);
   });
-  it('keeps wandering residents on roads throughout a full day', () => {
+  it('keeps residents on roads except when entering their assigned public venue', () => {
     const wanderers = places.map((place) => ({
       ...place,
       resident: {
@@ -97,7 +98,11 @@ describe('A small predictable daily life', () => {
     }));
     for (let minute = 360; minute < 1320; minute += 2.75)
       for (const state of simulateResidents(wanderers, minute)) {
-        expect(isRoad(Math.floor(state.position.x), Math.floor(state.position.y))).toBe(true);
+        const event = eventsForDay(0).find((event) => event.id === state.event?.id);
+        expect(
+          isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
+            (event && insideVenue(event.venue, state.position)),
+        ).toBe(true);
         expect(state.position.x).toBeGreaterThanOrEqual(1.5);
         expect(state.position.y).toBeLessThanOrEqual(ROAD_MAX_Y + 0.5);
       }

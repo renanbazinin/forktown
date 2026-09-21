@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { townMinutesAt } from './town-time';
+import { townDayAt, townMinutesAt } from './town-time';
 
 export function useTownClock() {
-  const [minutes, setMinutes] = useState(() => townMinutesAt(Date.now()));
+  // Keep day and minute in one snapshot, also while paused across midnight.
+  const [timestamp, setTimestamp] = useState(() => Date.now());
   const [playing, setPlaying] = useState(
     () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -12,13 +13,13 @@ export function useTownClock() {
       lastPaint = -Infinity;
     const tick = (now: number) => {
       if (!document.hidden && now - lastPaint >= 1000 / 30) {
-        setMinutes(townMinutesAt(Date.now()));
+        setTimestamp(Date.now());
         lastPaint = now;
       }
       frame = requestAnimationFrame(tick);
     };
     const sync = () => {
-      if (!document.hidden) setMinutes(townMinutesAt(Date.now()));
+      if (!document.hidden) setTimestamp(Date.now());
     };
     sync();
     frame = requestAnimationFrame(tick);
@@ -28,5 +29,5 @@ export function useTownClock() {
       document.removeEventListener('visibilitychange', sync);
     };
   }, [playing]);
-  return { minutes, playing, setPlaying };
+  return { minutes: townMinutesAt(timestamp), day: townDayAt(timestamp), playing, setPlaying };
 }

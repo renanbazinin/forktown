@@ -3127,3 +3127,133 @@
 .json-guide dd {
   margin: 0;
 }
+.town-events {
+  display: grid;
+  grid-template-columns: 0.8fr 1fr 1fr;
+  gap: 14px;
+  padding: 20px 24px;
+  background: #f4f2e9;
+  border-bottom: 1px solid #dedfce;
+}
+.events-intro {
+  align-self: center;
+}
+.events-intro .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1.2px;
+}
+.events-intro h3 {
+  margin: 5px 0;
+  font:
+    500 24px 'Fraunces',
+    serif;
+}
+.events-intro p {
+  margin: 0;
+  color: #6b7962;
+  font-size: 11px;
+}
+.event-card {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  text-align: left;
+  border: 1px solid #dcded0;
+  border-radius: 9px;
+  padding: 15px;
+  background: #fdfcf7;
+  color: #40563e;
+  cursor: pointer;
+  min-width: 0;
+}
+.event-card:hover {
+  border-color: #7b9366;
+  background: #fffef8;
+}
+.event-card:focus-visible {
+  outline: 2px solid #526d42;
+  outline-offset: 3px;
+}
+.event-card.is-live {
+  border-color: #8ea272;
+  background: #edf1e2;
+}
+.event-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #e9eddf;
+}
+.event-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.event-copy strong {
+  font-size: 13px;
+  line-height: 1.4;
+}
+.event-copy > span:last-child {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.event-time {
+  font-size: 9px;
+  color: #68765d;
+  line-height: 1.5;
+}
+.event-time .live-dot {
+  display: inline-block;
+  margin-right: 3px;
+}
+.venue-detail {
+  padding: 28px 24px;
+}
+.venue-detail h3 {
+  font:
+    500 30px 'Fraunces',
+    serif;
+  margin: 13px 0;
+}
+.venue-detail p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #6b7962;
+}
+.venue-program {
+  margin: 24px 0;
+  padding: 20px;
+  background: #f0f2e7;
+  border: 1px solid #dce2ce;
+  border-radius: 8px;
+}
+.venue-program h4 {
+  margin: 12px 0;
+  font:
+    500 22px 'Fraunces',
+    serif;
+}
+.venue-program strong {
+  font-size: 12px;
+  color: #4e6644;
+}
+@media (max-width: 900px) {
+  .town-events {
+    grid-template-columns: 1fr 1fr;
+    padding: 16px;
+  }
+  .events-intro {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 560px) {
+  .town-events {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}

@@ -1,5 +1,6 @@
 import { ArrowUpRight, Footprints, House, Moon, BriefcaseBusiness } from 'lucide-react';
 import type { ResidentState } from '../lib/simulation';
+import { residentActivityLabel } from '../lib/simulation';
 import ResidentPreview from './ResidentPreview';
 export const ACTIVITY_LABELS = {
   stroll: 'Out for a stroll',
@@ -54,7 +55,7 @@ export default function Neighbors({
               </div>
               <p className="neighbor-activity">
                 <Icon size={13} />
-                {ACTIVITY_LABELS[state.activity]}
+                {residentActivityLabel(state)}
               </p>
               <p className="neighbor-greeting">“{state.resident.greeting}”</p>
               <div className="neighbor-actions">

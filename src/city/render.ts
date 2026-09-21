@@ -1,5 +1,7 @@
 import { drawHouse, houseBounds } from './houses';
 import { drawResident } from './residents';
+import { drawVenue, venueBounds } from './venues';
+import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import type { ResidentState } from '../lib/simulation';
 export { drawHouse as drawBuilding } from './houses';
 import type { Place } from '../lib/schema';
@@ -35,6 +37,7 @@ type Palette = {
 };
 export type Camera = { x: number; y: number; zoom: number };
 const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
+const venueDepth = (plot: Plot) => plot.x + plot.y + 0.1;
 const residentDepth = (resident: ResidentState) => resident.position.x + resident.position.y;
 export const DAY: Palette = {
   grass: '#B9CF9B',
@@ -201,6 +204,8 @@ type RenderOptions = {
   showPlots: boolean;
   residents?: ResidentState[];
   followed?: string | null;
+  events?: TownEvent[];
+  minutes?: number;
 };
 export function renderCity({
   ctx,
@@ -214,6 +219,8 @@ export function renderCity({
   showPlots,
   residents = [],
   followed,
+  events = [],
+  minutes = 0,
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
   const p = night ? NIGHT : DAY;
@@ -279,7 +286,7 @@ export function renderCity({
   // Stable plot IDs keep existing contributions in place as the town grows.
   for (const plot of PLOTS) {
     const pt = plotCenter(plot);
-    const occupied = byPlot.has(plot.id);
+    const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
     const active = selectedPlot === plot.id;
     const hover = hoveredPlot === plot.id;
     if (occupied) {
@@ -319,6 +326,21 @@ export function renderCity({
     }
   }
   const objects: { depth: number; paint: () => void }[] = [];
+  // Rugs are floor paint: they must never be drawn over seated guests.
+  for (const venue of VENUES) {
+    const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
+    const point = plotCenter(plot);
+    drawVenue(
+      ctx,
+      venue,
+      point.x,
+      point.y,
+      night,
+      events.find((event) => event.venue.id === venue.id),
+      minutes,
+      'ground',
+    );
+  }
   for (let x = 0; x < WORLD_WIDTH; x++)
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       const seed = hash(`tree${x},${y}`);
@@ -336,6 +358,9 @@ export function renderCity({
         x < ROAD_MAX_X &&
         y < ROAD_MAX_Y &&
         !isRoad(x, y) &&
+        !PLOTS.some(
+          (plot) => venueAt(plot.id) && Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1,
+        ) &&
         x % BLOCK_SIZE === 0 &&
         y % BLOCK_SIZE === 2 &&
         seed % 2
@@ -343,6 +368,23 @@ export function renderCity({
         objects.push({ depth: x + y, paint: () => tree(ctx, pt.x, pt.y, 0.65, p, seed) });
       }
     }
+  for (const venue of VENUES) {
+    const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
+    const pt = plotCenter(plot);
+    objects.push({
+      depth: venueDepth(plot),
+      paint: () =>
+        drawVenue(
+          ctx,
+          venue,
+          pt.x,
+          pt.y,
+          night,
+          events.find((event) => event.venue.id === venue.id),
+          minutes,
+        ),
+    });
+  }
   for (const place of places) {
     const plot = PLOTS.find((v) => v.id === place.plot);
     if (!plot) continue;
@@ -411,6 +453,21 @@ export function cityHit(
   const plot = PLOTS.find((plot) => plot.id === plotId);
   let depth = plot ? houseDepth(plot) : -Infinity;
   let target: CityHit | undefined = plot ? { kind: 'place', id: plot.id } : undefined;
+  for (const venue of VENUES) {
+    const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
+    const p = plotCenter(plot),
+      bounds = venueBounds(venue);
+    if (
+      venueDepth(plot) >= depth &&
+      point.x >= p.x + bounds.left &&
+      point.x <= p.x + bounds.right &&
+      point.y >= p.y + bounds.top &&
+      point.y <= p.y + bounds.bottom
+    ) {
+      depth = venueDepth(plot);
+      target = { kind: 'place', id: plot.id };
+    }
+  }
   // Match the painter's order: residents follow houses at equal depth, and
   // the last resident in the input wins ties (the drawing sort is stable).
   for (const resident of residents) {

@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Forktown event artwork check</title>
+    <style>
+      body {
+        margin: 20px;
+        font: 15px system-ui;
+        background: #f8f6ee;
+        color: #304c40;
+      }
+      button,
+      select {
+        padding: 10px;
+        margin: 5px;
+      }
+      canvas {
+        display: block;
+        max-width: 100%;
+        background: #dfe7cf;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Event artwork check</h1>
+    <p>
+      Development fixture. Uses real drawing and simulation code; never saves houses or changes the
+      live town clock.
+    </p>
+    <label
+      >Town day
+      <select id="day">
+        <option>0</option>
+        <option>1</option>
+        <option>2</option>
+        <option>3</option>
+        <option>4</option>
+      </select></label
+    >
+    <button data-time="750">Walking to lunch</button>
+    <button data-time="850">Lunch event</button>
+    <button data-time="1000">Walking home</button>
+    <button data-time="1200">Evening concert</button>
+    <button data-time="1290">After the show</button>
+    <button data-time="1350">Bedtime</button>
+    <label><input type="checkbox" id="crowd" /> Full venue + overflow</label>
+    <button id="animate">Animate preview</button>
+    <p id="status"></p>
+    <canvas width="960" height="580" aria-label="Event artwork with real town residents"></canvas>
+    <ul id="residents"></ul>
+    <script type="module">
+      import { renderCity } from '/src/city/render.ts';
+      import { eventsForDay, HOUSE_PLOTS } from '/src/lib/events.ts';
+      import { places } from '/src/lib/places.ts';
+      import { simulateResidents, residentActivityLabel, timeLabel } from '/src/lib/simulation.ts';
+      import { getPlot, plotCenter } from '/src/lib/world.ts';
+      let minutes = 1200;
+      const canvas = document.querySelector('canvas');
+      function paint() {
+        const day = Number(document.querySelector('#day').value);
+        const homes = document.querySelector('#crowd').checked
+          ? HOUSE_PLOTS.slice(0, 16).map((plot, index) => ({
+              ...places[index % places.length],
+              id: `preview-${index}`,
+              plot: plot.id,
+              resident: {
+                ...places[index % places.length].resident,
+                routine: { morning: 'stroll', afternoon: 'stroll', evening: 'stroll' },
+              },
+            }))
+          : places;
+        const events = eventsForDay(day),
+          residents = simulateResidents(homes, minutes, day);
+        const event = events[minutes < 1080 ? 0 : 1];
+        const center = plotCenter(getPlot(event.venue.plot));
+        renderCity({
+          ctx: canvas.getContext('2d'),
+          width: 960,
+          height: 580,
+          camera: { x: 480 - center.x * 1.5, y: 280 - center.y * 1.5, zoom: 1.5 },
+          places,
+          residents,
+          events,
+          minutes,
+          night: minutes >= 1200,
+          selectedPlot: event.venue.plot,
+          hoveredPlot: null,
+          showPlots: false,
+        });
+        document.querySelector('#status').textContent = `${timeLabel(minutes)} · ${event.name}`;
+        document.querySelector('#residents').replaceChildren(
+          ...residents.map((resident) => {
+            const item = document.createElement('li');
+            item.textContent = `${resident.resident.name}: ${residentActivityLabel(resident)}`;
+            return item;
+          }),
+        );
+      }
+      for (const button of document.querySelectorAll('button[data-time]'))
+        button.onclick = () => {
+          minutes = Number(button.dataset.time);
+          paint();
+        };
+      document.querySelector('#day').onchange = paint;
+      document.querySelector('#crowd').onchange = paint;
+      let running = false,
+        last = 0;
+      document.querySelector('#animate').onclick = () => {
+        running = !running;
+        document.querySelector('#animate').textContent = running
+          ? 'Pause preview'
+          : 'Animate preview';
+        last = performance.now();
+      };
+      function tick(now) {
+        if (running) {
+          minutes = (minutes + (now - last) / 1000) % 1440;
+          paint();
+        }
+        last = now;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+      paint();
+    </script>
+  </body>
+</html>

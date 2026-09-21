@@ -20,7 +20,7 @@ Open `http://localhost:5173`. No accounts, API keys, database, or remote service
 ## Make your first contribution
 
 1. Fork and clone the repository, create a contribution branch, and run your local town using the commands above.
-2. Choose **Build a place**. Use Home, Neighbor, and Outdoor sign to customize it.
+2. Choose **Find your way in → Build a place**. Use Home, Neighbor, and Outdoor sign to customize it.
 3. Choose **Continue to save → Save to my project** to create your JSON in `places/`.
 4. Open **See my saved JSON** to learn from your file, then commit and push it.
 5. Open a pull request against the original repository.
@@ -34,9 +34,10 @@ Read the [step-by-step contribution guide](CONTRIBUTING.md). The published GitHu
 - Custom floors, roof shapes, wall and trim colors, window styles, gardens, porches, and balconies.
 - Residents with names, outfits, accessories, greetings, and three simple daily choices.
 - Road-following strolls with four directional walking views, distance-based footsteps, occasional neighbor greetings, bedtime, and a camera that follows a resident.
+- Shared daily events: picnics, books, and lawn games at the Lunch Green; rock, acoustic, and jazz evenings at the Little Stage. Strolling neighbors can join a small audience and walk home afterward. Both venues are reserved public plots.
 - A shared UTC-based 24-minute town day, automatic day/night lighting, pause/resume-live, and reduced-motion support.
 - Exterior signs: simple text or a restricted HTML/CSS artwork language, drawn as noninteractive canvas textures.
-- Searchable place directory and open-plot directory, including a keyboard-accessible alternative to the map.
+- A full-screen town with compact controls. Explore opens searchable places and open plots; the neighbor and music buttons reveal residents and events. All directories work with a keyboard.
 - Place stories, contributor credit, and shareable `#place=id` links without server routing.
 - A live building editor, local preview, direct saves to your local checkout, JSON export, and browser-based contribution instructions.
 - A shared schema used by the editor, build, and contribution validator.
