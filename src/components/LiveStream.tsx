@@ -49,7 +49,8 @@ export default function LiveStream() {
     if (element.height !== height) element.height = height;
     const now = performance.now();
     const elapsed = lastPaint.current === null ? 0 : (now - lastPaint.current) / 1000;
-    const target = liveCamera(shot, size.width, size.height);
+    // One town minute is one real second.
+    const target = liveCamera(shot, size.width, size.height, clock.minutes);
     camera.current =
       camera.current === null || elapsed > 2
         ? target

@@ -147,4 +147,45 @@ describe('Live broadcast director', () => {
     expect(stepped.x).toBeCloseTo(next.x);
     expect(stepped.zoom).toBeCloseTo(next.zoom);
   });
+
+  it('adds gentle motion to held shots while keeping the entire subject framed', () => {
+    const shots = [
+      shotAt(0, 360),
+      liveShotAt(liveProgram([], 0), 360, []),
+      ...[0, 1, 2, 3].map((day) => shotAt(day, liveFeature(day).start)),
+    ];
+    for (const shot of shots) {
+      for (const [width, height] of [
+        [1920, 900],
+        [390, 844],
+        [844, 390],
+      ]) {
+        const base = liveCamera(shot, width, height);
+        const later = liveCamera(shot, width, height, 22.5);
+        expect(later.zoom).toBeGreaterThan(base.zoom);
+        expect(later.x + shot.center.x * later.zoom).toBeGreaterThan(width / 2);
+        for (let second = 0; second <= 1440; second++) {
+          const camera = liveCamera(shot, width, height, second);
+          expect(camera.zoom).toBeGreaterThanOrEqual(base.zoom);
+          expect(camera.zoom).toBeLessThanOrEqual(base.zoom * 1.04);
+          const x = camera.x + shot.center.x * camera.zoom;
+          const y = camera.y + shot.center.y * camera.zoom;
+          expect(x - (shot.width * camera.zoom) / 2).toBeGreaterThan(0);
+          expect(x + (shot.width * camera.zoom) / 2).toBeLessThan(width);
+          expect(y - (shot.height * camera.zoom) / 2).toBeGreaterThan(0);
+          expect(y + (shot.height * camera.zoom) / 2).toBeLessThan(height);
+        }
+      }
+    }
+  });
+
+  it('keeps motion continuous at midnight and leaves resident tracking alone', () => {
+    const before = liveCamera(shotAt(2, 1439.999), 1920, 1080, 1439.999);
+    const after = liveCamera(shotAt(3, 0), 1920, 1080, 0);
+    expect(Math.abs(before.x - after.x)).toBeLessThan(0.01);
+    expect(Math.abs(before.zoom - after.zoom)).toBeLessThan(0.00001);
+    const neighbor = shotAt(12, 510);
+    expect(neighbor.kind).toBe('neighbor');
+    expect(liveCamera(neighbor, 1920, 1080, 35)).toEqual(liveCamera(neighbor, 1920, 1080));
+  });
 });

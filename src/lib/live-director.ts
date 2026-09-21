@@ -116,8 +116,8 @@ export function liveShotAt(
   };
 }
 
-export function liveCamera(shot: LiveShot, width: number, height: number): Camera {
-  const zoom = Math.max(
+export function liveCamera(shot: LiveShot, width: number, height: number, seconds = 0): Camera {
+  const baseZoom = Math.max(
     0.01,
     Math.min(
       shot.kind === 'home' ? 2.4 : 1.8,
@@ -125,7 +125,17 @@ export function liveCamera(shot: LiveShot, width: number, height: number): Camer
       (height * 0.86) / shot.height,
     ),
   );
-  return { x: width / 2 - shot.center.x * zoom, y: height / 2 - shot.center.y * zoom, zoom };
+  // Shared-clock cycles divide the 24-minute day, so the motion survives midnight
+  // and reloads. Keep it inside the framing margin; never zoom out toward empty land.
+  const moving = shot.kind !== 'neighbor';
+  const sway = moving ? Math.sin((cycle(seconds, 90) / 90) * Math.PI * 2) : 0;
+  const breath = moving ? (1 - Math.cos((cycle(seconds, 120) / 120) * Math.PI * 2)) / 2 : 0;
+  const zoom = baseZoom * (1 + breath * 0.04);
+  return {
+    x: width / 2 - shot.center.x * zoom + sway * Math.min(28, width * 0.018),
+    y: height / 2 - shot.center.y * zoom,
+    zoom,
+  };
 }
 
 export function easeLiveCamera(current: Camera, target: Camera, seconds: number): Camera {
