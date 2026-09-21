@@ -1,0 +1,40 @@
+{
+  "id": "funky-fun",
+  "name": "funky fun",
+  "creator": "renabazinin",
+  "plot": "A2",
+  "building": "studio",
+  "color": "#789B76",
+  "decoration": "flowers",
+  "story": "A small corner of the internet, made with curiosity and a little courage.",
+  "design": {
+    "wall": "#625b5b",
+    "trim": "#4b3016",
+    "floors": 1,
+    "roof": "flat",
+    "windows": "cross",
+    "garden": "vegetables",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "bobo",
+    "skin": "#000000",
+    "hair": "#db9129",
+    "outfit": "#000000",
+    "accessory": "hat",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "stroll",
+      "evening": "stroll",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "<div style=\"background-color: #192B40; text-align: center\">\n  <strong style=\"color: #FFD580; font-size: 28px\">MOON CLUB</strong>\n  <p style=\"color: #A8E6CF; font-size: 16px\">Night owls welcome</p>\n</div>"
+  }
+}
