@@ -3,13 +3,17 @@ import { describe, expect, it } from 'vitest';
 import {
   easeLiveCamera,
   liveCamera,
-  liveFeature,
   liveProgram,
   liveShotAt,
+  SCENERY_START,
+  SCENERY_SECONDS,
 } from '../src/lib/live-director';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
-import { getPlot, plotCenter } from '../src/lib/world';
+import { eventsForDay, isEventLive } from '../src/lib/events';
+import { footballAt } from '../src/lib/football';
+import { townCatAt } from '../src/lib/town-cat';
+import { isRoad, project } from '../src/lib/world';
 
 const places = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
@@ -18,121 +22,133 @@ const shotAt = (day: number, minute: number) =>
   liveShotAt(liveProgram(places, day), minute, simulateResidents(places, minute, day));
 
 describe('Live broadcast director', () => {
-  it('keeps every postcard centered on an occupied home, including a sparse town', () => {
-    const sparse = [
-      { ...places[0], plot: 'A1' },
-      { ...places[1], plot: 'J10' },
-    ];
-    for (const homes of [places, sparse, [places[0]]]) {
-      const seen = new Set<string>();
-      for (let day = 0; day < 8; day++) {
+  it('limits scenery to exactly 60 seconds and films actual outdoor activity for the rest of each day', () => {
+    const sleepers = places.map((p) => ({
+      ...p,
+      resident: {
+        ...p.resident,
+        routine: { morning: 'home', afternoon: 'home', evening: 'home', night: 'sleep' } as const,
+      },
+    }));
+    for (const homes of [places, sleepers, [], [places[0]]]) {
+      for (let day = 0; day < 4; day++) {
         const program = liveProgram(homes, day);
-        for (let minute = 0; minute < 1440; minute += 30) {
+        let scenery = 0;
+        for (let minute = 0; minute < 1440; minute++) {
+          const residents = simulateResidents(homes, minute, day);
+          const shot = liveShotAt(program, minute, residents);
+          if (shot.kind === 'home') {
+            scenery++;
+            expect(minute).toBeGreaterThanOrEqual(SCENERY_START);
+            expect(minute).toBeLessThan(SCENERY_START + SCENERY_SECONDS);
+          } else if (shot.kind === 'neighbor') {
+            expect(residents.find((r) => r.id === shot.residentId)?.activity).toBe('stroll');
+          } else if (shot.kind === 'event') {
+            if (shot.id.startsWith('football:')) expect(footballAt(minute, day).live).toBe(true);
+            else {
+              const event = eventsForDay(day).find((event) => shot.id.endsWith(`:${event.id}`))!;
+              expect(event).toBeDefined();
+              expect(isEventLive(event, minute)).toBe(true);
+              if (event.venue.kind === 'green')
+                expect(
+                  residents.some(
+                    (r) =>
+                      r.activity === 'stroll' &&
+                      r.event?.id === event.id &&
+                      r.event.phase === 'attending',
+                  ),
+                ).toBe(true);
+            }
+          } else expect(shot.kind).toBe('cat');
+        }
+        expect(scenery).toBe(60);
+      }
+    }
+  });
+
+  it('prefers each live gathering, follows people outside the old morning window, and stays for a full match', () => {
+    for (const minute of [100, 800, 1200, 1420]) expect(shotAt(12, minute).kind).toBe('event');
+    expect(shotAt(12, 420).kind).toBe('neighbor');
+    expect(shotAt(12, 1000).kind).toBe('neighbor');
+    for (const minute of [640, 700, 779.9]) expect(shotAt(12, minute).id).toContain('football:');
+    expect(shotAt(12, 299.99).kind).not.toBe('home');
+    expect(shotAt(12, 300).kind).toBe('home');
+    expect(shotAt(12, 359.99).kind).toBe('home');
+    expect(shotAt(12, 360).kind).not.toBe('home');
+  });
+
+  it('keeps casting deterministic and switches away from a resident who goes indoors', () => {
+    const program = liveProgram(places, 12);
+    expect(liveProgram([...places].reverse(), 12)).toEqual(program);
+    const residents = simulateResidents(places, 510, 12);
+    const shot = liveShotAt(program, 510, residents);
+    expect(shot.kind).toBe('neighbor');
+    const indoors = residents.map((r) =>
+      r.id === shot.residentId ? { ...r, activity: 'sleep' as const } : r,
+    );
+    expect(liveShotAt(program, 510, indoors).residentId).not.toBe(shot.residentId);
+  });
+
+  it('keeps the party continuous at midnight and follows its guests home afterward', () => {
+    expect(shotAt(2, 1439.9)).toEqual(shotAt(3, 0));
+    expect(shotAt(3, 149.9).kind).toBe('event');
+    expect(shotAt(3, 160).kind).toBe('neighbor');
+    expect(shotAt(3, 290).kind).toBe('cat');
+  });
+
+  it('keeps the cat on the street, visible during scenery, and continuous across midnight', () => {
+    for (const homes of [places, [], [places[0]]]) {
+      const program = liveProgram(homes, 12);
+      for (let minute = 0; minute < 1440; minute += 0.5) {
+        const cat = townCatAt(homes, minute);
+        expect(isRoad(Math.floor(cat.position.x), Math.floor(cat.position.y))).toBe(true);
+        if (minute >= 300 && minute < 360) {
           const shot = liveShotAt(program, minute, []);
-          if (shot.kind === 'event') continue;
-          expect(shot.kind).toBe('home');
-          const home = homes.find((place) => place.name === shot.label)!;
-          expect(home).toBeDefined();
-          seen.add(home.id);
-          const center = plotCenter(getPlot(home.plot)!);
+          const point = project(cat.position.x, cat.position.y);
           for (const [width, height] of [
             [1920, 900],
             [390, 844],
           ]) {
-            const camera = liveCamera(shot, width, height);
-            const x = center.x * camera.zoom + camera.x;
-            const y = (center.y - 40) * camera.zoom + camera.y;
-            expect(x).toBeCloseTo(width / 2);
-            expect(y).toBeCloseTo(height / 2);
+            const camera = liveCamera(shot, width, height, minute);
+            expect(point.x * camera.zoom + camera.x).toBeGreaterThan(20);
+            expect(point.x * camera.zoom + camera.x).toBeLessThan(width - 20);
+            expect(point.y * camera.zoom + camera.y).toBeGreaterThan(20);
+            expect(point.y * camera.zoom + camera.y).toBeLessThan(height - 20);
           }
-          expect(liveCamera(shot, 1920, 900).zoom).toBeGreaterThanOrEqual(2);
         }
       }
-      expect(seen.size).toBe(homes.length);
+      const before = townCatAt(homes, 1439.999).position;
+      const after = townCatAt(homes, 0).position;
+      expect(Math.hypot(before.x - after.x, before.y - after.y)).toBeLessThan(0.001);
     }
   });
 
-  it('films a public landmark instead of empty terrain when there are no homes', () => {
-    const shot = liveShotAt(liveProgram([], 0), 360, []);
-    expect(shot.kind).toBe('venue');
-    expect(shot.label).toBe('The Little Stage');
-  });
-
-  it('casts the same neighbor regardless of input order or reload, and follows for three real minutes', () => {
-    const program = liveProgram(places, 12);
-    expect(program.neighborId).toBeTruthy();
-    expect(liveProgram([...places].reverse(), 12)).toEqual(program);
-    for (const minute of [450, 510, 570, 629.9]) {
+  it('keeps subjects framed during gentle drift and leaves people and cat tracking alone', () => {
+    for (const minute of [100, 320, 650, 800, 1200]) {
       const shot = shotAt(12, minute);
-      expect(shot.kind).toBe('neighbor');
-      expect(shot.residentId).toBe(program.neighborId);
-    }
-    expect(shotAt(12, 449.9).kind).not.toBe('neighbor');
-    expect(shotAt(12, 630).kind).not.toBe('neighbor');
-    expect(
-      new Set(Array.from({ length: 30 }, (_, day) => liveProgram(places, day).neighborId)).size,
-    ).toBeGreaterThan(1);
-  });
-
-  it('covers every available event type over time, only during its scheduled feature', () => {
-    const featured = new Set<string>();
-    for (let day = 0; day < 100; day++) {
-      const feature = liveFeature(day);
-      featured.add(feature.id);
-      for (const time of [feature.start, (feature.start + feature.end) / 2, feature.end - 0.1]) {
-        const shot = shotAt(day + Math.floor(time / 1440), time % 1440);
-        expect(shot.kind).toBe('event');
-        expect(shot.id).toBe(`event:${day}:${feature.id}`);
-      }
-      for (let time = 360; time < 1440; time += 15) {
-        if (time < feature.start || time >= feature.end)
-          expect(shotAt(day, time).kind).not.toBe('event');
-      }
-    }
-    expect([...featured].sort()).toEqual([
-      'acoustic',
-      'books',
-      'football',
-      'games',
-      'jazz',
-      'night-party',
-      'picnic',
-      'rock',
-    ]);
-  });
-
-  it('keeps the midnight party framed across the day boundary, then releases it at 02:30', () => {
-    expect(shotAt(2, 1439.9)).toEqual(shotAt(3, 0));
-    expect(shotAt(3, 149.9).kind).toBe('event');
-    expect(shotAt(3, 150).kind).not.toBe('event');
-  });
-
-  it('has valid framing all day, including empty towns and portrait screens', () => {
-    for (const homes of [
-      places,
-      [],
-      places.map((p) => ({
-        ...p,
-        resident: {
-          ...p.resident,
-          routine: { morning: 'home', afternoon: 'home', evening: 'home', night: 'sleep' } as const,
-        },
-      })),
-    ]) {
-      const program = liveProgram(homes, 4);
-      for (let minute = 0; minute < 1440; minute += 30) {
-        const shot = liveShotAt(program, minute, simulateResidents(homes, minute, 4));
-        for (const [width, height] of [
-          [1920, 1080],
-          [390, 844],
-        ]) {
-          const camera = liveCamera(shot, width, height);
-          expect(Object.values(camera).every(Number.isFinite)).toBe(true);
-          expect(camera.zoom).toBeGreaterThan(0);
-          expect(shot.center.x * camera.zoom + camera.x).toBeCloseTo(width / 2);
-          expect(shot.center.y * camera.zoom + camera.y).toBeCloseTo(height / 2);
+      for (const [width, height] of [
+        [1920, 900],
+        [390, 844],
+        [844, 390],
+      ]) {
+        const base = liveCamera(shot, width, height);
+        for (let second = 0; second < 1440; second += 5) {
+          const camera = liveCamera(shot, width, height, second);
+          const x = camera.x + shot.center.x * camera.zoom,
+            y = camera.y + shot.center.y * camera.zoom;
+          expect(camera.zoom).toBeGreaterThanOrEqual(base.zoom);
+          expect(camera.zoom).toBeLessThanOrEqual(base.zoom * 1.04);
+          expect(x - (shot.width * camera.zoom) / 2).toBeGreaterThan(0);
+          expect(x + (shot.width * camera.zoom) / 2).toBeLessThan(width);
+          expect(y - (shot.height * camera.zoom) / 2).toBeGreaterThan(0);
+          expect(y + (shot.height * camera.zoom) / 2).toBeLessThan(height);
         }
       }
+    }
+    for (const minute of [290, 510]) {
+      const shot = shotAt(12, minute);
+      expect(['cat', 'neighbor']).toContain(shot.kind);
+      expect(liveCamera(shot, 1920, 1080, 35)).toEqual(liveCamera(shot, 1920, 1080));
     }
   });
 
@@ -146,46 +162,5 @@ describe('Live broadcast director', () => {
     for (let i = 0; i < 30; i++) stepped = easeLiveCamera(stepped, to, 1 / 30);
     expect(stepped.x).toBeCloseTo(next.x);
     expect(stepped.zoom).toBeCloseTo(next.zoom);
-  });
-
-  it('adds gentle motion to held shots while keeping the entire subject framed', () => {
-    const shots = [
-      shotAt(0, 360),
-      liveShotAt(liveProgram([], 0), 360, []),
-      ...[0, 1, 2, 3].map((day) => shotAt(day, liveFeature(day).start)),
-    ];
-    for (const shot of shots) {
-      for (const [width, height] of [
-        [1920, 900],
-        [390, 844],
-        [844, 390],
-      ]) {
-        const base = liveCamera(shot, width, height);
-        const later = liveCamera(shot, width, height, 22.5);
-        expect(later.zoom).toBeGreaterThan(base.zoom);
-        expect(later.x + shot.center.x * later.zoom).toBeGreaterThan(width / 2);
-        for (let second = 0; second <= 1440; second++) {
-          const camera = liveCamera(shot, width, height, second);
-          expect(camera.zoom).toBeGreaterThanOrEqual(base.zoom);
-          expect(camera.zoom).toBeLessThanOrEqual(base.zoom * 1.04);
-          const x = camera.x + shot.center.x * camera.zoom;
-          const y = camera.y + shot.center.y * camera.zoom;
-          expect(x - (shot.width * camera.zoom) / 2).toBeGreaterThan(0);
-          expect(x + (shot.width * camera.zoom) / 2).toBeLessThan(width);
-          expect(y - (shot.height * camera.zoom) / 2).toBeGreaterThan(0);
-          expect(y + (shot.height * camera.zoom) / 2).toBeLessThan(height);
-        }
-      }
-    }
-  });
-
-  it('keeps motion continuous at midnight and leaves resident tracking alone', () => {
-    const before = liveCamera(shotAt(2, 1439.999), 1920, 1080, 1439.999);
-    const after = liveCamera(shotAt(3, 0), 1920, 1080, 0);
-    expect(Math.abs(before.x - after.x)).toBeLessThan(0.01);
-    expect(Math.abs(before.zoom - after.zoom)).toBeLessThan(0.00001);
-    const neighbor = shotAt(12, 510);
-    expect(neighbor.kind).toBe('neighbor');
-    expect(liveCamera(neighbor, 1920, 1080, 35)).toEqual(liveCamera(neighbor, 1920, 1080));
   });
 });

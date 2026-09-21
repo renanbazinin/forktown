@@ -3,6 +3,8 @@ import { drawResident } from './residents';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
 import { drawFootball } from './football';
+import { drawTownCat } from './cat';
+import { townCatAt, TOWN_CAT_ID } from '../lib/town-cat';
 import {
   footballAt,
   insideFootball,
@@ -441,6 +443,11 @@ export function renderCity({
       },
     });
   }
+  const cat = townCatAt(places, minutes);
+  objects.push({
+    depth: cat.position.x + cat.position.y,
+    paint: () => drawTownCat(ctx, cat, night, followed === TOWN_CAT_ID),
+  });
   objects.sort((a, b) => a.depth - b.depth).forEach((object) => object.paint());
   drawBirds(ctx, minutes, night);
   ctx.restore();

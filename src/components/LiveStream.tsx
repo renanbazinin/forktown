@@ -5,6 +5,7 @@ import { footballAt, footballListening } from '../lib/football';
 import { easeLiveCamera, liveCamera, liveProgram, liveShotAt } from '../lib/live-director';
 import { latestArrival, places } from '../lib/places';
 import { project } from '../lib/world';
+import { townCatAt, TOWN_CAT_NAME } from '../lib/town-cat';
 import { simulateResidents } from '../lib/simulation';
 import { useTownClock } from '../lib/use-town-clock';
 import { trackForTown } from '../music/score';
@@ -18,6 +19,7 @@ export default function LiveStream() {
   const followLabel = useRef<HTMLDivElement>(null);
   const camera = useRef<Camera | null>(null);
   const lastPaint = useRef<number | null>(null);
+  const lastShot = useRef<string | null>(null);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const program = useMemo(() => liveProgram(places, clock.day), [clock.day]);
@@ -29,6 +31,11 @@ export default function LiveStream() {
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const shot = liveShotAt(program, clock.minutes, residents);
   const followedResident = residents.find((resident) => resident.id === shot.residentId);
+  const cat = townCatAt(places, clock.minutes);
+  const followPosition =
+    followedResident?.position ?? (shot.kind === 'cat' ? cat.position : undefined);
+  const followName =
+    followedResident?.resident.name ?? (shot.kind === 'cat' ? TOWN_CAT_NAME : undefined);
   const night = clock.minutes < 360 || clock.minutes >= 1200;
 
   useEffect(() => {
@@ -55,10 +62,17 @@ export default function LiveStream() {
     const elapsed = lastPaint.current === null ? 0 : (now - lastPaint.current) / 1000;
     // One town minute is one real second.
     const target = liveCamera(shot, size.width, size.height, clock.minutes);
+    const old = camera.current;
+    const subjectX = old ? shot.center.x * old.zoom + old.x : 0;
+    const subjectY = old ? shot.center.y * old.zoom + old.y : 0;
+    const distantCut =
+      lastShot.current !== shot.id &&
+      (subjectX < 60 || subjectX > size.width - 60 || subjectY < 80 || subjectY > size.height - 60);
     camera.current =
-      camera.current === null || elapsed > 2
+      camera.current === null || elapsed > 2 || distantCut
         ? target
         : easeLiveCamera(camera.current, target, elapsed);
+    lastShot.current = shot.id;
     lastPaint.current = now;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.imageSmoothingEnabled = false;
@@ -77,10 +91,11 @@ export default function LiveStream() {
       showPlots: false,
       followed: shot.residentId,
     });
-    if (followLabel.current && followedResident) {
-      const point = project(followedResident.position.x, followedResident.position.y);
+    if (followLabel.current && followPosition) {
+      const point = project(followPosition.x, followPosition.y);
       const x = point.x * camera.current.zoom + camera.current.x;
-      const y = (point.y - 43) * camera.current.zoom + camera.current.y;
+      const y =
+        (point.y - (shot.kind === 'cat' ? 24 : 43)) * camera.current.zoom + camera.current.y;
       const halfLabel = followLabel.current.offsetWidth / 2 + 12;
       followLabel.current.style.left = `${Math.max(halfLabel, Math.min(size.width - halfLabel, x))}px`;
       followLabel.current.style.top = `${Math.max(90, Math.min(size.height - 30, y))}px`;
@@ -106,6 +121,10 @@ export default function LiveStream() {
     shot.height,
     shot.residentId,
     followedResident,
+    followPosition?.x,
+    followPosition?.y,
+    shot.id,
+    shot.kind,
   ]);
 
   return (
@@ -151,13 +170,13 @@ export default function LiveStream() {
           </div>
         </div>
       </aside>
-      {followedResident && (
+      {followName && (
         <div ref={followLabel} className="live-follow-label live-glass" role="status">
           <span className="live-caption">
             <i aria-hidden="true" />
             Following
           </span>
-          <strong>{followedResident.resident.name}</strong>
+          <strong>{followName}</strong>
         </div>
       )}
       <Soundtrack

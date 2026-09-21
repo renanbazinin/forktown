@@ -17,7 +17,7 @@ npm run dev
 
 Open `http://localhost:5173`. No accounts, API keys, database, or remote services are required.
 
-For a clean recording view, open `http://localhost:5173/live/`: automatic camera direction, a daily neighbor story and featured event, automatic sound where permitted, and only the Forktown symbol on screen. See [the live broadcast script and recording notes](docs/LIVE.md).
+For a clean recording view, open `http://localhost:5173/live/`: automatic coverage of live events, outdoor neighbors, and the town cat, with only one minute of neighborhood scenery per town day. Includes automatic sound where permitted, a small population card, and labels for the resident or cat being followed. See [the live broadcast script and recording notes](docs/LIVE.md).
 
 ## Make your first contribution
 
