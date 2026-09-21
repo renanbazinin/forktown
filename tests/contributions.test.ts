@@ -14,6 +14,8 @@ import {
   unproject,
 } from '../src/lib/world';
 import { buildingHit, shade } from '../src/city/render';
+import { HOUSE_PLOTS } from '../src/lib/events';
+import { FOOTBALL_PLOTS } from '../src/lib/football';
 
 const sample: Place = placeSchema.parse({
   id: 'tiny-library',
@@ -125,11 +127,11 @@ describe('The world stays predictable as people contribute', () => {
     expect(shade('#FFFFFF', 30)).toBe('#ffffff');
     expect(shade('#000000', -30)).toBe('#000000');
   });
-  it('has 50 unique plots with the two public venues reserved', () => {
-    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(50);
+  it('has 100 unique plots with the public venues and six-plot ground reserved', () => {
+    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(100);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
-        !['B5', 'C5'].includes(plot.id),
+        !['B5', 'C5', ...FOOTBALL_PLOTS].includes(plot.id),
       );
   });
   it('keeps the same coordinates for an existing plot regardless of other places', () => {
@@ -155,7 +157,7 @@ describe('The world stays predictable as people contribute', () => {
     expect(findPlotAt(-10, 500)).toBeUndefined();
   });
   it('gives every home a selectable three-by-three grass plot bounded by streets', () => {
-    for (const plot of PLOTS) {
+    for (const plot of HOUSE_PLOTS) {
       for (let dx = -1; dx <= 1; dx++)
         for (let dy = -1; dy <= 1; dy++) {
           expect(isRoad(plot.x + dx, plot.y + dy)).toBe(false);

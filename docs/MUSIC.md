@@ -1,7 +1,9 @@
 # Forktown FM
 
-Five original instrumental scores live in `src/music/score.ts`: a daytime theme,
-a sparse nighttime variation, and rock, acoustic, and jazz concert arrangements.
+Six original instrumental scores live in `src/music/score.ts`: a daytime theme,
+a sparse nighttime variation, rock, acoustic, and jazz concert arrangements,
+and **One More Little Dance**, a 112 BPM midnight disco with offbeat keys,
+plucked melody, octave bass, and a soft four-on-the-floor beat.
 They use 16-bar phrases with a contrasting bridge and a returning melody.
 There are no downloaded samples, external streams, or music service accounts.
 The scores and synthesis code are part of this repository's MIT-licensed source.
@@ -23,3 +25,7 @@ For future music contributions, start with a score change and audition it here.
 Keep the 64-beat form, leave space in the melody, and test the loop and mix levels.
 Do not add someone else's songs or recordings without an appropriate license.
 An automated note validation test lives in `tests/music.test.ts`.
+
+# Football sounds
+
+The Meadow Ground adds original synthesized kick, whistle, and crowd effects to the same opt-in Town sound control. Effects follow the match's actual pass, shot, and goal moments; they fade with zoom and camera distance and pan toward the ground. Pausing, muting, hiding the tab, or moving away stops them. Resuming skips missed cues. See [Football at the Meadow Ground](FOOTBALL.md) for the sound and match preview.

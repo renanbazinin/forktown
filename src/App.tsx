@@ -31,8 +31,17 @@ import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
 import TownEvents from './components/TownEvents';
 import Soundtrack from './components/Soundtrack';
+import FootballMatch from './components/FootballMatch';
+import { footballAt, isFootballPlot, FOOTBALL_VENUE } from './lib/football';
 import { trackForTown } from './music/score';
-import { HOUSE_PLOTS, eventsForDay, venueAt, eventStatus } from './lib/events';
+import {
+  HOUSE_PLOTS,
+  eventsForDay,
+  venueAt,
+  eventStatus,
+  eventAtVenue,
+  isEventLive,
+} from './lib/events';
 import { isFoundingPlace, places, repositoryUrl } from './lib/places';
 import { TYPE_LABELS, type Place } from './lib/schema';
 import { localSaveAvailable } from './lib/local-save';
@@ -41,6 +50,8 @@ import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simul
 
 type Panel = 'places' | 'neighbors' | 'events';
 function initialSelection() {
+  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'football')
+    return FOOTBALL_VENUE.plot;
   return (
     places.find(
       (place) => place.id === new URLSearchParams(window.location.hash.slice(1)).get('place'),
@@ -53,6 +64,7 @@ export default function App() {
   const exploreButton = useRef<HTMLButtonElement>(null);
   const panelTitle = useRef<HTMLHeadingElement>(null);
   const [selectedPlot, setSelectedPlot] = useState<string | null>(initialSelection);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(() => (initialSelection() ? 'places' : null));
   const [followed, setFollowed] = useState<string | null>(null);
   const [showPlots, setShowPlots] = useState(false);
@@ -65,6 +77,9 @@ export default function App() {
   const [toast, setToast] = useState('');
   const [shared, setShared] = useState(false);
   const clock = useTownClock();
+  const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
+  const [listening, setListening] = useState({ gain: 0, pan: 0 });
+  const selectedFootball = isFootballPlot(selectedPlot ?? '');
   const night = clock.minutes < 360 || clock.minutes >= 1200;
   const events = useMemo(() => eventsForDay(clock.day), [clock.day]);
   const displayPlaces = useMemo(
@@ -81,7 +96,19 @@ export default function App() {
   const selected = displayPlaces.find((place) => place.plot === selectedPlot);
   const selectedResident = residents.find((resident) => resident.id === selected?.id);
   const selectedVenue = selectedPlot ? venueAt(selectedPlot) : undefined;
-  const selectedEvent = events.find((event) => event.venue.id === selectedVenue?.id);
+  const selectedEvent = selectedVenue
+    ? (events.find(
+        (event) => event.venue.id === selectedVenue.id && event.id === selectedEventId,
+      ) ?? eventAtVenue(events, selectedVenue.id, clock.minutes))
+    : undefined;
+  const selectedProgram = selectedEvent
+    ? [
+        selectedEvent,
+        ...events.filter(
+          (event) => event.venue.id === selectedVenue?.id && event !== selectedEvent,
+        ),
+      ]
+    : [];
   const available = HOUSE_PLOTS.filter(
     (plot) => !displayPlaces.some((place) => place.plot === plot.id),
   );
@@ -93,21 +120,20 @@ export default function App() {
   const filteredPlots = available.filter((plot) =>
     plot.id.toLowerCase().includes(search.toLowerCase()),
   );
-  const liveEvent = events.find(
-    (event) => clock.minutes >= event.start && clock.minutes < event.end,
-  );
+  const liveEvent = events.find((event) => isEventLive(event, clock.minutes));
 
   const select = useCallback((plotId: string | null, focus = false) => {
     city.current?.stopFollowing();
     setFollowed(null);
     setSelectedPlot(plotId);
+    setSelectedEventId(null);
     setShared(false);
     if (plotId) setPanel('places');
     const place = places.find((place) => place.plot === plotId);
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : ''}`,
+      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFootballPlot(plotId ?? '') ? '#venue=football' : ''}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -185,6 +211,7 @@ export default function App() {
   );
   const heading =
     selected?.name ??
+    (selectedFootball ? FOOTBALL_VENUE.name : undefined) ??
     selectedVenue?.name ??
     (selectedPlot
       ? `Plot ${selectedPlot}`
@@ -207,6 +234,8 @@ export default function App() {
         residents={residents}
         events={events}
         minutes={clock.minutes}
+        football={football}
+        onListening={setListening}
         followed={followed}
         onStopFollowing={() => setFollowed(null)}
         onResidentSelect={follow}
@@ -293,9 +322,14 @@ export default function App() {
           }}
         >
           <Music2 size={19} />
-          {liveEvent && <i className="event-indicator" />}
+          {(liveEvent || football.live) && <i className="event-indicator" />}
         </button>
-        <Soundtrack track={trackForTown(clock.minutes, events)} playing={clock.playing} />
+        <Soundtrack
+          track={trackForTown(clock.minutes, events)}
+          playing={clock.playing}
+          football={football}
+          listening={listening}
+        />
       </nav>
 
       {draft && (
@@ -334,17 +368,28 @@ export default function App() {
             </button>
           </div>
           <div className="town-panel-content">
-            {selectedVenue && selectedEvent ? (
+            {selectedFootball ? (
+              <FootballMatch
+                game={football}
+                watching={
+                  residents.filter(
+                    (r) => r.event?.id === 'football' && r.event.phase === 'attending',
+                  ).length
+                }
+              />
+            ) : selectedVenue && selectedEvent ? (
               <div className="venue-info">
                 <span className="quiet-label">PUBLIC SPACE · {selectedVenue.plot}</span>
-                <div className="venue-program">
-                  <span className="eyebrow">{eventStatus(selectedEvent, clock.minutes)}</span>
-                  <h3>{selectedEvent.name}</h3>
-                  <p>{selectedEvent.description}</p>
-                  <strong>
-                    {timeLabel(selectedEvent.start)}–{timeLabel(selectedEvent.end)}
-                  </strong>
-                </div>
+                {selectedProgram.map((event) => (
+                  <div className="venue-program" key={event.period}>
+                    <span className="eyebrow">{eventStatus(event, clock.minutes)}</span>
+                    <h3>{event.name}</h3>
+                    <p>{event.description}</p>
+                    <strong>
+                      {timeLabel(event.start)}–{timeLabel(event.end)}
+                    </strong>
+                  </div>
+                ))}
                 <p className="muted-copy">Reserved for everyone. A new lineup each town day.</p>
               </div>
             ) : selected ? (
@@ -421,9 +466,13 @@ export default function App() {
               </div>
             ) : panel === 'events' ? (
               <TownEvents
+                football={football}
                 events={events}
                 minutes={clock.minutes}
-                onVisit={(plot) => select(plot, true)}
+                onVisit={(plot, eventId) => {
+                  select(plot, true);
+                  setSelectedEventId(eventId);
+                }}
               />
             ) : panel === 'neighbors' ? (
               <div className="resident-directory">

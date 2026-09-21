@@ -34,7 +34,7 @@
 
 ## When the first neighborhood fills up
 
-Increase the row and column counts in `src/lib/town-config.ts`; see [Expanding the town](EXPANDING_THE_TOWN.md). The town currently supports 50 plots while preserving the original 25 addresses and coordinates. Separate districts remain a future design choice for much larger towns.
+Increase the row and column counts in `src/lib/town-config.ts`; see [Expanding the town](EXPANDING_THE_TOWN.md). The town currently supports 100 plots while preserving the previous 50 addresses and coordinates. Separate districts remain a future design choice for much larger towns.
 
 ## Later experiments
 

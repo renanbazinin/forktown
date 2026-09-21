@@ -664,3 +664,167 @@ body,
     width: 36px;
   }
 }
+.football-info {
+  padding: 22px 20px;
+}
+.football-info > .eyebrow {
+  font-size: 8px;
+  letter-spacing: 1.1px;
+}
+.football-info h3 {
+  margin: 10px 0;
+  font: 500 28px var(--serif);
+  line-height: 1.12;
+}
+.football-info > p {
+  color: #71806a;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.football-scorecard {
+  margin-top: 20px;
+  border-radius: 12px;
+  overflow: hidden;
+  color: #f5eed7;
+  background: #294f40;
+}
+.football-live {
+  padding: 12px 9px;
+  text-align: center;
+  font: 9px var(--mono);
+  background: #ffffff08;
+}
+.football-live .live-dot {
+  display: inline-block;
+  margin-right: 6px;
+}
+.football-score {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  position: relative;
+  padding: 20px 12px 17px;
+}
+.football-score > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+}
+.football-crest {
+  width: 27px;
+  height: 31px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px 4px 12px 12px;
+  font: 600 14px var(--serif);
+  border: 1px solid #e9e6ba60;
+}
+.football-crest.team-0 {
+  background: #448773;
+  color: #d6edc5;
+}
+.football-crest.team-1 {
+  background: #dca058;
+  color: #324d3e;
+}
+.football-score strong {
+  font: 500 40px var(--serif);
+  line-height: 1;
+}
+.football-score > div > span:last-child {
+  font-size: 11px;
+}
+.football-versus {
+  position: absolute;
+  left: calc(50% - 3px);
+  top: 61px;
+  color: #aebf9e;
+}
+.football-commentary {
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 12px 15px;
+  border-top: 1px solid #ffffff15;
+  font-size: 11px;
+  text-align: center;
+  line-height: 1.5;
+}
+.football-commentary.is-goal {
+  color: #ffe19b;
+  background: #ffffff08;
+}
+.football-stats {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  text-align: center;
+  gap: 12px;
+  padding: 18px 10px;
+  border-bottom: 1px solid #e3e7d8;
+  font: 11px var(--mono);
+}
+.football-stats small {
+  color: #819076;
+  font-size: 8px;
+  letter-spacing: 1.5px;
+}
+.football-notes {
+  padding-top: 8px;
+}
+.football-notes p {
+  display: flex;
+  gap: 10px;
+  color: #6d7c63;
+  font-size: 11px;
+  line-height: 1.7;
+}
+.football-notes svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.sound-popover .sound-field-note {
+  font-size: 11px;
+  line-height: 1.5;
+  color: #6d7c63;
+}
+.football-event .event-symbol {
+  font-size: 20px;
+}
+@media (max-width: 600px) {
+  .football-info {
+    padding: 15px 18px;
+  }
+  .football-info h3 {
+    font-size: 22px;
+    margin: 7px 0;
+  }
+  .football-info > p {
+    font-size: 11px;
+    margin: 7px 0;
+  }
+  .football-scorecard {
+    margin-top: 12px;
+  }
+  .football-score {
+    padding: 12px 10px;
+  }
+  .football-score > div {
+    gap: 6px;
+  }
+  .football-crest {
+    width: 23px;
+    height: 26px;
+    font-size: 12px;
+  }
+  .football-score strong {
+    font-size: 32px;
+  }
+  .football-versus {
+    top: 45px;
+  }
+  .football-commentary {
+    min-height: 40px;
+    padding: 8px 12px;
+  }
+}

@@ -1,4 +1,7 @@
 import type { Place } from '../lib/schema';
+import type { ResidentState } from '../lib/simulation';
+import { hash } from '../lib/world';
+import { drawChimneySmoke } from './ambience';
 import { drawSign } from './signs';
 
 type Ctx = CanvasRenderingContext2D;
@@ -55,12 +58,15 @@ export function drawHouse(
   y: number,
   night = false,
   scale = 1,
+  life?: { minutes: number; activity?: ResidentState['activity'] },
 ) {
   const d = place.design,
     { height: h } = houseBounds(place);
   const roof = tint(place.color, night ? -35 : 0),
     wall = tint(d.wall, night ? -55 : 0),
     trim = tint(d.trim, night ? -25 : 0);
+  const seed = hash(place.id);
+  const awakeInside = life?.activity === 'home' || life?.activity === 'work';
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -173,17 +179,26 @@ export function drawHouse(
     for (const side of [-1, 1]) {
       ctx.save();
       ctx.transform(1, side === -1 ? 0.5 : -0.5, 0, 1, side === -1 ? -25 : 8, yy + 5);
+      const silhouette = () => {
+        if (!night || !awakeInside || floor !== 0 || side !== (seed % 2 ? -1 : 1)) return;
+        // One neighbor behind one pane, with the window frame painted in front.
+        box(ctx, 5, 3, 3, 3, '#83744D');
+        box(ctx, 4, 6, 5, 4, '#83744D');
+        box(ctx, 3, 9, 7, 1, '#83744D');
+      };
       if (d.windows === 'round') {
         ctx.beginPath();
         ctx.arc(6, 6, 6, 0, Math.PI * 2);
         ctx.fillStyle = night ? '#F1D68F' : '#8EBCBF';
         ctx.fill();
+        silhouette();
         ctx.strokeStyle = trim;
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
         box(ctx, 0, 0, 12, 12, trim);
         box(ctx, 1, 1, 10, 10, night ? '#F1D68F' : '#90B6BA');
+        silhouette();
         box(ctx, 5, 0, 2, 12, trim);
         if (d.windows === 'cross') box(ctx, 0, 5, 12, 2, trim);
         else {
@@ -299,6 +314,27 @@ export function drawHouse(
       ctx.lineTo(3 * i, 17 - h - 7 * i);
       ctx.stroke();
     }
+  }
+  if (['cottage', 'cafe', 'bookshop', 'studio'].includes(place.building)) {
+    const chimneyX = -18,
+      chimneyY = -h - (flat ? 2 : 16);
+    const brick = night ? '#827E6C' : '#B3977F';
+    box(ctx, chimneyX, chimneyY - 13, 7, 14, brick);
+    polygon(
+      ctx,
+      [
+        [chimneyX + 7, chimneyY - 13],
+        [chimneyX + 10, chimneyY - 15],
+        [chimneyX + 10, chimneyY - 1],
+        [chimneyX + 7, chimneyY + 1],
+      ],
+      tint(brick, -22),
+    );
+    box(ctx, chimneyX - 1, chimneyY - 15, 12, 3, tint(brick, 12));
+    box(ctx, chimneyX + 2, chimneyY - 15, 6, 1, tint(brick, -35));
+    box(ctx, chimneyX, chimneyY - 7, 7, 1, tint(brick, -12));
+    if (awakeInside && life)
+      drawChimneySmoke(ctx, chimneyX + 5, chimneyY - 17, life.minutes, seed, night);
   }
   if (d.feature === 'balcony') {
     polygon(

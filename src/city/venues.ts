@@ -1,4 +1,5 @@
-import type { TownEvent, Venue } from '../lib/events';
+import { isEventLive, type TownEvent, type Venue } from '../lib/events';
+import { project } from '../lib/world';
 
 export const venueBounds = (venue: Venue) => ({
   left: venue.kind === 'stage' ? -44 : -84,
@@ -17,8 +18,8 @@ export function drawVenue(
   minutes = 0,
   layer: 'ground' | 'objects' = 'objects',
 ) {
-  if (layer === 'ground' && venue.kind === 'stage') return;
-  const live = !!event && minutes >= event.start && minutes < event.end;
+  const live = !!event && isEventLive(event, minutes);
+  const party = live && event?.id === 'night-party';
   ctx.save();
   ctx.translate(x, y);
   const rect = (x: number, y: number, w: number, h: number, color: string) => {
@@ -32,6 +33,26 @@ export function drawVenue(
     ctx.closePath();
     ctx.fill();
   };
+  if (layer === 'ground' && venue.kind === 'stage') {
+    if (party) {
+      // Steady pastel tiles sit under the dancers and leave the stage approach open.
+      for (let row = 0; row < 3; row++)
+        for (let col = 0; col < 5; col++) {
+          const pt = project(-1 + col * 0.5, 0.5 + row * 0.4);
+          poly(
+            [
+              [pt.x, pt.y - 8],
+              [pt.x + 16, pt.y],
+              [pt.x, pt.y + 8],
+              [pt.x - 16, pt.y],
+            ],
+            ['#796E87', '#8D816C', '#638B80'][(row + col) % 3],
+          );
+        }
+    }
+    ctx.restore();
+    return;
+  }
   const label = (text: string, y: number, color: string) => {
     ctx.font = 'bold 9px "Space Mono", monospace';
     ctx.textAlign = 'center';
@@ -86,46 +107,76 @@ export function drawVenue(
       night ? '#365653' : '#557E72',
     );
     rect(-43, -54, 86, 16, '#304F48');
-    label('THE LITTLE STAGE', -43, '#F5E8BD');
+    label(party ? 'MIDNIGHT DISCO' : 'THE LITTLE STAGE', -43, '#F5E8BD');
     for (let i = 0; i < 7; i++)
-      rect(-57 + i * 19, -37 + Math.abs(i - 3) * -4, 4, 4, live || night ? '#FFE0A0' : '#CFBE8E');
+      rect(
+        -57 + i * 19,
+        -37 + Math.abs(i - 3) * -4,
+        4,
+        4,
+        party ? ['#F2C18E', '#CEB7DF', '#ADDBC9'][i % 3] : live || night ? '#FFE0A0' : '#CFBE8E',
+      );
     for (const px of [-55, 41]) {
       rect(px, -18, 15, 29, '#35453F');
       rect(px + 3, -15, 9, 7, '#58645B');
       rect(px + 3, -3, 9, 9, '#202F2E');
     }
-    // Instruments remain on the stage between shows; performers appear only during a set.
-    rect(-9, -15, 19, 14, '#AE795B');
-    rect(-8, -17, 17, 3, '#E1CF9F');
-    rect(-17, -29, 1, 23, '#788176');
-    rect(-24, -31, 16, 3, '#C5B475');
-    rect(22, -28, 2, 36, '#3D5049');
-    rect(20, -29, 8, 3, '#293F3A');
-    if (live) {
-      const bob = Math.sin(minutes * 2) > 0 ? 1 : 0;
-      for (const [px, py, shirt] of [
-        [-27, 7, '#B686A6'],
-        [28, 8, '#D8B46F'],
-        [0, -19, '#89B4AE'],
-      ] as const) {
-        rect(px - 3, py - 13 + bob, 8, 10, shirt);
-        rect(px - 3, py - 22 + bob, 7, 9, '#D6B18F');
-        rect(px - 4, py - 23 + bob, 9, 4, '#424A41');
-        rect(px - 3, py - 3, 3, 6, '#35463E');
-        rect(px + 2, py - 3, 3, 6, '#35463E');
-        if (px !== 0) {
-          rect(px - 5, py - 10 + bob, 12, 6, '#C77456');
-          poly(
-            [
-              [px + 4, py - 8 + bob],
-              [px + 14, py - 17 + bob],
-              [px + 16, py - 14 + bob],
-              [px + 6, py - 5 + bob],
-            ],
-            '#EDD3A0',
-          );
+    if (party) {
+      // A tiny DJ, two turntables, and a raised hand. Lights stay steady.
+      const lift = Math.sin(minutes * 2) > 0 ? 2 : 0;
+      rect(-5, -27, 11, 16, '#B18DB7');
+      rect(-4, -37, 9, 10, '#D6B18F');
+      rect(-5, -39, 11, 4, '#424A41');
+      rect(-7, -36, 3, 7, '#283E3A');
+      rect(5, -36, 3, 7, '#283E3A');
+      rect(6, -26, 8, 3, '#B18DB7');
+      rect(12, -33 - lift, 3, 10, '#D6B18F');
+      rect(-25, -12, 50, 20, '#304F48');
+      rect(-25, -14, 50, 4, '#8FAAA0');
+      for (const px of [-14, 14]) {
+        ctx.fillStyle = '#233D38';
+        ctx.beginPath();
+        ctx.ellipse(px, -12, 8, 3, 0, 0, Math.PI * 2);
+        ctx.fill();
+        rect(px - 1, -13, 2, 2, '#E5C989');
+      }
+      for (let i = 0; i < 3; i++) rect(-5 + i * 4, -7, 2, 5, '#D1B5D6');
+    } else {
+      // Instruments remain on the stage between shows; performers appear only during a set.
+      rect(-9, -15, 19, 14, '#AE795B');
+      rect(-8, -17, 17, 3, '#E1CF9F');
+      rect(-17, -29, 1, 23, '#788176');
+      rect(-24, -31, 16, 3, '#C5B475');
+      rect(22, -28, 2, 36, '#3D5049');
+      rect(20, -29, 8, 3, '#293F3A');
+      if (live) {
+        const bob = Math.sin(minutes * 2) > 0 ? 1 : 0;
+        for (const [px, py, shirt] of [
+          [-27, 7, '#B686A6'],
+          [28, 8, '#D8B46F'],
+          [0, -19, '#89B4AE'],
+        ] as const) {
+          rect(px - 3, py - 13 + bob, 8, 10, shirt);
+          rect(px - 3, py - 22 + bob, 7, 9, '#D6B18F');
+          rect(px - 4, py - 23 + bob, 9, 4, '#424A41');
+          rect(px - 3, py - 3, 3, 6, '#35463E');
+          rect(px + 2, py - 3, 3, 6, '#35463E');
+          if (px !== 0) {
+            rect(px - 5, py - 10 + bob, 12, 6, '#C77456');
+            poly(
+              [
+                [px + 4, py - 8 + bob],
+                [px + 14, py - 17 + bob],
+                [px + 16, py - 14 + bob],
+                [px + 6, py - 5 + bob],
+              ],
+              '#EDD3A0',
+            );
+          }
         }
       }
+    }
+    if (live) {
       ctx.font = '18px serif';
       ctx.fillStyle = night ? '#EED8A3' : '#6E7653';
       ctx.fillText('♪', -82, -24 - Math.sin(minutes) * 4);

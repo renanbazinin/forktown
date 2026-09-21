@@ -2,8 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX, X } from 'lucide-react';
 import { TRACKS, type TrackId } from '../music/score';
 import { TownPlayer } from '../music/player';
+import { footballSoundsBetween } from '../music/football-sound';
+import type { FootballState } from '../lib/football';
 
-export default function Soundtrack({ track, playing }: { track: TrackId; playing: boolean }) {
+export default function Soundtrack({
+  track,
+  playing,
+  football,
+  listening,
+}: {
+  track: TrackId;
+  playing: boolean;
+  football: FootballState;
+  listening: { gain: number; pan: number };
+}) {
   const player = useRef<TownPlayer | null>(null);
   const [enabled, setEnabled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -12,6 +24,17 @@ export default function Soundtrack({ track, playing }: { track: TrackId; playing
   const [volume, setVolume] = useState(0.55);
   const [hidden, setHidden] = useState(document.hidden);
   const request = useRef(0);
+  const previousMatch = useRef<FootballState | null>(null);
+  useEffect(() => {
+    if (!enabled || !playing || hidden || !football.live || listening.gain < 0.015) {
+      previousMatch.current = null;
+      player.current?.silenceEffects();
+      return;
+    }
+    for (const sound of footballSoundsBetween(previousMatch.current, football))
+      player.current?.effect(sound.kind, listening.gain * sound.strength, listening.pan);
+    previousMatch.current = football;
+  }, [football, enabled, playing, hidden, listening]);
   useEffect(() => {
     const visibility = () => setHidden(document.hidden);
     document.addEventListener('visibilitychange', visibility);
@@ -102,6 +125,9 @@ export default function Soundtrack({ track, playing }: { track: TrackId; playing
           </div>
           <strong>{TRACKS[track].title}</strong>
           <p>{TRACKS[track].subtitle}</p>
+          <p className="sound-field-note">
+            Zoom close to the football for kicks, whistles, and cheers.
+          </p>
           <button className="sound-toggle" onClick={() => void toggle()} aria-pressed={enabled}>
             {enabled ? <Volume2 size={16} /> : <VolumeX size={16} />}
             {enabled ? 'Sound on' : 'Turn sound on'}
@@ -109,7 +135,7 @@ export default function Soundtrack({ track, playing }: { track: TrackId; playing
           <label className="sound-volume">
             Volume
             <input
-              aria-label="Music volume"
+              aria-label="Town volume"
               type="range"
               min="0"
               max="100"

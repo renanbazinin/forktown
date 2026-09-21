@@ -7,7 +7,11 @@ describe('Original town soundtrack', () => {
     for (let day = 0; day < 20; day++) {
       const events = eventsForDay(day);
       const concert = events[1];
-      expect(trackForTown(0, events)).toBe('night');
+      expect(trackForTown(0, events)).toBe('party');
+      expect(trackForTown(1409.99, events)).toBe('night');
+      expect(trackForTown(1410, events)).toBe('party');
+      expect(trackForTown(149.99, events)).toBe('party');
+      expect(trackForTown(150, events)).toBe('night');
       expect(trackForTown(360, events)).toBe('town');
       expect(trackForTown(850, events)).toBe('town');
       expect(trackForTown(concert.start - 0.01, events)).toBe('town');

@@ -187,10 +187,12 @@ export function NeighborDetails({
             }
           >
             <option value="sleep">Sleep through the night</option>
-            <option value="stroll">Take a moonlit stroll</option>
+            <option value="stroll">Be a night owl</option>
           </select>
         </label>
-        <small>Night owls take a quiet walk, then head home to sleep. We pick the time.</small>
+        <small>
+          Night owls can join the midnight party or take a moonlit stroll, then head home to sleep.
+        </small>
       </div>
     </div>
   );

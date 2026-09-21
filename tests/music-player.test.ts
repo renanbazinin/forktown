@@ -23,10 +23,18 @@ beforeEach(() => {
     'AudioContext',
     class {
       currentTime = 10;
+      state = 'running';
+      sampleRate = 12000;
       destination = {};
       resume = vi.fn().mockResolvedValue(undefined);
       suspend = vi.fn().mockResolvedValue(undefined);
       close = close.mockResolvedValue(undefined);
+      createBuffer() {
+        return { copyToChannel: vi.fn() };
+      }
+      createStereoPanner() {
+        return { pan: parameter(), connect: vi.fn().mockReturnThis(), disconnect: vi.fn() };
+      }
       createGain() {
         return { gain: parameter(), connect: vi.fn().mockReturnThis(), disconnect: vi.fn() };
       }
@@ -47,6 +55,27 @@ afterEach(() => vi.unstubAllGlobals());
 const buffer = {} as AudioBuffer;
 
 describe('Soundtrack playback lifecycle', () => {
+  it('stops nearby football sounds on pause, mute, and disposal without replaying them', async () => {
+    const player = new TownPlayer();
+    player.effect('kick', 0, 0);
+    expect(sources).toHaveLength(0);
+    player.effect('kick', 0.7, 0);
+    expect(sources).toHaveLength(1);
+    expect(sources[0].start).toHaveBeenCalledOnce();
+    await player.suspend();
+    expect(sources[0].stop).toHaveBeenCalledOnce();
+    expect(sources[0].disconnect).toHaveBeenCalledOnce();
+    await player.resume();
+    expect(sources).toHaveLength(1);
+    player.effect('cheer', 0.5, 0.4);
+    player.stop();
+    expect(sources[1].stop).toHaveBeenCalledOnce();
+    player.effect('whistle', 0.5, 0);
+    player.dispose();
+    expect(sources[2].disconnect).toHaveBeenCalledOnce();
+    player.effect('kick', 0.7, 0);
+    expect(sources).toHaveLength(3);
+  });
   it('does not start a late render after the user mutes', async () => {
     let finish!: (buffer: AudioBuffer) => void;
     vi.mocked(renderTrack).mockReturnValueOnce(

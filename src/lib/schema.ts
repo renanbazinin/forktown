@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { compileSign } from './sign.ts';
 import { getPlot } from './world.ts';
 import { venueAt } from './events.ts';
+import { isFootballPlot } from './football.ts';
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color.');
 export const ACTIVITIES = ['stroll', 'work', 'home'] as const;
@@ -128,7 +129,7 @@ export const placeSchema = z
       .string()
       .refine((id) => !!getPlot(id), 'Choose an existing plot from the town map.')
       .refine(
-        (id) => !venueAt(id),
+        (id) => !venueAt(id) && !isFootballPlot(id),
         'This plot is reserved for a public town venue. Choose a house plot.',
       ),
     building: z.enum(BUILDING_TYPES),

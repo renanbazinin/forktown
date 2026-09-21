@@ -37,7 +37,7 @@ describe('Shared town events', () => {
     expect(eventsForDay(7)).toEqual(eventsForDay(7));
   });
   it('reserves venues in both builder options and shared save/CI validation', () => {
-    expect(HOUSE_PLOTS).toHaveLength(48);
+    expect(HOUSE_PLOTS).toHaveLength(92);
     for (const venue of VENUES) {
       expect(HOUSE_PLOTS.some((plot) => plot.id === venue.plot)).toBe(false);
       expect(
@@ -71,7 +71,7 @@ describe('Shared town events', () => {
   });
   it('walks continuously to a venue, attends, returns home, and sleeps without teleporting', () => {
     const entrance = plotEntrance(getPlot(walker.plot)!);
-    for (const event of eventsForDay(4)) {
+    for (const event of eventsForDay(4).filter((event) => event.period !== 'night')) {
       expect(simulateResidents([walker], event.depart, 4)[0].position).toEqual(entrance);
       expect(simulateResidents([walker], event.start + 1, 4)[0]).toMatchObject({
         moving: false,
@@ -108,12 +108,16 @@ describe('Shared town events', () => {
     ]) {
       const first = simulateResidents(crowd, minute, 19);
       expect(simulateResidents([...crowd].reverse(), minute, 19).reverse()).toEqual(first);
-      const attending = first.filter((state) => state.event?.phase === 'attending');
+      const attending = first.filter(
+        (state) => state.event?.phase === 'attending' && state.event.id !== 'football',
+      );
       expect(attending).toHaveLength(capacity);
       expect(new Set(attending.map((state) => JSON.stringify(state.position))).size).toBe(capacity);
       expect(attending.every((state) => !state.greeting)).toBe(true);
       const overflow = first.filter((state) => !state.event);
-      expect(overflow).toHaveLength(crowd.length - capacity);
+      expect(overflow).toHaveLength(
+        crowd.length - capacity - first.filter((state) => state.event?.id === 'football').length,
+      );
       expect(
         overflow.every(
           (state) =>
@@ -156,12 +160,12 @@ describe('Shared town events', () => {
       id: `crowd-${i}`,
       plot: plot.id,
     }));
-    for (const event of eventsForDay(2)) {
+    for (const event of eventsForDay(2).filter((event) => event.period !== 'night')) {
       for (let minute = event.depart; minute <= event.homeBy; minute += 1.3) {
         const now = simulateResidents(crowd, minute, 2),
           next = simulateResidents(crowd, minute + 0.001, 2);
         now.forEach((state, index) => {
-          if (!state.event) return;
+          if (!state.event || state.event.id === 'football') return;
           expect(state.greeting).toBe(false);
           expect(
             Math.hypot(
@@ -179,9 +183,11 @@ describe('Shared town events', () => {
         if (!state.moving) expect(state.pose).toBeUndefined();
     }
   });
-  it('labels the exact event boundaries without running the event overnight', () => {
+  it('labels exact event boundaries and keeps sleeping residents out of the party', () => {
     for (const event of eventsForDay(1)) {
-      expect(eventStatus(event, event.start - 1)).toBe('Later today');
+      expect(eventStatus(event, event.start - 1)).toBe(
+        event.period === 'night' ? 'Later tonight' : 'Later today',
+      );
       expect(eventStatus(event, event.start)).toBe('Happening now');
       expect(eventStatus(event, event.end)).toBe('Finished today');
     }

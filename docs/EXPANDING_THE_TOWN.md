@@ -1,21 +1,21 @@
 # Expanding the town
 
-The town has **50 plots: five rows (A–E) and ten columns (1–10)**. Two are reserved public venues (B5 and C5), leaving 48 house plots. Every existing house keeps its ID, coordinates, grass, and entrance; existing place JSON and share links need no migration.
+The town has **100 plots: ten rows (A–J) and ten columns (1–10)**, twice the previous 50-plot capacity. B5 and C5 hold the stage and green; F3–F5 and G3–G5 form the six-plot Meadow Ground, leaving 92 house plots. Every existing house keeps its ID, coordinates, grass, and entrance; existing place JSON and share links need no migration.
 
 ## One size setting
 
 Edit `src/lib/town-config.ts`:
 
 ```ts
-export const TOWN_SIZE = { rows: 5, columns: 10 } as const;
+export const TOWN_SIZE = { rows: 10, columns: 10 } as const;
 ```
 
-For example, change this to `{ rows: 10, columns: 10 }` for 100 plots, or `{ rows: 8, columns: 14 }` for 112. Increase either count or both. The next build derives the plot list, allowed contribution addresses, road graph, terrain edges, and map framing from those counts. The builder and directory discover the new plots automatically. Restart the development server after changing the configuration so browser and local-save validation use the same layout.
+For example, change this to `{ rows: 10, columns: 14 }` for 140 plots, or `{ rows: 12, columns: 14 }` for 168. Increase either count or both. The next build derives the plot list, allowed contribution addresses, road graph, terrain edges, and map framing from those counts. The builder and directory discover the new plots automatically. Restart the development server after changing the configuration so browser and local-save validation use the same layout.
 
 ## Compatibility rules
 
 - Grow by adding rows and columns. Do not reduce either count in a published town: that could remove someone's plot or invalidate a saved draft.
-- Public venues are configured in `src/lib/events.ts`. Their plots must exist and remain reserved; the shared schema, builder, and directory exclude them from house contributions. Never reserve an occupied house plot without explicitly relocating its contribution.
+- Scheduled public venues are configured in `src/lib/events.ts`; the football site is configured in `town-config.ts` and `football.ts`. Their plots must exist and remain reserved; the shared schema, builder, and directory exclude them from house contributions. Public sites remove their internal roads and lamps while preserving perimeter routes. Never reserve an occupied house plot without explicitly relocating its contribution.
 - Keep the block spacing, coordinate origin, and address convention fixed. They define existing home positions. Changing them would require an explicit migration.
 - Row letters and column numbers are independent of the current town size. Row Z is followed by AA, AB, and so on; A10 follows A9. Existing IDs are never renumbered.
 - Place links use the place ID, not an array index or map coordinate. Leave existing place IDs intact.

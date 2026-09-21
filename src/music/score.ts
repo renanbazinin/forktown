@@ -1,6 +1,6 @@
-import type { TownEvent } from '../lib/events';
+import { isEventLive, type TownEvent } from '../lib/events';
 
-export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz';
+export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party';
 export type Voice = 'bell' | 'keys' | 'pluck' | 'lead' | 'pad' | 'bass' | 'kick' | 'snare' | 'hat';
 export type Note = {
   beat: number;
@@ -16,13 +16,13 @@ export const TRACKS: Record<TrackId, { title: string; subtitle: string; bpm: num
   rock: { title: 'One More Block', subtitle: 'Small stage. Big Saturday.', bpm: 116 },
   acoustic: { title: 'Honey on the Steps', subtitle: 'Sun-warmed strings', bpm: 86 },
   jazz: { title: 'After-hours Lemonade', subtitle: 'A little swing under the stars', bpm: 96 },
+  party: { title: 'One More Little Dance', subtitle: 'Midnight at the Little Stage', bpm: 112 },
 };
 export const BEATS = 64;
 export const durationOf = (track: TrackId) => (BEATS * 60) / TRACKS[track].bpm;
 export function trackForTown(minutes: number, events: TownEvent[]): TrackId {
-  const show = events.find(
-    (event) => event.period === 'evening' && minutes >= event.start && minutes < event.end,
-  );
+  const show = events.find((event) => event.venue.kind === 'stage' && isEventLive(event, minutes));
+  if (show?.id === 'night-party') return 'party';
   if (show && (show.id === 'rock' || show.id === 'acoustic' || show.id === 'jazz')) return show.id;
   return minutes < 360 || minutes >= 1200 ? 'night' : 'town';
 }
@@ -332,6 +332,7 @@ export function compose(track: TrackId): Note[] {
   const rock = track === 'rock';
   const jazz = track === 'jazz';
   const acoustic = track === 'acoustic';
+  const party = track === 'party';
   for (let bar = 0; bar < 16; bar++) {
     const base = bar * 4;
     const [root, ...chord] = harmony[bar];
@@ -343,13 +344,20 @@ export function compose(track: TrackId): Note[] {
         base + offset,
         pitch - (quiet || acoustic ? 12 : 0),
         quiet ? length * 1.6 : length,
-        rock ? 'lead' : jazz ? 'keys' : acoustic ? 'pluck' : 'bell',
+        rock ? 'lead' : jazz ? 'keys' : acoustic || party ? 'pluck' : 'bell',
         quiet ? 0.11 : rock ? 0.16 : 0.14,
         -0.12,
       );
     });
     // Warm chord bed; acoustic rolls its voicing like a fingerpicked instrument.
-    if (acoustic) {
+    if (party) {
+      // Offbeat keys and a soft four-on-the-floor beat for the midnight dancers.
+      [0.5, 1.5, 2.5, 3.5].forEach((offset) =>
+        chord.forEach((pitch, index) =>
+          add(base + offset, pitch, 0.3, 'keys', 0.036, (index - 1.5) * 0.2),
+        ),
+      );
+    } else if (acoustic) {
       [0, 2, 1, 3, 0, 2, 1, 3].forEach((degree, step) =>
         add(
           base + step * 0.5 + degree * 0.012,
@@ -382,7 +390,11 @@ export function compose(track: TrackId): Note[] {
         );
     }
     // Bass anticipations give the tunes a little bounce; jazz walks to the next root.
-    if (jazz) {
+    if (party) {
+      [0, 1.5, 2, 3.5].forEach((offset, index) =>
+        add(base + offset, root + (index % 2 ? 12 : 0), 0.4, 'bass', 0.13),
+      );
+    } else if (jazz) {
       [root, root + 7, root + 12, harmony[(bar + 1) % 16][0] + (bar % 2 ? 1 : -1)].forEach(
         (pitch, i) => add(base + i, pitch, 0.8, 'bass', 0.13),
       );
@@ -394,8 +406,8 @@ export function compose(track: TrackId): Note[] {
       }
     }
     if (!quiet) {
-      const gentle = acoustic ? 0.5 : jazz ? 0.55 : rock ? 1 : 0.6;
-      [0, 2, ...(rock && bar % 2 ? [2.75] : [])].forEach((offset) =>
+      const gentle = acoustic ? 0.5 : jazz ? 0.55 : rock ? 1 : party ? 0.75 : 0.6;
+      (party ? [0, 1, 2, 3] : [0, 2, ...(rock && bar % 2 ? [2.75] : [])]).forEach((offset) =>
         add(base + offset, 36, 0.22, 'kick', 0.23 * gentle),
       );
       [1, 3].forEach((offset) => add(base + offset, 38, 0.15, 'snare', 0.095 * gentle));

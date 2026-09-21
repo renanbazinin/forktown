@@ -4,11 +4,12 @@ import { PLOTS, plotEntrance, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
 import { roadPath, simulateResidents } from '../src/lib/simulation';
 import { placeSchema } from '../src/lib/schema';
 import { readFileSync } from 'node:fs';
+import { HOUSE_PLOTS } from '../src/lib/events';
 
 describe('Growing the town without moving contributions', () => {
   it('doubles the capacity while preserving every original address and coordinate', () => {
-    const original = createWorldLayout({ rows: 5, columns: 5 });
-    const expanded = createWorldLayout({ rows: 5, columns: 10 });
+    const original = createWorldLayout({ rows: 5, columns: 10 });
+    const expanded = createWorldLayout({ rows: 10, columns: 10 });
     expect(expanded.plots).toHaveLength(original.plots.length * 2);
     for (const plot of original.plots) expect(expanded.getPlot(plot.id)).toEqual(plot);
     expect(expanded.getPlot('A10')).toMatchObject({ x: 39, y: 3 });
@@ -16,7 +17,7 @@ describe('Growing the town without moving contributions', () => {
   });
 
   it.each([
-    { rows: 8, columns: 14 },
+    { rows: 12, columns: 14 },
     { rows: 28, columns: 12 },
   ])('supports later growth to $rows rows and $columns columns', (size) => {
     const future = createWorldLayout(size);
@@ -47,7 +48,7 @@ describe('Growing the town without moving contributions', () => {
 
   it('connects every current home to the expanded road network', () => {
     const destination = { x: ROAD_MAX_X + 0.5, y: ROAD_MAX_Y + 0.5 };
-    for (const plot of PLOTS) {
+    for (const plot of HOUSE_PLOTS) {
       const entrance = plotEntrance(plot);
       const path = roadPath(entrance, destination);
       expect(path[0]).toEqual(entrance);
@@ -61,11 +62,11 @@ describe('Growing the town without moving contributions', () => {
     const home = placeSchema.parse({
       ...JSON.parse(readFileSync('places/my-little-place.json', 'utf8')),
       id: 'new-edge',
-      plot: 'E10',
+      plot: 'J10',
     });
     const state = simulateResidents([home], 0)[0];
-    expect(state.home.plot).toBe('E10');
-    expect(state.position).toEqual(plotEntrance(PLOTS.find((plot) => plot.id === 'E10')!));
-    expect(placeSchema.safeParse({ ...home, plot: 'E11' }).success).toBe(false);
+    expect(state.home.plot).toBe('J10');
+    expect(state.position).toEqual(plotEntrance(PLOTS.find((plot) => plot.id === 'J10')!));
+    expect(placeSchema.safeParse({ ...home, plot: 'J11' }).success).toBe(false);
   });
 });

@@ -1,5 +1,13 @@
 import type { Place } from './schema';
-import { EVENT_SPOTS, eventSpot, eventsForDay, type EventPose, type TownEvent } from './events';
+import { FOOTBALL_ENTRANCE, spectatorSpot, footballAt } from './football';
+import {
+  EVENT_SPOTS,
+  eventMinutes,
+  eventSpot,
+  eventsForDay,
+  type EventPose,
+  type TownEvent,
+} from './events';
 import {
   getPlot,
   hash,
@@ -133,17 +141,19 @@ function eventWalk(home: Place, event: TownEvent, seat: number, time: number) {
         : { position: audience, moving: false, facing: spot.facing, walkPhase: 0 };
   const beat = Math.floor((time + (hash(home.id) % 19)) / 12);
   const pose: EventPose =
-    event.venue.kind === 'stage'
-      ? (event.id === 'rock' ? beat % 3 !== 0 : beat % 4 === 0)
-        ? 'cheer'
-        : 'sway'
-      : event.id === 'books'
-        ? beat % 4 === 0
-          ? 'sip'
-          : 'read'
-        : event.id === 'games' && seat % 2 === 0
-          ? 'play'
-          : (['sit', 'sip', 'chat', 'sit'] as const)[(beat + seat) % 4];
+    event.id === 'night-party'
+      ? 'dance'
+      : event.venue.kind === 'stage'
+        ? (event.id === 'rock' ? beat % 3 !== 0 : beat % 4 === 0)
+          ? 'cheer'
+          : 'sway'
+        : event.id === 'books'
+          ? beat % 4 === 0
+            ? 'sip'
+            : 'read'
+          : event.id === 'games' && seat % 2 === 0
+            ? 'play'
+            : (['sit', 'sip', 'chat', 'sit'] as const)[(beat + seat) % 4];
   return {
     ...movement,
     ...(phase === 'attending'
@@ -158,13 +168,19 @@ function eventWalk(home: Place, event: TownEvent, seat: number, time: number) {
 }
 
 export function residentActivityLabel(state: ResidentState): string {
-  if (state.nightWalk) return 'Out for a moonlit stroll';
+  if (state.event?.id === 'football')
+    return state.event.phase === 'going'
+      ? 'Walking to the football'
+      : state.event.phase === 'returning'
+        ? 'Walking home from the football'
+        : 'Watching football at The Meadow Ground';
   if (state.event)
     return state.event.phase === 'going'
       ? `Walking to ${state.event.name}`
       : state.event.phase === 'returning'
         ? 'Walking home from the event'
-        : `${state.pose === 'read' ? 'Reading' : state.pose === 'sip' ? 'Sipping lemonade' : state.pose === 'chat' ? 'Chatting' : state.pose === 'play' ? 'Playing' : state.pose === 'cheer' ? 'Cheering' : state.pose === 'sway' ? 'Swaying' : 'Relaxing'} at ${state.event.name}`;
+        : `${state.pose === 'dance' ? 'Dancing' : state.pose === 'read' ? 'Reading' : state.pose === 'sip' ? 'Sipping lemonade' : state.pose === 'chat' ? 'Chatting' : state.pose === 'play' ? 'Playing' : state.pose === 'cheer' ? 'Cheering' : state.pose === 'sway' ? 'Swaying' : 'Relaxing'} at ${state.event.name}`;
+  if (state.nightWalk) return 'Out for a moonlit stroll';
   return {
     stroll: 'Out for a stroll',
     work: 'Working at home',
@@ -178,6 +194,9 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
   const period = periodAt(time);
   const start = period === 'morning' ? 360 : period === 'afternoon' ? 720 : 1080;
   const event = eventsForDay(day).find((event) => event.period === period);
+  const eventTime = event ? eventMinutes(event, time) : time;
+  // Keep the guest list and seats attached to the evening across midnight.
+  const eventDay = period === 'night' && time < 360 ? day - 1 : day;
   // Venue capacity comes from its physical spots. Overflow keeps its usual stroll.
   // Selection is shared, order-independent,
   // and changes each day; contributors never need to schedule a named meeting.
@@ -186,27 +205,56 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         .filter((home) => home.resident.routine[event.period] === 'stroll')
         .sort(
           (a, b) =>
-            hash(`${day}:${event.id}:${a.id}`) - hash(`${day}:${event.id}:${b.id}`) ||
+            hash(`${eventDay}:${event.id}:${a.id}`) - hash(`${eventDay}:${event.id}:${b.id}`) ||
             (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
         )
         .slice(0, EVENT_SPOTS[event.venue.kind].length)
         .map((home) => home.id)
     : [];
+  const footballCandidates =
+    period === 'morning' || period === 'afternoon'
+      ? places
+          .filter(
+            (home) => home.resident.routine[period] === 'stroll' && !attendees.includes(home.id),
+          )
+          .sort(
+            (a, b) =>
+              hash(`fans:${day}:${period}:${a.id}`) - hash(`fans:${day}:${period}:${b.id}`) ||
+              a.id.localeCompare(b.id),
+          )
+          .map((home) => home.id)
+      : [];
+  // Leave some neighbors strolling through the streets as well.
+  const footballFans = footballCandidates.slice(
+    0,
+    Math.min(6, Math.ceil(footballCandidates.length / 2)),
+  );
+  const football = footballFans.length ? footballAt(time, day) : undefined;
   const states = places.flatMap((home): ResidentState[] => {
     const plot = getPlot(home.plot);
     if (!plot) return [];
     const doorstep = plotEntrance(plot);
+    const seat = attendees.indexOf(home.id);
+    const footballSeat = footballFans.indexOf(home.id);
+    const nightGuest = period === 'night' && seat !== -1;
+    const partyTrip =
+      nightGuest && !!event && eventTime >= event.depart && eventTime < event.homeBy;
     // One quiet, local walk, with departures spread from 22:00 to 02:00.
     // Anchor to the evening across midnight; a new UTC town day must not teleport walkers.
     const nightTime = (time - 1320 + 1440) % 1440;
     const nightDeparture = hash(`night:${home.id}`) % 240;
     const nightWalk =
       period === 'night' &&
+      !nightGuest &&
       home.resident.routine.night === 'stroll' &&
       nightTime >= nightDeparture &&
       nightTime < nightDeparture + 180;
     const activity =
-      period === 'night' ? (nightWalk ? 'stroll' : 'sleep') : home.resident.routine[period];
+      period === 'night'
+        ? nightWalk || partyTrip
+          ? 'stroll'
+          : 'sleep'
+        : home.resident.routine[period];
     let position = doorstep,
       moving = false;
     let facing: ResidentState['facing'] = 'se',
@@ -221,7 +269,7 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
       const route = [...outward, ...outward.slice(0, -1).reverse()];
       const movement = alongRoute(route, (nightTime - nightDeparture) / 180);
       ({ position, moving, facing, walkPhase } = movement);
-    } else if (activity === 'stroll') {
+    } else if (activity === 'stroll' && !partyTrip && footballSeat === -1) {
       const seed = hash(home.id),
         a = roadNodes[seed % roadNodes.length],
         b = roadNodes[(seed * 7 + 43) % roadNodes.length];
@@ -249,6 +297,33 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         walkPhase = (step * 3) % 1;
       }
     }
+    let footballVisit: Partial<ResidentState> = {};
+    if (footballSeat !== -1) {
+      const spot = spectatorSpot(footballSeat);
+      const route = [
+        ...roadPath(doorstep, FOOTBALL_ENTRANCE),
+        { x: spot.x, y: FOOTBALL_ENTRANCE.y },
+        spot,
+      ];
+      const arrive = start + 70,
+        leave = start + 285,
+        homeBy = start + 350;
+      const phase = time < arrive ? 'going' : time < leave ? 'attending' : 'returning';
+      footballVisit = {
+        ...(phase === 'going'
+          ? alongRoute(route, (time - start) / (arrive - start))
+          : phase === 'returning'
+            ? alongRoute([...route].reverse(), (time - leave) / (homeBy - leave))
+            : {
+                position: spot,
+                moving: false,
+                facing: 'ne',
+                walkPhase: (time / 3 + footballSeat / 6) % 1,
+              }),
+        ...(phase === 'attending' && football?.goal ? { pose: 'cheer' as const } : {}),
+        event: time < homeBy ? { id: 'football', name: 'The Meadow Ground', phase } : undefined,
+      };
+    }
     return [
       {
         id: home.id,
@@ -260,9 +335,10 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         facing,
         walkPhase,
         greeting: false,
+        ...footballVisit,
         ...(nightWalk ? { nightWalk: true } : {}),
-        ...(event && attendees.includes(home.id)
-          ? eventWalk(home, event, attendees.indexOf(home.id), time)
+        ...(event && seat !== -1 && (period !== 'night' || partyTrip)
+          ? eventWalk(home, event, seat, eventTime)
           : {}),
       },
     ];

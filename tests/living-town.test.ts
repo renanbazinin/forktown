@@ -5,6 +5,7 @@ import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
 import { getPlot, isRoad, plotEntrance, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
 import { eventsForDay, insideVenue } from '../src/lib/events';
+import { insideFootball } from '../src/lib/football';
 
 const places = readdirSync('places')
   .filter((file) => file.endsWith('.json'))
@@ -102,6 +103,7 @@ describe('A small predictable daily life', () => {
         const event = eventsForDay(0).find((event) => event.id === state.event?.id);
         expect(
           isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
+            (state.event?.id === 'football' && insideFootball(state.position)) ||
             (event && insideVenue(event.venue, state.position)),
         ).toBe(true);
         expect(state.position.x).toBeGreaterThanOrEqual(1.5);

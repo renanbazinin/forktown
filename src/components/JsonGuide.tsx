@@ -27,7 +27,8 @@ export default function JsonGuide() {
         <dt>resident / routine</dt>
         <dd>
           Your one neighbor's appearance, greeting, and daily activities. At night, choose sleep or
-          a moonlit stroll. Working or resting keeps them indoors.
+          a night out with a midnight party or moonlit stroll. Working or resting keeps them
+          indoors.
         </dd>
         <dt>sign</dt>
         <dd>

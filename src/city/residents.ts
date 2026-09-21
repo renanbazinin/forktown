@@ -15,13 +15,15 @@ export function drawResident(
   const left = facing === 'sw' || facing === 'nw';
   const seated = !!state?.pose && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
   const cheering = state?.pose === 'cheer';
-  const dancing = cheering || state?.pose === 'sway';
+  const disco = state?.pose === 'dance';
+  const dancing = cheering || disco || state?.pose === 'sway';
+  const stepping = state?.moving || disco;
   const stride = state?.moving || dancing ? Math.sin((state.walkPhase ?? 0) * Math.PI * 2) : 0;
   const swing = Math.round(stride * 2);
   const bob = seated ? 5 : state?.moving || dancing ? -Math.round(Math.abs(stride) * 0.8) : 0;
-  const nearLift = state?.moving ? Math.max(0, Math.round(stride * 2)) : 0;
-  const farLift = state?.moving ? Math.max(0, Math.round(-stride * 2)) : 0;
-  const footSwing = state?.moving ? swing : 0;
+  const nearLift = stepping ? Math.max(0, Math.round(stride * 2)) : 0;
+  const farLift = stepping ? Math.max(0, Math.round(-stride * 2)) : 0;
+  const footSwing = stepping ? swing : 0;
   const outfitShadow = tint(resident.outfit, -24);
   ctx.save();
   ctx.translate(x, y);
@@ -35,7 +37,7 @@ export function drawResident(
   if (left) ctx.scale(-1, 1);
   // The far arm and foot sit behind the body; feet lift rather than stretch.
   ctx.fillStyle = outfitShadow;
-  if (cheering) {
+  if (cheering || (disco && stride > 0)) {
     ctx.fillRect(-6, -15 + bob, 4, 4);
     ctx.fillRect(-7, -22 + bob - Math.max(0, swing), 3, 10);
     ctx.fillStyle = resident.skin;
@@ -76,7 +78,7 @@ export function drawResident(
     ctx.fillRect(1, -14 + bob, 2, 2);
   }
   ctx.fillStyle = resident.outfit;
-  if (cheering) {
+  if (cheering || (disco && stride <= 0)) {
     ctx.fillRect(3, -15 + bob, 4, 4);
     ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);
     ctx.fillStyle = resident.skin;

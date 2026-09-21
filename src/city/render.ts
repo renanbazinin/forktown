@@ -1,7 +1,16 @@
 import { drawHouse, houseBounds } from './houses';
 import { drawResident } from './residents';
 import { drawVenue, venueBounds } from './venues';
-import { VENUES, venueAt, type TownEvent } from '../lib/events';
+import { drawBirds, drawMeadow } from './ambience';
+import { drawFootball } from './football';
+import {
+  footballAt,
+  insideFootball,
+  isFootballPlot,
+  FOOTBALL_VENUE,
+  type FootballState,
+} from '../lib/football';
+import { VENUES, venueAt, eventAtVenue, type TownEvent } from '../lib/events';
 import type { ResidentState } from '../lib/simulation';
 export { drawHouse as drawBuilding } from './houses';
 import type { Place } from '../lib/schema';
@@ -17,6 +26,7 @@ import {
   isRoad,
   plotCenter,
   project,
+  unproject,
   type Plot,
   type Point,
 } from '../lib/world';
@@ -206,6 +216,7 @@ type RenderOptions = {
   followed?: string | null;
   events?: TownEvent[];
   minutes?: number;
+  football?: FootballState;
 };
 export function renderCity({
   ctx,
@@ -221,6 +232,7 @@ export function renderCity({
   followed,
   events = [],
   minutes = 0,
+  football = footballAt(minutes),
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
   const p = night ? NIGHT : DAY;
@@ -228,6 +240,7 @@ export function renderCity({
   ctx.translate(camera.x, camera.y);
   ctx.scale(camera.zoom, camera.zoom);
   const byPlot = new Map(places.map((place) => [place.plot, place]));
+  const residentsByHome = new Map(residents.map((resident) => [resident.id, resident]));
   const terrainPoint = (x: number, y: number) => project(x, y);
   const b = terrainPoint(WORLD_WIDTH, 0),
     c = terrainPoint(WORLD_WIDTH, WORLD_HEIGHT),
@@ -285,6 +298,7 @@ export function renderCity({
     }
   // Stable plot IDs keep existing contributions in place as the town grows.
   for (const plot of PLOTS) {
+    if (isFootballPlot(plot.id)) continue;
     const pt = plotCenter(plot);
     const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
     const active = selectedPlot === plot.id;
@@ -297,6 +311,7 @@ export function renderCity({
         diamond(ctx, stone.x, stone.y, 7, 3.5, night ? '#899483' : '#E3DABF');
       }
     }
+    if (!occupied) drawMeadow(ctx, plot, night);
     if (active || hover) diamond(ctx, pt.x, pt.y, 108, 54, night ? '#B5C59B40' : '#F4EDCD80');
     if (!occupied) {
       const corners = [
@@ -325,7 +340,12 @@ export function renderCity({
       }
     }
   }
-  const objects: { depth: number; paint: () => void }[] = [];
+  const objects = drawFootball(
+    ctx,
+    football,
+    night,
+    isFootballPlot(selectedPlot ?? '') || isFootballPlot(hoveredPlot ?? ''),
+  );
   // Rugs are floor paint: they must never be drawn over seated guests.
   for (const venue of VENUES) {
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
@@ -336,7 +356,7 @@ export function renderCity({
       point.x,
       point.y,
       night,
-      events.find((event) => event.venue.id === venue.id),
+      eventAtVenue(events, venue.id, minutes),
       minutes,
       'ground',
     );
@@ -358,6 +378,7 @@ export function renderCity({
         x < ROAD_MAX_X &&
         y < ROAD_MAX_Y &&
         !isRoad(x, y) &&
+        !insideFootball({ x, y }) &&
         !PLOTS.some(
           (plot) => venueAt(plot.id) && Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1,
         ) &&
@@ -374,15 +395,7 @@ export function renderCity({
     objects.push({
       depth: venueDepth(plot),
       paint: () =>
-        drawVenue(
-          ctx,
-          venue,
-          pt.x,
-          pt.y,
-          night,
-          events.find((event) => event.venue.id === venue.id),
-          minutes,
-        ),
+        drawVenue(ctx, venue, pt.x, pt.y, night, eventAtVenue(events, venue.id, minutes), minutes),
     });
   }
   for (const place of places) {
@@ -391,7 +404,11 @@ export function renderCity({
     const pt = plotCenter(plot);
     objects.push({
       depth: houseDepth(plot),
-      paint: () => drawHouse(ctx, place, pt.x, pt.y, night, 1.12),
+      paint: () =>
+        drawHouse(ctx, place, pt.x, pt.y, night, 1.12, {
+          minutes,
+          activity: residentsByHome.get(place.id)?.activity,
+        }),
     });
   }
   for (const { x, y } of STREETLIGHTS) {
@@ -425,6 +442,7 @@ export function renderCity({
     });
   }
   objects.sort((a, b) => a.depth - b.depth).forEach((object) => object.paint());
+  drawBirds(ctx, minutes, night);
   ctx.restore();
 }
 
@@ -453,6 +471,16 @@ export function cityHit(
   const plot = PLOTS.find((plot) => plot.id === plotId);
   let depth = plot ? houseDepth(plot) : -Infinity;
   let target: CityHit | undefined = plot ? { kind: 'place', id: plot.id } : undefined;
+  const board = project(15.5, 22.2);
+  const hitsBoard =
+    point.x >= board.x - 92 &&
+    point.x <= board.x + 92 &&
+    point.y >= board.y - 93 &&
+    point.y <= board.y - 33;
+  if (insideFootball(unproject(point.x, point.y)) || hitsBoard) {
+    depth = -1;
+    target = { kind: 'place', id: FOOTBALL_VENUE.plot };
+  }
   for (const venue of VENUES) {
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const p = plotCenter(plot),

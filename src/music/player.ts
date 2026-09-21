@@ -1,5 +1,7 @@
 import type { TrackId } from './score';
 import { renderTrack } from './synth';
+import { renderFootballSound } from './football-sound';
+import type { FootballSound } from '../lib/football';
 
 export class TownPlayer {
   private context: AudioContext;
@@ -9,6 +11,8 @@ export class TownPlayer {
   private revision = 0;
   private disposed = false;
   private active = new Map<AudioBufferSourceNode, GainNode>();
+  private effects = new Map<AudioBufferSourceNode, { gain: GainNode; pan: StereoPannerNode }>();
+  private effectBuffers = new Map<FootballSound['kind'], AudioBuffer>();
   constructor() {
     // Construct only from the sound button's user gesture.
     this.context = new AudioContext();
@@ -20,7 +24,42 @@ export class TownPlayer {
     return this.context.resume();
   }
   suspend() {
+    this.silenceEffects();
     return this.context.suspend();
+  }
+  effect(kind: FootballSound['kind'], volume: number, pan: number) {
+    if (this.disposed || volume <= 0 || this.context.state !== 'running') return;
+    let buffer = this.effectBuffers.get(kind);
+    if (!buffer) {
+      const data = renderFootballSound(kind, this.context.sampleRate);
+      buffer = this.context.createBuffer(1, data.length, this.context.sampleRate);
+      buffer.copyToChannel(data, 0);
+      this.effectBuffers.set(kind, buffer);
+    }
+    const source = this.context.createBufferSource(),
+      gain = this.context.createGain(),
+      panner = this.context.createStereoPanner();
+    source.buffer = buffer;
+    gain.gain.value = Math.min(1, volume);
+    panner.pan.value = Math.max(-1, Math.min(1, pan));
+    source.connect(gain).connect(panner).connect(this.output);
+    this.effects.set(source, { gain, pan: panner });
+    source.onended = () => {
+      source.disconnect();
+      gain.disconnect();
+      panner.disconnect();
+      this.effects.delete(source);
+    };
+    source.start();
+  }
+  silenceEffects() {
+    for (const [source, nodes] of this.effects) {
+      source.stop();
+      source.disconnect();
+      nodes.gain.disconnect();
+      nodes.pan.disconnect();
+    }
+    this.effects.clear();
   }
   volume(value: number) {
     this.output.gain.setTargetAtTime(
@@ -72,6 +111,7 @@ export class TownPlayer {
     this.current = { source, gain, track };
   }
   stop() {
+    this.silenceEffects();
     ++this.revision;
     this.current = undefined;
     const time = this.context.currentTime;
@@ -83,6 +123,8 @@ export class TownPlayer {
     }
   }
   dispose() {
+    this.silenceEffects();
+    this.effectBuffers.clear();
     this.disposed = true;
     ++this.revision;
     for (const source of this.active.keys()) {

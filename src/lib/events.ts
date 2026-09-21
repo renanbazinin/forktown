@@ -1,4 +1,5 @@
 import { getPlot, hash, PLOTS } from './world.ts';
+import { isFootballPlot } from './football.ts';
 
 // Public venues belong to the town, outside the one-house contribution files.
 export const VENUES = [
@@ -6,7 +7,7 @@ export const VENUES = [
   { id: 'stage', plot: 'B5', name: 'The Little Stage', kind: 'stage' },
 ] as const;
 export type Venue = (typeof VENUES)[number];
-export type EventPose = 'sit' | 'read' | 'sip' | 'chat' | 'play' | 'cheer' | 'sway';
+export type EventPose = 'sit' | 'read' | 'sip' | 'chat' | 'play' | 'cheer' | 'sway' | 'dance';
 type EventSpot = { x: number; y: number; facing: 'se' | 'sw' | 'ne' | 'nw' };
 // Coordinates relative to the plot center. These are usable lawn spots, not a street queue.
 // Keep the stage audience in front of the platform (which ends at local y = 0.2).
@@ -40,7 +41,7 @@ export function insideVenue(venue: Venue, point: { x: number; y: number }) {
   return Math.abs(point.x - plot.x - 0.5) <= 1.5 && Math.abs(point.y - plot.y - 0.5) <= 1.5;
 }
 export const venueAt = (plot: string) => VENUES.find((venue) => venue.plot === plot);
-export const HOUSE_PLOTS = PLOTS.filter((plot) => !venueAt(plot.id));
+export const HOUSE_PLOTS = PLOTS.filter((plot) => !venueAt(plot.id) && !isFootballPlot(plot.id));
 
 export const EVENT_CHOICES = {
   afternoon: [
@@ -83,7 +84,7 @@ export type TownEvent = {
   name: string;
   description: string;
   venue: Venue;
-  period: 'afternoon' | 'evening';
+  period: 'afternoon' | 'evening' | 'night';
   depart: number;
   start: number;
   end: number;
@@ -91,7 +92,7 @@ export type TownEvent = {
 };
 
 export function eventsForDay(day: number): TownEvent[] {
-  return (['afternoon', 'evening'] as const).map((period, index) => {
+  const daytime = (['afternoon', 'evening'] as const).map((period, index) => {
     const choices = EVENT_CHOICES[period];
     const choice = choices[hash(`forktown-event:${Math.floor(day)}:${period}`) % choices.length];
     return {
@@ -104,11 +105,50 @@ export function eventsForDay(day: number): TownEvent[] {
       homeBy: index ? 1310 : 1070,
     };
   });
+  return [
+    ...daytime,
+    {
+      id: 'night-party',
+      name: 'Midnight at the Little Stage',
+      description:
+        'A little disco for the night owls. Warm lights, dancing feet, and one more song.',
+      venue: VENUES[1],
+      period: 'night',
+      depart: 1350,
+      start: 1410,
+      end: 1590,
+      homeBy: 1710,
+    },
+  ];
+}
+// Night events use the evening's timeline: 02:30 is minute 1590, not 150.
+// Every consumer (travel, artwork, labels, and music) shares this midnight rule.
+export function eventMinutes(event: TownEvent, minutes: number) {
+  const time = ((minutes % 1440) + 1440) % 1440;
+  return event.period === 'night' && time < 360 ? time + 1440 : time;
+}
+export function isEventLive(event: TownEvent, minutes: number) {
+  const time = eventMinutes(event, minutes);
+  return time >= event.start && time < event.end;
+}
+export function eventAtVenue(events: TownEvent[], venueId: string, minutes: number) {
+  const program = events.filter((event) => event.venue.id === venueId);
+  return (
+    program.find((event) => {
+      const time = eventMinutes(event, minutes);
+      return time >= event.depart && time < event.homeBy;
+    }) ??
+    program.find((event) => eventMinutes(event, minutes) < event.end) ??
+    program.at(-1)
+  );
 }
 export function eventStatus(event: TownEvent, minutes: number) {
-  return minutes < event.start
-    ? 'Later today'
-    : minutes < event.end
+  const time = eventMinutes(event, minutes);
+  return time < event.start
+    ? event.period === 'night'
+      ? 'Later tonight'
+      : 'Later today'
+    : time < event.end
       ? 'Happening now'
       : 'Finished today';
 }

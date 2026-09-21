@@ -7,6 +7,14 @@ import type { ResidentState } from '../lib/simulation';
 import { residentActivityLabel } from '../lib/simulation';
 import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { project, WORLD_BOUNDS } from '../lib/world';
+import {
+  FOOTBALL_CENTER,
+  FOOTBALL_VENUE,
+  GROUND,
+  isFootballPlot,
+  footballListening,
+  type FootballState,
+} from '../lib/football';
 
 export type CityHandle = {
   focus: (plotId: string) => void;
@@ -22,6 +30,8 @@ type Props = {
   residents: ResidentState[];
   events: TownEvent[];
   minutes: number;
+  football: FootballState;
+  onListening: (listening: { gain: number; pan: number }) => void;
   followed: string | null;
   onStopFollowing: () => void;
   onResidentSelect: (id: string) => void;
@@ -37,6 +47,8 @@ const City = forwardRef<CityHandle, Props>(function City(
     residents,
     events,
     minutes,
+    football,
+    onListening,
     followed,
     onStopFollowing,
     onResidentSelect,
@@ -73,6 +85,28 @@ const City = forwardRef<CityHandle, Props>(function City(
       }
     : camera;
   cameraRef.current = renderedCamera;
+  useEffect(() => {
+    onListening(footballListening(renderedCamera, size.width, size.height));
+  }, [
+    renderedCamera.x,
+    renderedCamera.y,
+    renderedCamera.zoom,
+    size.width,
+    size.height,
+    onListening,
+  ]);
+  const footballCamera = (width: number, height: number): Camera => {
+    const pt = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y);
+    const mobile = width < 600;
+    const usableWidth = mobile ? width - 20 : width - 400;
+    const usableHeight = mobile ? height * 0.43 : height - 150;
+    const zoom = Math.max(0.25, Math.min(1.45, usableWidth / 735, usableHeight / 445));
+    return {
+      x: (mobile ? width / 2 : (width - 370) / 2) - pt.x * zoom,
+      y: (mobile ? height * 0.3 : height * 0.52) - pt.y * zoom,
+      zoom,
+    };
+  };
   const defaultCamera = useCallback((width: number, height: number): Camera => {
     const zoom = Math.max(
       0.01,
@@ -109,6 +143,11 @@ const City = forwardRef<CityHandle, Props>(function City(
         const plot = getPlot(id);
         return plot ? [plotCenter(plot)] : [];
       });
+      points.push(
+        project(GROUND.left, GROUND.bottom),
+        project(GROUND.right, GROUND.top),
+        project(GROUND.right, GROUND.bottom),
+      );
       if (!points.length) return overview;
       const left = Math.min(...points.map((point) => point.x)) - 110;
       const right = Math.max(...points.map((point) => point.x)) + 110;
@@ -140,6 +179,10 @@ const City = forwardRef<CityHandle, Props>(function City(
       reset,
       stopFollowing,
       focus: (id) => {
+        if (isFootballPlot(id)) {
+          setCamera(footballCamera(size.width, size.height));
+          return;
+        }
         const plot = getPlot(id);
         if (!plot) return;
         const pt = plotCenter(plot);
@@ -161,7 +204,8 @@ const City = forwardRef<CityHandle, Props>(function City(
       setSize({ width, height });
       const initial = neighborhoodCamera(width, height);
       const selected = getPlot(selectedRef.current ?? '');
-      if (selected) {
+      if (selected && isFootballPlot(selected.id)) setCamera(footballCamera(width, height));
+      else if (selected) {
         const point = plotCenter(selected),
           zoom = Math.max(initial.zoom, 0.85);
         setCamera({
@@ -181,7 +225,12 @@ const City = forwardRef<CityHandle, Props>(function City(
           fit.current * 0.65,
           Math.min(Math.max(6, fit.current * 3.5), old.zoom * factor),
         );
-        const a = anchor ?? { x: size.width / 2, y: size.height / 2 };
+        const pitch = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y);
+        const a =
+          anchor ??
+          (isFootballPlot(selectedRef.current ?? '')
+            ? { x: pitch.x * old.zoom + old.x, y: pitch.y * old.zoom + old.y }
+            : { x: size.width / 2, y: size.height / 2 });
         return {
           x: a.x - ((a.x - old.x) * zoom) / old.zoom,
           y: a.y - ((a.y - old.y) * zoom) / old.zoom,
@@ -228,6 +277,7 @@ const City = forwardRef<CityHandle, Props>(function City(
       residents,
       events,
       minutes,
+      football,
       followed,
     });
   }, [
@@ -242,6 +292,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     followed,
     events,
     minutes,
+    football,
   ]);
   const hit = (clientX: number, clientY: number) => {
     const bounds = canvas.current!.getBoundingClientRect();
@@ -368,7 +419,9 @@ const City = forwardRef<CityHandle, Props>(function City(
         >
           <MapPin size={13} />
           <span>
-            {hoveredPlace?.name ?? venueAt(hover)?.name ?? `Plot ${hover} · Make it yours`}
+            {hoveredPlace?.name ??
+              venueAt(hover)?.name ??
+              (isFootballPlot(hover) ? FOOTBALL_VENUE.name : `Plot ${hover} · Make it yours`)}
           </span>
         </div>
       )}

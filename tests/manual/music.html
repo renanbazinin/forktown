@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Forktown FM — the first five</title>
+    <title>Forktown FM — listening room</title>
     <style>
       * {
         box-sizing: border-box;
@@ -131,7 +131,7 @@
       <div class="eyebrow">FORKTOWN FM / VOL. 01</div>
       <h1>A soundtrack for<br />a little place.</h1>
       <p class="intro">
-        Five original miniatures. Warm keys, wooden plucks, soft pixel bells, and a tiny band with
+        Six original miniatures. Warm keys, wooden plucks, soft pixel bells, and a tiny band with
         somewhere to be. Pick a record. Stay a while.
       </p>
       <div id="tracks"></div>
@@ -144,7 +144,8 @@
       <pre id="checks"></pre>
       <p class="note">
         Each tune has a 16-bar arrangement and loops seamlessly. This listening room is only in the
-        local development build. In town, music follows the day and the evening concert.
+        local development build. In town, music follows the day, the evening concert, and the
+        midnight party.
       </p>
       <a href="/">Back to the town →</a>
     </main>
@@ -152,8 +153,8 @@
       import { TRACKS, durationOf } from '/src/music/score.ts';
       import { TownPlayer } from '/src/music/player.ts';
       import { renderTrack } from '/src/music/synth.ts';
-      const colors = ['#93ae7e', '#566b80', '#ba8064', '#c2a56f', '#798784'];
-      const glyphs = ['♫', '☾', 'ϟ', '♬', '♪'];
+      const colors = ['#93ae7e', '#566b80', '#ba8064', '#c2a56f', '#798784', '#9b7ca8'];
+      const glyphs = ['♫', '☾', 'ϟ', '♬', '♪', '✦'];
       const list = document.querySelector('#tracks');
       const status = document.querySelector('#status');
       let player,
@@ -194,7 +195,7 @@
       document.querySelector('#check').onclick = async (event) => {
         event.target.disabled = true;
         const report = document.querySelector('#checks');
-        report.textContent = 'Rendering and measuring all five mixes…\n';
+        report.textContent = 'Rendering and measuring all six mixes…\n';
         try {
           for (const id of Object.keys(TRACKS)) {
             const buffer = await renderTrack(id);
