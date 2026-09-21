@@ -2,7 +2,9 @@
 
 Open `/live/` (or `/forktown/live/` on a repository Pages site) for a clean browser source for OBS or screen recording. `/live` also works on the development server; static hosts may redirect to the trailing slash. The production build includes a real `live/index.html`, so a direct visit or refresh does not need a server rewrite.
 
-Only the town and the small Forktown symbol appear. There are no buttons, zoom controls, tooltips, follow markers, captions, or cursor. The route supplies the picture and town sound; use your recording software to capture or stream it. It does not save a recording or broadcast to a service itself.
+The town appears with a small Forktown symbol and a compact glass card in the top-right showing the resident population and latest contributor to join. During a resident follow, a name label travels above that neighbor and a small marker highlights their feet. There are no buttons, zoom controls, tooltips, or cursor. The route supplies the picture and town sound; use your recording software to capture or stream it. It does not save a recording or broadcast to a service itself.
+
+Population counts one resident per occupied home, including the founding neighbors. Latest arrival uses the most recent addition of a current community home in the repository's mainline history, not its latest edit; starter homes are excluded. Builds embed that history locally, without browser API calls. CI fetches full history. Source archives or shallow clones without reliable history show a welcome message instead of guessing an arrival.
 
 ## A day in the director's notebook
 

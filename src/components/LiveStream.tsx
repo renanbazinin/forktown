@@ -3,16 +3,19 @@ import { renderCity, type Camera } from '../city/render';
 import { eventsForDay } from '../lib/events';
 import { footballAt, footballListening } from '../lib/football';
 import { easeLiveCamera, liveCamera, liveProgram, liveShotAt } from '../lib/live-director';
-import { places } from '../lib/places';
+import { latestArrival, places } from '../lib/places';
+import { project } from '../lib/world';
 import { simulateResidents } from '../lib/simulation';
 import { useTownClock } from '../lib/use-town-clock';
 import { trackForTown } from '../music/score';
 import Soundtrack from './Soundtrack';
+import ResidentPreview from './ResidentPreview';
 import '../live.css';
 
 export default function LiveStream() {
   const clock = useTownClock({ autoPlay: true });
   const canvas = useRef<HTMLCanvasElement>(null);
+  const followLabel = useRef<HTMLDivElement>(null);
   const camera = useRef<Camera | null>(null);
   const lastPaint = useRef<number | null>(null);
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -25,6 +28,7 @@ export default function LiveStream() {
   );
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const shot = liveShotAt(program, clock.minutes, residents);
+  const followedResident = residents.find((resident) => resident.id === shot.residentId);
   const night = clock.minutes < 360 || clock.minutes >= 1200;
 
   useEffect(() => {
@@ -71,7 +75,18 @@ export default function LiveStream() {
       selectedPlot: null,
       hoveredPlot: null,
       showPlots: false,
+      followed: shot.residentId,
     });
+    if (followLabel.current && followedResident) {
+      const point = project(followedResident.position.x, followedResident.position.y);
+      const x = point.x * camera.current.zoom + camera.current.x;
+      const y = (point.y - 43) * camera.current.zoom + camera.current.y;
+      const halfLabel = followLabel.current.offsetWidth / 2 + 12;
+      followLabel.current.style.left = `${Math.max(halfLabel, Math.min(size.width - halfLabel, x))}px`;
+      followLabel.current.style.top = `${Math.max(90, Math.min(size.height - 30, y))}px`;
+      followLabel.current.style.visibility =
+        x >= 0 && x <= size.width && y >= 0 && y <= size.height ? 'visible' : 'hidden';
+    }
     const field = footballListening(camera.current, size.width, size.height);
     setListening((old) =>
       Math.abs(old.gain - field.gain) < 0.002 && Math.abs(old.pan - field.pan) < 0.002
@@ -89,6 +104,8 @@ export default function LiveStream() {
     shot.center.y,
     shot.width,
     shot.height,
+    shot.residentId,
+    followedResident,
   ]);
 
   return (
@@ -104,6 +121,45 @@ export default function LiveStream() {
           <i />
         </span>
       </div>
+      <aside className="live-community live-glass" aria-label="Town population and latest arrival">
+        <div className="live-population">
+          <div>
+            <span className="live-caption">Population</span>
+            <strong>
+              {places.length}
+              <span>neighbors</span>
+            </strong>
+          </div>
+          <span className="live-community-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+        <div className="live-arrival">
+          {latestArrival && (
+            <div className="live-avatar">
+              <ResidentPreview resident={latestArrival.resident} size={34} />
+            </div>
+          )}
+          <div className="live-arrival-copy">
+            <span className="live-caption">Latest arrival</span>
+            <strong>{latestArrival ? `@${latestArrival.creator}` : 'Welcome, neighbor'}</strong>
+            <span className="live-arrival-home">
+              {latestArrival?.name ?? 'A little town, growing together'}
+            </span>
+          </div>
+        </div>
+      </aside>
+      {followedResident && (
+        <div ref={followLabel} className="live-follow-label live-glass" role="status">
+          <span className="live-caption">
+            <i aria-hidden="true" />
+            Following
+          </span>
+          <strong>{followedResident.resident.name}</strong>
+        </div>
+      )}
       <Soundtrack
         track={trackForTown(clock.minutes, events)}
         playing={clock.playing}
