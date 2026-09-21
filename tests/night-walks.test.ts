@@ -82,8 +82,13 @@ describe('Optional moonlit walks', () => {
     );
     expect(simulateResidents(owls, 60, 9)).toEqual(simulateResidents(owls, 60, 10));
   });
-  it('gives the starter town visible night life while preserving sleeping neighbors', () => {
-    const states = simulateResidents(places, 60);
+  it('supports opted-in night owls alongside sleeping neighbors', () => {
+    const town = places.map((home) =>
+      ['moonbeam-cafe', 'after-hours', 'stargazer'].includes(home.id)
+        ? owls.find((owl) => owl.id === home.id)!
+        : home,
+    );
+    const states = simulateResidents(town, 60);
     expect(states.some((state) => state.nightWalk && state.moving)).toBe(true);
     expect(states.some((state) => state.activity === 'sleep')).toBe(true);
   });
