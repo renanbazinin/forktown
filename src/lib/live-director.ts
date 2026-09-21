@@ -54,16 +54,15 @@ export function liveShotAt(
   residents: ResidentState[],
 ): LiveShot {
   const time = cycle(minutes, 1440);
-  const cat = townCatAt(program.homes, time);
+  const cat = townCatAt(program.homes, time, program.day);
   // Exactly one real minute per town day for context, with the cat still outside in the frame.
   if (time >= SCENERY_START && time < SCENERY_START + SCENERY_SECONDS) {
-    const home = plotCenter(getPlot(cat.homePlot)!);
     const point = project(cat.position.x, cat.position.y);
     return {
       id: `postcard:${program.day}`,
       kind: 'home',
       label: 'The neighborhood waking up',
-      center: { x: (home.x + point.x) / 2, y: (home.y - 40 + point.y) / 2 },
+      center: { x: point.x, y: point.y - 40 },
       width: 600,
       height: 420,
     };
@@ -121,6 +120,18 @@ export function liveShotAt(
     };
   }
   if (football.live) return matchShot();
+
+  if (!cat.outside) {
+    const home = plotCenter(getPlot(cat.homePlot)!);
+    return {
+      id: `quiet-home:${program.day}:${cat.homePlot}`,
+      kind: 'home',
+      label: 'A quiet moment in the neighborhood',
+      center: { x: home.x, y: home.y - 40 },
+      width: 600,
+      height: 420,
+    };
+  }
 
   const point = project(cat.position.x, cat.position.y);
   return {

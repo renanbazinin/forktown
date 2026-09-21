@@ -218,6 +218,7 @@ type RenderOptions = {
   followed?: string | null;
   events?: TownEvent[];
   minutes?: number;
+  day?: number;
   football?: FootballState;
 };
 export function renderCity({
@@ -234,6 +235,7 @@ export function renderCity({
   followed,
   events = [],
   minutes = 0,
+  day = 0,
   football = footballAt(minutes),
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
@@ -443,11 +445,12 @@ export function renderCity({
       },
     });
   }
-  const cat = townCatAt(places, minutes);
-  objects.push({
-    depth: cat.position.x + cat.position.y,
-    paint: () => drawTownCat(ctx, cat, night, followed === TOWN_CAT_ID),
-  });
+  const cat = townCatAt(places, minutes, day);
+  if (cat.outside)
+    objects.push({
+      depth: cat.position.x + cat.position.y,
+      paint: () => drawTownCat(ctx, cat, night, followed === TOWN_CAT_ID),
+    });
   objects.sort((a, b) => a.depth - b.depth).forEach((object) => object.paint());
   drawBirds(ctx, minutes, night);
   ctx.restore();

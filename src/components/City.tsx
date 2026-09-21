@@ -30,6 +30,7 @@ type Props = {
   residents: ResidentState[];
   events: TownEvent[];
   minutes: number;
+  day: number;
   football: FootballState;
   onListening: (listening: { gain: number; pan: number }) => void;
   followed: string | null;
@@ -47,6 +48,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     residents,
     events,
     minutes,
+    day,
     football,
     onListening,
     followed,
@@ -277,6 +279,7 @@ const City = forwardRef<CityHandle, Props>(function City(
       residents,
       events,
       minutes,
+      day,
       football,
       followed,
     });
@@ -292,6 +295,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     followed,
     events,
     minutes,
+    day,
     football,
   ]);
   const hit = (clientX: number, clientY: number) => {

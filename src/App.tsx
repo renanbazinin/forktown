@@ -234,6 +234,7 @@ export default function App() {
         residents={residents}
         events={events}
         minutes={clock.minutes}
+        day={clock.day}
         football={football}
         onListening={setListening}
         followed={followed}

@@ -10,6 +10,7 @@ export function drawTownCat(
   const point = project(cat.position.x, cat.position.y);
   ctx.save();
   ctx.translate(point.x, point.y);
+  ctx.scale(0.8, 0.8);
   ctx.fillStyle = followed ? '#F0DBA575' : '#23341B30';
   ctx.beginPath();
   ctx.ellipse(0, 1, followed ? 16 : 11, followed ? 6 : 3, 0, 0, Math.PI * 2);

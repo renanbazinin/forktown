@@ -23,7 +23,7 @@ const shotAt = (day: number, minute: number) =>
   liveShotAt(liveProgram(places, day), minute, simulateResidents(places, minute, day));
 
 describe('Live broadcast director', () => {
-  it('limits scenery to exactly 60 seconds and films actual outdoor activity for the rest of each day', () => {
+  it('schedules 60 seconds of scenery and only uses extra scenery when nobody is outside', () => {
     const sleepers = places.map((p) => ({
       ...p,
       resident: {
@@ -39,9 +39,15 @@ describe('Live broadcast director', () => {
           const residents = simulateResidents(homes, minute, day);
           const shot = liveShotAt(program, minute, residents);
           if (shot.kind === 'home') {
-            scenery++;
-            expect(minute).toBeGreaterThanOrEqual(SCENERY_START);
-            expect(minute).toBeLessThan(SCENERY_START + SCENERY_SECONDS);
+            if (shot.id.startsWith('postcard:')) {
+              scenery++;
+              expect(minute).toBeGreaterThanOrEqual(SCENERY_START);
+              expect(minute).toBeLessThan(SCENERY_START + SCENERY_SECONDS);
+            } else {
+              expect(residents.some((resident) => resident.activity === 'stroll')).toBe(false);
+              expect(townCatAt(homes, minute, day).outside).toBe(false);
+              expect(footballAt(minute, day).live).toBe(false);
+            }
           } else if (shot.kind === 'neighbor') {
             expect(residents.find((r) => r.id === shot.residentId)?.activity).toBe('stroll');
           } else if (shot.kind === 'event') {
@@ -60,7 +66,10 @@ describe('Live broadcast director', () => {
                   ),
                 ).toBe(true);
             }
-          } else expect(shot.kind).toBe('cat');
+          } else {
+            expect(shot.kind).toBe('cat');
+            expect(townCatAt(homes, minute, day).outside).toBe(true);
+          }
         }
         expect(scenery).toBe(60);
       }
@@ -166,7 +175,7 @@ describe('Live broadcast director', () => {
     for (const homes of [places, [], [places[0]]]) {
       const program = liveProgram(homes, 12);
       for (let minute = 0; minute < 1440; minute += 0.5) {
-        const cat = townCatAt(homes, minute);
+        const cat = townCatAt(homes, minute, 12);
         expect(isRoad(Math.floor(cat.position.x), Math.floor(cat.position.y))).toBe(true);
         if (minute >= 300 && minute < 360) {
           const shot = liveShotAt(program, minute, []);
@@ -183,8 +192,8 @@ describe('Live broadcast director', () => {
           }
         }
       }
-      const before = townCatAt(homes, 1439.999).position;
-      const after = townCatAt(homes, 0).position;
+      const before = townCatAt(homes, 1439.999, 12).position;
+      const after = townCatAt(homes, 0, 13).position;
       expect(Math.hypot(before.x - after.x, before.y - after.y)).toBeLessThan(0.001);
     }
   });

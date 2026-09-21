@@ -31,7 +31,7 @@ export default function LiveStream() {
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const shot = liveShotAt(program, clock.minutes, residents);
   const followedResident = residents.find((resident) => resident.id === shot.residentId);
-  const cat = townCatAt(places, clock.minutes);
+  const cat = townCatAt(places, clock.minutes, clock.day);
   const followPosition =
     followedResident?.position ?? (shot.kind === 'cat' ? cat.position : undefined);
   const followName =
@@ -85,6 +85,7 @@ export default function LiveStream() {
       events,
       football,
       minutes: clock.minutes,
+      day: clock.day,
       night,
       selectedPlot: null,
       hoveredPlot: null,
@@ -114,6 +115,7 @@ export default function LiveStream() {
     events,
     football,
     clock.minutes,
+    clock.day,
     night,
     shot.center.x,
     shot.center.y,
