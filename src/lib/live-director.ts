@@ -1,13 +1,13 @@
 import type { Camera } from '../city/render';
-import { eventsForDay, HOUSE_PLOTS } from './events';
+import { eventsForDay, VENUES } from './events';
 import { FOOTBALL_CENTER } from './football';
 import type { Place } from './schema';
 import { simulateResidents, type ResidentState } from './simulation';
-import { getPlot, plotCenter, project, WORLD_WIDTH, WORLD_HEIGHT, type Point } from './world';
+import { getPlot, plotCenter, project, type Point } from './world';
 
 export type LiveShot = {
   id: string;
-  kind: 'neighbor' | 'event' | 'home' | 'river' | 'meadow' | 'overview';
+  kind: 'neighbor' | 'event' | 'home' | 'venue';
   label: string;
   center: Point;
   width: number;
@@ -88,61 +88,42 @@ export function liveShotAt(
     };
   }
 
-  // Unhurried 90-second postcards between the two longer stories.
+  // Every postcard is anchored to an occupied home, never empty land or a map edge.
   const beat = Math.floor(time / 90);
-  const selection = cycle(beat + program.day, 5);
   const id = `postcard:${program.day}:${beat}`;
   const home = program.homes[cycle(program.day + beat, program.homes.length)];
-  if ((selection === 0 || selection === 3) && home) {
+  if (home) {
     const point = plotCenter(getPlot(home.plot)!);
     return {
       id,
       kind: 'home',
       label: home.name,
       center: { x: point.x, y: point.y - 40 },
-      width: 590,
-      height: 420,
+      width: 460,
+      height: 340,
     };
   }
-  if (selection === 1)
-    return {
-      id,
-      kind: 'river',
-      label: 'A moment by the river',
-      center: project(WORLD_WIDTH - 3, WORLD_HEIGHT * 0.35),
-      width: 750,
-      height: 510,
-    };
-  const meadow = HOUSE_PLOTS.find((plot) => !program.homes.some((place) => place.plot === plot.id));
-  if (selection === 2 && meadow)
-    return {
-      id,
-      kind: 'meadow',
-      label: 'Room to grow',
-      center: plotCenter(meadow),
-      width: 650,
-      height: 440,
-    };
-  const points = program.homes.map((place) => plotCenter(getPlot(place.plot)!));
-  if (!points.length) points.push(project(WORLD_WIDTH / 2, WORLD_HEIGHT / 2));
-  const left = Math.min(...points.map((p) => p.x)) - 180;
-  const right = Math.max(...points.map((p) => p.x)) + 180;
-  const top = Math.min(...points.map((p) => p.y)) - 180;
-  const bottom = Math.max(...points.map((p) => p.y)) + 100;
+  // A new town with no homes still has a real public landmark to film.
+  const venue = VENUES[1];
+  const point = plotCenter(getPlot(venue.plot)!);
   return {
     id,
-    kind: 'overview',
-    label: 'The neighborhood',
-    center: { x: (left + right) / 2, y: (top + bottom) / 2 },
-    width: right - left,
-    height: bottom - top,
+    kind: 'venue',
+    label: venue.name,
+    center: { x: point.x, y: point.y - 35 },
+    width: 520,
+    height: 370,
   };
 }
 
 export function liveCamera(shot: LiveShot, width: number, height: number): Camera {
   const zoom = Math.max(
     0.01,
-    Math.min(1.8, (width * 0.9) / shot.width, (height * 0.86) / shot.height),
+    Math.min(
+      shot.kind === 'home' ? 2.4 : 1.8,
+      (width * 0.9) / shot.width,
+      (height * 0.86) / shot.height,
+    ),
   );
   return { x: width / 2 - shot.center.x * zoom, y: height / 2 - shot.center.y * zoom, zoom };
 }

@@ -9,6 +9,7 @@ import {
 } from '../src/lib/live-director';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
+import { getPlot, plotCenter } from '../src/lib/world';
 
 const places = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
@@ -17,6 +18,46 @@ const shotAt = (day: number, minute: number) =>
   liveShotAt(liveProgram(places, day), minute, simulateResidents(places, minute, day));
 
 describe('Live broadcast director', () => {
+  it('keeps every postcard centered on an occupied home, including a sparse town', () => {
+    const sparse = [
+      { ...places[0], plot: 'A1' },
+      { ...places[1], plot: 'J10' },
+    ];
+    for (const homes of [places, sparse, [places[0]]]) {
+      const seen = new Set<string>();
+      for (let day = 0; day < 8; day++) {
+        const program = liveProgram(homes, day);
+        for (let minute = 0; minute < 1440; minute += 30) {
+          const shot = liveShotAt(program, minute, []);
+          if (shot.kind === 'event') continue;
+          expect(shot.kind).toBe('home');
+          const home = homes.find((place) => place.name === shot.label)!;
+          expect(home).toBeDefined();
+          seen.add(home.id);
+          const center = plotCenter(getPlot(home.plot)!);
+          for (const [width, height] of [
+            [1920, 900],
+            [390, 844],
+          ]) {
+            const camera = liveCamera(shot, width, height);
+            const x = center.x * camera.zoom + camera.x;
+            const y = (center.y - 40) * camera.zoom + camera.y;
+            expect(x).toBeCloseTo(width / 2);
+            expect(y).toBeCloseTo(height / 2);
+          }
+          expect(liveCamera(shot, 1920, 900).zoom).toBeGreaterThanOrEqual(2);
+        }
+      }
+      expect(seen.size).toBe(homes.length);
+    }
+  });
+
+  it('films a public landmark instead of empty terrain when there are no homes', () => {
+    const shot = liveShotAt(liveProgram([], 0), 360, []);
+    expect(shot.kind).toBe('venue');
+    expect(shot.label).toBe('The Little Stage');
+  });
+
   it('casts the same neighbor regardless of input order or reload, and follows for three real minutes', () => {
     const program = liveProgram(places, 12);
     expect(program.neighborId).toBeTruthy();
