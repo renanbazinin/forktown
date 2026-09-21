@@ -1,5 +1,7 @@
 # Contribution policy and merge protection
 
+Enabled on `main` on September 21, 2026. See [verified GitHub results](CONTRIBUTION_VERIFICATION.md).
+
 The required `Contribution policy` status inspects PR files through GitHub's API. Only trusted default-branch code runs; PR code is never checked out and its dependencies are never installed. The token reads contents/PRs and writes statuses, but cannot merge or deploy. Results attach to the inspected PR head. API failures and incomplete lists fail the check.
 
 - Each PR adds at most one house filename. Renames count; deletions do not offset additions. Code/docs PRs can add zero houses.
