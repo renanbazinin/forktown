@@ -1,10 +1,15 @@
-import { TOWN_SIZE, FOOTBALL_SITE, CINEMA_SITE, ZOO_SITE } from './town-config.ts';
+import { TOWN_SIZE, FOOTBALL_SITE, CINEMA_SITE, ZOO_SITE, FARM_SITE } from './town-config.ts';
 import { createWorldLayout, type Point, type Plot } from './world-layout.ts';
 export { BLOCK_SIZE, ROAD_MIN } from './world-layout.ts';
 export type { Point, Plot } from './world-layout.ts';
 export const TILE_W = 76;
 export const TILE_H = 38;
-export const WORLD = createWorldLayout(TOWN_SIZE, [FOOTBALL_SITE, CINEMA_SITE, ZOO_SITE]);
+export const WORLD = createWorldLayout(TOWN_SIZE, [
+  FOOTBALL_SITE,
+  CINEMA_SITE,
+  ZOO_SITE,
+  FARM_SITE,
+]);
 export const PLOTS = WORLD.plots;
 export const STREETLIGHTS = WORLD.streetlights;
 export const ROAD_MAX_X = WORLD.roadMaxX;

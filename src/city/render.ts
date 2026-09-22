@@ -1,4 +1,6 @@
 import { drawZoo, zooSignHit, ZOO_SIGN_DEPTH } from './zoo';
+import { drawFarm, drawFarmGround, drawUfo } from './farm';
+import { FARM, insideFarm, isFarmPlot } from '../lib/farm';
 import { insideZoo, isZooPlot, ZOO_VENUE } from '../lib/zoo';
 import { drawHouse, houseBounds } from './houses';
 import { drawResident } from './residents';
@@ -85,6 +87,7 @@ const trees = terrain.flatMap(({ x, y, point }) => {
     !insideFootball({ x, y }) &&
     !insideCinema({ x, y }) &&
     !insideZoo({ x, y }) &&
+    !insideFarm({ x, y }) &&
     !venuePlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
     x % BLOCK_SIZE === 0 &&
     y % BLOCK_SIZE === 2 &&
@@ -252,6 +255,7 @@ type RenderOptions = {
   height: number;
   camera: Camera;
   places: Place[];
+  ufoPlaces?: readonly Place[];
   selectedPlot: string | null;
   hoveredPlot: string | null;
   night: boolean;
@@ -269,6 +273,7 @@ export function renderCity({
   height,
   camera,
   places,
+  ufoPlaces = places,
   selectedPlot,
   hoveredPlot,
   night,
@@ -363,7 +368,13 @@ export function renderCity({
     }
     // Stable plot IDs keep existing contributions in place as the town grows.
     for (const plot of PLOTS) {
-      if (isFootballPlot(plot.id) || isCinemaPlot(plot.id) || isZooPlot(plot.id)) continue;
+      if (
+        isFootballPlot(plot.id) ||
+        isCinemaPlot(plot.id) ||
+        isZooPlot(plot.id) ||
+        isFarmPlot(plot.id)
+      )
+        continue;
       const pt = plotCenter(plot);
       if (!visible(pt, 110, 60, 60)) continue;
       const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
@@ -406,6 +417,7 @@ export function renderCity({
         }
       }
     }
+    drawFarmGround(ctx, night);
   });
   const objects = drawFootball(
     ctx,
@@ -413,6 +425,7 @@ export function renderCity({
     night,
     isFootballPlot(selectedPlot ?? '') || isFootballPlot(hoveredPlot ?? ''),
   );
+  objects.push(...drawFarm(ctx, minutes, day, night));
   objects.push(
     ...drawZoo(
       ctx,
@@ -518,6 +531,7 @@ export function renderCity({
     });
   objects.sort((a, b) => a.depth - b.depth).forEach((object) => object.paint());
   drawBirds(ctx, minutes, night);
+  drawUfo(ctx, minutes, day, ufoPlaces);
   ctx.restore();
 }
 
@@ -547,6 +561,10 @@ export function cityHit(
   const plot = PLOTS.find((plot) => plot.id === plotId);
   let depth = plot ? houseDepth(plot) : -Infinity;
   let target: CityHit | undefined = plot ? { kind: 'place', id: plot.id } : undefined;
+  if (insideFarm(unproject(point.x, point.y)) && depth < 0) {
+    target = { kind: 'place', id: FARM.plot };
+    depth = -1;
+  }
   const hitsZooSign = zooSignHit(point);
   if (insideZoo(unproject(point.x, point.y)) || hitsZooSign) {
     const zooDepth = hitsZooSign ? ZOO_SIGN_DEPTH : -1;

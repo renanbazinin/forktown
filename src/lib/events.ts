@@ -1,5 +1,6 @@
 import { getPlot, hash, PLOTS } from './world.ts';
 import { isFootballPlot } from './football.ts';
+import { isFarmPlot } from './farm.ts';
 import { ZOO_VENUE, ZOO_SPOTS, isZooPlot, insideZoo } from './zoo.ts';
 import { CINEMA_VENUE, CINEMA_SEATS, isCinemaPlot, insideCinema, cinemaProgram } from './cinema.ts';
 
@@ -58,7 +59,9 @@ export const venueAt = (plot: string) =>
     : isCinemaPlot(plot)
       ? CINEMA_VENUE
       : VENUES.find((venue) => venue.plot === plot);
-export const HOUSE_PLOTS = PLOTS.filter((plot) => !venueAt(plot.id) && !isFootballPlot(plot.id));
+export const HOUSE_PLOTS = PLOTS.filter(
+  (plot) => !venueAt(plot.id) && !isFootballPlot(plot.id) && !isFarmPlot(plot.id),
+);
 
 export const EVENT_CHOICES = {
   afternoon: [

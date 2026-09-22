@@ -1,6 +1,6 @@
 # Expanding the town
 
-The town has **200 plots: twenty rows (A–T) and ten columns (1–10)**, twice the previous 100-plot capacity. B5 and C5 hold the stage and green; F3–F5 and G3–G5 form the six-plot Meadow Ground; D6, D7, E6, and E7 hold the Starlight Cinema; O4-R9 hold the 24-plot Willow Grove Zoo, leaving 164 house plots. Every existing house keeps its ID, coordinates, grass, and entrance; existing place JSON and share links need no migration.
+The town has **200 plots: twenty rows (A–T) and ten columns (1–10)**, twice the previous 100-plot capacity. B5 and C5 hold the stage and green; F3–F5 and G3–G5 form the six-plot Meadow Ground; D6, D7, E6, and E7 hold the Starlight Cinema; O4–R9 hold the 24-plot Willow Grove Zoo; S4–T9 hold the 12-plot Moon Harvest Farm, leaving 152 house plots. Every existing house keeps its ID, coordinates, grass, and entrance; existing place JSON and share links need no migration.
 
 ## One size setting
 
@@ -15,7 +15,7 @@ For example, change this to `{ rows: 20, columns: 14 }` for 280 plots, or `{ row
 ## Compatibility rules
 
 - Grow by adding rows and columns. Do not reduce either count in a published town: that could remove someone's plot or invalidate a saved draft.
-- Scheduled public venues are configured in `src/lib/events.ts`; multi-plot sites are configured in `town-config.ts` and their venue modules (`football.ts`, `cinema.ts`, and `zoo.ts`). Their plots must exist and remain reserved; the shared schema, builder, and directory exclude them from house contributions. Public sites remove their internal roads and lamps while preserving perimeter routes. Never reserve an occupied house plot without explicitly relocating its contribution.
+- Scheduled public venues are configured in `src/lib/events.ts`; multi-plot sites are configured in `town-config.ts` and their site modules (`football.ts`, `cinema.ts`, `zoo.ts`, and `farm.ts`). Their plots must exist and remain reserved; the shared schema, builder, and directory exclude them from house contributions. Public sites remove their internal roads and lamps while preserving perimeter routes. Never reserve an occupied house plot without explicitly relocating its contribution.
 - Keep the block spacing, coordinate origin, and address convention fixed. They define existing home positions. Changing them would require an explicit migration.
 - Row letters and column numbers are independent of the current town size. Row Z is followed by AA, AB, and so on; A10 follows A9. Existing IDs are never renumbered.
 - Place links use the place ID, not an array index or map coordinate. Leave existing place IDs intact.

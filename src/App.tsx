@@ -1,4 +1,6 @@
 import ZooInfo from './components/ZooInfo';
+import FarmInfo from './components/FarmInfo';
+import { FARM, isFarmPlot } from './lib/farm';
 import { isZooPlot, ZOO_VENUE } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -54,6 +56,7 @@ import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simul
 
 type Panel = 'places' | 'neighbors' | 'events';
 function initialSelection() {
+  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'farm') return FARM.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'zoo')
     return ZOO_VENUE.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'cinema')
@@ -88,6 +91,7 @@ export default function App() {
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const selectedFootball = isFootballPlot(selectedPlot ?? '');
+  const selectedFarm = isFarmPlot(selectedPlot ?? '');
   const night = clock.minutes < 360 || clock.minutes >= 1200;
   const cinemaEvening = clock.minutes < 360;
   const events = useMemo(
@@ -145,7 +149,7 @@ export default function App() {
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : ''}`,
+      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : ''}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -223,6 +227,7 @@ export default function App() {
   );
   const heading =
     selected?.name ??
+    (selectedFarm ? FARM.name : undefined) ??
     (selectedFootball ? FOOTBALL_VENUE.name : undefined) ??
     selectedVenue?.name ??
     (selectedPlot
@@ -381,7 +386,9 @@ export default function App() {
             </button>
           </div>
           <div className="town-panel-content">
-            {selectedVenue?.kind === 'zoo' ? (
+            {selectedFarm ? (
+              <FarmInfo />
+            ) : selectedVenue?.kind === 'zoo' ? (
               <ZooInfo
                 minutes={clock.minutes}
                 watching={
