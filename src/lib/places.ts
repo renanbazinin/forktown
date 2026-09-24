@@ -1,4 +1,5 @@
 import { validatePlaces } from './schema';
+import { townArrivals } from './arrivals';
 
 const modules = import.meta.glob('../../places/*.json', { eager: true, import: 'default' });
 const result = validatePlaces(
@@ -13,6 +14,6 @@ export const repository = /^[\w.-]+\/[\w.-]+$/.test(import.meta.env.VITE_GITHUB_
   : '';
 export const repositoryUrl = repository ? `https://github.com/${repository}` : null;
 export const isFoundingPlace = (place: { creator: string }) => place.creator === 'forktown';
-export const latestArrival = __TOWN_ARRIVALS__
+export const latestArrival = townArrivals
   .map((id) => places.find((place) => place.id === id && !isFoundingPlace(place)))
   .find((place) => place !== undefined);

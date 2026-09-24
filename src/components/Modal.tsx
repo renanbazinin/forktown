@@ -3,11 +3,13 @@ import { X } from 'lucide-react';
 
 export default function Modal({
   title,
+  eyebrow,
   onClose,
   children,
   wide = false,
 }: {
   title: string;
+  eyebrow?: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
@@ -51,7 +53,7 @@ export default function Modal({
     >
       <div className="modal-header">
         <div>
-          <span className="eyebrow">A LITTLE SOMETHING OF YOUR OWN</span>
+          {eyebrow && <span className="eyebrow">{eyebrow}</span>}
           <h2 id="modal-title">{title}</h2>
         </div>
         <button className="icon-button" aria-label="Close dialog" onClick={onClose}>

@@ -52,16 +52,20 @@ body,
   letter-spacing: -1px;
   text-shadow: 0 1px 14px #f5f6e9;
 }
-.town-wordmark .brand-dot {
-  margin-left: -10px;
-}
 .town-wordmark .brand-mark {
-  transform: scale(0.8);
-  margin-right: -4px;
+  flex-shrink: 0;
+}
+/* The full stop is a small lantern resting on the baseline. */
+.town-wordmark .brand-lantern {
+  align-self: flex-end;
+  margin: 0 0 7px -8px;
 }
 .town-app-night .town-wordmark {
   color: #f1eedc;
   text-shadow: 0 1px 14px #263c3c;
+}
+.town-app-night .town-wordmark .brand-lantern {
+  filter: drop-shadow(0 0 4px #ffe0a0b3);
 }
 .way-in {
   display: flex;
@@ -159,11 +163,17 @@ body,
 .event-indicator {
   position: absolute;
   top: 8px;
-  right: 10px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #9c7451;
+  right: 9px;
+  width: 6px;
+  height: 6px;
+  border-radius: 1px;
+  background: var(--lantern);
+  box-shadow: inset 0 0 0 1px #8a5a1c;
+}
+.town-app-night .event-indicator {
+  box-shadow:
+    inset 0 0 0 1px #8a5a1c,
+    0 0 6px #ffe0a0;
 }
 .town-app .map-controls {
   right: 28px;
@@ -357,9 +367,10 @@ body,
   font-weight: 600;
   color: #4d6844;
 }
+/* A neighbor's own words: Fraunces italic, with their line breaks kept. */
 .home-story {
-  font-size: 14px;
-  line-height: 1.65;
+  font: italic 500 16px/1.55 var(--serif);
+  white-space: pre-line;
   margin: 13px 0;
 }
 .home-info-body > .resident-link {
@@ -442,6 +453,14 @@ body,
 .empty-corner p {
   font: 500 22px var(--serif);
   color: #46553e;
+  text-align: center;
+}
+.empty-corner small {
+  margin-top: -12px;
+  max-width: 240px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
   text-align: center;
 }
 .draft-chip {
@@ -528,7 +547,8 @@ body,
   font-size: 13px;
 }
 .town-app .modal-header .eyebrow {
-  display: none;
+  font-size: 10px;
+  color: var(--lantern-ink);
 }
 .town-app .toast {
   bottom: 90px;
@@ -547,8 +567,8 @@ body,
   .town-wordmark .brand-mark {
     display: none;
   }
-  .town-wordmark .brand-dot {
-    margin-left: -6px;
+  .town-wordmark .brand-lantern {
+    margin: 0 0 6px -4px;
   }
   .way-in {
     padding: 12px 15px;
@@ -884,4 +904,293 @@ body,
     min-height: 40px;
     padding: 8px 12px;
   }
+}
+
+/* A first-visit note that waits above the dock and never takes focus. */
+.welcome-card {
+  position: fixed;
+  z-index: 4;
+  left: 28px;
+  bottom: calc(max(24px, env(safe-area-inset-bottom)) + 66px);
+  width: min(340px, calc(100vw - 56px));
+  padding: 18px 20px;
+  border: 1px solid #fefdf5a6;
+  border-radius: 18px;
+  background: #fdfcf7f7;
+  color: var(--ink);
+  box-shadow:
+    0 12px 60px #1d392426,
+    0 2px 6px #1d39240a;
+  backdrop-filter: blur(18px);
+  animation: welcome-in 300ms ease both;
+}
+@keyframes welcome-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.welcome-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 28px;
+}
+.welcome-card .eyebrow {
+  color: var(--lantern-ink);
+}
+.welcome-card h2 {
+  margin: 14px 0 8px;
+  font: 500 22px/1.2 var(--serif);
+  letter-spacing: -0.3px;
+  text-wrap: balance;
+}
+.welcome-card p {
+  font-size: 14px;
+  line-height: 1.55;
+}
+.welcome-card small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.welcome-card-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-top: 16px;
+}
+.welcome-card-actions > .icon-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: var(--muted);
+}
+@media (max-width: 600px) {
+  .welcome-card {
+    left: 12px;
+    right: 12px;
+    width: auto;
+    bottom: calc(max(16px, env(safe-area-inset-bottom)) + 62px);
+    padding: 16px 18px;
+  }
+  .welcome-card h2 {
+    font-size: 20px;
+  }
+}
+/* Short screens (landscape phones, small laptop windows): keep the card clear of the header. */
+@media (max-height: 600px) {
+  .welcome-card {
+    max-height: calc(100dvh - 190px);
+    overflow-y: auto;
+    padding: 12px 16px 14px;
+  }
+  .welcome-card-heading svg,
+  .welcome-card small {
+    display: none;
+  }
+  .welcome-card h2 {
+    margin: 8px 0 4px;
+    font-size: 18px;
+  }
+  .welcome-card-actions {
+    margin-top: 10px;
+  }
+}
+/* The sound popover opens in the same bottom-left corner; the welcome waits until it closes. */
+.town-app:has(.sound-popover) .welcome-card {
+  display: none;
+}
+
+/* Dusk skin: from nightfall to dawn the chrome turns with the town. Modals stay cream; they
+   are documents. */
+.map-clock,
+.explore-dock,
+.town-app .map-controls,
+.town-panel,
+.welcome-card,
+.map-tooltip,
+.town-app .follow-status,
+.town-app .toast,
+.sound-popover,
+.town-calendar,
+.welcome-card :is(.eyebrow, small, .text-button) {
+  transition:
+    background-color 400ms ease,
+    border-color 400ms ease,
+    color 400ms ease;
+}
+.town-app-night :is(.town-panel, .welcome-card, .sound-popover, .map-tooltip, .follow-status) {
+  --ink: var(--dusk-ink);
+  --muted: var(--dusk-muted);
+  --line: var(--dusk-line);
+  --green-pale: var(--dusk-raised);
+}
+.town-app-night :is(button, a, input, textarea, select, canvas, pre):focus-visible {
+  outline-color: #a9cfa0;
+}
+.town-app-night .modal :is(button, a, input, textarea, select, pre):focus-visible {
+  outline-color: #739b76;
+}
+.town-app-night .map-clock {
+  background: #263c3ce6;
+  border-color: #45605c99;
+  color: var(--dusk-ink);
+}
+.town-app-night .map-clock button:hover {
+  background: var(--dusk-raised);
+}
+.town-app-night .map-clock .calendar-trigger {
+  border-left-color: #c3d4c233;
+}
+.town-app-night .explore-dock,
+.town-app-night .map-controls {
+  background: #263c3ceb;
+  border-color: var(--dusk-line);
+}
+.town-app-night .explore-dock button,
+.town-app-night .map-controls button {
+  color: #dce3cf;
+}
+.town-app-night .explore-dock button:hover,
+.town-app-night .explore-dock button[aria-expanded='true'],
+.town-app-night .map-controls button:hover {
+  background: var(--dusk-raised);
+  color: var(--dusk-ink);
+}
+.town-app-night .map-controls .control-divider {
+  background: var(--dusk-line);
+}
+.town-app-night .town-panel {
+  background: #2b4242f5;
+  border-color: #45605c80;
+  color: var(--dusk-ink);
+}
+.town-app-night .town-panel-content {
+  scrollbar-color: var(--dusk-line) transparent;
+}
+.town-app-night .town-panel-header {
+  border-bottom-color: var(--dusk-line);
+}
+.town-app-night .browse-row {
+  border-bottom-color: #3a5553;
+}
+.town-app-night :is(.browse-row, .resident-link):hover {
+  background: var(--dusk-raised);
+}
+.town-app-night .browse-row > svg,
+.town-app-night
+  .town-panel
+  :is(small, .muted-copy, .quiet-label, .map-label-setting, .empty-search) {
+  color: var(--dusk-muted);
+}
+.town-app-night :is(.town-panel, .welcome-card) :is(.home-credit, .text-button) {
+  color: var(--dusk-link);
+}
+.town-app-night .home-story {
+  color: var(--dusk-ink);
+}
+.town-app-night .home-sign,
+.town-app-night .venue-program {
+  background: var(--dusk-raised);
+  border-color: var(--dusk-line);
+}
+.town-app-night .venue-program strong {
+  color: var(--dusk-link);
+}
+.town-app-night .football-stats {
+  border-bottom-color: var(--dusk-line);
+}
+.town-app-night .town-panel .search-field {
+  background: var(--dusk);
+  border-color: var(--dusk-line);
+  color: var(--dusk-muted);
+}
+.town-app-night .town-panel .search-field input {
+  color: var(--dusk-ink);
+}
+.town-app-night .town-panel .search-field input::placeholder,
+.town-app-night .town-panel .search-field button {
+  color: var(--dusk-muted);
+}
+.town-app-night .town-panel .search-field:focus-within {
+  outline-color: #a9cfa0;
+}
+.town-app-night .directory-tabs button {
+  color: var(--dusk-muted);
+}
+.town-app-night .directory-tabs button.active {
+  color: var(--dusk-ink);
+}
+.town-app-night .directory-tabs button.active::after {
+  background: #9fc08e;
+}
+.town-app-night .directory-tabs button span {
+  background: var(--dusk-raised);
+}
+.town-app-night .plot-symbol,
+.town-app-night .empty-corner {
+  color: #9fc08e;
+}
+.town-app-night .empty-corner p {
+  color: var(--dusk-ink);
+}
+.town-app-night .map-label-setting input,
+.town-app-night .sound-volume input {
+  accent-color: #9fc08e;
+}
+.town-app-night .event-card {
+  background: var(--dusk-raised);
+  border-color: var(--dusk-line);
+  color: var(--dusk-ink);
+}
+.town-app-night .event-card:hover {
+  background: #35504c;
+  border-color: #6f9a6a;
+}
+.town-app-night .event-card.is-live {
+  background: #35504c;
+  border-color: #6f9a6a;
+}
+/* A shade deeper than the card so the symbol still reads as a disc. */
+.town-app-night .event-symbol {
+  background: var(--dusk);
+}
+.town-app-night .event-time {
+  color: var(--dusk-muted);
+}
+.town-app-night :is(.map-tooltip, .follow-status, .toast, .sound-popover) {
+  background: #263c3cf2;
+  border-color: var(--dusk-line);
+  color: var(--dusk-ink);
+}
+.town-app-night .follow-status button {
+  border-left-color: var(--dusk-line);
+  color: var(--dusk-link);
+}
+.town-app-night .toast button {
+  color: var(--dusk-muted);
+}
+.town-app-night .explore-dock .sound-toggle {
+  background: var(--dusk-raised);
+}
+.town-app-night .welcome-card {
+  background: #2b4242f5;
+  border-color: #45605c80;
+  color: var(--dusk-ink);
+  box-shadow:
+    0 12px 60px #0b1a1a59,
+    0 2px 6px #0b1a1a1f;
+}
+.town-app-night .welcome-card .eyebrow {
+  color: var(--lantern);
+}
+.town-app-night .welcome-card-actions > .icon-button {
+  color: var(--dusk-muted);
 }

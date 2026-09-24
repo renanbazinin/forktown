@@ -507,6 +507,23 @@
     --green-pale: #eef1e6;
     --mono: 'Space Mono', monospace;
     --serif: 'Fraunces', Georgia, serif;
+    --sans: 'DM Sans', system-ui, sans-serif;
+    /* The Lantern Fork. --lantern is a fill only; accent text uses --lantern-ink. */
+    --leaf: #769267;
+    --lantern: #f2c06b;
+    --lantern-ink: #8a5a1c;
+    --lantern-pale: #fff6df;
+    --glow: #ffe0a0;
+    --timber: #ad9069;
+    --timber-ink: #6f5a3c;
+    /* Dusk skin for the chrome from nightfall (20:00) to dawn (06:00). */
+    --dusk: #263c3c;
+    --dusk-surface: #2b4242;
+    --dusk-raised: #30494a;
+    --dusk-line: #45605c;
+    --dusk-ink: #f1eedc;
+    --dusk-muted: #c3d4c2;
+    --dusk-link: #bfd8a6;
   }
   html {
     scroll-behavior: smooth;
@@ -656,57 +673,6 @@
     align-items: center;
     justify-content: space-between;
     gap: 28px;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    font-family: var(--mono);
-    font-size: 25px;
-    font-weight: 400;
-    letter-spacing: -1.9px;
-    padding: 0;
-  }
-  .brand-dot {
-    color: #7f956b;
-  }
-  .brand-mark {
-    width: 24px;
-    height: 27px;
-    position: relative;
-    display: block;
-    image-rendering: pixelated;
-  }
-  .brand-mark i {
-    position: absolute;
-    display: block;
-    background: #769267;
-    width: 7px;
-    height: 7px;
-  }
-  .brand-mark i:nth-child(1) {
-    left: 9px;
-    top: 0;
-  }
-  .brand-mark i:nth-child(2) {
-    left: 2px;
-    top: 7px;
-    width: 21px;
-  }
-  .brand-mark i:nth-child(3) {
-    left: 0;
-    top: 14px;
-    width: 26px;
-  }
-  .brand-mark i:nth-child(4) {
-    left: 4px;
-    top: 21px;
-    background: #c9b48b;
-  }
-  .brand-mark i:nth-child(5) {
-    left: 17px;
-    top: 21px;
-    background: #c9b48b;
   }
   .header-inner nav {
     display: flex;
@@ -2371,9 +2337,6 @@
     .header-inner {
       gap: 16px;
     }
-    .brand {
-      font-size: 23px;
-    }
     .hero h1 {
       font-size: 44px;
     }
@@ -2839,9 +2802,6 @@
     .hero {
       padding: 29px 0;
     }
-    .brand {
-      font-size: 24px;
-    }
     .town-title h2 {
       font-size: 11px;
     }
@@ -3106,7 +3066,7 @@
 .json-guide {
   margin: 1rem 0;
   padding: 1rem;
-  border: 1px solid var(--border, #dce1d2);
+  border: 1px solid #dce1d2;
   border-radius: 8px;
   font-size: 0.875rem;
   line-height: 1.6;

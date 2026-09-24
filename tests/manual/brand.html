@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forktown · Brand study</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      body {
+        margin: 0;
+        overflow: auto !important;
+        height: auto !important;
+        background: #f8f7f2;
+      }
+      html,
+      #root {
+        overflow: auto !important;
+        height: auto !important;
+      }
+      .study {
+        padding: 18px 24px 48px;
+        font: 13px var(--sans);
+        color: var(--ink);
+      }
+      .study > header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 18px;
+        margin-bottom: 18px;
+      }
+      .study h2 {
+        margin: 28px 0 12px;
+        font: 500 22px var(--serif);
+      }
+      .swatches {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 22px;
+        padding: 22px;
+        border-radius: 12px;
+      }
+      .swatches figure {
+        margin: 0;
+        display: grid;
+        justify-items: center;
+        gap: 8px;
+        font: 10px var(--mono);
+      }
+      .day {
+        background: var(--paper);
+        border: 1px solid var(--line);
+      }
+      .night {
+        background: var(--dusk);
+        color: var(--dusk-ink);
+      }
+      .magnified {
+        zoom: 3;
+      }
+      /* A slice of the real chrome over a painted town. */
+      .study .stage {
+        position: relative;
+        height: 640px;
+        min-height: 0;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      .stage canvas {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .stage .welcome-card,
+      .stage .map-clock,
+      .stage .toast {
+        position: absolute;
+      }
+      .stage .map-tooltip {
+        left: 520px;
+        top: 420px;
+      }
+      .stage .map-controls {
+        position: absolute;
+      }
+      .stage .toast {
+        bottom: 24px;
+        left: 50%;
+      }
+      table {
+        border-collapse: collapse;
+        font: 12px var(--mono);
+      }
+      td,
+      th {
+        padding: 6px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+      }
+      .chip {
+        display: inline-block;
+        padding: 3px 9px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module">
+      import '/src/styles.css';
+      import '/src/explore.css';
+      import '/src/calendar.css';
+      import '@fontsource/dm-sans/400.css';
+      import '@fontsource/dm-sans/600.css';
+      import '@fontsource/space-mono/400.css';
+      import '@fontsource/space-mono/700.css';
+      import '@fontsource/fraunces/500.css';
+      import '@fontsource/fraunces/500-italic.css';
+      import { createElement as h, useEffect, useRef, useState } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { ArrowRight, Compass, MapPin, Music2, Plus, Sprout, Users, X } from 'lucide-react';
+      import BrandMark, { LanternDot } from '/src/components/BrandMark.tsx';
+      import WelcomeCard from '/src/components/WelcomeCard.tsx';
+      import { BRAND, NIGHT_FOCUS, PLOT_COPY, contrast } from '/src/lib/brand.ts';
+      import { renderCity } from '/src/city/render.ts';
+      import { places, latestArrival } from '/src/lib/places.ts';
+      import { WORLD_BOUNDS } from '/src/lib/world.ts';
+
+      const SIZES = [16, 24, 32, 64, 128];
+
+      function Marks({ night, tile }) {
+        return h(
+          'div',
+          { className: `swatches ${night ? 'night' : 'day'}` },
+          SIZES.map((size) =>
+            h('figure', { key: size }, h(BrandMark, { size, night, tile }), `${size}px`),
+          ),
+        );
+      }
+
+      function Wordmark({ night }) {
+        return h(
+          'div',
+          {
+            className: `town-app ${night ? 'town-app-night' : ''}`,
+            style: { height: 'auto', minHeight: 0 },
+          },
+          h(
+            'div',
+            { className: `swatches ${night ? 'night' : 'day'}` },
+            h(
+              'button',
+              { className: 'town-wordmark' },
+              h(BrandMark, { size: 26, night }),
+              h('span', { className: 'wordmark-text' }, 'forktown'),
+              h(LanternDot),
+            ),
+            h(
+              'div',
+              { className: 'magnified' },
+              h(
+                'button',
+                { className: 'town-wordmark' },
+                h(BrandMark, { size: 26, night }),
+                h('span', { className: 'wordmark-text' }, 'forktown'),
+                h(LanternDot),
+              ),
+            ),
+          ),
+        );
+      }
+
+      function Town({ minutes }) {
+        const canvas = useRef(null);
+        useEffect(() => {
+          const element = canvas.current;
+          const paint = () => {
+            const width = element.clientWidth,
+              height = element.clientHeight;
+            element.width = width;
+            element.height = height;
+            const ctx = element.getContext('2d');
+            ctx.imageSmoothingEnabled = false;
+            const zoom = 0.7;
+            renderCity({
+              ctx,
+              width,
+              height,
+              places,
+              minutes,
+              day: 20000,
+              camera: {
+                x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
+                y: -120,
+                zoom,
+              },
+              night: minutes < 360 || minutes >= 1200,
+              selectedPlot: null,
+              hoveredPlot: null,
+              showPlots: false,
+            });
+          };
+          paint();
+          const observer = new ResizeObserver(paint);
+          observer.observe(element);
+          return () => observer.disconnect();
+        }, [minutes]);
+        return h('canvas', { ref: canvas, 'aria-hidden': true });
+      }
+
+      function Chrome({ night }) {
+        const minutes = night ? 1290 : 780;
+        return h(
+          'main',
+          { className: `town-app stage ${night ? 'town-app-night' : ''}` },
+          h(Town, { minutes }),
+          h(
+            'header',
+            { className: 'map-header' },
+            h(
+              'button',
+              { className: 'town-wordmark' },
+              h(BrandMark, { size: 26, night }),
+              h('span', { className: 'wordmark-text' }, 'forktown'),
+              h(LanternDot),
+            ),
+            h(
+              'div',
+              { className: 'map-clock' },
+              h('span', { className: 'live-dot' }),
+              h('time', null, night ? '21:30' : '13:00'),
+              h('button', { className: 'calendar-trigger' }, h('span', null, 'Autumn 4')),
+            ),
+            h('button', { className: 'way-in' }, 'Find your way in ', h(ArrowRight, { size: 16 })),
+          ),
+          h(WelcomeCard, {
+            neighbors: places.length,
+            newest: latestArrival?.name,
+            onFindWayIn: () => {},
+            onVisitFork: () => {},
+            onDismiss: () => {},
+          }),
+          h(
+            'nav',
+            { className: 'explore-dock' },
+            h(
+              'button',
+              { 'aria-expanded': false },
+              h(Compass, { size: 19 }),
+              h('span', null, 'Explore'),
+            ),
+            h('button', null, h(Users, { size: 19 })),
+            h(
+              'button',
+              { 'aria-label': 'Town events, happening now' },
+              h(Music2, { size: 19 }),
+              h('i', { className: 'event-indicator' }),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'map-tooltip' },
+            h(MapPin, { size: 13 }),
+            h('span', null, PLOT_COPY.tooltip('C4')),
+          ),
+          h(
+            'div',
+            { className: 'map-controls' },
+            h('button', null, h(Plus, { size: 17 })),
+            h('span', { className: 'control-divider' }),
+            h('button', null, h(X, { size: 17 })),
+          ),
+          h(
+            'section',
+            { className: 'town-panel' },
+            h(
+              'div',
+              { className: 'town-panel-header' },
+              h('h2', null, 'Plot C4'),
+              h('button', { className: 'icon-button' }, h(X, { size: 19 })),
+            ),
+            h(
+              'div',
+              { className: 'town-panel-content' },
+              h(
+                'div',
+                { className: 'empty-corner' },
+                h(Sprout, { size: 36, strokeWidth: 1.3 }),
+                h('p', null, PLOT_COPY.title),
+                h('small', null, PLOT_COPY.hint),
+                h(
+                  'button',
+                  { className: 'button button-primary' },
+                  h(Plus, { size: 15 }),
+                  'Build here',
+                ),
+              ),
+              h(
+                'div',
+                { className: 'town-events' },
+                h(
+                  'button',
+                  { className: 'event-card is-live' },
+                  h('span', { className: 'event-symbol' }, h(Music2, { size: 18 })),
+                  h(
+                    'span',
+                    { className: 'event-copy' },
+                    h(
+                      'span',
+                      { className: 'event-time' },
+                      h('i', { className: 'live-dot' }),
+                      ' Happening now · 21:00–22:30',
+                    ),
+                    h('strong', null, 'Jazz on the Little Stage'),
+                  ),
+                ),
+              ),
+              h(
+                'div',
+                { className: 'home-info-body' },
+                h('a', { className: 'home-credit', href: '#' }, '@neighbor'),
+                h(
+                  'p',
+                  { className: 'home-story' },
+                  'A porch light for late walkers.\nTea on the step at dusk.\nKnock twice.',
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      const PAIRS = [
+        ['ink', 'surface'],
+        ['muted', 'surface'],
+        ['green', 'surface'],
+        ['lanternInk', 'surface'],
+        ['lanternInk', 'paper'],
+        ['lanternInk', 'lanternPale'],
+        ['lanternInk', 'greenPale'],
+        ['ink', 'lanternPale'],
+        ['ink', 'lantern'],
+        ['lantern', 'surface'],
+        ['duskInk', 'dusk'],
+        ['duskInk', 'duskSurface'],
+        ['duskInk', 'duskRaised'],
+        ['duskMuted', 'dusk'],
+        ['duskMuted', 'duskSurface'],
+        ['duskMuted', 'duskRaised'],
+        ['duskLink', 'dusk'],
+        ['duskLink', 'duskSurface'],
+        ['glow', 'duskSurface'],
+      ];
+
+      function Contrast() {
+        const rows = [
+          ...PAIRS.map(([text, background]) => [text, background, BRAND[text], BRAND[background]]),
+          ['night focus', 'duskSurface', NIGHT_FOCUS, BRAND.duskSurface],
+        ];
+        return h(
+          'table',
+          null,
+          h(
+            'thead',
+            null,
+            h('tr', null, h('th', null, 'Sample'), h('th', null, 'Pair'), h('th', null, 'Ratio')),
+          ),
+          h(
+            'tbody',
+            null,
+            rows.map(([text, background, fg, bg]) => {
+              const ratio = contrast(fg, bg);
+              return h(
+                'tr',
+                { key: `${text}-${background}` },
+                h(
+                  'td',
+                  null,
+                  h(
+                    'span',
+                    { className: 'chip', style: { color: fg, background: bg } },
+                    'Lantern No. 13',
+                  ),
+                ),
+                h('td', null, `${text} on ${background}`),
+                h(
+                  'td',
+                  null,
+                  `${ratio.toFixed(2)}:1 ${ratio >= 4.5 ? 'text' : ratio >= 3 ? 'large / UI' : 'fill only'}`,
+                ),
+              );
+            }),
+          ),
+        );
+      }
+
+      function Study() {
+        const [night, setNight] = useState(true);
+        return h(
+          'div',
+          { className: 'study' },
+          h(
+            'header',
+            null,
+            h('strong', null, 'Brand study'),
+            h(
+              'label',
+              null,
+              h('input', {
+                type: 'checkbox',
+                checked: night,
+                onChange: (event) => setNight(event.target.checked),
+              }),
+              ' Dusk chrome',
+            ),
+            h('a', { href: '/' }, 'Back to town'),
+          ),
+          h('h2', null, 'The mark.'),
+          h(Marks, { night: false, tile: false }),
+          h('br'),
+          h(Marks, { night: true, tile: false }),
+          h('br'),
+          h(Marks, { night: false, tile: true }),
+          h('h2', null, 'The wordmark.'),
+          h(Wordmark, { night: false }),
+          h('br'),
+          h(Wordmark, { night: true }),
+          h('h2', null, 'The chrome.'),
+          h(Chrome, { night }),
+          h('h2', null, 'Contrast.'),
+          h(Contrast),
+        );
+      }
+
+      createRoot(document.getElementById('root')).render(h(Study));
+    </script>
+  </body>
+</html>

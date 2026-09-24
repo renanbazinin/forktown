@@ -3,6 +3,7 @@ import type { ResidentState } from '../lib/simulation';
 import { hash } from '../lib/world';
 import { drawChimneySmoke } from './ambience';
 import { drawSign } from './signs';
+import { drawLanternPost, type HouseLantern } from './lantern-post';
 
 type Ctx = CanvasRenderingContext2D;
 export type HouseAppearance = Pick<
@@ -58,7 +59,7 @@ export function drawHouse(
   y: number,
   night = false,
   scale = 1,
-  life?: { minutes: number; activity?: ResidentState['activity'] },
+  life?: { minutes: number; activity?: ResidentState['activity']; lantern?: HouseLantern },
 ) {
   const d = place.design,
     { height: h } = houseBounds(place);
@@ -67,6 +68,8 @@ export function drawHouse(
     trim = tint(d.trim, night ? -25 : 0);
   const seed = hash(place.id);
   const awakeInside = life?.activity === 'home' || life?.activity === 'work';
+  // On the map a home's windows wait for its lantern; previews without one keep the old glow.
+  const windowsLit = night && (life?.lantern?.lit ?? true);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -118,6 +121,7 @@ export function drawHouse(
       night ? '#899483' : '#E3DABF',
     );
   }
+  if (life?.lantern) drawLanternPost(ctx, life.lantern, night);
   polygon(
     ctx,
     [
@@ -180,7 +184,7 @@ export function drawHouse(
       ctx.save();
       ctx.transform(1, side === -1 ? 0.5 : -0.5, 0, 1, side === -1 ? -25 : 8, yy + 5);
       const silhouette = () => {
-        if (!night || !awakeInside || floor !== 0 || side !== (seed % 2 ? -1 : 1)) return;
+        if (!windowsLit || !awakeInside || floor !== 0 || side !== (seed % 2 ? -1 : 1)) return;
         // One neighbor behind one pane, with the window frame painted in front.
         box(ctx, 5, 3, 3, 3, '#83744D');
         box(ctx, 4, 6, 5, 4, '#83744D');
@@ -189,7 +193,7 @@ export function drawHouse(
       if (d.windows === 'round') {
         ctx.beginPath();
         ctx.arc(6, 6, 6, 0, Math.PI * 2);
-        ctx.fillStyle = night ? '#F1D68F' : '#8EBCBF';
+        ctx.fillStyle = windowsLit ? '#F1D68F' : night ? '#4E6461' : '#8EBCBF';
         ctx.fill();
         silhouette();
         ctx.strokeStyle = trim;
@@ -197,7 +201,7 @@ export function drawHouse(
         ctx.stroke();
       } else {
         box(ctx, 0, 0, 12, 12, trim);
-        box(ctx, 1, 1, 10, 10, night ? '#F1D68F' : '#90B6BA');
+        box(ctx, 1, 1, 10, 10, windowsLit ? '#F1D68F' : night ? '#4E6461' : '#90B6BA');
         silhouette();
         box(ctx, 5, 0, 2, 12, trim);
         if (d.windows === 'cross') box(ctx, 0, 5, 12, 2, trim);

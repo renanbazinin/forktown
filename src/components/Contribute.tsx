@@ -23,12 +23,15 @@ import { HOUSE_PLOTS as PLOTS } from '../lib/events';
 import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
 import { pickDraftNames } from '../lib/draft-names';
+import { restoreDraftPlot, storyPrompt } from '../lib/builder-nudges';
+import { BUILDER_DEFAULT_STORY } from '../lib/lanterns';
 import BuildingPreview from './BuildingPreview';
 import Modal from './Modal';
 import HouseFiles from './HouseFiles';
 import JsonGuide from './JsonGuide';
 import ResidentPreview from './ResidentPreview';
 import { HomeDetails, NeighborDetails, SignDetails } from './Customization';
+import '../stories.css';
 
 const COLORS = ['#789B76', '#C97878', '#759BAF', '#AD88AE', '#D0AA65', '#BE8E68'];
 const initial = (plot: string, places: Place[]): Place => {
@@ -41,7 +44,8 @@ const initial = (plot: string, places: Place[]): Place => {
     building: 'cottage',
     color: COLORS[0],
     decoration: 'flowers',
-    story: 'A small corner of the internet, made with curiosity and a little courage.',
+    // Empty on purpose: the placeholder asks a question, so every house arrives with its own story.
+    story: '',
     resident: { ...DEFAULT_RESIDENT, name: residentName },
   });
 };
@@ -90,12 +94,7 @@ const Contribute = memo(function Contribute({
           if (restored.resident.name === 'New neighbor')
             restored.resident = { ...restored.resident, name: residentName };
         }
-        return {
-          ...restored,
-          plot:
-            plot ??
-            (occupied.has(result.data.plot) ? (available[0]?.id ?? 'A1') : result.data.plot),
-        };
+        return { ...restored, plot: restoreDraftPlot(plot ?? restored.plot, available) };
       }
     } catch {
       /* A stale draft should never prevent a new contribution. */
@@ -438,11 +437,19 @@ const Contribute = memo(function Contribute({
                   rows={3}
                   value={draft.story}
                   maxLength={180}
+                  placeholder={storyPrompt(draft.id || draft.name)}
                   onChange={(event) => update('story', event.target.value)}
                   aria-invalid={attempted && !!errors.story}
-                  aria-describedby={attempted && errors.story ? 'error-story' : undefined}
+                  aria-describedby={
+                    attempted && errors.story ? 'error-story story-hint' : 'story-hint'
+                  }
                 />
                 <span className="character-count">{draft.story.length}/180</span>
+                <span className="field-hint" id="story-hint">
+                  {draft.story.trim() === BUILDER_DEFAULT_STORY
+                    ? 'This is the old example story. Write your own so it can be told as Tonight’s tale.'
+                    : 'Your story may be told as Tonight’s tale at the Lantern Fork. Write it in your own words.'}
+                </span>
                 {fieldError('story')}
               </label>
               <div className="field-row">
@@ -585,8 +592,8 @@ const Contribute = memo(function Contribute({
                 <div>
                   <h3>Welcome to the neighborhood</h3>
                   <p>
-                    After review and merging, the city rebuilds with your place and your creator
-                    credit.
+                    After review and merging, the town rebuilds with your house, your credit, and
+                    your lantern on the Lantern Fork.
                   </p>
                 </div>
               </li>

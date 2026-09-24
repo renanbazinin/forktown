@@ -128,6 +128,28 @@
   line-height: 1.7;
   color: #7a846d;
 }
+/* The almanac follows the chrome into dusk. */
+.town-app-night .town-calendar {
+  border-color: var(--dusk-line);
+  background: var(--dusk);
+  color: var(--dusk-ink);
+  box-shadow: 0 16px 60px #0b1a1a66;
+}
+.town-app-night :is(.calendar-eyebrow, .calendar-heading h2 span, .calendar-footer p) {
+  color: var(--dusk-muted);
+}
+.town-app-night .calendar-heading button:hover {
+  background: var(--dusk-raised);
+}
+.town-app-night .calendar-moon {
+  background: var(--dusk-raised);
+}
+.town-app-night .calendar-days [aria-current='date'] {
+  background: var(--green);
+}
+.town-app-night .calendar-footer {
+  border-top-color: var(--dusk-line);
+}
 @media (min-width: 601px) and (max-width: 800px) {
   .calendar-trigger span {
     display: none;

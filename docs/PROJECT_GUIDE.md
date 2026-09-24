@@ -21,6 +21,11 @@ Starter places use `creator: "forktown"` as a project credit, not a real communi
 - The six-plot Meadow Ground: four-a-side football all day, a live scoreboard, passing, shots, saves, goal celebrations, spectators, and short breaks between halves. Zoom close with Town sound enabled for kicks, whistles, and cheers. See [Football at the Meadow Ground](FOOTBALL.md).
 - A shared UTC-based 24-minute town day, automatic day/night lighting, pause/resume-live, and reduced-motion support.
 - A quiet sun, moon, and starry background, with continuous lunar phases and a shared town almanac. Four 28-day seasons count forward from a permanent UTC epoch. Open the date beside the clock. See [Sky and calendar](SKY_AND_CALENDAR.md).
+- The Lantern Fork identity: a leaf-and-lantern fork mark shared by the header, favicon and /live, a warm lantern accent, a dusk skin for the controls after 20:00, and a first-visit welcome card. See [Brand](BRAND.md).
+- The Lantern Fork on D3: a forked tree at the heart of town with one lantern for every house, in the order the houses moved in. Select it for the full register. See [The Lantern Fork](LANTERN_FORK.md).
+- Lantern hour at nightfall (20:00): the Fork's lanterns, each house's windows and its lantern post light in arrival order, then the streetlamps carry the light outward from the Fork by 20:30.
+- Tonight's tale: each evening one neighbor's own story is told at the Fork, in the Events panel and in the almanac. See [Tales](TALES.md).
+- The far side: golden-hour light, a quiet horizon with three sister forks, far fields beyond the town, and commit-stone paving at every crossing. See [The far side](THE_FAR_SIDE.md).
 - Optional original music: day and night themes, three concert arrangements, and a midnight dance track, with a volume control, soft transitions, and automatic pause when the tab is hidden. See [Forktown FM](MUSIC.md) for the listening preview and score guide.
 - Exterior signs: simple text or a restricted HTML/CSS artwork language, drawn as noninteractive canvas textures.
 - A full-screen town with compact controls. Explore opens searchable places and open plots; the neighbor and music buttons reveal residents and events. All directories work with a keyboard.
@@ -43,8 +48,15 @@ src/city/houses.ts         Customizable homes and exterior sign textures
 src/city/residents.ts      Pixel resident artwork
 src/lib/simulation.ts      Deterministic road routes and daily routines
 src/lib/sign.ts            Restricted HTML/CSS-to-artwork compiler
+src/lib/brand.ts           Tagline, brand palette, mark pixels, and identity copy
+src/lib/lanterns.ts        The lantern register, lantern-hour clock, and tonight's tale
+src/city/lantern-fork.ts   The Lantern Fork on D3
+src/city/horizon.ts        The horizon, sister forks, and far fields
 src/components/City.tsx    Map interaction and accessible controls
 src/components/Contribute.tsx  Building editor and JSON export
+src/components/BrandMark.tsx   The leaf-and-lantern mark and the wordmark's lantern
+src/components/WelcomeCard.tsx First-visit welcome card
+src/components/ForkCard.tsx    The Lantern Fork's register card
 src/App.tsx                The town, directory, and onboarding
 scripts/validate-places.ts Command-line contribution checks
 scripts/local-places.ts    Development-only saves to the local places folder

@@ -1,13 +1,17 @@
 import { isEventLive, type TownEvent, type Venue } from '../lib/events';
 import { project } from '../lib/world';
+import { FORK_BOUNDS } from '../lib/lanterns';
 import { drawVenueTitle } from './venue-title';
 
-export const venueBounds = (venue: Venue) => ({
-  left: venue.kind === 'stage' ? -44 : -84,
-  right: 84,
-  top: venue.kind === 'stage' ? -94 : -40,
-  bottom: venue.kind === 'stage' ? 26 : 38,
-});
+export const venueBounds = (venue: Venue) =>
+  venue.kind === 'fork'
+    ? FORK_BOUNDS
+    : {
+        left: venue.kind === 'stage' ? -44 : -84,
+        right: 84,
+        top: venue.kind === 'stage' ? -94 : -40,
+        bottom: venue.kind === 'stage' ? 26 : 38,
+      };
 
 export function drawVenue(
   ctx: CanvasRenderingContext2D,
@@ -19,6 +23,8 @@ export function drawVenue(
   minutes = 0,
   layer: 'ground' | 'objects' = 'objects',
 ) {
+  // The Lantern Fork has its own painter (lantern-fork.ts); the green art must not land on D3.
+  if (venue.kind === 'fork') return;
   const live = !!event && isEventLive(event, minutes);
   const party = live && event?.id === 'night-party';
   ctx.save();

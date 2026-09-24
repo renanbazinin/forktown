@@ -1,6 +1,6 @@
 # Forktown 🌱
 
-**A living pixel town, built one pull request at a time.** Design a home and a neighbor; contribute one JSON file.
+**A little town, built one pull request at a time.** Design a home and a neighbor; contribute one JSON file. Every house hangs a lantern on the Lantern Fork.
 
 [Visit the town](https://renanbazinin.github.io/forktown/) · [Detailed contributor guide](CONTRIBUTING.md)
 

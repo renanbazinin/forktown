@@ -23,7 +23,9 @@ import '@fontsource/dm-sans/500.css';
 import '@fontsource/dm-sans/600.css';
 import '@fontsource/dm-sans/700.css';
 import '@fontsource/space-mono/400.css';
+import '@fontsource/space-mono/700.css';
 import '@fontsource/fraunces/500.css';
+import '@fontsource/fraunces/500-italic.css';
 import City, { type CityHandle } from './components/City';
 import BuildingPreview from './components/BuildingPreview';
 import ResidentPreview from './components/ResidentPreview';
@@ -31,7 +33,11 @@ import SignPreview from './components/SignPreview';
 import Contribute from './components/Contribute';
 import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
+import BrandMark, { LanternDot } from './components/BrandMark';
+import WelcomeCard from './components/WelcomeCard';
 import TownEvents from './components/TownEvents';
+import ForkCard from './components/ForkCard';
+import LanternProvenance from './components/LanternProvenance';
 import Soundtrack from './components/Soundtrack';
 import FootballMatch from './components/FootballMatch';
 import CalendarClock from './components/CalendarClock';
@@ -47,14 +53,30 @@ import {
   eventAtVenue,
   isEventLive,
 } from './lib/events';
-import { isFoundingPlace, places, repositoryUrl } from './lib/places';
+import { isFoundingPlace, latestArrival, places, repositoryUrl } from './lib/places';
+import { GUIDE_COPY, PLOT_COPY, TITLE, WELCOME_KEY, shouldWelcome } from './lib/brand';
 import { TYPE_LABELS, type Place } from './lib/schema';
 import { localSaveAvailable } from './lib/local-save';
 import { useTownClock } from './lib/use-town-clock';
+import { useLanternTown } from './lib/use-lantern-town';
+import { FORK_PLOT } from './lib/lanterns';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
 
 type Panel = 'places' | 'neighbors' | 'events';
+// Keeps the welcome closed for this page load even when storage refuses the flag.
+let welcomeDismissed = false;
+function initialWelcome() {
+  if (welcomeDismissed) return false;
+  let storage: Storage | null = null;
+  try {
+    storage = window.localStorage;
+  } catch {
+    // Blocked storage greets once per session.
+  }
+  return shouldWelcome(window.location.hash, storage);
+}
 function initialSelection() {
+  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'fork') return FORK_PLOT;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'farm') return FARM.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'zoo')
     return ZOO_VENUE.plot;
@@ -86,6 +108,7 @@ export default function App() {
   const [draft, setDraft] = useState<Place | null>(null);
   const [toast, setToast] = useState('');
   const [shared, setShared] = useState(false);
+  const [welcome, setWelcome] = useState(initialWelcome);
   const clock = useTownClock();
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
@@ -110,6 +133,7 @@ export default function App() {
     () => simulateResidents(displayPlaces, clock.minutes, clock.day),
     [displayPlaces, clock.minutes, clock.day],
   );
+  const lanternTown = useLanternTown(places, clock.minutes, clock.day);
   const selected = displayPlaces.find((place) => place.plot === selectedPlot);
   const selectedResident = residents.find((resident) => resident.id === selected?.id);
   const selectedVenue = selectedPlot ? venueAt(selectedPlot) : undefined;
@@ -150,7 +174,7 @@ export default function App() {
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : ''}`,
+      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -218,6 +242,17 @@ export default function App() {
       setToast('Copy the browser address to share this home.');
     }
   }
+  const dismissWelcome = useCallback(() => {
+    welcomeDismissed = true;
+    // The card is about to unmount; don't strand keyboard focus on <body>.
+    if (document.activeElement?.closest('.welcome-card')) exploreButton.current?.focus();
+    setWelcome(false);
+    try {
+      localStorage.setItem(WELCOME_KEY, '1');
+    } catch {
+      // The module flag above still keeps it closed.
+    }
+  }, []);
   const closeBuilder = useCallback(() => setModal(null), []);
   const preview = useCallback(
     (place: Place) => {
@@ -241,7 +276,7 @@ export default function App() {
 
   return (
     <main className={`town-app ${night ? 'town-app-night' : ''}`}>
-      <h1 className="sr-only">Forktown — a town built together</h1>
+      <h1 className="sr-only">{TITLE}</h1>
       <City
         ref={city}
         places={displayPlaces}
@@ -271,20 +306,31 @@ export default function App() {
             city.current?.reset();
           }}
         >
-          <span className="brand-mark" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-            <i />
-            <i />
-          </span>
-          forktown<span className="brand-dot">.</span>
+          <BrandMark size={26} night={night} />
+          <span className="wordmark-text">forktown</span>
+          <LanternDot />
         </button>
-        <CalendarClock clock={clock} />
+        <CalendarClock
+          clock={clock}
+          evening={{ hour: lanternTown.hour, tale: lanternTown.tale, places }}
+          onVisitPlace={(plot) => select(plot, true)}
+        />
         <button className="way-in" onClick={() => setModal('guide')}>
           Find your way in <ArrowRight size={16} />
         </button>
       </header>
+      {welcome && !panel && !draft && (
+        <WelcomeCard
+          neighbors={places.length}
+          newest={latestArrival?.name}
+          onFindWayIn={() => setModal('guide')}
+          onVisitFork={() => {
+            dismissWelcome();
+            select(FORK_PLOT, true);
+          }}
+          onDismiss={dismissWelcome}
+        />
+      )}
 
       <nav className="explore-dock" aria-label="Town tools">
         <button
@@ -320,7 +366,7 @@ export default function App() {
           <Users size={19} />
         </button>
         <button
-          aria-label="Town events"
+          aria-label={liveEvent || football.live ? 'Town events, happening now' : 'Town events'}
           title="Events"
           aria-expanded={panel === 'events'}
           aria-controls="town-panel"
@@ -402,6 +448,15 @@ export default function App() {
                   ).length
                 }
               />
+            ) : selectedVenue?.kind === 'fork' ? (
+              <ForkCard
+                register={lanternTown.register}
+                hour={lanternTown.hour}
+                tale={lanternTown.tale}
+                places={places}
+                onVisit={(plot) => select(plot, true)}
+                onFindWayIn={() => setModal('guide')}
+              />
             ) : selectedVenue && selectedEvent ? (
               <div className="venue-info">
                 <span className="quiet-label">PUBLIC SPACE · {selectedVenue.plot}</span>
@@ -438,6 +493,12 @@ export default function App() {
                       @{selected.creator} <ExternalLink size={12} />
                     </a>
                   )}
+                  <LanternProvenance
+                    register={lanternTown.register}
+                    placeId={selected.id}
+                    tale={lanternTown.tale}
+                    places={places}
+                  />
                   <p className="home-story">{selected.story}</p>
                   {selectedResident && (
                     <button className="resident-link" onClick={() => follow(selected.id)}>
@@ -485,7 +546,8 @@ export default function App() {
             ) : selectedPlot ? (
               <div className="empty-corner">
                 <Sprout size={36} strokeWidth={1.3} />
-                <p>A little room for your idea.</p>
+                <p>{PLOT_COPY.title}</p>
+                <small>{PLOT_COPY.hint}</small>
                 <button
                   className="button button-primary"
                   onClick={() => startBuilding(selectedPlot)}
@@ -499,6 +561,12 @@ export default function App() {
                 football={football}
                 events={events}
                 minutes={clock.minutes}
+                evening={{
+                  hour: lanternTown.hour,
+                  tale: lanternTown.tale,
+                  register: lanternTown.register,
+                  places,
+                }}
                 onVisit={(plot, eventId) => {
                   select(plot, true);
                   setSelectedEventId(eventId);
@@ -592,7 +660,7 @@ export default function App() {
                           </span>
                           <span>
                             <strong>Plot {plot.id}</strong>
-                            <small>Available</small>
+                            <small>{PLOT_COPY.row}</small>
                           </span>
                           <ArrowRight size={14} />
                         </button>
@@ -633,34 +701,23 @@ export default function App() {
         </Modal>
       )}
       {modal === 'guide' && (
-        <Modal title="Make yourself at home." onClose={() => setModal(null)}>
+        <Modal
+          title="Make yourself at home."
+          eyebrow={GUIDE_COPY.eyebrow}
+          onClose={() => setModal(null)}
+        >
           <div className="welcome-guide">
-            <p>One house. One neighbor. Your first contribution.</p>
+            <p>{GUIDE_COPY.intro}</p>
             <ol>
-              <li>
-                <span aria-hidden="true">1</span>
-                <div>
-                  <strong>Fork the town</strong>
-                  <p>Clone your copy and run it locally.</p>
-                </div>
-              </li>
-              <li>
-                <span aria-hidden="true">2</span>
-                <div>
-                  <strong>Make a place</strong>
-                  <p>Design your house. Save its JSON file.</p>
-                </div>
-              </li>
-              <li>
-                <span aria-hidden="true">3</span>
-                <div>
-                  <strong>Join the neighborhood</strong>
-                  <p>
-                    Commit, push, and open a pull request. After review and merge, your place joins
-                    the town.
-                  </p>
-                </div>
-              </li>
+              {GUIDE_COPY.steps.map(([title, detail], i) => (
+                <li key={title}>
+                  <span aria-hidden="true">{i + 1}</span>
+                  <div>
+                    <strong>{title}</strong>
+                    <p>{detail}</p>
+                  </div>
+                </li>
+              ))}
             </ol>
             {localSaveAvailable ? (
               <button className="button button-primary" onClick={() => startBuilding()}>

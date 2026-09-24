@@ -2,17 +2,20 @@ import { ArrowUpRight, Music2, Sun, Film, PawPrint } from 'lucide-react';
 import { eventStatus, type TownEvent } from '../lib/events';
 import { timeLabel } from '../lib/simulation';
 import { FOOTBALL_VENUE, type FootballState } from '../lib/football';
+import EveningNote, { type Evening } from './EveningNote';
 
 export default function TownEvents({
   events,
   minutes,
   onVisit,
   football,
+  evening,
 }: {
   events: TownEvent[];
   minutes: number;
   onVisit: (plot: string, eventId: string) => void;
   football: FootballState;
+  evening?: Evening;
 }) {
   return (
     <section className="town-events" aria-label="Today’s town events">
@@ -21,6 +24,12 @@ export default function TownEvents({
         <h3>Today, together.</h3>
         <p>A new lineup every town day.</p>
       </div>
+      {evening && (
+        <>
+          <EveningNote {...evening} onVisit={onVisit} />
+          <p className="eyebrow evening-eyebrow">AROUND TOWN TODAY</p>
+        </>
+      )}
       <button
         className={`event-card football-event ${football.live ? 'is-live' : ''}`}
         onClick={() => onVisit(FOOTBALL_VENUE.plot, 'football')}

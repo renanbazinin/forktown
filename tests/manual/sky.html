@@ -18,7 +18,7 @@
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 18px;
+        gap: 10px 18px;
         padding: 18px 24px;
       }
       label {
@@ -26,10 +26,21 @@
         align-items: center;
         gap: 8px;
       }
+      button {
+        padding: 6px 10px;
+        font: inherit;
+      }
+      button[aria-pressed='true'] {
+        background: #3b5142;
+        color: #eef0e3;
+      }
       canvas {
         display: block;
         width: 100%;
         height: calc(100dvh - 120px);
+      }
+      canvas.fixed {
+        outline: 1px solid #c9ceb9;
       }
       output {
         display: block;
@@ -41,6 +52,19 @@
     <header>
       <strong>Sky study</strong>
       <label>Town time <input id="time" type="range" min="0" max="1439" value="780" /></label>
+      <button data-time="720">12:00 noon</button>
+      <button data-time="1165">19:25 golden hour</button>
+      <button data-time="1201">20:01 nightfall</button>
+      <button data-time="375">06:15 dawn</button>
+      <button id="whole" aria-pressed="false">Whole town</button>
+      <label
+        >Size
+        <select id="size">
+          <option value="">Fill window</option>
+          <option value="1440x900">1440 × 900</option>
+          <option value="390x844">390 × 844</option>
+        </select>
+      </label>
       <label
         >Moon
         <select id="phase">
@@ -57,15 +81,79 @@
     <canvas aria-label="Sky behind the town overview"></canvas>
     <output></output>
     <script type="module">
+      // Development fixture: ?time=1165&size=390x844&view=whole opens a scene directly.
+      // It uses the real renderer and never changes the live town clock.
       import { renderCity } from '/src/city/render.ts';
       import { places } from '/src/lib/places.ts';
-      import { WORLD_BOUNDS } from '/src/lib/world.ts';
+      import { VENUES } from '/src/lib/events.ts';
+      import { WORLD_BOUNDS, getPlot, plotCenter } from '/src/lib/world.ts';
       import { CALENDAR_EPOCH_DAY, townCalendarAt } from '/src/lib/town-calendar.ts';
       import { timeLabel } from '/src/lib/simulation.ts';
       const canvas = document.querySelector('canvas');
       const time = document.querySelector('#time');
       const phase = document.querySelector('#phase');
+      const size = document.querySelector('#size');
+      const whole = document.querySelector('#whole');
+      const query = new URLSearchParams(location.search);
+      if (query.has('time')) time.value = query.get('time');
+      if (query.has('size')) size.value = query.get('size');
+      whole.setAttribute('aria-pressed', String(query.get('view') === 'whole'));
+
+      // The same framing as the map: the whole town, or the opening view around the houses.
+      function wholeTown(width, height) {
+        const zoom = Math.max(
+          0.01,
+          Math.min(
+            (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
+            (height - 85) / (WORLD_BOUNDS.bottom + 98),
+          ),
+        );
+        return {
+          x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
+          y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
+          zoom,
+        };
+      }
+      function openingView(width, height) {
+        const overview = wholeTown(width, height);
+        const all = [
+          ...places.map((place) => place.plot),
+          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
+            (venue) => venue.plot,
+          ),
+        ].flatMap((id) => {
+          const plot = getPlot(id);
+          return plot ? [plotCenter(plot)] : [];
+        });
+        const median = (values) => values.sort((a, b) => a - b)[values.length >> 1];
+        const mid = { x: median(all.map((p) => p.x)), y: median(all.map((p) => p.y)) };
+        const distance = (p) => Math.hypot(p.x - mid.x, p.y - mid.y);
+        const typical = median(all.map(distance));
+        const points = all.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
+        const left = Math.min(...points.map((point) => point.x)) - 110;
+        const right = Math.max(...points.map((point) => point.x)) + 110;
+        const top = Math.min(...points.map((point) => point.y)) - 145;
+        const bottom = Math.max(...points.map((point) => point.y)) + 80;
+        const zoom = Math.max(
+          overview.zoom,
+          Math.min(
+            0.85,
+            (width < 600 ? width * 1.6 : width - 150) / (right - left),
+            (height - 160) / (bottom - top),
+          ),
+        );
+        return {
+          x: width / 2 - ((left + right) / 2) * zoom,
+          y: height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom,
+          zoom,
+        };
+      }
+
       function paint() {
+        const [fixedWidth, fixedHeight] = size.value.split('x').map(Number);
+        canvas.classList.toggle('fixed', Boolean(size.value));
+        canvas.style.width = size.value ? `${fixedWidth}px` : '';
+        canvas.style.height = size.value ? `${fixedHeight}px` : '';
         const width = canvas.clientWidth,
           height = canvas.clientHeight;
         const ratio = Math.min(devicePixelRatio, 2);
@@ -76,10 +164,10 @@
         ctx.imageSmoothingEnabled = false;
         const minutes = Number(time.value),
           day = CALENDAR_EPOCH_DAY + Number(phase.value);
-        const zoom = Math.min(
-          (width - 80) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left),
-          (height - 190) / WORLD_BOUNDS.bottom,
-        );
+        const camera =
+          whole.getAttribute('aria-pressed') === 'true'
+            ? wholeTown(width, height)
+            : openingView(width, height);
         renderCity({
           ctx,
           width,
@@ -87,11 +175,7 @@
           places,
           minutes,
           day,
-          camera: {
-            x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
-            y: 165,
-            zoom,
-          },
+          camera,
           night: minutes < 360 || minutes >= 1200,
           selectedPlot: null,
           hoveredPlot: null,
@@ -99,10 +183,20 @@
         });
         const calendar = townCalendarAt(day, minutes);
         document.querySelector('output').textContent =
-          `${calendar.label} · ${timeLabel(minutes)} · ${calendar.moonName} · ${Math.round(calendar.illumination * 100)}% illuminated`;
+          `${calendar.label} · ${timeLabel(minutes)} · ${calendar.moonName} · ${Math.round(calendar.illumination * 100)}% illuminated · ${width} × ${height} · zoom ${camera.zoom.toFixed(2)}`;
       }
+      for (const button of document.querySelectorAll('[data-time]'))
+        button.addEventListener('click', () => {
+          time.value = button.dataset.time;
+          paint();
+        });
+      whole.addEventListener('click', () => {
+        whole.setAttribute('aria-pressed', String(whole.getAttribute('aria-pressed') !== 'true'));
+        paint();
+      });
       time.addEventListener('input', paint);
       phase.addEventListener('change', paint);
+      size.addEventListener('change', paint);
       new ResizeObserver(paint).observe(canvas);
       paint();
     </script>

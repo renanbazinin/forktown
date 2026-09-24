@@ -1,12 +1,11 @@
 import { moonSlice, townSkyAt } from '../lib/town-calendar';
 import { hash } from '../lib/world';
+import { drawHorizon, goldenHour, mixRgb, rgb } from './horizon';
 
 const stars = Array.from({ length: 44 }, (_, i) => {
   const seed = hash(`town-sky:${i}`);
   return { x: (seed % 997) / 997, y: ((seed >>> 10) % 997) / 997, bright: seed % 3 };
 });
-const blend = (night: number[], day: number[], amount: number) =>
-  `rgb(${night.map((channel, i) => Math.round(channel + (day[i] - channel) * amount)).join(' ')})`;
 
 // Screen-space sky, drawn before the camera transform and all world geometry.
 // It stays distant while panning; terrain naturally hides it in close-up views.
@@ -18,11 +17,16 @@ export function drawSky(
   minutes: number,
 ) {
   const sky = townSkyAt(day, minutes);
+  // Golden hour warms the low sky and the sun; the grass keeps its palette.
+  const glow = goldenHour(minutes);
+  const stop = (dark: number[], light: number[], warm: number[] = dark, amount = 0) =>
+    rgb(mixRgb(mixRgb(dark, light, sky.daylight), warm, amount * glow));
   ctx.save();
   const wash = ctx.createLinearGradient(0, 0, 0, height);
-  wash.addColorStop(0, blend([29, 49, 53], [205, 219, 204], sky.daylight));
-  wash.addColorStop(0.65, blend([47, 68, 65], [220, 224, 202], sky.daylight));
-  wash.addColorStop(1, blend([54, 73, 67], [211, 222, 201], sky.daylight));
+  wash.addColorStop(0, stop([29, 49, 53], [205, 219, 204]));
+  wash.addColorStop(0.44, stop([40, 60, 58], [222, 226, 205], [240, 206, 152], 0.6));
+  wash.addColorStop(0.65, stop([47, 68, 65], [220, 224, 202], [233, 211, 168], 0.35));
+  wash.addColorStop(1, stop([54, 73, 67], [211, 222, 201], [242, 192, 138], 0.55));
   ctx.fillStyle = wash;
   ctx.fillRect(0, 0, width, height);
   for (const star of stars) {
@@ -39,7 +43,7 @@ export function drawSky(
     const x = body.x * width;
     const y = body.y * height;
     const radius = (kind === 'sun' ? 23 : 19) * size;
-    const light = kind === 'sun' ? '#F5DF99' : '#DFE6CF';
+    const light = kind === 'sun' ? rgb(mixRgb([245, 223, 153], [244, 194, 122], glow)) : '#DFE6CF';
     const halo = ctx.createRadialGradient(x, y, radius, x, y, radius * 3.5);
     halo.addColorStop(0, kind === 'sun' ? '#F1D79722' : '#DCE5CD0B');
     halo.addColorStop(1, '#DCE5CD00');
@@ -65,5 +69,7 @@ export function drawSky(
       }
     }
   }
+  // Stars are already down, so the ridge hides the lowest of them and the setting sun.
+  drawHorizon(ctx, width, height, sky.daylight, minutes);
   ctx.restore();
 }

@@ -49,7 +49,7 @@ Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not cha
 | `building`   | `cottage`, `cafe`, `bookshop`, `greenhouse`, `studio`, or `observatory`.                                                                                                                                                                                         |
 | `color`      | A six-digit hex color, such as `#789B76`.                                                                                                                                                                                                                        |
 | `decoration` | `flowers`, `tree`, `bench`, or `mailbox`.                                                                                                                                                                                                                        |
-| `story`      | A personal description of 10–180 characters.                                                                                                                                                                                                                     |
+| `story`      | A personal description of 10–180 characters. Your story may be told as Tonight's tale at the Lantern Fork.                                                                                                                                                       |
 
 Add only your own place file. There is no shared list to edit. Plot positions remain fixed as the town grows.
 
@@ -66,9 +66,9 @@ The eight basic fields above still work: omitted `design`, `resident`, and `sign
 
 One place brings one resident. A resident can be fictional; the creator credit should be your GitHub username. To change your own home or daily routine later, edit your existing JSON file and submit another PR.
 
-The Little Stage (B5) and Lunch Green (C5) are public venues, reserved for everyone. Choose another plot for your house. Neighbors who choose `stroll` in the afternoon or evening may walk to a town event, enjoy it, and walk home. There is no extra scheduling to configure, and work/home routines stay indoors. Lunch events run 13:00–16:00; evening shows run 19:00–21:00, in town time. Everyone sees the same daily lineup when their device clocks agree.
+The Little Stage (B5), the Lunch Green (C5) and the Lantern Fork (D3) are public venues, reserved for everyone. Choose another plot for your house. Neighbors who choose `stroll` in the afternoon or evening may walk to a town event, enjoy it, and walk home. There is no extra scheduling to configure, and work/home routines stay indoors. Lunch events run 13:00–16:00; evening shows run 19:00–21:00, in town time. Everyone sees the same daily lineup when their device clocks agree.
 
-The Meadow Ground also reserves F3–F5 and G3–G5 for daytime four-a-side football. The Starlight Cinema, Willow Grove Zoo, and Moon Harvest Farm reserve plots too; [Expanding the town](docs/EXPANDING_THE_TOWN.md) lists every reserved plot. The town has 200 plots, with 152 available for houses before existing homes are counted. Morning and afternoon strollers can stop to watch a match and walk home; no extra fields are needed in your JSON. See [Football at the Meadow Ground](docs/FOOTBALL.md).
+The Meadow Ground also reserves F3–F5 and G3–G5 for daytime four-a-side football. The Starlight Cinema, Willow Grove Zoo, and Moon Harvest Farm reserve plots too; [Expanding the town](docs/EXPANDING_THE_TOWN.md) lists every reserved plot. The town has 200 plots, with 151 available for houses before existing homes are counted. Morning and afternoon strollers can stop to watch a match and walk home; no extra fields are needed in your JSON. See [Football at the Meadow Ground](docs/FOOTBALL.md).
 
 The town follows a shared UTC-based day: one real minute equals one town hour. The cycle repeats every 24 minutes, starting at UTC midnight. Visitors can pause their view; returning to live catches up to the current town time. Following a neighbor keeps the camera with them; dragging the map or pressing Stop following returns to exploring.
 

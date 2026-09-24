@@ -4,6 +4,7 @@ import { eventsForDay, isEventLive, type TownEvent } from './events';
 import { ducksAt } from './ducks';
 import { cinemaAt, CINEMA_FRAME } from './cinema';
 import { FOOTBALL_CENTER, footballAt } from './football';
+import { eveningDayAt, FORK_PLOT } from './lanterns';
 import type { Place } from './schema';
 import { simulateResidents, type ResidentState } from './simulation';
 import { townCatAt, TOWN_CAT_NAME, TOWN_CAT_ID } from './town-cat';
@@ -11,7 +12,7 @@ import { getPlot, hash, plotCenter, project, type Point } from './world';
 
 export type LiveShot = {
   id: string;
-  kind: 'neighbor' | 'event' | 'home' | 'cat' | 'ducks';
+  kind: 'neighbor' | 'event' | 'home' | 'cat' | 'ducks' | 'lanterns';
   label: string;
   center: Point;
   width: number;
@@ -32,6 +33,9 @@ const cycle = (value: number, length: number) => ((value % length) + length) % l
 export const SCENERY_START = 300;
 export const SCENERY_SECONDS = 60;
 export const FOLLOW_SECONDS = 45;
+/** Lantern hour on air: two seconds of dark tree, the lanterns, then the first lamps. */
+export const LANTERN_SHOT = { start: 1198, end: 1224 };
+const FORK_CENTER = plotCenter(getPlot(FORK_PLOT)!);
 
 function shuffled<T>(items: readonly T[], seed: string): T[] {
   const result = [...items];
@@ -124,6 +128,16 @@ export function liveShotAt(
       height: 420,
     };
   }
+  // Every evening the town lights itself; an empty town has no lanterns to film.
+  if (program.homes.length && time >= LANTERN_SHOT.start && time < LANTERN_SHOT.end)
+    return {
+      id: `lanterns:${eveningDayAt(time, program.day)}`,
+      kind: 'lanterns',
+      label: 'Lantern hour at the Lantern Fork',
+      center: { x: FORK_CENTER.x + 4, y: FORK_CENTER.y - 58 },
+      width: 620,
+      height: 440,
+    };
 
   const cinema = cinemaAt(time, program.day);
   if (cinema.live && features(program, 'cinema', time))
@@ -233,7 +247,7 @@ export function liveCamera(shot: LiveShot, width: number, height: number, second
   const baseZoom = Math.max(
     0.01,
     Math.min(
-      shot.kind === 'event' || shot.kind === 'home' ? 1.8 : 2.4,
+      shot.kind === 'event' || shot.kind === 'home' || shot.kind === 'lanterns' ? 1.8 : 2.4,
       (width * 0.9) / shot.width,
       (height * 0.86) / shot.height,
     ),

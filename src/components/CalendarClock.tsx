@@ -1,9 +1,14 @@
-import { Pause, Play, X } from 'lucide-react';
+import { BookOpen, Pause, Play, X } from 'lucide-react';
 import { memo, useId } from 'react';
 import { timeLabel } from '../lib/simulation';
 import { moonSlice, townCalendarAt, DAYS_PER_SEASON } from '../lib/town-calendar';
 import type { useTownClock } from '../lib/use-town-clock';
+import type { EveningTale, LanternHour } from '../lib/lanterns';
+import type { Place } from '../lib/schema';
+import { realWait } from '../lib/evening-copy';
+import LanternGlyph from './LanternGlyph';
 import '../calendar.css';
+import '../stories.css';
 
 const Moon = memo(function Moon({ phase, size = 20 }: { phase: number; size?: number }) {
   const rows = Array.from({ length: 41 }, (_, i) => {
@@ -23,9 +28,18 @@ const Moon = memo(function Moon({ phase, size = 20 }: { phase: number; size?: nu
   );
 });
 
-export default function CalendarClock({ clock }: { clock: ReturnType<typeof useTownClock> }) {
+export default function CalendarClock({
+  clock,
+  evening,
+  onVisitPlace,
+}: {
+  clock: ReturnType<typeof useTownClock>;
+  evening?: { hour: LanternHour; tale?: EveningTale; places: readonly Place[] };
+  onVisitPlace?: (plot: string) => void;
+}) {
   const id = useId();
   const calendar = townCalendarAt(clock.day, clock.minutes);
+  const told = evening?.tale && evening.places.find((place) => place.id === evening.tale?.placeId);
   return (
     <>
       <div className="map-clock" title="UTC-synced · One real minute is one town hour">
@@ -71,6 +85,38 @@ export default function CalendarClock({ clock }: { clock: ReturnType<typeof useT
             </span>
           </div>
         </div>
+        {evening && (
+          <section className="almanac-evening" aria-label="This evening">
+            <p>
+              <LanternGlyph lit={evening.hour.phase !== 'waiting' && evening.hour.total > 0} />
+              <span>
+                <strong>Lantern hour</strong> · 20:00 ·{' '}
+                {evening.hour.phase === 'waiting'
+                  ? realWait(evening.hour.startsIn)
+                  : evening.hour.phase === 'lighting'
+                    ? 'happening now'
+                    : 'all lit'}
+              </span>
+            </p>
+            {told && (
+              <p>
+                <BookOpen size={14} aria-hidden="true" />
+                <span>
+                  <strong>Tonight's tale</strong> ·{' '}
+                  <button
+                    className="text-button"
+                    onClick={() => {
+                      document.getElementById(id)?.hidePopover();
+                      onVisitPlace?.(told.plot);
+                    }}
+                  >
+                    {told.name}
+                  </button>
+                </span>
+              </p>
+            )}
+          </section>
+        )}
         <ol className="calendar-days" aria-label={`${calendar.season}, Year ${calendar.year}`}>
           {Array.from({ length: DAYS_PER_SEASON }, (_, i) => (
             <li
