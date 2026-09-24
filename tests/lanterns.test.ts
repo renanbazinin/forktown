@@ -21,30 +21,13 @@ import { eventsForDay, HOUSE_PLOTS, VENUES } from '../src/lib/events';
 import { placeSchema } from '../src/lib/schema';
 import { drawVenue, venueBounds } from '../src/city/venues';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { ARRIVALS, TOWN } from './lantern-town';
 
-const places = readdirSync('places')
+// Every house file, for checks that must hold however the town grows.
+const everyHouse = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
   .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
-// Newest first, as the build reads it from the town's merge history.
-const ARRIVALS = [
-  'rehovot-orchard',
-  'willow-lodge',
-  'vaxsius-markus',
-  'moss-nook',
-  'mulu-s',
-  'jons-arcade',
-  'arts',
-  'funky-fun',
-  'my-little-place',
-  'after-hours',
-  'evergreen',
-  'hello-world',
-  'little-workshop',
-  'moonbeam-cafe',
-  'plot-twist',
-  'stargazer',
-  'sunday-morning',
-];
+const places = TOWN;
 const ORDER = [
   'after-hours',
   'evergreen',
@@ -172,6 +155,17 @@ describe('The lantern register', () => {
     for (const entry of fewer.entries.filter((entry) => !entry.founding))
       expect(entry.slot).toBe(today.byId.get(entry.id)!.slot);
     expect(fewer.founders).toBe(7);
+  });
+
+  it('gives every house in places/ exactly one lantern, founders first', () => {
+    const register = lanternRegister(everyHouse, []);
+    expect(register.total).toBe(everyHouse.length);
+    expect(new Set(register.entries.map((entry) => entry.id)).size).toBe(everyHouse.length);
+    const founders = everyHouse.filter((place) => place.creator === 'forktown').length;
+    register.entries.forEach((entry, i) => {
+      expect(entry.founding).toBe(i < founders);
+      expect(entry.slot).toBe(entry.founding ? i : FOUNDER_SLOTS + i - founders);
+    });
   });
 
   it('handles an empty town and a town of one neighbor', () => {
@@ -309,6 +303,14 @@ describe("Tonight's tale", () => {
     expect(hasOwnStory({ story: 'Too short' })).toBe(false);
     const told = new Set(Array.from({ length: 60 }, (_, day) => tale(720, day)));
     for (const id of DEFAULT_STORIES) expect(told.has(id)).toBe(false);
+  });
+
+  it('only ever tells a real house its own story', () => {
+    for (let day = 0; day < 40; day++) {
+      const tonight = taleOfTheEvening(everyHouse, day);
+      if (!tonight) continue;
+      expect(hasOwnStory(everyHouse.find((place) => place.id === tonight.placeId)!)).toBe(true);
+    }
   });
 
   it('is deterministic and independent of input order', () => {

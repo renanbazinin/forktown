@@ -11,30 +11,13 @@ import { restoreDraftPlot, storyPrompt, STORY_PROMPTS } from '../src/lib/builder
 import { FORK_PLOT, lanternHourAt, lanternRegister } from '../src/lib/lanterns';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { placeSchema } from '../src/lib/schema';
+import { ARRIVALS, TOWN } from './lantern-town';
 
-const places = readdirSync('places')
+const places = TOWN;
+// Every house file, for checks about the plots they occupy today.
+const everyHouse = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
   .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
-// Newest first, as the build reads it from the town's merge history.
-const ARRIVALS = [
-  'rehovot-orchard',
-  'willow-lodge',
-  'vaxsius-markus',
-  'moss-nook',
-  'mulu-s',
-  'jons-arcade',
-  'arts',
-  'funky-fun',
-  'my-little-place',
-  'after-hours',
-  'evergreen',
-  'hello-world',
-  'little-workshop',
-  'moonbeam-cafe',
-  'plot-twist',
-  'stargazer',
-  'sunday-morning',
-];
 const nameOf = (id: string) => places.find((place) => place.id === id)?.name ?? id;
 
 describe('Lantern hour words', () => {
@@ -138,7 +121,9 @@ describe('The builder asks for a story of its own', () => {
   });
 
   it('moves a restored draft off a taken or reserved plot', () => {
-    const available = HOUSE_PLOTS.filter((plot) => !places.some((place) => place.plot === plot.id));
+    const available = HOUSE_PLOTS.filter(
+      (plot) => !everyHouse.some((place) => place.plot === plot.id),
+    );
     expect(restoreDraftPlot(available[3].id, available)).toBe(available[3].id);
     expect(restoreDraftPlot(FORK_PLOT, available)).toBe(available[0].id);
     expect(restoreDraftPlot('C6', available)).toBe(available[0].id);
