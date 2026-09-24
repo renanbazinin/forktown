@@ -1,6 +1,6 @@
 # Expanding the town
 
-The town has **200 plots: twenty rows (A–T) and ten columns (1–10)**, twice the previous 100-plot capacity. B5 and C5 hold the stage and green; F3–F5 and G3–G5 form the six-plot Meadow Ground; D6, D7, E6, and E7 hold the Starlight Cinema; O4–R9 hold the 24-plot Willow Grove Zoo; S4–T9 hold the 12-plot Moon Harvest Farm, leaving 152 house plots. Every existing house keeps its ID, coordinates, grass, and entrance; existing place JSON and share links need no migration.
+The town has **200 plots: twenty rows (A–T) and ten columns (1–10)**, twice the previous 100-plot capacity. B5 and C5 hold the stage and green; D3 holds the Lantern Fork; F3–F5 and G3–G5 form the six-plot Meadow Ground; D6, D7, E6, and E7 hold the Starlight Cinema; O4–R9 hold the 24-plot Willow Grove Zoo; S4–T9 hold the 12-plot Moon Harvest Farm, leaving 151 house plots. Every existing house keeps its ID, coordinates, grass, and entrance; existing place JSON and share links need no migration.
 
 ## One size setting
 

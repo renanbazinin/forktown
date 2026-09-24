@@ -5,6 +5,7 @@ import { placeSchema } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { getPlot, plotCenter, project } from '../src/lib/world';
 import { ZOO_SIGN, ZOO_SIGN_DEPTH } from '../src/city/zoo';
+import { FORK_PLOT } from '../src/lib/lanterns';
 
 const places = readdirSync('places')
   .filter((file) => file.endsWith('.json'))
@@ -79,6 +80,25 @@ describe('Map selection follows visible depth', () => {
       kind: 'resident',
       id: 'last',
     });
+  });
+
+  it("selects the Lantern Fork without stealing its neighbours' fronts", () => {
+    const fork = plotCenter(getPlot(FORK_PLOT)!);
+    for (const [dx, dy] of [
+      [0, -100],
+      [-40, 30],
+    ])
+      expect(cityHit({ x: fork.x + dx, y: fork.y + dy }, places, [])).toEqual({
+        kind: 'place',
+        id: FORK_PLOT,
+      });
+    for (const plot of ['C2', 'C3', 'D2']) {
+      const front = plotCenter(getPlot(plot)!);
+      expect(cityHit({ x: front.x, y: front.y - 30 }, places, [])).toEqual({
+        kind: 'place',
+        id: plot,
+      });
+    }
   });
 
   it.each(['work', 'home', 'sleep'] as const)('ignores residents indoors during %s', (activity) => {

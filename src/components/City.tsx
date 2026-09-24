@@ -8,6 +8,7 @@ import { findPlotAt, getPlot, plotCenter, unproject } from '../lib/world';
 import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { residentActivityLabel } from '../lib/simulation';
+import { PLOT_COPY } from '../lib/brand';
 import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
 import { project, WORLD_BOUNDS } from '../lib/world';
@@ -398,7 +399,7 @@ const City = forwardRef<CityHandle, Props>(function City(
         ref={canvas}
         role="img"
         tabIndex={0}
-        aria-label="Interactive Forktown map. Drag to pan, scroll or use plus and minus to zoom. Arrow keys move the map; Home shows the whole town. Use Explore places to select a house with a keyboard."
+        aria-label={PLOT_COPY.map}
         onKeyDown={(event) => {
           const moves: Record<string, [number, number]> = {
             ArrowLeft: [35, 0],
@@ -503,7 +504,7 @@ const City = forwardRef<CityHandle, Props>(function City(
                 ? FARM.name
                 : isFootballPlot(hover)
                   ? FOOTBALL_VENUE.name
-                  : `Plot ${hover} · Make it yours`)}
+                  : PLOT_COPY.tooltip(hover))}
           </span>
         </div>
       )}

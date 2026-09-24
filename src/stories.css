@@ -1,0 +1,327 @@
+/* Tonight's tale and the lantern register: the Lantern Fork's words in the DOM. Unlayered, like
+   explore.css, and every token keeps a fallback so these rules stand on their own. */
+
+/* A neighbor's own words: Fraunces italic, with their line breaks kept. */
+.tale-quote {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--lantern, #f2c06b);
+  border-radius: 0 8px 8px 0;
+  background: var(--lantern-pale, #fff6df);
+  color: var(--ink, #343e35);
+  font: italic 500 15px/1.55 var(--serif, 'Fraunces', serif);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.fork-card .eyebrow,
+.lantern-provenance .eyebrow,
+.evening-eyebrow {
+  font: 10px/1.7 var(--mono, 'Space Mono', monospace);
+  letter-spacing: 1.4px;
+  color: var(--lantern-ink, #8a5a1c);
+}
+.lantern-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 7px;
+  border: 1px solid #e8d2a6;
+  border-radius: 4px;
+  background: var(--lantern-pale, #fff6df);
+  color: var(--lantern-ink, #8a5a1c);
+  font: 10px/1.5 var(--mono, 'Space Mono', monospace);
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+/* The same marks the world uses, so the lantern keeps one meaning: a terracotta pennant for the
+   newest neighbor and a paper tag for tonight's tale. */
+.lantern-badge.is-newest::before {
+  content: '';
+  width: 6px;
+  height: 7px;
+  background: #c57b65;
+  clip-path: polygon(0 0, 100% 50%, 0 100%);
+}
+.lantern-badge.is-tale::before {
+  content: '';
+  width: 5px;
+  height: 7px;
+  border: 1px solid var(--lantern-ink, #8a5a1c);
+  border-radius: 1px 1px 0 0;
+  background: #fbf3de;
+}
+.lantern-number,
+.fork-hour.is-lighting .fork-hour-detail {
+  font: 700 12px var(--mono, 'Space Mono', monospace);
+}
+.lantern-glyph {
+  display: block;
+}
+.tale-quote,
+.lantern-badge,
+.fork-hour,
+.almanac-evening {
+  transition:
+    background-color 400ms ease,
+    border-color 400ms ease,
+    color 400ms ease;
+}
+
+/* The Fork card */
+.fork-card {
+  display: flex;
+  flex-direction: column;
+  padding: 22px 22px 30px;
+}
+.fork-lede {
+  margin: 6px 0 18px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.fork-hour {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--green-pale, #eef1e6);
+}
+.fork-hour [role='status'] {
+  font: 500 17px/1.35 var(--serif, 'Fraunces', serif);
+}
+.fork-hour-detail {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted, #5f6b57);
+}
+.fork-hour.is-lighting .fork-hour-detail {
+  color: var(--lantern-ink, #8a5a1c);
+}
+.fork-tale {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 24px;
+}
+.fork-tale h3 {
+  margin-top: -6px;
+  font: 500 22px/1.25 var(--serif, 'Fraunces', serif);
+}
+.fork-tale h3 .text-button {
+  min-height: 0;
+  font: inherit;
+  text-align: left;
+}
+.tale-credit {
+  font-size: 12px;
+  color: var(--muted, #5f6b57);
+}
+.lantern-heading {
+  margin: 28px 0 6px;
+  font: 500 17px/1.3 var(--serif, 'Fraunces', serif);
+}
+.lantern-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lantern-list li + li {
+  border-top: 1px solid var(--line, #e4e5da);
+}
+.lantern-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  text-align: left;
+}
+.lantern-row:hover {
+  background: var(--green-pale, #eef1e6);
+}
+.lantern-row > span:not([class]) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+.lantern-row strong {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lantern-row small {
+  font-size: 11px;
+  color: var(--muted, #5f6b57);
+}
+.lantern-number {
+  min-width: 2ch;
+  color: var(--muted, #5f6b57);
+  text-align: right;
+}
+.fork-note {
+  margin-top: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted, #5f6b57);
+}
+.fork-footer {
+  margin: 28px 0 16px;
+  font: 500 18px/1.4 var(--serif, 'Fraunces', serif);
+}
+.fork-card > .button {
+  align-self: flex-start;
+}
+
+/* Place-card provenance */
+.lantern-provenance {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted, #5f6b57);
+}
+.lantern-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+/* "This evening" in the Events panel */
+.evening-eyebrow {
+  grid-column: 1 / -1;
+  margin: 4px 0 -4px;
+}
+.evening-eyebrow:first-of-type {
+  margin-top: 0;
+}
+.evening-card .evening-body {
+  font-size: 12px;
+  line-height: 1.5;
+}
+.evening-card .live-dot {
+  border-radius: 1px;
+  background: var(--lantern, #f2c06b);
+  box-shadow: inset 0 0 0 1px #8a5a1c;
+}
+.event-card.tale-card {
+  align-items: flex-start;
+  cursor: default;
+}
+.event-card.tale-card:hover {
+  border-color: #dcded0;
+  background: #fdfcf7;
+}
+.tale-card .tale-quote {
+  padding: 8px 12px;
+  font-size: 14px;
+}
+.tale-card .text-button {
+  align-self: flex-start;
+  gap: 5px;
+  min-height: 28px;
+  font-size: 11px;
+}
+
+/* The almanac's evening lines */
+.almanac-evening {
+  display: grid;
+  gap: 8px;
+  margin: -8px 0 22px;
+  padding: 12px 14px;
+  border: 1px solid #efdfbb;
+  border-radius: 12px;
+  background: var(--lantern-pale, #fff6df);
+  font-size: 12px;
+}
+.almanac-evening p {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  line-height: 1.5;
+}
+.almanac-evening p > svg {
+  width: 12px;
+  color: var(--lantern-ink, #8a5a1c);
+}
+.almanac-evening strong {
+  font-weight: 600;
+}
+.almanac-evening .text-button {
+  min-height: 24px;
+  font-size: 12px;
+  color: var(--green, #516b42);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* The builder's story hint */
+.field-hint {
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--muted, #5f6b57);
+}
+
+/* Dusk: the same words, lit from within. */
+.town-app-night .tale-quote {
+  background: var(--dusk-raised, #30494a);
+  color: var(--dusk-ink, #f1eedc);
+}
+.town-app-night :is(.fork-card .eyebrow, .lantern-provenance .eyebrow, .evening-eyebrow) {
+  color: var(--lantern, #f2c06b);
+}
+.town-app-night .lantern-badge {
+  border-color: #f2c06a40;
+  background: #f2c06a24;
+  color: var(--lantern, #f2c06b);
+}
+.town-app-night .lantern-badge.is-tale::before {
+  border-color: var(--lantern, #f2c06b);
+}
+.town-app-night .fork-hour {
+  background: var(--dusk-raised, #30494a);
+}
+.town-app-night .fork-hour.is-lighting .fork-hour-detail {
+  color: var(--glow, #ffe0a0);
+}
+.town-app-night :is(.fork-hour-detail, .tale-credit, .lantern-number, .fork-note) {
+  color: var(--dusk-muted, #c3d4c2);
+}
+.town-app-night .lantern-list li + li {
+  border-top-color: #3a5553;
+}
+.town-app-night .lantern-row:hover {
+  background: var(--dusk-raised, #30494a);
+}
+/* Keeps "Newest" above 4.5:1 on the hovered row's lighter ground. */
+.town-app-night .lantern-row:hover .lantern-badge {
+  color: var(--glow, #ffe0a0);
+}
+.town-app-night .lantern-provenance {
+  color: var(--dusk-muted, #c3d4c2);
+}
+.town-app-night .lantern-glyph:not(.is-lit) .lantern-glyph-body {
+  fill: #7c8676;
+}
+.town-app-night .lantern-glyph.is-lit {
+  filter: drop-shadow(0 0 3px #ffe0a0b3);
+}
+.town-app-night .event-card.tale-card:hover {
+  border-color: var(--dusk-line, #45605c);
+  background: var(--dusk-raised, #30494a);
+}
+.town-app-night .almanac-evening {
+  border-color: var(--dusk-line, #45605c);
+  background: var(--dusk-raised, #30494a);
+}
+.town-app-night .almanac-evening p > svg {
+  color: var(--lantern, #f2c06b);
+}
+.town-app-night .almanac-evening .text-button {
+  color: var(--dusk-link, #bfd8a6);
+}

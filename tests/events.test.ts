@@ -38,7 +38,7 @@ describe('Shared town events', () => {
     expect(eventsForDay(7)).toEqual(eventsForDay(7));
   });
   it('reserves venues in both builder options and shared save/CI validation', () => {
-    expect(HOUSE_PLOTS).toHaveLength(152);
+    expect(HOUSE_PLOTS).toHaveLength(151);
     for (const venue of VENUES) {
       expect(HOUSE_PLOTS.some((plot) => plot.id === venue.plot)).toBe(false);
       expect(

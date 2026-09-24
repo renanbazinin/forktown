@@ -23,17 +23,32 @@ import {
   type FootballState,
 } from '../lib/football';
 import { VENUES, venueAt, eventAtVenue, type TownEvent } from '../lib/events';
+import {
+  eveningDayAt,
+  FORK_PLOT,
+  lanternRegister,
+  lanternsLit,
+  taleOfTheEvening,
+  type EveningTale,
+  type LanternRegister,
+} from '../lib/lanterns';
+import { townArrivals } from '../lib/arrivals';
+import { drawForkPlaza, drawLanternFork } from './lantern-fork';
+import { drawSproutStake } from './lantern-post';
+import { drawGlow } from './glow';
+import { LAMPS, lampOn } from './lamplight';
+import { drawCommitStone, drawFarFields, drawGoldenHour } from './horizon';
 import type { ResidentState } from '../lib/simulation';
 export { drawHouse as drawBuilding } from './houses';
 import type { Place } from '../lib/schema';
 import {
   PLOTS,
-  STREETLIGHTS,
   WORLD_WIDTH,
   WORLD_HEIGHT,
   ROAD_MAX_X,
   ROAD_MAX_Y,
   BLOCK_SIZE,
+  getPlot,
   hash,
   isRoad,
   plotCenter,
@@ -60,6 +75,37 @@ type Palette = {
 export type Camera = { x: number; y: number; zoom: number };
 const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
 const venueDepth = (plot: Plot) => plot.x + plot.y + 0.1;
+export const forkPlot = getPlot(FORK_PLOT)!;
+const forkPt = plotCenter(forkPlot);
+// Brass commit stones mark the four crossings around the Fork, the town's HEAD.
+const FORK_CORNERS = new Set(
+  [
+    [-2, -2],
+    [2, -2],
+    [-2, 2],
+    [2, 2],
+  ].map(([dx, dy]) => `${forkPlot.x + dx},${forkPlot.y + dy}`),
+);
+// The register only changes with the published roster or the arrival order, never per frame.
+const registers = new WeakMap<
+  readonly Place[],
+  { arrivals: readonly string[]; register: LanternRegister }
+>();
+function registerFor(roster: readonly Place[], arrivals: readonly string[]) {
+  const cached = registers.get(roster);
+  if (cached?.arrivals === arrivals) return cached.register;
+  const register = lanternRegister(roster, arrivals);
+  registers.set(roster, { arrivals, register });
+  return register;
+}
+const tales = new WeakMap<readonly Place[], { eveningDay: number; tale?: EveningTale }>();
+function taleFor(roster: readonly Place[], eveningDay: number) {
+  const cached = tales.get(roster);
+  if (cached?.eveningDay === eveningDay) return cached.tale;
+  const tale = taleOfTheEvening(roster, eveningDay);
+  tales.set(roster, { eveningDay, tale });
+  return tale;
+}
 const residentDepth = (resident: ResidentState) => resident.position.x + resident.position.y;
 // World geometry and seeds are fixed between builds; only their palette changes.
 const terrain = Array.from({ length: WORLD_WIDTH * WORLD_HEIGHT }, (_, i) => {
@@ -256,7 +302,10 @@ type RenderOptions = {
   height: number;
   camera: Camera;
   places: Place[];
+  /** The published roster: lanterns, tales and UFO visits never include a local draft. */
   ufoPlaces?: readonly Place[];
+  /** Arrival order, newest first; the build's Git history by default. */
+  arrivals?: readonly string[];
   selectedPlot: string | null;
   hoveredPlot: string | null;
   night: boolean;
@@ -275,6 +324,7 @@ export function renderCity({
   camera,
   places,
   ufoPlaces = places,
+  arrivals = townArrivals,
   selectedPlot,
   hoveredPlot,
   night,
@@ -289,6 +339,11 @@ export function renderCity({
   ctx.clearRect(0, 0, width, height);
   drawSky(ctx, width, height, day, minutes);
   const p = night ? NIGHT : DAY;
+  // Every light on the map reads the same lantern-hour clock, so the Fork, the windows, the
+  // posts and the lamps can never disagree.
+  const register = registerFor(ufoPlaces, arrivals);
+  const tale = taleFor(ufoPlaces, eveningDayAt(minutes, day));
+  const litCount = lanternsLit(register.total, minutes);
   ctx.save();
   ctx.translate(camera.x, camera.y);
   ctx.scale(camera.zoom, camera.zoom);
@@ -315,6 +370,7 @@ export function renderCity({
     [...byPlot.keys()].sort().join(','),
   ].join(':');
   paintGroundLayer(ctx, groundKey, (ctx) => {
+    drawFarFields(ctx, night);
     const terrainPoint = (x: number, y: number) => project(x, y);
     const b = terrainPoint(WORLD_WIDTH, 0),
       c = terrainPoint(WORLD_WIDTH, WORLD_HEIGHT),
@@ -360,6 +416,8 @@ export function renderCity({
         diamond(ctx, pt.x, pt.y, 38, 19, p.roadEdge);
         diamond(ctx, pt.x, pt.y - 1, 36, 18, p.road);
         if (seed % 3 === 0) rect(ctx, pt.x + (seed % 10) - 5, pt.y + 4, 2, 1, p.roadEdge);
+        if (x % BLOCK_SIZE === 1 && y % BLOCK_SIZE === 1)
+          drawCommitStone(ctx, pt.x, pt.y, night, FORK_CORNERS.has(`${x},${y}`));
       } else if (seed % 2) {
         for (let k = 0; k < 3; k++) {
           const gx = pt.x - 19 + ((seed >> (k * 3)) % 35),
@@ -384,6 +442,7 @@ export function renderCity({
       const hover = hoveredPlot === plot.id;
       if (occupied) {
         diamond(ctx, pt.x, pt.y, 105, 52.5, night ? '#577468' : '#BFD5A4');
+        if (plot.id === FORK_PLOT) drawForkPlaza(ctx, pt.x, pt.y, night);
         // A short footpath connects the front of the lawn to the street.
         for (let step = 0; step < 5; step++) {
           const stone = project(plot.x + 0.5, plot.y + 1.02 + step * 0.25);
@@ -392,7 +451,7 @@ export function renderCity({
       }
       if (!occupied) drawMeadow(ctx, plot, night);
       if (active || hover) diamond(ctx, pt.x, pt.y, 108, 54, night ? '#B5C59B40' : '#F4EDCD80');
-      if (!occupied) {
+      if (!occupied && (showPlots || hover || active)) {
         const corners = [
           [pt.x, pt.y - 49],
           [pt.x + 98, pt.y],
@@ -408,16 +467,13 @@ export function renderCity({
         ctx.closePath();
         ctx.stroke();
         ctx.restore();
-        if (showPlots || hover || active) {
-          ctx.fillStyle = p.ink;
-          ctx.font = '10px "Space Mono", monospace';
-          ctx.textAlign = 'center';
-          ctx.fillText(plot.id, pt.x, pt.y + 4);
-        } else {
-          rect(ctx, pt.x - 3, pt.y, 6, 1, night ? '#ABC6B870' : '#69885A70');
-          rect(ctx, pt.x, pt.y - 3, 1, 6, night ? '#ABC6B870' : '#69885A70');
-        }
+        ctx.fillStyle = p.ink;
+        ctx.font = '10px "Space Mono", monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(plot.id, pt.x, pt.y + 4);
       }
+      // An empty plot waits for its lantern: the stake stands where the post will go.
+      if (!occupied) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
     }
     drawFarmGround(ctx, night);
   });
@@ -448,7 +504,7 @@ export function renderCity({
     ),
   );
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo') continue;
+    if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const point = plotCenter(plot);
     drawVenue(
@@ -467,7 +523,7 @@ export function renderCity({
     objects.push({ depth, paint: () => tree(ctx, point.x, point.y, scale, p, seed) });
   }
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo') continue;
+    if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const pt = plotCenter(plot);
     objects.push({
@@ -476,35 +532,53 @@ export function renderCity({
         drawVenue(ctx, venue, pt.x, pt.y, night, eventAtVenue(events, venue.id, minutes), minutes),
     });
   }
+  if (visible(forkPt, 90, 140, 50))
+    objects.push(
+      ...drawLanternFork(ctx, {
+        x: forkPt.x,
+        y: forkPt.y,
+        depth: forkPlot.x + forkPlot.y,
+        register,
+        lit: litCount,
+        taleId: tale?.placeId,
+        night,
+        leaf: p.leaf,
+        leafLight: p.leafLight,
+      }),
+    );
   for (const place of places) {
     const plot = PLOTS.find((v) => v.id === place.plot);
     if (!plot) continue;
     const pt = plotCenter(plot);
+    // Drafts are not on the register, so a local preview gets no lantern post.
+    const entry = register.byId.get(place.id);
+    const lantern = entry && {
+      lit: entry.index < litCount,
+      tale: tale?.placeId === place.id,
+      newest: register.newest === place.id,
+    };
     objects.push({
       depth: houseDepth(plot),
       paint: () =>
         drawHouse(ctx, place, pt.x, pt.y, night, 1.12, {
           minutes,
           activity: residentsByHome.get(place.id)?.activity,
+          lantern,
         }),
     });
   }
-  for (const { x, y } of STREETLIGHTS) {
+  // After the lanterns, the lamps carry the light outward from the Fork.
+  for (const { x, y, distance } of LAMPS) {
     const pt = project(x + 0.5, y + 0.5);
     if (!visible(pt, 26, 57, 2)) continue;
+    const lit = night && lampOn(distance, minutes);
     objects.push({
       depth: x + y,
       paint: () => {
         rect(ctx, pt.x, pt.y - 29, 2, 30, night ? '#637266' : '#8B9073');
-        rect(ctx, pt.x - 3, pt.y - 33, 8, 6, night ? '#F4D79A' : '#EDE5C1');
+        rect(ctx, pt.x - 3, pt.y - 33, 8, 6, lit ? '#F4D79A' : night ? '#7C8272' : '#EDE5C1');
         rect(ctx, pt.x - 4, pt.y - 35, 10, 2, night ? '#7A8C7D' : '#748269');
-        if (night) {
-          const glow = ctx.createRadialGradient(pt.x + 1, pt.y - 30, 0, pt.x + 1, pt.y - 30, 24);
-          glow.addColorStop(0, '#FFDA8030');
-          glow.addColorStop(1, '#FFDA8000');
-          ctx.fillStyle = glow;
-          ctx.fillRect(pt.x - 24, pt.y - 55, 50, 50);
-        }
+        if (lit) drawGlow(ctx, pt.x + 1, pt.y - 30, 24, 0.19);
       },
     });
   }
@@ -535,6 +609,7 @@ export function renderCity({
   drawBirds(ctx, minutes, night);
   drawUfo(ctx, minutes, day, ufoPlaces);
   ctx.restore();
+  drawGoldenHour(ctx, width, height, minutes);
 }
 
 export function buildingHit(point: Point, places: Place[]): string | undefined {

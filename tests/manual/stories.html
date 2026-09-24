@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Forktown stories check</title>
+    <style>
+      body {
+        margin: 0;
+        font:
+          14px 'DM Sans',
+          system-ui;
+        background: #dfe7cf;
+        color: #304c40;
+      }
+      body.night {
+        background: #1c2e2d;
+        color: #f1eedc;
+      }
+      .fixture-controls {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 14px;
+        padding: 16px 20px;
+      }
+      .fixture-controls h1 {
+        margin: 0 12px 0 0;
+        font:
+          500 22px 'Fraunces',
+          serif;
+      }
+      .fixture-controls button {
+        padding: 6px 10px;
+        border: 1px solid #9aa98c;
+        border-radius: 6px;
+        background: #fdfcf7;
+        color: #304c40;
+      }
+      .fixture-controls button[aria-pressed='true'] {
+        background: #304c40;
+        color: #fdfcf7;
+      }
+      .fixture-controls p {
+        flex-basis: 100%;
+        margin: 0;
+        font-size: 12px;
+        opacity: 0.8;
+      }
+      /* The real app is one full-screen stage; here the panels sit side by side and scroll. */
+      html:root,
+      :root body,
+      :root #root {
+        height: auto;
+        overflow: auto;
+      }
+      :root .fixture .map-clock {
+        display: none;
+      }
+      .fixture .town-app {
+        height: auto;
+        overflow: visible;
+      }
+      .fixture-grid {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 24px;
+        padding: 8px 20px 40px;
+      }
+      .fixture .town-panel {
+        position: static;
+        max-height: none;
+        width: 340px;
+      }
+      .fixture .town-calendar {
+        position: static;
+        display: block;
+        inset: auto;
+        transform: none;
+        max-height: none;
+      }
+      @media (max-width: 420px) {
+        .fixture-grid {
+          padding: 8px 12px 40px;
+        }
+        .fixture .town-panel,
+        .fixture .town-calendar {
+          width: 100%;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="fixture-controls">
+      <h1>Tonight's tale and the lantern register</h1>
+      <button data-minute="720">12:00 waiting</button>
+      <button data-minute="1193">19:53 waiting</button>
+      <button data-minute="1205">20:05 lighting</button>
+      <button data-minute="1260">21:00 lit</button>
+      <button data-minute="120">02:00 lit</button>
+      <label><input type="checkbox" id="shallow" /> No arrival history</label>
+      <label><input type="checkbox" id="night" /> Dusk skin</label>
+      <label>Town day <input id="day" type="number" min="0" value="0" style="width: 64px" /></label>
+      <p id="status">
+        Development fixture. Mounts the real ForkCard, Events panel, place cards and almanac with
+        published places; the dusk skin follows the time unless you tick the box.
+      </p>
+    </div>
+    <div class="fixture" id="root"></div>
+    <script type="module">
+      import { createElement as h, Fragment } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import '/src/styles.css';
+      import '/src/explore.css';
+      import ForkCard from '/src/components/ForkCard.tsx';
+      import TownEvents from '/src/components/TownEvents.tsx';
+      import LanternProvenance from '/src/components/LanternProvenance.tsx';
+      import CalendarClock from '/src/components/CalendarClock.tsx';
+      import { places } from '/src/lib/places.ts';
+      import { eventsForDay } from '/src/lib/events.ts';
+      import { footballAt } from '/src/lib/football.ts';
+      import { timeLabel } from '/src/lib/simulation.ts';
+      import { useLanternTown } from '/src/lib/use-lantern-town.ts';
+
+      const state = { minutes: 720, day: 0, shallow: false, forceNight: false };
+      const status = document.querySelector('#status');
+      const panel = (title, content) =>
+        h(
+          'section',
+          { className: 'town-panel', 'aria-label': title },
+          h('div', { className: 'town-panel-header' }, h('h2', null, title)),
+          h('div', { className: 'town-panel-content' }, content),
+        );
+      const log = (what) => (status.textContent = `${what} · ${timeLabel(state.minutes)}`);
+
+      function Fixture({ minutes, day, shallow, night }) {
+        const town = shallow
+          ? useLanternTown(places, minutes, day, [])
+          : useLanternTown(places, minutes, day);
+        const cards = [town.tale?.placeId, town.register.newest, 'mulu-s', 'stargazer']
+          .filter((id, i, all) => id && all.indexOf(id) === i)
+          .map((id) => places.find((place) => place.id === id));
+        const clock = { minutes, day, playing: false, setPlaying: () => {} };
+        return h(
+          'main',
+          { className: `town-app ${night ? 'town-app-night' : ''}` },
+          h(
+            'div',
+            { className: 'fixture-grid' },
+            panel(
+              'The Lantern Fork',
+              h(ForkCard, {
+                register: town.register,
+                hour: town.hour,
+                tale: town.tale,
+                places,
+                onVisit: (plot) => log(`Visit ${plot}`),
+                onFindWayIn: () => log('Find your way in'),
+              }),
+            ),
+            panel(
+              'Today in town',
+              h(TownEvents, {
+                events: eventsForDay(day, minutes < 360 ? 0 : 720),
+                minutes,
+                football: footballAt(minutes, day),
+                evening: { hour: town.hour, tale: town.tale, register: town.register, places },
+                onVisit: (plot, id) => log(`Visit ${plot} (${id})`),
+              }),
+            ),
+            panel(
+              'Place cards',
+              h(
+                Fragment,
+                null,
+                cards.map((place) =>
+                  h(
+                    'div',
+                    { className: 'home-info-body', key: place.id },
+                    h('strong', null, place.name),
+                    h(LanternProvenance, {
+                      register: town.register,
+                      placeId: place.id,
+                      tale: town.tale,
+                      places,
+                    }),
+                    h('p', { className: 'home-story' }, place.story),
+                  ),
+                ),
+                h(
+                  'div',
+                  { className: 'home-info-body' },
+                  h('strong', null, 'A draft (shows no provenance)'),
+                  h(LanternProvenance, {
+                    register: town.register,
+                    placeId: 'my-draft',
+                    tale: town.tale,
+                    places,
+                  }),
+                ),
+              ),
+            ),
+            h(CalendarClock, {
+              clock,
+              evening: { hour: town.hour, tale: town.tale, places },
+              onVisitPlace: (plot) => log(`Almanac visit ${plot}`),
+            }),
+          ),
+        );
+      }
+
+      const root = createRoot(document.querySelector('#root'));
+      function render() {
+        const night = state.forceNight || state.minutes < 360 || state.minutes >= 1200;
+        document.body.classList.toggle('night', night);
+        for (const button of document.querySelectorAll('[data-minute]'))
+          button.setAttribute(
+            'aria-pressed',
+            String(Number(button.dataset.minute) === state.minutes),
+          );
+        root.render(h(Fixture, { ...state, night }));
+      }
+      for (const button of document.querySelectorAll('[data-minute]'))
+        button.onclick = () => {
+          state.minutes = Number(button.dataset.minute);
+          render();
+        };
+      document.querySelector('#shallow').onchange = (event) => {
+        state.shallow = event.target.checked;
+        render();
+      };
+      document.querySelector('#night').onchange = (event) => {
+        state.forceNight = event.target.checked;
+        render();
+      };
+      document.querySelector('#day').oninput = (event) => {
+        state.day = Number(event.target.value) || 0;
+        render();
+      };
+      const scene = new URLSearchParams(location.search);
+      if (scene.has('minute')) state.minutes = Number(scene.get('minute'));
+      if (scene.has('day')) state.day = Number(scene.get('day'));
+      state.shallow = scene.get('shallow') === '1';
+      document.querySelector('#shallow').checked = state.shallow;
+      render();
+    </script>
+  </body>
+</html>

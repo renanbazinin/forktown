@@ -3,6 +3,7 @@ import { isFootballPlot } from './football.ts';
 import { isFarmPlot } from './farm.ts';
 import { ZOO_VENUE, ZOO_SPOTS, isZooPlot, insideZoo } from './zoo.ts';
 import { CINEMA_VENUE, CINEMA_SEATS, isCinemaPlot, insideCinema, cinemaProgram } from './cinema.ts';
+import { FORK_ID, FORK_NAME, FORK_PLOT } from './lanterns.ts';
 
 // Public venues belong to the town, outside the one-house contribution files.
 export const VENUES = [
@@ -10,6 +11,9 @@ export const VENUES = [
   { id: 'stage', plot: 'B5', name: 'The Little Stage', kind: 'stage' },
   CINEMA_VENUE,
   ZOO_VENUE,
+  // The heart of town: one lantern for every neighbor. Drawn by src/city/lantern-fork.ts.
+  // Append new venues; eventsForDay reads VENUES[0] and VENUES[1].
+  { id: FORK_ID, plot: FORK_PLOT, name: FORK_NAME, kind: 'fork' },
 ] as const;
 export type Venue = (typeof VENUES)[number];
 export type EventPose = 'sit' | 'read' | 'sip' | 'chat' | 'play' | 'cheer' | 'sway' | 'dance';
@@ -41,6 +45,8 @@ export const EVENT_SPOTS: Record<Venue['kind'], readonly EventSpot[]> = {
     { x: 1.25, y: 0.7, facing: 'ne' },
     { x: -1.2, y: 1.3, facing: 'ne' },
   ],
+  // No gatherings at the Fork yet; its ritual is the lanterns themselves.
+  fork: [],
 };
 export function eventSpot(venue: Venue, index: number) {
   const plot = getPlot(venue.plot)!;

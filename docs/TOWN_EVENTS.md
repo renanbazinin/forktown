@@ -18,6 +18,15 @@ Picnic guests sit with folded legs, sip lemonade, or chat. Book events bring ope
 
 The stage performers and DJ are scenery, not extra contributed residents. Sound is optional: turn on town sound for the current concert or the original midnight dance track. There is no autoplay audio or flashing lights. Pausing the town also pauses gestures, performers, music notes, and sound.
 
+## Every evening
+
+Two things happen every evening, whatever the lineup. They open the Events panel under "THIS EVENING", and the almanac lists them too.
+
+- **Lantern hour, 20:00.** The Lantern Fork on D3 lights one lantern for every house, oldest first: one a second with today's houses, and all of them by 20:20 at any size. Each house's windows and lantern post light with its lantern, then the streetlamps follow outward from the Fork until 20:30. Everything stays lit until 06:00. Before nightfall the card counts down in real time ("Nightfall is in about 7 minutes."); while it lights it shows "Happening now". See [The Lantern Fork](LANTERN_FORK.md).
+- **Tonight's tale.** One neighbor's own story, told from 06:00 to 06:00 in a fair rotation. The card quotes it and links to the house. See [Tonight's tale](TALES.md).
+
+Lantern hour is not a gathering: it has no guests, no spots and no venue schedule, and it never changes who attends the lunch, the concert or the disco.
+
 ## Extend it
 
 `src/lib/events.ts` owns venues, event choices, and schedules; `src/city/venues.ts` draws them. `src/lib/simulation.ts` handles attendance, and `TownEvents.tsx` exposes the daily program through keyboard-accessible buttons. Existing house JSON requires no new fields.

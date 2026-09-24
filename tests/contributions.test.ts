@@ -147,9 +147,15 @@ describe('The world stays predictable as people contribute', () => {
     expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(200);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
-        !['B5', 'C5', ...FOOTBALL_PLOTS, ...CINEMA_PLOTS, ...ZOO_PLOTS, ...FARM_PLOTS].includes(
-          plot.id,
-        ),
+        ![
+          'B5',
+          'C5',
+          'D3',
+          ...FOOTBALL_PLOTS,
+          ...CINEMA_PLOTS,
+          ...ZOO_PLOTS,
+          ...FARM_PLOTS,
+        ].includes(plot.id),
       );
   });
   it('keeps the same coordinates for an existing plot regardless of other places', () => {

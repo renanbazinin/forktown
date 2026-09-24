@@ -9,6 +9,7 @@ import {
   SCENERY_START,
   SCENERY_SECONDS,
   FOLLOW_SECONDS,
+  LANTERN_SHOT,
 } from '../src/lib/live-director';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
@@ -16,7 +17,8 @@ import { eventsForDay, isEventLive } from '../src/lib/events';
 import { footballAt } from '../src/lib/football';
 import { townCatAt } from '../src/lib/town-cat';
 import { ducksAt } from '../src/lib/ducks';
-import { isRoad, project } from '../src/lib/world';
+import { getPlot, isRoad, plotCenter, project } from '../src/lib/world';
+import { FORK_BOUNDS, FORK_PLOT } from '../src/lib/lanterns';
 
 const places = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
@@ -25,6 +27,7 @@ const shotAt = (day: number, minute: number) =>
   liveShotAt(liveProgram(places, day), minute, simulateResidents(places, minute, day));
 
 describe('Live broadcast director', () => {
+  // Every minute of four days for four towns: seconds of work, so it gets a generous timeout.
   it('keeps the scenery window and films only selected events or eligible outdoor subjects', () => {
     const sleepers = places.map((p) => ({
       ...p,
@@ -89,6 +92,10 @@ describe('Live broadcast director', () => {
                   ),
                 ).toBe(true);
             }
+          } else if (shot.kind === 'lanterns') {
+            expect(homes.length).toBeGreaterThan(0);
+            expect(minute).toBeGreaterThanOrEqual(LANTERN_SHOT.start);
+            expect(minute).toBeLessThan(LANTERN_SHOT.end);
           } else if (shot.kind === 'ducks') {
             expect(program.highlights).toContain('ducks');
             expect(ducksAt(minute).length).toBeGreaterThan(0);
@@ -102,7 +109,7 @@ describe('Live broadcast director', () => {
         expect(scenery).toBe(60);
       }
     }
-  });
+  }, 20_000);
 
   it('chooses three varied highlights each day, with no always-on ducks or disco', () => {
     const lineups = new Set<string>();
@@ -115,7 +122,7 @@ describe('Live broadcast director', () => {
         ['ducks', 620],
         ['football', 700],
         ['afternoon', 800],
-        ['evening', 1200],
+        ['evening', 1150],
         ['night', 1420],
       ] as const) {
         const shot = shotAt(day, minute);
@@ -266,6 +273,50 @@ describe('Live broadcast director', () => {
     }
     expect(shotAt(3, 160).kind).toBe('neighbor');
     expect(shotAt(3, 290).kind).toBe('cat');
+  });
+
+  it('films Lantern hour at the Lantern Fork every evening', () => {
+    expect(LANTERN_SHOT).toEqual({ start: 1198, end: 1224 });
+    const fork = plotCenter(getPlot(FORK_PLOT)!);
+    for (let day = 0; day < 6; day++) {
+      for (const [minute, filmed] of [
+        [1197.9, false],
+        [1198, true],
+        [1210, true],
+        [1223.9, true],
+        [1224, false],
+      ] as const) {
+        const shot = shotAt(day, minute);
+        expect(shot.kind === 'lanterns').toBe(filmed);
+        if (!filmed) continue;
+        expect(shot.id).toBe(`lanterns:${day}`);
+        expect(shot.label).toBe('Lantern hour at the Lantern Fork');
+        expect(shot).toEqual(shotAt(day, 1198));
+      }
+      const empty = liveProgram([], day);
+      expect(liveShotAt(empty, 1210, []).kind).not.toBe('lanterns');
+    }
+    // The whole Fork, from the top of its crown to its plaque, stays inside both screens.
+    const shot = shotAt(3, 1210);
+    for (const [width, height] of [
+      [1920, 900],
+      [390, 844],
+    ]) {
+      for (let second = 0; second < 1440; second += 5) {
+        const camera = liveCamera(shot, width, height, second);
+        const screen = (x: number, y: number) => ({
+          x: x * camera.zoom + camera.x,
+          y: y * camera.zoom + camera.y,
+        });
+        const topLeft = screen(fork.x + FORK_BOUNDS.left, fork.y + FORK_BOUNDS.top);
+        const bottomRight = screen(fork.x + FORK_BOUNDS.right, fork.y + FORK_BOUNDS.bottom);
+        expect(topLeft.x).toBeGreaterThan(0);
+        expect(topLeft.y).toBeGreaterThan(0);
+        expect(bottomRight.x).toBeLessThan(width);
+        expect(bottomRight.y).toBeLessThan(height);
+      }
+      expect(liveCamera(shot, width, height).zoom).toBeLessThanOrEqual(1.8);
+    }
   });
 
   it('frames the whole duck family on selected days and ends its clip on time', () => {

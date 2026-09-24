@@ -27,9 +27,6 @@
 .live-stream-night .live-watermark {
   filter: drop-shadow(0 2px 8px #142826);
 }
-.live-stream-night .brand-mark i:nth-child(-n + 3) {
-  background: #c0d0ac;
-}
 
 .live-glass {
   color: #2f463b;

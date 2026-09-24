@@ -12,6 +12,8 @@ import { trackForTown } from '../music/score';
 import { cinemaAt, cinemaListening } from '../lib/cinema';
 import Soundtrack from './Soundtrack';
 import ResidentPreview from './ResidentPreview';
+import BrandMark from './BrandMark';
+import { TAGLINE } from '../lib/brand';
 import '../live.css';
 
 export default function LiveStream() {
@@ -147,13 +149,7 @@ export default function LiveStream() {
       <h1 className="sr-only">Forktown live stream</h1>
       <canvas ref={canvas} role="img" aria-label={`Forktown live: ${shot.label}`} />
       <div className="live-watermark" role="img" aria-label="Forktown">
-        <span className="brand-mark" aria-hidden="true">
-          <i />
-          <i />
-          <i />
-          <i />
-          <i />
-        </span>
+        <BrandMark size={40} night={night} />
       </div>
       <aside className="live-community live-glass" aria-label="Town population and latest arrival">
         <div className="live-population">
@@ -179,9 +175,7 @@ export default function LiveStream() {
           <div className="live-arrival-copy">
             <span className="live-caption">Latest arrival</span>
             <strong>{latestArrival ? `@${latestArrival.creator}` : 'Welcome, neighbor'}</strong>
-            <span className="live-arrival-home">
-              {latestArrival?.name ?? 'A little town, growing together'}
-            </span>
+            <span className="live-arrival-home">{latestArrival?.name ?? TAGLINE.slice(0, -1)}</span>
           </div>
         </div>
       </aside>

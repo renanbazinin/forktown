@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forktown · Lantern Fork preview</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #eaf0df;
+        color: #304d40;
+        font: 15px system-ui;
+      }
+      h1 {
+        font: 32px Georgia;
+        margin: 0 0 12px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+        cursor: pointer;
+      }
+      button[aria-pressed='true'] {
+        background: #d9e6c8;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      #detail {
+        image-rendering: pixelated;
+      }
+      canvas {
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+      }
+      input[type='range'] {
+        flex: 1;
+        min-width: 220px;
+      }
+      #status {
+        font:
+          14px 'Space Mono',
+          monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>The Lantern Fork</h1>
+    <nav id="zooms"></nav>
+    <nav id="minutes"></nav>
+    <nav>
+      <label
+        >Minute <input id="time" type="range" min="1190" max="1240" step="0.1" value="720"
+      /></label>
+      <button id="play">Play Lantern hour</button>
+    </nav>
+    <nav>
+      <label>Houses <input id="roster" type="range" min="0" max="151" step="1" /></label>
+      <label><input id="shallow" type="checkbox" /> No arrival history</label>
+      <label><input id="labels" type="checkbox" /> Show plot labels</label>
+      <label><input id="loupe" type="checkbox" /> Loupe</label>
+    </nav>
+    <p id="status"></p>
+    <canvas id="detail" width="1440" height="900" hidden></canvas>
+    <canvas id="map" width="1440" height="900"></canvas>
+    <script type="module">
+      import { renderCity } from '/src/city/render.ts';
+      import { places } from '/src/lib/places.ts';
+      import { HOUSE_PLOTS } from '/src/lib/events.ts';
+      import {
+        FORK_PLOT,
+        eveningDayAt,
+        lanternHourAt,
+        lanternRegister,
+        taleOfTheEvening,
+      } from '/src/lib/lanterns.ts';
+      import { timeLabel } from '/src/lib/simulation.ts';
+      import { getPlot, plotCenter } from '/src/lib/world.ts';
+
+      const canvas = document.querySelector('#map'),
+        ctx = canvas.getContext('2d');
+      const slider = document.querySelector('#time'),
+        rosterSlider = document.querySelector('#roster');
+      const history = typeof __TOWN_ARRIVALS__ === 'undefined' ? [] : __TOWN_ARRIVALS__;
+      // Real houses first, in lighting order, then synthetic neighbors on the free house plots.
+      const real = lanternRegister(places, history).entries.map((entry) =>
+        places.find((place) => place.id === entry.id),
+      );
+      const taken = new Set(places.map((place) => place.plot));
+      const synthetic = HOUSE_PLOTS.filter((plot) => !taken.has(plot.id)).map((plot, k) => {
+        const model = places[k % places.length];
+        return {
+          ...model,
+          id: `neighbor-${k + 1}`,
+          name: `Neighbor ${k + 1}`,
+          creator: 'someone',
+          plot: plot.id,
+        };
+      });
+      const everyone = [...real, ...synthetic];
+      rosterSlider.max = String(everyone.length);
+      rosterSlider.value = String(places.length);
+      const state = {
+        minutes: 720,
+        day: 0,
+        zoom: 0.7,
+        roster: places,
+        arrivals: history,
+        playing: false,
+      };
+      // ?m=1205&z=3&loupe opens straight onto a minute and zoom with only the magnified Fork.
+      const params = new URLSearchParams(location.search);
+      if (params.has('m')) state.minutes = Number(params.get('m'));
+      if (params.has('z')) state.zoom = Number(params.get('z'));
+      if (params.has('loupe')) {
+        document.querySelector('#loupe').checked = true;
+        document.body.style.padding = '0';
+        document.querySelectorAll('h1, nav, #status, #map').forEach((el) => (el.hidden = true));
+      }
+      window.forkPreview = state;
+      let last = performance.now();
+
+      function setRoster() {
+        const count = Number(rosterSlider.value);
+        const roster = everyone.slice(0, count);
+        const extra = roster
+          .filter((place) => place.id.startsWith('neighbor-'))
+          .map((place) => place.id);
+        state.roster = count === places.length ? places : roster;
+        state.arrivals = document.querySelector('#shallow').checked
+          ? []
+          : [...extra.reverse(), ...history];
+      }
+      rosterSlider.oninput = setRoster;
+      document.querySelector('#shallow').onchange = setRoster;
+
+      for (const zoom of [0.7, 1.6, 3]) {
+        const button = document.createElement('button');
+        button.textContent = `Zoom ${zoom}`;
+        button.onclick = () => {
+          state.zoom = zoom;
+          document
+            .querySelectorAll('#zooms button')
+            .forEach((b) => b.setAttribute('aria-pressed', b === button));
+        };
+        button.setAttribute('aria-pressed', zoom === state.zoom);
+        document.querySelector('#zooms').append(button);
+      }
+      for (const label of [
+        '12:00',
+        '19:25',
+        '19:59',
+        '20:00',
+        '20:05',
+        '20:12',
+        '20:16',
+        '20:22',
+        '20:30',
+        '03:00',
+        '06:00',
+      ]) {
+        const button = document.createElement('button');
+        button.textContent = label;
+        const [h, m] = label.split(':').map(Number);
+        button.onclick = () => {
+          state.minutes = h * 60 + m;
+          state.playing = false;
+        };
+        document.querySelector('#minutes').append(button);
+      }
+      slider.oninput = () => {
+        state.minutes = Number(slider.value);
+        state.playing = false;
+      };
+      document.querySelector('#play').onclick = () => {
+        state.minutes = 1198;
+        state.playing = true;
+      };
+
+      const fork = plotCenter(getPlot(FORK_PLOT));
+      function tick(now) {
+        if (state.playing) {
+          state.minutes += (now - last) / 1000;
+          if (state.minutes >= 1240) state.playing = false;
+        }
+        last = now;
+        const { minutes, day, zoom, roster, arrivals } = state;
+        const night = minutes < 360 || minutes >= 1200;
+        const center = { x: fork.x + 4, y: fork.y - 44 };
+        renderCity({
+          ctx,
+          width: canvas.width,
+          height: canvas.height,
+          camera: {
+            x: canvas.width / 2 - center.x * zoom,
+            y: canvas.height / 2 - center.y * zoom,
+            zoom,
+          },
+          places: roster,
+          ufoPlaces: roster,
+          arrivals,
+          selectedPlot: null,
+          hoveredPlot: null,
+          night,
+          showPlots: document.querySelector('#labels').checked,
+          minutes,
+          day,
+        });
+        // The loupe magnifies the Fork's screen pixels, so tiny lanterns can be judged as drawn.
+        const detail = document.querySelector('#detail');
+        detail.hidden = !document.querySelector('#loupe').checked;
+        if (!detail.hidden) {
+          const scale = zoom <= 1 ? 6 : zoom <= 2 ? 3 : 1.5;
+          const w = detail.width / scale,
+            h = detail.height / scale;
+          const dctx = detail.getContext('2d');
+          dctx.imageSmoothingEnabled = false;
+          dctx.drawImage(
+            canvas,
+            canvas.width / 2 - w / 2,
+            canvas.height / 2 - h / 2,
+            w,
+            h,
+            0,
+            0,
+            detail.width,
+            detail.height,
+          );
+        }
+        if (minutes >= 1190 && minutes <= 1240) slider.value = minutes;
+        const hour = lanternHourAt(lanternRegister(roster, arrivals).total, minutes);
+        const tale = taleOfTheEvening(roster, eveningDayAt(minutes, day));
+        document.querySelector('#status').textContent =
+          `${timeLabel(minutes)} · Lantern hour: ${hour.phase} · ${hour.lit}/${hour.total} lit · tale: ${tale?.placeId ?? 'none'}`;
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>
