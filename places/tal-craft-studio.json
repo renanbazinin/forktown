@@ -1,0 +1,40 @@
+{
+  "id": "tal-craft-studio",
+  "name": "Craft Studio",
+  "creator": "TalOrlanczyk",
+  "plot": "F2",
+  "building": "studio",
+  "color": "#7C3AED",
+  "decoration": "bench",
+  "story": "Downstairs is a bustling arts and crafts workshop filled with clay, paint, and handmade projects. Upstairs is Jon's cozy maker loft.",
+  "design": {
+    "wall": "#FFFBEB",
+    "trim": "#C084FC",
+    "floors": 2,
+    "roof": "flat",
+    "windows": "round",
+    "garden": "paving",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Jon",
+    "skin": "#D9B68B",
+    "hair": "#451A03",
+    "outfit": "#7C3AED",
+    "accessory": "glasses",
+    "greeting": "Let's make something!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "CRAFT STUDIO",
+    "color": "#C084FC",
+    "background": "#2B213A",
+    "html": "<div style=\"background-color: #2B213A; color: #C084FC; text-align: center\"><strong style=\"font-size: 24px\">✨ CRAFT STUDIO ✨</strong><p style=\"font-size: 12px; color: #34D399\">Make • Mold • Inspire</p></div>"
+  }
+}
