@@ -115,7 +115,6 @@
       import '@fontsource/fraunces/500-italic.css';
       import '@fontsource/space-mono/700.css';
       import { CINEMA_FILMS, cinemaAt } from '/src/lib/cinema.ts';
-      import { REEL } from '/src/films/index.ts';
       import { drawCinemaFilm, loadReel } from '/src/city/cinema-films.ts';
       import { townDayAt, townMinutesAt } from '/src/lib/town-time.ts';
       import { TownPlayer } from '/src/music/player.ts';
@@ -145,9 +144,8 @@
         paint();
       }
       await loadReel();
-      const reel = CINEMA_FILMS.filter((film) => film.artwork in REEL).length;
       document.querySelector('#library').textContent =
-        `${CINEMA_FILMS.length} original shorts — ${CINEMA_FILMS.length - reel} classics and ${reel} from the Starlight Reel — with original music and sound effects. Choose a film to hear its soundtrack.`;
+        `${CINEMA_FILMS.length} original shorts with original music and sound effects. Choose a film to hear its soundtrack.`;
       const screens = CINEMA_FILMS.map((film) => {
         const article = document.createElement('article');
         const canvas = document.createElement('canvas');
