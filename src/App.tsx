@@ -442,6 +442,7 @@ export default function App() {
             ) : selectedFootball ? (
               <FootballMatch
                 game={football}
+                minutes={clock.minutes}
                 watching={
                   residents.filter(
                     (r) => r.event?.id === 'football' && r.event.phase === 'attending',
