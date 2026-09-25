@@ -51,7 +51,21 @@ export function cinemaListening(
 export const CINEMA_CARD_SECONDS = 6;
 export const CINEMA_SCREEN_RISE = 20 * 60;
 export const CINEMA_SCREEN_ROLL_SECONDS = 6;
-export type FilmArtwork = 'popcorn' | 'moon' | 'duckling' | 'race' | 'duel' | 'ufo';
+/** The first library, drawn in `src/city/cinema-films.ts`. */
+export type ClassicArtwork = 'popcorn' | 'moon' | 'duckling' | 'race' | 'duel' | 'ufo';
+/** The Starlight Reel: longer stories, each a self-contained module in `src/films/`. */
+export type ReelArtwork =
+  | 'boat'
+  | 'anglerfish'
+  | 'orchestra'
+  | 'rocket'
+  | 'heist'
+  | 'ghost'
+  | 'bloom'
+  | 'train'
+  | 'mitten'
+  | 'lanterns';
+export type FilmArtwork = ClassicArtwork | ReelArtwork;
 export type CinemaFilm = {
   id: string;
   title: string;
@@ -101,6 +115,77 @@ export const CINEMA_FILMS: readonly CinemaFilm[] = [
     description: 'A flying saucer arrives, and three night owls take an unexpected trip.',
     duration: 60,
     artwork: 'ufo',
+  },
+  {
+    id: 'hello-downstream',
+    title: 'Hello, Downstream',
+    description: 'A paper boat with one word on its side, and a very long way to go.',
+    duration: 60,
+    artwork: 'boat',
+  },
+  {
+    id: 'mail-for-the-anglerfish',
+    title: 'Mail for the Anglerfish',
+    description:
+      'The deep-sea postman has a letter for everyone except the one who lights the way.',
+    duration: 60,
+    artwork: 'anglerfish',
+  },
+  {
+    id: 'the-rain-orchestra',
+    title: 'The Rain Orchestra',
+    description: 'A leaky roof, a pile of pots, and a bored boy who hears music in the rain.',
+    duration: 60,
+    artwork: 'orchestra',
+  },
+  {
+    id: 'cardboard-rocket',
+    title: 'Cardboard Rocket',
+    description: 'Nova is flying to the Moon tonight. Dinner keeps calling her home.',
+    duration: 60,
+    artwork: 'rocket',
+  },
+  {
+    id: 'the-great-pie-heist',
+    title: 'The Great Pie Heist',
+    description: 'A raccoon with a plan, a pie on a windowsill, and nothing going to plan.',
+    duration: 60,
+    artwork: 'heist',
+  },
+  {
+    id: 'boo-politely',
+    title: 'Boo, Politely',
+    description: 'A shy little ghost tries to scare off the new family. It does not go well.',
+    duration: 60,
+    artwork: 'ghost',
+  },
+  {
+    id: 'bolt-and-the-bloom',
+    title: 'Bolt and the Bloom',
+    description: 'In a grey city where nothing grows, a small robot finds something that does.',
+    duration: 60,
+    artwork: 'bloom',
+  },
+  {
+    id: 'the-sleeper-train',
+    title: 'The Sleeper Train',
+    description: 'Fennel wants to stay awake to see the sea at sunrise. The night is very long.',
+    duration: 60,
+    artwork: 'train',
+  },
+  {
+    id: 'the-mitten',
+    title: 'The Mitten',
+    description: 'An old winter tale: one lost red mitten, and far too many guests.',
+    duration: 60,
+    artwork: 'mitten',
+  },
+  {
+    id: 'lanterns-on-the-cliff',
+    title: 'Lanterns on the Cliff',
+    description: 'The lighthouse goes dark in a storm, so the whole town lights the way home.',
+    duration: 60,
+    artwork: 'lanterns',
   },
 ];
 export type CinemaSlot = {

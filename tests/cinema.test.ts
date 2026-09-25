@@ -73,7 +73,7 @@ describe('Starlight Cinema', () => {
     ];
     const seen = new Set<string>(),
       bills = new Set<string>();
-    for (let day = 0; day < 40; day++) {
+    for (let day = 0; day < 80; day++) {
       const bill = cinemaProgram(day, library);
       expect(bill.films).toHaveLength(3);
       expect(new Set(bill.films.map((f) => f.id)).size).toBe(3);
@@ -94,15 +94,15 @@ describe('Starlight Cinema', () => {
       1230 + 24 + cinemaProgram(0).films.reduce((sum, film) => sum + film.duration, 0),
     );
   });
-  it('rotates the six-film library, including the race, sword duel, and UFO, three at a time', () => {
-    expect(CINEMA_FILMS).toHaveLength(6);
+  it('rotates the classics and the Starlight Reel together, three at a time', () => {
+    expect(CINEMA_FILMS).toHaveLength(16);
     expect(CINEMA_FILMS.map((film) => film.artwork)).toEqual(
-      expect.arrayContaining(['race', 'duel', 'ufo']),
+      expect.arrayContaining(['race', 'duel', 'ufo', 'orchestra', 'lanterns', 'mitten']),
     );
     const firstDay = townDayAt(Date.parse('2026-09-23T00:00:00Z'));
     const seen = new Set<string>(),
       selections = new Set<string>();
-    for (let day = firstDay; day < firstDay + 60; day++) {
+    for (let day = firstDay; day < firstDay + 90; day++) {
       const films = cinemaProgram(day).films;
       expect(new Set(films.map((film) => film.id)).size).toBe(3);
       films.forEach((film) => seen.add(film.id));
@@ -113,8 +113,15 @@ describe('Starlight Cinema', () => {
           .join(','),
       );
     }
-    expect(seen.size).toBe(6);
-    expect(selections.size).toBeGreaterThan(8);
+    expect(seen.size).toBe(16);
+    expect(selections.size).toBeGreaterThan(40);
+  });
+  it('fits any three films into the evening, so the screen is stowed before midnight', () => {
+    // The disco, bedtimes, and the live director all assume the bill ends before 00:00.
+    const longest = [...CINEMA_FILMS].sort((a, b) => b.duration - a.duration).slice(0, 3);
+    const latest = cinemaProgram(0, longest);
+    expect(latest.end + CINEMA_SCREEN_ROLL_SECONDS).toBeLessThanOrEqual(1440);
+    for (const film of CINEMA_FILMS) expect(film.duration).toBeLessThanOrEqual(60);
   });
   it('shares the program and playback position across fresh instances, refreshes, and time zones', async () => {
     const utc = Date.parse('2026-09-23T00:20:37Z');
