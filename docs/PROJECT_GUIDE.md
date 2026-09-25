@@ -26,6 +26,7 @@ Starter places use `creator: "forktown"` as a project credit, not a real communi
 - Lantern hour at nightfall (20:00): the Fork's lanterns, each house's windows and its lantern post light in arrival order, then the streetlamps carry the light outward from the Fork by 20:30.
 - Tonight's tale: each evening one neighbor's own story is told at the Fork, in the Events panel and in the almanac. See [Tales](TALES.md).
 - The far side: golden-hour light, a quiet horizon with three sister forks, far fields beyond the town, and commit-stone paving at every crossing. See [The far side](THE_FAR_SIDE.md).
+- The turning year: the seasons dress the town. Blossom and drifting petals in spring, fireflies on summer nights, ochre and russet trees and pumpkins in autumn, snow on the roofs, the trees and the far ridge in winter, and a line in the almanac for each stage. See [The turning year](THE_TURNING_YEAR.md).
 - Optional original music: day and night themes, three concert arrangements, and a midnight dance track, with a volume control, soft transitions, and automatic pause when the tab is hidden. See [Forktown FM](MUSIC.md) for the listening preview and score guide.
 - Exterior signs: simple text or a restricted HTML/CSS artwork language, drawn as noninteractive canvas textures.
 - A full-screen town with compact controls. Explore opens searchable places and open plots; the neighbor and music buttons reveal residents and events. All directories work with a keyboard.
@@ -52,6 +53,12 @@ src/lib/brand.ts           Tagline, brand palette, mark pixels, and identity cop
 src/lib/lanterns.ts        The lantern register, lantern-hour clock, and tonight's tale
 src/city/lantern-fork.ts   The Lantern Fork on D3
 src/city/horizon.ts        The horizon, sister forks, and far fields
+src/lib/seasons.ts         The turning year: seeded schedules for trees, snow, and fireflies
+src/lib/season-copy.ts     The almanac's line for each stage of the year
+src/city/trees.ts          The town's trees through the year
+src/city/weather.ts        Fireflies, falling snow, and the season's light
+src/city/season-ground.ts  Seasonal grass tufts and river ice
+src/city/season-palette.ts The turning year's colors
 src/components/City.tsx    Map interaction and accessible controls
 src/components/Contribute.tsx  Building editor and JSON export
 src/components/BrandMark.tsx   The leaf-and-lantern mark and the wordmark's lantern

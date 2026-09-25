@@ -73,7 +73,7 @@ After checks, maintainer review, merge, and deployment, your house appears in th
 
 Forktown makes a first open-source contribution something you can visit. Each contributed house brings a neighbor, a story, and its creator’s credit into a shared pixel town.
 
-The town has a life of its own: neighbors take walks, meet at concerts, watch films, and stop by football matches. A full day and night lasts 24 real minutes. Explore at your own pace, follow a resident, or enjoy the [live view](https://renanbazinin.github.io/forktown/live/).
+The town has a life of its own: neighbors take walks, meet at concerts, watch films, and stop by football matches. A full day and night lasts 24 real minutes, and each season about 11 hours: blossom, fireflies, turning leaves, then snow. Explore at your own pace, follow a resident, or enjoy the [live view](https://renanbazinin.github.io/forktown/live/).
 
 Want to help beyond building a house? Improve the guides, report a bug, or contribute to the town itself. The [project guide](docs/PROJECT_GUIDE.md) covers features, code structure, and development commands.
 

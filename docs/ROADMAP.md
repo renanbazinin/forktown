@@ -38,4 +38,4 @@ Increase the row and column counts in `src/lib/town-config.ts`; see [Expanding t
 
 ## Later experiments
 
-Original pixel sprites, community landmarks, seasonal scenery, a shared garden, or reviewed interiors. Independent projects could connect to the town through a portal directory. Keep the first contribution small and the community credit visible as the world grows.
+Original pixel sprites, community landmarks, a shared garden, or reviewed interiors. Seasonal scenery has arrived: see [The turning year](THE_TURNING_YEAR.md). Independent projects could connect to the town through a portal directory. Keep the first contribution small and the community credit visible as the world grows.

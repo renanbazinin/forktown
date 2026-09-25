@@ -3,6 +3,8 @@ import { hash } from '../lib/world';
 import { drawGlow, LIGHT } from './glow';
 import { tint } from './houses';
 import { drawVenueTitle } from './venue-title';
+import { canopyAt, pumpkinOut, type TownSeason } from '../lib/seasons';
+import { BLOSSOM, FOLIAGE, mixHex, pick, PUMPKIN, SNOW } from './season-palette';
 
 type Ctx = CanvasRenderingContext2D;
 type Lobe = { cx: number; cy: number; rx: number; ry: number };
@@ -189,10 +191,28 @@ type ForkOptions = {
   night: boolean;
   leaf: string;
   leafLight: string;
+  /** The Fork stays evergreen; a season only adds blossom, a few turned leaves or snow. */
+  season?: TownSeason;
 };
 
+// The Fork keeps the middle of the town's schedules: it flowers through early spring, and a few
+// of its leaves turn in the second half of autumn.
+const FORK_SEASON_SEED = 0.5;
+function forkYear(season: TownSeason) {
+  const leafy = canopyAt(season.yearDay, FORK_SEASON_SEED, 'deciduous');
+  return {
+    blossom: canopyAt(season.yearDay, FORK_SEASON_SEED, 'blossom').blossom,
+    // The turned dapples go green again as the town's other trees go bare.
+    turned: leafy.deepen * (1 - leafy.dormant),
+    snow: leafy.snow,
+  };
+}
+
 function drawTree(ctx: Ctx, o: ForkOptions) {
-  const { night } = o;
+  const { night, season } = o;
+  // The canopy stays evergreen so the lanterns always hang in leaves. The year only lends it
+  // a little blossom, a few dapples that turn late in autumn, and snow on the lobes' tops.
+  const year = season && forkYear(season);
   const bark = night ? '#5C5446' : '#8A6F4E',
     barkLight = night ? '#6E6452' : '#A88B63',
     barkDark = night ? '#463F36' : '#6F583D';
@@ -262,6 +282,27 @@ function drawTree(ctx: Ctx, o: ForkOptions) {
       3,
       tint(o.leafLight, 14),
     );
+    if (!year) continue;
+    DAPPLES.forEach((dapple, i) => {
+      if (dapple.lobe !== lobe) return;
+      // Pale pink blossom opens on one dapple in three, clear of the lanterns' cream.
+      if (i % 3 === 0 && i / DAPPLES.length < year.blossom) {
+        rect(ctx, dapple.x + 2, dapple.y, 2, 2, pick(BLOSSOM.deep, night));
+        rect(ctx, dapple.x + 1, dapple.y - 1, 2, 2, pick(BLOSSOM.pink, night));
+      }
+      // One dapple in four turns ochre or russet late in autumn; the canopy stays green.
+      if (i % 4 === 1 && year.turned > 0) {
+        const autumn = i % 8 === 1 ? FOLIAGE.russet : FOLIAGE.ochre;
+        const from = tint(o.leaf, -14);
+        rect(ctx, dapple.x, dapple.y, 4, 2, mixHex(from, pick(autumn.leaf, night), year.turned));
+      }
+    });
+    if (year.snow > 0) {
+      const alpha = ctx.globalAlpha;
+      ctx.globalAlpha = alpha * year.snow;
+      steppedLobe(ctx, lobe, pick(SNOW.top, night), (dy) => dy < -0.7 * lobe.ry);
+      ctx.globalAlpha = alpha;
+    }
   }
   // A crowded tree softens each glow so a big town's canopy stays a canopy, not a blaze.
   const crowd = Math.min(1, Math.sqrt(32 / Math.max(1, o.register.total)));
@@ -307,7 +348,7 @@ function drawTree(ctx: Ctx, o: ForkOptions) {
   }
 }
 
-function drawPlaque(ctx: Ctx, night: boolean) {
+function drawPlaque(ctx: Ctx, night: boolean, season?: TownSeason) {
   for (const px of [-6, 40]) {
     rect(ctx, px, 34, 4, 8, night ? '#6E7560' : '#927B59');
     rect(ctx, px, 34, 1, 8, night ? '#919274' : '#B8A078');
@@ -321,6 +362,20 @@ function drawPlaque(ctx: Ctx, night: boolean) {
     fontSize: 12,
     night,
   });
+  // Two small pumpkins keep the plaque company from mid autumn until the first snow, taken in
+  // before the snow settles on the Fork itself.
+  if (season && pumpkinOut(season.yearDay, 0.2)) {
+    rect(ctx, -14, 38, 7, 4, pick(PUMPKIN.body, night));
+    rect(ctx, -13, 37, 5, 6, pick(PUMPKIN.body, night));
+    rect(ctx, -11, 38, 1, 4, pick(PUMPKIN.rib, night));
+    rect(ctx, -11, 35, 2, 2, pick(PUMPKIN.stem, night));
+  }
+  if (season && pumpkinOut(season.yearDay, 0.45)) {
+    rect(ctx, 47, 39, 5, 3, pick(PUMPKIN.body, night));
+    rect(ctx, 48, 38, 3, 5, pick(PUMPKIN.body, night));
+    rect(ctx, 49, 39, 1, 3, pick(PUMPKIN.rib, night));
+    rect(ctx, 49, 36, 1, 2, pick(PUMPKIN.stem, night));
+  }
 }
 
 /**
@@ -337,6 +392,6 @@ export function drawLanternFork(ctx: Ctx, o: ForkOptions) {
   };
   return [
     { depth: o.depth + 0.5, paint: at(() => drawTree(ctx, o)) },
-    { depth: o.depth + 1.3, paint: at(() => drawPlaque(ctx, o.night)) },
+    { depth: o.depth + 1.3, paint: at(() => drawPlaque(ctx, o.night, o.season)) },
   ];
 }

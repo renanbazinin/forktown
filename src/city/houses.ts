@@ -4,6 +4,15 @@ import { hash } from '../lib/world';
 import { drawChimneySmoke } from './ambience';
 import { drawSign } from './signs';
 import { drawLanternPost, type HouseLantern } from './lantern-post';
+import {
+  AUTUMN,
+  firstSnowAt,
+  pumpkinOut,
+  seedFraction,
+  snowAt,
+  type TownSeason,
+} from '../lib/seasons';
+import { PUMPKIN, SNOW, pick } from './season-palette';
 
 type Ctx = CanvasRenderingContext2D;
 export type HouseAppearance = Pick<
@@ -34,6 +43,13 @@ function box(ctx: Ctx, x: number, y: number, w: number, h: number, fill: string)
   ctx.fillStyle = fill;
   ctx.fillRect(x, y, w, h);
 }
+/** A lean polygon for seasonal layers: fill() closes the path, so it skips closePath. */
+function drift(ctx: Ctx, points: number[][], fill: string) {
+  ctx.beginPath();
+  points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+  ctx.fillStyle = fill;
+  ctx.fill();
+}
 const BASE_HEIGHT = {
   cottage: 32,
   cafe: 34,
@@ -42,6 +58,24 @@ const BASE_HEIGHT = {
   studio: 36,
   observatory: 42,
 };
+// Each home's seasonal schedule is fixed by its id, so it is worked out once, not every frame.
+const schedules = new Map<
+  string,
+  { roof: number; doorstep: boolean; squash: number; beds: number[] }
+>();
+function scheduleOf(id: string) {
+  let schedule = schedules.get(id);
+  if (!schedule) {
+    schedule = {
+      roof: seedFraction(`roof:${id}`),
+      doorstep: seedFraction(`pumpkin:${id}`) < 0.45,
+      squash: hash(`squash:${id}`),
+      beds: Array.from({ length: 7 }, (_, bed) => seedFraction(`squash:${id}:${bed}`)),
+    };
+    schedules.set(id, schedule);
+  }
+  return schedule;
+}
 export function houseBounds(place: HouseAppearance) {
   const height = BASE_HEIGHT[place.building] + (place.design.floors - 1) * 23;
   const roof =
@@ -59,7 +93,13 @@ export function drawHouse(
   y: number,
   night = false,
   scale = 1,
-  life?: { minutes: number; activity?: ResidentState['activity']; lantern?: HouseLantern },
+  life?: {
+    minutes: number;
+    activity?: ResidentState['activity'];
+    lantern?: HouseLantern;
+    /** Only the map passes a season: previews and the builder keep the neighbour's own colours. */
+    season?: TownSeason;
+  },
 ) {
   const d = place.design,
     { height: h } = houseBounds(place);
@@ -70,6 +110,32 @@ export function drawHouse(
   const awakeInside = life?.activity === 'home' || life?.activity === 'work';
   // On the map a home's windows wait for its lantern; previews without one keep the old glow.
   const windowsLit = night && (life?.lantern?.lit ?? true);
+  // The turning year rests on top of the neighbour's own colours and never repaints them.
+  // Each roof keeps its own snow schedule, and its doorstep pumpkin goes in as that snow comes.
+  const season = life?.season;
+  const { roof: roofSeed, doorstep, squash, beds } = scheduleOf(place.id);
+  const snow = season ? snowAt(season.yearDay, roofSeed) : 0,
+    snowTop = pick(SNOW.top, night),
+    snowShade = pick(SNOW.shade, night);
+  /** Snow settles and thaws by fading, one roof at a time; the rest of the winter it is opaque. */
+  const frosted = (paint: () => void) => {
+    if (!snow) return;
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * snow;
+    paint();
+    ctx.globalAlpha = alpha;
+  };
+  // The garden's pumpkins are picked when the first snow settles on this roof.
+  const beforeSnow = season && season.yearDay >= AUTUMN && season.yearDay < firstSnowAt(roofSeed);
+  const onDoorstep = !!season && doorstep && pumpkinOut(season.yearDay, roofSeed);
+  // Two vegetable beds ripen into pumpkins through early autumn, each on its own day, and a
+  // third where no pumpkin waits on the doorstep.
+  const ripe = (bed: number) =>
+    beforeSnow &&
+    (bed === squash % 7 ||
+      bed === (squash + 3) % 7 ||
+      (!doorstep && squash & 8 && bed === (squash + 5) % 7)) &&
+    season.yearDay >= AUTUMN + 2 + 5 * beds[bed];
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -94,18 +160,22 @@ export function drawHouse(
     d.garden === 'paving' ? (night ? '#808477' : '#CFC9B3') : night ? '#567253' : '#BBD395',
   );
   // Garden beds stay within the plot; all artwork is drawn locally.
-  for (let i = 0; i < 7; i++) {
+  const bed = (i: number) => {
     const gx = -34 + i * 10,
       gy = 24 - Math.abs(gx) * 0.35;
     if (d.garden === 'vegetables') {
       box(ctx, gx, gy, 7, 4, '#957453');
-      box(ctx, gx + 2, gy - 4, 3, 6, '#567B44');
+      if (ripe(i)) {
+        box(ctx, gx + 1, gy - 2, 5, 4, pick(PUMPKIN.body, night));
+        box(ctx, gx + 3, gy - 4, 1, 2, pick(PUMPKIN.stem, night));
+      } else box(ctx, gx + 2, gy - 4, 3, 6, '#567B44');
     }
     if (d.garden === 'wildflowers') {
       box(ctx, gx, gy - 3, 1, 5, '#668654');
       box(ctx, gx - 1, gy - 4, 3, 2, ['#EDC88B', '#D18F87', '#B3A5CD'][i % 3]);
     }
-  }
+  };
+  for (let i = 0; i < 7; i++) bed(i);
   // Stepping stones cross the lawn from the front door toward the street.
   for (let step = 0; step < 3; step++) {
     const sx = -18 - step * 8.5,
@@ -121,7 +191,7 @@ export function drawHouse(
       night ? '#899483' : '#E3DABF',
     );
   }
-  if (life?.lantern) drawLanternPost(ctx, life.lantern, night);
+  if (life?.lantern) drawLanternPost(ctx, life.lantern, night, snow);
   polygon(
     ctx,
     [
@@ -218,6 +288,15 @@ export function drawHouse(
   box(ctx, 0, -4, 8, 16, trim);
   box(ctx, 5, 3, 1, 2, '#EFD8A4');
   ctx.restore();
+  if (onDoorstep) {
+    // A doorstep pumpkin right of the door, clear of the porch post. Pumpkins never glow.
+    box(ctx, -6, 14, 7, 4, pick(PUMPKIN.body, night));
+    box(ctx, -5, 13, 5, 6, pick(PUMPKIN.body, night));
+    box(ctx, -3, 14, 1, 4, pick(PUMPKIN.rib, night));
+    box(ctx, -3, 11, 2, 2, pick(PUMPKIN.stem, night));
+    // The fourth bed stands in front of it, so that bed is drawn again over the pumpkin.
+    bed(3);
+  }
   const flat =
     d.roof === 'flat' || (d.roof === 'classic' && ['studio', 'cafe'].includes(place.building));
   if (flat) {
@@ -242,6 +321,19 @@ export function drawHouse(
         [-33, 5 - h],
       ],
       roof,
+    );
+    // Snow lies inside a rim of roof colour; a studio's skylight is painted over it, swept clear.
+    frosted(() =>
+      drift(
+        ctx,
+        [
+          [-28, -h],
+          [0, -h - 14.5],
+          [28, -h],
+          [0, 14.5 - h],
+        ],
+        snowTop,
+      ),
     );
     if (place.building === 'studio') {
       polygon(
@@ -270,6 +362,24 @@ export function drawHouse(
     ctx.beginPath();
     ctx.ellipse(0, -h, 25, 29, 0, Math.PI, Math.PI * 2);
     ctx.fill();
+    frosted(() => {
+      // A cap on the crown of the dome, its lower edge curving round the front, and snow on the
+      // deck in front of it. The telescope is painted over the cap.
+      ctx.fillStyle = snowTop;
+      ctx.beginPath();
+      ctx.ellipse(0, -h, 25, 29, 0, Math.PI + 0.86, Math.PI * 2 - 0.86);
+      ctx.ellipse(0, -h - 22, 16.3, 2.5, 0, 0, Math.PI);
+      ctx.fill();
+      drift(
+        ctx,
+        [
+          [-27, -h],
+          [0, 14 - h],
+          [27, -h],
+        ],
+        snowTop,
+      );
+    });
     polygon(
       ctx,
       [
@@ -318,6 +428,33 @@ export function drawHouse(
       ctx.lineTo(3 * i, 17 - h - 7 * i);
       ctx.stroke();
     }
+    frosted(() => {
+      // Snow on the top two courses and the far slope. The shaded layer reaches 1px lower as the
+      // snow's thickness; the lower courses and the gable end keep the neighbour's roof colour.
+      drift(
+        ctx,
+        [
+          [-18, -h - 35],
+          [-24.4, -h - 20],
+          [-8.2, -h - 10.2],
+          [8.6, -h - 3],
+          [15, -h - 18],
+        ],
+        snowShade,
+      );
+      drift(
+        ctx,
+        [
+          [-18, -h - 35],
+          [-24, -h - 21],
+          [-8, -h - 11.2],
+          [9, -h - 4],
+          [12, -h - 11],
+          [0, -h - 17],
+        ],
+        snowTop,
+      );
+    });
   }
   if (['cottage', 'cafe', 'bookshop', 'studio'].includes(place.building)) {
     const chimneyX = -18,
@@ -337,6 +474,12 @@ export function drawHouse(
     box(ctx, chimneyX - 1, chimneyY - 15, 12, 3, tint(brick, 12));
     box(ctx, chimneyX + 2, chimneyY - 15, 6, 1, tint(brick, -35));
     box(ctx, chimneyX, chimneyY - 7, 7, 1, tint(brick, -12));
+    frosted(() => {
+      // Snow on the cap either side of the warm flue; on a gable the left side sits against the
+      // snowy slope, so only a flat roof needs it.
+      if (flat) box(ctx, chimneyX - 1, chimneyY - 16, 3, 1, snowTop);
+      box(ctx, chimneyX + 8, chimneyY - 16, 3, 1, snowTop);
+    });
     if (awakeInside && life)
       drawChimneySmoke(ctx, chimneyX + 5, chimneyY - 17, life.minutes, seed, night);
   }
@@ -373,6 +516,19 @@ export function drawHouse(
         [-40, -4],
       ],
       roof,
+    );
+    // Snow banks against the wall on the upper part of the porch roof.
+    frosted(() =>
+      drift(
+        ctx,
+        [
+          [-33, -14],
+          [-2, 2],
+          [-5.5, 7.5],
+          [-36.5, -8.5],
+        ],
+        snowTop,
+      ),
     );
     box(ctx, -38, -2, 2, 19, trim);
     box(ctx, -9, 12, 2, 14, trim);
@@ -451,6 +607,7 @@ export function drawHouse(
     box(ctx, 34, 13, 2, 14, trim);
     box(ctx, 30, 10, 9, 6, roof);
     box(ctx, 38, 8, 1, 6, '#C57B65');
+    frosted(() => box(ctx, 30, 9, 8, 1, snowTop));
   }
   if (place.decoration === 'tree') {
     box(ctx, 39, 1, 3, 23, trim);
@@ -467,6 +624,20 @@ export function drawHouse(
       ],
       night ? '#41644E' : '#719455',
     );
+    // A stepped cap on the tip, then snow resting just inside each tier's upper slopes.
+    frosted(() => {
+      box(ctx, 39, -21, 2, 1, snowTop);
+      box(ctx, 38, -20, 4, 2, snowTop);
+      for (const [left, right, top] of [
+        [36, 42, -17],
+        [32, 46, -10],
+        [31, 47, -2],
+        [28, 50, 4],
+      ]) {
+        box(ctx, left, top, 2, 2, snowTop);
+        box(ctx, right, top, 2, 2, snowShade);
+      }
+    });
   }
   if (place.decoration === 'flowers')
     for (let i = 0; i < 4; i++) {
