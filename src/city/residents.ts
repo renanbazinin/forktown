@@ -8,7 +8,10 @@ export function drawResident(
   x: number,
   y: number,
   scale = 1,
-  state?: Pick<ResidentState, 'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove'>,
+  state?: Pick<
+    ResidentState,
+    'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove' | 'event'
+  >,
 ) {
   const facing = state?.facing ?? 'se';
   const back = facing === 'ne' || facing === 'nw';
@@ -195,7 +198,8 @@ export function drawResident(
     ctx.fillStyle = '#7B8A69';
     for (const x of [-4, 0, 4]) ctx.fillRect(x, -27, 2, 2);
   }
-  if (dancing && (state?.walkPhase ?? 0) < 0.3) {
+  // Music notes belong to the stage and the disco; a football crowd cheers without them.
+  if (dancing && state?.event?.id !== 'football' && (state?.walkPhase ?? 0) < 0.3) {
     // A small pixel music note, only occasionally, so a full crowd stays readable.
     const rise = Math.round((state?.walkPhase ?? 0) * 12);
     ctx.fillStyle = '#E0B768';

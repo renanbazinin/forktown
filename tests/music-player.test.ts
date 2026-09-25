@@ -2,7 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TownPlayer } from '../src/music/player';
 import { renderTrack, renderCinemaTrack } from '../src/music/synth';
 import { CINEMA_FILMS } from '../src/lib/cinema';
-vi.mock('../src/music/synth', () => ({ renderTrack: vi.fn(), renderCinemaTrack: vi.fn() }));
+vi.mock('../src/music/synth', () => ({
+  renderTrack: vi.fn(),
+  renderCinemaTrack: vi.fn(),
+  renderFootballTakes: vi.fn(() => new Promise(() => {})),
+}));
 
 const parameter = () => ({
   value: 0,

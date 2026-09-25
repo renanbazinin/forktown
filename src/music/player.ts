@@ -1,6 +1,6 @@
 import type { TrackId } from './score';
-import { renderTrack } from './synth';
-import { renderFootballSound } from './football-sound';
+import { renderFootballTakes, renderTrack } from './synth';
+import { FOOTBALL_SOUND_TAKES, renderFootballSound } from './football-sound';
 import type { FootballSound } from '../lib/football';
 import { CinemaPlayer, type CinemaPlayback } from './cinema-player';
 
@@ -15,7 +15,9 @@ export class TownPlayer {
   private disposed = false;
   private active = new Map<AudioBufferSourceNode, GainNode>();
   private effects = new Map<AudioBufferSourceNode, { gain: GainNode; pan: StereoPannerNode }>();
-  private effectBuffers = new Map<FootballSound['kind'], AudioBuffer>();
+  private effectBuffers = new Map<string, AudioBuffer>();
+  private effectTurns = new Map<FootballSound['kind'], number>();
+  private warming?: Promise<void>;
   constructor() {
     // Interactive mode starts from a gesture; the live route also attempts permitted autoplay.
     this.context = new AudioContext();
@@ -33,7 +35,7 @@ export class TownPlayer {
     });
   }
   resume() {
-    return this.context.resume();
+    return this.context.resume().then(() => this.warmEffects());
   }
   suspend() {
     this.silenceEffects();
@@ -48,13 +50,10 @@ export class TownPlayer {
   }
   effect(kind: FootballSound['kind'], volume: number, pan: number) {
     if (this.disposed || volume <= 0 || this.context.state !== 'running') return;
-    let buffer = this.effectBuffers.get(kind);
-    if (!buffer) {
-      const data = renderFootballSound(kind, this.context.sampleRate);
-      buffer = this.context.createBuffer(1, data.length, this.context.sampleRate);
-      buffer.copyToChannel(data, 0);
-      this.effectBuffers.set(kind, buffer);
-    }
+    // Rotate through the rendered takes so repeated kicks and cheers never sound stamped.
+    const turn = this.effectTurns.get(kind) ?? 0;
+    this.effectTurns.set(kind, turn + 1);
+    const buffer = this.effectBuffer(kind, turn % FOOTBALL_SOUND_TAKES[kind]);
     const source = this.context.createBufferSource(),
       gain = this.context.createGain(),
       panner = this.context.createStereoPanner();
@@ -70,6 +69,34 @@ export class TownPlayer {
       this.effects.delete(source);
     };
     source.start();
+  }
+  private effectBuffer(kind: FootballSound['kind'], take: number) {
+    const key = `${kind}:${take}`;
+    let buffer = this.effectBuffers.get(key);
+    if (!buffer) {
+      const data = renderFootballSound(kind, this.context.sampleRate, take);
+      buffer = this.context.createBuffer(1, data.length, this.context.sampleRate);
+      buffer.copyToChannel(data, 0);
+      this.effectBuffers.set(key, buffer);
+    }
+    return buffer;
+  }
+  /** Renders every take in a worker, so neither turning sound on nor the first goal stalls a frame. */
+  private warmEffects() {
+    if (this.disposed || this.warming) return;
+    const rate = this.context.sampleRate;
+    this.warming = renderFootballTakes(rate)
+      .then((takes) => {
+        if (this.disposed) return;
+        for (const [key, data] of takes) {
+          if (this.effectBuffers.has(key)) continue;
+          const buffer = this.context.createBuffer(1, data.length, rate);
+          buffer.copyToChannel(data as Float32Array<ArrayBuffer>, 0);
+          this.effectBuffers.set(key, buffer);
+        }
+      })
+      // Without the worker, a take is still rendered the first time it plays.
+      .catch(() => {});
   }
   silenceEffects() {
     for (const [source, nodes] of this.effects) {

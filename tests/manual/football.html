@@ -12,39 +12,110 @@
         font: 14px system-ui;
       }
       header {
-        padding: 18px 24px;
+        padding: 14px 20px;
         display: flex;
         flex-wrap: wrap;
-        gap: 12px;
+        gap: 10px;
         align-items: center;
       }
       h1 {
-        font: 28px Georgia;
-        margin: 0 16px 0 0;
+        font: 26px Georgia;
+        margin: 0 12px 0 0;
       }
       button,
       input {
         accent-color: #426e50;
       }
       button {
-        padding: 9px 13px;
+        padding: 8px 12px;
         border: 1px solid #c5ceb5;
         border-radius: 6px;
         color: inherit;
         background: #fffdf6;
         cursor: pointer;
       }
+      button[aria-pressed='true'] {
+        color: #fffdf6;
+        background: #426e50;
+        border-color: #426e50;
+      }
+      .group {
+        display: inline-flex;
+        gap: 4px;
+        align-items: center;
+      }
+      main {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        height: calc(100dvh - 150px);
+      }
       canvas {
         display: block;
         width: 100%;
-        height: calc(100dvh - 175px);
+        height: 100%;
         background: #dde5ce;
       }
+      aside {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-left: 1px solid #d6dcc6;
+        background: #fbfaf3;
+      }
+      aside h2 {
+        margin: 0;
+        padding: 12px 14px 8px;
+        font:
+          12px ui-monospace,
+          monospace;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      #stats {
+        margin: 0;
+        padding: 0 14px 10px;
+        font:
+          12px/1.6 ui-monospace,
+          monospace;
+        white-space: pre;
+        border-bottom: 1px solid #e2e5d6;
+      }
+      #log {
+        flex: 1;
+        overflow-y: auto;
+        margin: 0;
+        padding: 0 14px 14px;
+        list-style: none;
+        font-size: 12px;
+      }
+      #log li {
+        display: grid;
+        grid-template-columns: 30px 78px 1fr;
+        gap: 6px;
+        padding: 5px 0;
+        border-bottom: 1px dotted #d6dcc6;
+      }
+      #log li:first-child {
+        font-weight: 600;
+      }
+      #log li.goal {
+        background: #fff2cc;
+      }
+      #log small {
+        font-family: ui-monospace, monospace;
+        color: #6b7962;
+      }
+      .t0 {
+        color: #287968;
+      }
+      .t1 {
+        color: #a86a26;
+      }
       footer {
-        padding: 12px 24px;
+        padding: 10px 20px;
         display: flex;
         flex-wrap: wrap;
-        gap: 20px;
+        gap: 16px;
         align-items: center;
       }
       #caption {
@@ -55,19 +126,52 @@
         align-items: center;
         gap: 8px;
       }
+      kbd {
+        padding: 1px 4px;
+        border: 1px solid #c5ceb5;
+        border-radius: 3px;
+        font-size: 11px;
+      }
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: 1fr;
+          grid-template-rows: 60dvh 40dvh;
+          height: auto;
+        }
+        aside {
+          border-left: 0;
+          border-top: 1px solid #d6dcc6;
+        }
+      }
     </style>
   </head>
   <body>
     <header>
       <h1>The Meadow Ground</h1>
       <button id="play">Pause match</button><button id="sound">Turn sound on</button
-      ><button id="new">Next match</button><button id="night">Night view</button
-      ><label>Zoom <input id="zoom" type="range" min="0.3" max="2" step="0.05" value="1.1" /></label
+      ><button id="new">Next match</button><button id="night">Floodlights</button>
+      <span class="group" role="group" aria-label="Playback speed">
+        <button data-speed="0.5" aria-pressed="false">×0.5</button
+        ><button data-speed="1" aria-pressed="true">×1</button
+        ><button data-speed="2" aria-pressed="false">×2</button>
+      </span>
+      <span class="group" role="group" aria-label="Frame stepping">
+        <button id="back" title="Step back one frame (,)">◀ Frame</button
+        ><button id="step" title="Step forward one frame (.)">Frame ▶</button>
+      </span>
+      <label>Zoom <input id="zoom" type="range" min="0.3" max="2" step="0.05" value="1.1" /></label
       ><a href="/">Back to town</a>
     </header>
-    <canvas aria-label="Live four-a-side football preview"></canvas>
+    <main>
+      <canvas aria-label="Live five-a-side football preview"></canvas>
+      <aside aria-labelledby="log-title">
+        <h2 id="log-title">Match log</h2>
+        <pre id="stats"></pre>
+        <ol id="log" aria-label="Events, newest first"></ol>
+      </aside>
+    </main>
     <footer>
-      <strong id="score"></strong><span id="caption" role="status"></span
+      <strong id="score"></strong><span id="caption"></span
       ><label
         >Match time
         <input
@@ -78,7 +182,11 @@
           max="139.99"
           step="0.01"
           value="0" /></label
-      ><small>Preview uses the real match, crowd, and sound. One second = one town minute.</small>
+      ><small
+        >Preview uses the real match, crowd, and sound. One second = one town minute.
+        <kbd>Space</kbd> pause · <kbd>,</kbd> <kbd>.</kbd> step a frame (<kbd>Shift</kbd> for a
+        second).</small
+      >
     </footer>
     <script type="module">
       import { renderCity } from '/src/city/render.ts';
@@ -90,23 +198,28 @@
       import { eventsForDay } from '/src/lib/events.ts';
       import { project } from '/src/lib/world.ts';
       import { TOWN_DAY_MS, UTC_DAY_MS } from '/src/lib/town-time.ts';
+      const FRAME = 1 / 60;
       let minutes = 500,
         day = 0,
+        speed = 1,
         running = !matchMedia('(prefers-reduced-motion: reduce)').matches,
         last = performance.now(),
         previous = null,
         audio = null,
-        enabled = false;
-      const canvas = document.querySelector('canvas'),
-        play = document.querySelector('#play'),
-        sound = document.querySelector('#sound');
-      play.textContent = running ? 'Pause match' : 'Play match';
-      play.onclick = () => {
-        running = !running;
+        enabled = false,
+        logged = '';
+      const $ = (selector) => document.querySelector(selector);
+      const canvas = $('canvas'),
+        play = $('#play'),
+        sound = $('#sound');
+      const setRunning = (value) => {
+        running = value;
         play.textContent = running ? 'Pause match' : 'Play match';
         previous = null;
         audio?.silenceEffects();
       };
+      setRunning(running);
+      play.onclick = () => setRunning(!running);
       sound.onclick = async () => {
         audio ??= new TownPlayer();
         await audio.resume();
@@ -115,17 +228,51 @@
         previous = null;
         sound.textContent = enabled ? 'Mute sound' : 'Turn sound on';
       };
-      document.querySelector('#new').onclick = () => {
+      // Day, then the floodlit last match (lights stay on until 20:08), then the closed ground.
+      const VIEWS = [
+        [500, 'Floodlights'],
+        [1175, 'Night view'],
+        [1260, 'Day view'],
+      ];
+      let view = 0;
+      const showView = (next) => {
+        view = next;
+        minutes = VIEWS[view][0];
+        $('#night').textContent = VIEWS[view][1];
+        previous = null;
+      };
+      $('#new').onclick = () => {
         day += UTC_DAY_MS / TOWN_DAY_MS;
-        minutes = 500;
-        previous = null;
+        showView(0);
       };
-      document.querySelector('#night').onclick = () => {
-        minutes = minutes >= 1200 ? 500 : 1260;
-        previous = null;
+      $('#night').onclick = () => showView((view + 1) % VIEWS.length);
+      for (const button of document.querySelectorAll('[data-speed]'))
+        button.onclick = () => {
+          speed = Number(button.dataset.speed);
+          for (const other of document.querySelectorAll('[data-speed]'))
+            other.setAttribute('aria-pressed', String(other === button));
+          previous = null;
+        };
+      // Stepping pauses the match and skips sound cues rather than replaying them.
+      const step = (by) => {
+        setRunning(false);
+        minutes += by;
       };
-      document.querySelector('#time').oninput = (event) => {
-        minutes = 500 + Number(event.target.value);
+      $('#back').onclick = () => step(-FRAME);
+      $('#step').onclick = () => step(FRAME);
+      document.addEventListener('keydown', (event) => {
+        if (event.target.closest?.('input, textarea, select')) return;
+        if (event.key === ' ') {
+          if (event.target.closest?.('button, a')) return;
+          event.preventDefault();
+          setRunning(!running);
+        } else if (event.key === ',' || event.key === '<') step(event.shiftKey ? -1 : -FRAME);
+        else if (event.key === '.' || event.key === '>') step(event.shiftKey ? 1 : FRAME);
+      });
+      $('#time').oninput = (event) => {
+        // Scrub within whichever of the six matches is on (or the first, when closed).
+        const match = Math.max(0, Math.min(5, Math.floor((minutes - 360) / 140)));
+        minutes = 360 + match * 140 + Number(event.target.value);
         previous = null;
         audio?.silenceEffects();
       };
@@ -134,10 +281,36 @@
         if (document.hidden) audio?.suspend();
         else if (enabled) audio?.resume();
       });
+      const pair = ([a, b]) => `${a}–${b}`.padEnd(6);
+      function log(game) {
+        const key = `${game.day}:${game.match}:${game.events.length}`;
+        if (key === logged) return;
+        logged = key;
+        const list = $('#log');
+        list.replaceChildren(
+          ...game.events
+            .slice()
+            .reverse()
+            .map((event) => {
+              const item = document.createElement('li');
+              item.className = event.kind === 'goal' ? 'goal' : '';
+              const minute = document.createElement('small');
+              minute.textContent = `${event.minute}'`;
+              const kind = document.createElement('small');
+              kind.textContent = event.kind;
+              if (event.team !== null) kind.className = `t${event.team}`;
+              const text = document.createElement('span');
+              text.textContent = event.text;
+              item.append(minute, kind, text);
+              return item;
+            }),
+        );
+        if (!game.events.length) list.innerHTML = '<li><small>No events yet.</small></li>';
+      }
       function paint(now) {
         const delta = Math.min(0.1, (now - last) / 1000);
         last = now;
-        if (running && !document.hidden) minutes += delta;
+        if (running && !document.hidden) minutes += delta * speed;
         const game = footballAt(minutes, day),
           width = canvas.clientWidth,
           height = canvas.clientHeight,
@@ -152,7 +325,7 @@
         const ctx = canvas.getContext('2d');
         ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
         const center = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y),
-          zoom = Number(document.querySelector('#zoom').value),
+          zoom = Number($('#zoom').value),
           camera = { x: width / 2 - center.x * zoom, y: height / 2 - center.y * zoom, zoom };
         renderCity({
           ctx,
@@ -174,10 +347,18 @@
           for (const effect of footballSoundsBetween(previous, game))
             audio.effect(effect.kind, effect.strength * listening.gain, listening.pan);
         previous = enabled && running && !document.hidden && listening.gain > 0 ? game : null;
-        document.querySelector('#score').textContent =
+        $('#score').textContent =
           `Meadow ${game.score[0]} : ${game.score[1]} Sunset · ${game.clock}`;
-        document.querySelector('#caption').textContent = game.caption;
-        document.querySelector('#time').value = game.elapsed;
+        $('#caption').textContent = game.caption;
+        $('#time').value = game.elapsed;
+        $('#stats').textContent = [
+          `${game.phase.padEnd(9)} t=${game.elapsed.toFixed(2).padStart(6)}s  match ${game.match + 1}`,
+          `possession ${pair(game.possession)} shots ${pair(game.shots)}`,
+          `on target  ${pair(game.onTarget)} saves ${pair(game.saves)}`,
+          `corners    ${pair(game.corners)} restart ${game.restart ?? '-'}`,
+          `ball ${game.ball.x.toFixed(2)},${game.ball.y.toFixed(2)} h${game.ball.height.toFixed(1)} owner ${game.ball.owner ?? '-'}`,
+        ].join('\n');
+        log(game);
         requestAnimationFrame(paint);
       }
       requestAnimationFrame(paint);

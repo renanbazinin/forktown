@@ -13,7 +13,13 @@ import { groundTuft, riverGlint } from './season-ground';
 import { SNOW, pick } from './season-palette';
 import { seedFraction, snowAt, townSeasonAt } from '../lib/seasons';
 import { paintGroundLayer } from './ground-cache';
-import { drawFootball } from './football';
+import {
+  drawFootball,
+  footballFurnitureHit,
+  lampBlocksGoal,
+  scoreboardHit,
+  spectatorAlpha,
+} from './football';
 import { drawTownCat } from './cat';
 import { drawDuck } from './ducks';
 import { drawCinema, cinemaScreenHit } from './cinema';
@@ -414,6 +420,7 @@ export function renderCity({
     football,
     night,
     isFootballPlot(selectedPlot ?? '') || isFootballPlot(hoveredPlot ?? ''),
+    minutes,
   );
   objects.push(...drawFarm(ctx, minutes, day, night));
   objects.push(
@@ -508,7 +515,7 @@ export function renderCity({
   // After the lanterns, the lamps carry the light outward from the Fork.
   LAMPS.forEach(({ x, y, distance }, i) => {
     const pt = project(x + 0.5, y + 0.5);
-    if (!visible(pt, 26, 57, 2)) return;
+    if (!visible(pt, 26, 57, 2) || lampBlocksGoal(x + 0.5, y + 0.5)) return;
     const lit = night && lampOn(distance, minutes);
     const snow = snowAt(season.yearDay, LAMP_SNOW[i]);
     objects.push({
@@ -536,7 +543,12 @@ export function renderCity({
       paint: () => {
         if (followed === resident.id)
           diamond(ctx, pt.x, pt.y + 2, 10, 5, night ? '#F0DBA575' : '#FFF7D5');
+        // Spectators at the football fade while play near the touchline is behind them.
+        const alpha = ctx.globalAlpha;
+        if (resident.event?.id === 'football')
+          ctx.globalAlpha = alpha * spectatorAlpha(football, pt);
         drawResident(ctx, resident.resident, pt.x, pt.y, 1.25, resident);
+        ctx.globalAlpha = alpha;
       },
     });
   }
@@ -600,15 +612,17 @@ export function cityHit(
       target = { kind: 'place', id: ZOO_VENUE.plot };
     }
   }
-  const board = project(15.5, 22.2);
-  const hitsBoard =
-    point.x >= board.x - 92 &&
-    point.x <= board.x + 92 &&
-    point.y >= board.y - 93 &&
-    point.y <= board.y - 33;
+  const hitsBoard = scoreboardHit(point);
   if (insideFootball(unproject(point.x, point.y)) || hitsBoard) {
     depth = -1;
     target = { kind: 'place', id: FOOTBALL_VENUE.plot };
+  } else {
+    // Dugout roofs, masts and the scoreboard's legs rise over the roads and houses behind.
+    const furniture = footballFurnitureHit(point);
+    if (furniture > -Infinity && furniture >= depth) {
+      depth = furniture;
+      target = { kind: 'place', id: FOOTBALL_VENUE.plot };
+    }
   }
   for (const venue of VENUES) {
     if (venue.kind === 'cinema' || venue.kind === 'zoo') continue;

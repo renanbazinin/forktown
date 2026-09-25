@@ -2,6 +2,7 @@ import { ArrowUpRight, Music2, Sun, Film, PawPrint } from 'lucide-react';
 import { eventStatus, type TownEvent } from '../lib/events';
 import { timeLabel } from '../lib/simulation';
 import { FOOTBALL_VENUE, type FootballState } from '../lib/football';
+import { FootballIcon } from './FootballMatch';
 import EveningNote, { type Evening } from './EveningNote';
 
 export default function TownEvents({
@@ -17,6 +18,20 @@ export default function TownEvents({
   football: FootballState;
   evening?: Evening;
 }) {
+  const minute = Math.min(10, Number(football.clock.slice(0, 2)) + 1);
+  const phase =
+    football.phase === 'halftime'
+      ? 'Half-time'
+      : football.phase === 'fulltime'
+        ? 'Full-time'
+        : `LIVE · ${minute}'`;
+  const match = football.live
+    ? `Meadow ${football.score[0]} : ${football.score[1]} Sunset`
+    : 'Meadow FC v Sunset United';
+  const scored = football.goal ? (football.celebration?.team ?? null) : null;
+  const spoken = football.live
+    ? `${phase.startsWith('LIVE') ? `live, minute ${minute}` : phase.toLowerCase()}: Meadow FC ${football.score[0]}, Sunset United ${football.score[1]}`
+    : 'back at sunrise';
   return (
     <section className="town-events" aria-label="Today’s town events">
       <div className="events-intro">
@@ -33,21 +48,28 @@ export default function TownEvents({
       <button
         className={`event-card football-event ${football.live ? 'is-live' : ''}`}
         onClick={() => onVisit(FOOTBALL_VENUE.plot, 'football')}
-        aria-label="Watch football at The Meadow Ground"
+        aria-label={`Watch football at ${FOOTBALL_VENUE.name}, ${spoken}`}
       >
-        <span className="event-symbol" aria-hidden="true">
-          ⚽
+        <span className="event-symbol">
+          <FootballIcon />
         </span>
         <span className="event-copy">
           <span className="event-time">
             {football.live && <i className="live-dot" />}{' '}
-            {football.live ? 'On the pitch now' : 'Back at sunrise'} · 06:00–20:00
+            {football.live ? phase : 'Back at sunrise · 06:00–20:00'}
+            {scored !== null && (
+              <b className={`football-card-goal team-${scored}`}>
+                Goal · {scored ? 'Sunset' : 'Meadow'}
+              </b>
+            )}
           </span>
-          <strong>
-            Meadow {football.score[0]} : {football.score[1]} Sunset
+          <strong className="football-card-score">
+            <i className="football-chip team-0" aria-hidden="true" />
+            {match}
+            <i className="football-chip team-1" aria-hidden="true" />
           </strong>
           <span>
-            A little football, all day <ArrowUpRight size={12} />
+            {FOOTBALL_VENUE.name} <ArrowUpRight size={12} />
           </span>
         </span>
       </button>

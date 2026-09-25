@@ -233,6 +233,13 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
   return result;
 }
 
+/** Spectators split by seat: even seats back Meadow FC, odd seats Sunset United. */
+function supporterCheers(time: number, day: number, seat: number) {
+  const game = footballAt(time, day);
+  if (!game.goal) return false;
+  return !game.celebration || game.celebration.team === seat % 2;
+}
+
 export function tripState(
   home: Place,
   trip: ResidentTrip,
@@ -262,7 +269,7 @@ export function tripState(
   const beat = Math.floor((time + (hash(home.id) % 19)) / 12);
   const pose =
     event.venue.kind === 'football'
-      ? footballAt(time, day).goal
+      ? supporterCheers(time, day, seat)
         ? 'cheer'
         : undefined
       : event.venue.kind === 'zoo'

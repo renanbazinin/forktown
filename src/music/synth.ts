@@ -16,6 +16,32 @@ export function renderCinemaTrack(film: CinemaFilm): Promise<AudioBuffer> {
   );
 }
 
+/** Every football effect take as mono samples, keyed `kind:take`. */
+export function renderFootballTakes(sampleRate: number): Promise<Map<string, Float32Array>> {
+  return new Promise((resolve, reject) => {
+    // Constructed inside the promise, so a page without workers just falls back to on-demand takes.
+    const worker = new Worker(new URL('./football-worker.ts', import.meta.url), { type: 'module' });
+    const timer = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('Football sounds took too long to prepare.'));
+    }, 30000);
+    const cleanup = () => {
+      clearTimeout(timer);
+      worker.terminate();
+    };
+    worker.onerror = () => {
+      cleanup();
+      reject(new Error('Could not prepare the football sounds.'));
+    };
+    worker.onmessage = (event: MessageEvent<[string, Float32Array][] | { error: string }>) => {
+      cleanup();
+      if ('error' in event.data) reject(new Error(event.data.error));
+      else resolve(new Map(event.data));
+    };
+    worker.postMessage(sampleRate);
+  });
+}
+
 function renderAudio(worker: Worker, input: TrackId | CinemaFilm): Promise<AudioBuffer> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
