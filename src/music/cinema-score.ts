@@ -1,4 +1,5 @@
-import type { CinemaFilm, FilmArtwork } from '../lib/cinema';
+import type { CinemaFilm, ClassicArtwork, ReelArtwork } from '../lib/cinema';
+import { REEL_SCORES } from '../films/scores';
 import type { Voice } from './score';
 
 export type FilmEffect =
@@ -21,7 +22,42 @@ export type FilmEffect =
   | 'hum'
   | 'beam'
   | 'gasp'
-  | 'warp';
+  | 'warp'
+  | 'rain'
+  | 'drip'
+  | 'bubble'
+  | 'whale'
+  | 'chug'
+  | 'whistle'
+  | 'thunder'
+  | 'wave'
+  | 'crunch'
+  | 'boing'
+  | 'creak'
+  | 'rumble'
+  | 'whir'
+  | 'splash'
+  | 'knock'
+  | 'clatter'
+  | 'woo'
+  | 'sneeze'
+  | 'tweet'
+  | 'bark'
+  | 'click'
+  | 'scribble'
+  | 'sparkle'
+  | 'crackle'
+  | 'thud'
+  | 'squeak'
+  | 'applause'
+  | 'toll'
+  | 'foghorn'
+  | 'snore'
+  | 'tick'
+  | 'yawn'
+  | 'croak'
+  | 'gull'
+  | 'giggle';
 export type FilmCue = { at: number; duration: number; gain: number; pan: number } & (
   { kind: 'note'; voice: Voice; pitch: number } | { kind: FilmEffect }
 );
@@ -29,7 +65,7 @@ export type FilmCue = { at: number; duration: number; gain: number; pan: number 
 // Original melodies and arrangements. All cue positions use the same normalized
 // story timeline as the artwork, including the three-second opening/end titles.
 const themes: Record<
-  FilmArtwork,
+  ClassicArtwork,
   { bpm: number; root: number; voice: Voice; melody: number[]; chords: number[] }
 > = {
   popcorn: {
@@ -77,8 +113,9 @@ const themes: Record<
 };
 
 export function cinemaScore(film: CinemaFilm): FilmCue[] {
+  if (film.artwork in REEL_SCORES) return REEL_SCORES[film.artwork as ReelArtwork](film);
   const cues: FilmCue[] = [];
-  const theme = themes[film.artwork],
+  const theme = themes[film.artwork as ClassicArtwork],
     beat = 60 / theme.bpm;
   const story = film.duration - 6;
   const at = (p: number) => 3 + p * story;

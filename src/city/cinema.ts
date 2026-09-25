@@ -1,6 +1,6 @@
 import { cinemaAt, CINEMA_GROUND, CINEMA_SEATS } from '../lib/cinema';
 import { project } from '../lib/world';
-import { drawCinemaCard, drawCinemaFilm } from './cinema-films';
+import { drawCinemaCard, drawCinemaFilm, loadReel } from './cinema-films';
 
 type Ctx = CanvasRenderingContext2D;
 export const SCREEN_ORIGIN = project(22.3, 14.7);
@@ -64,6 +64,8 @@ export function drawCinema(
     ctx.fillRect(p.x + 8, p.y - 2, 4, 5);
   }
   const state = cinemaAt(minutes, day);
+  // Fetch the reel's pictures while the screen rises, half an hour before the first film.
+  if (state.screenReveal > 0) void loadReel();
   if (state.live) {
     polygon(
       ctx,

@@ -123,7 +123,8 @@ describe('Live broadcast director', () => {
         ['football', 700],
         ['afternoon', 800],
         ['evening', 1150],
-        ['night', 1420],
+        // After any cinema bill has ended (see the cinema's before-midnight test).
+        ['night', 1436],
       ] as const) {
         const shot = shotAt(day, minute);
         expect(shot.kind === 'event' || shot.kind === 'ducks').toBe(highlights.includes(highlight));

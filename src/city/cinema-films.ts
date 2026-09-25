@@ -1,4 +1,6 @@
-import type { CinemaFilm, CinemaSlot } from '../lib/cinema';
+import type { CinemaFilm, CinemaSlot, ClassicArtwork, ReelArtwork } from '../lib/cinema';
+import { titles } from '../films/kit';
+import type { FilmModule } from '../films/types';
 
 type Ctx = CanvasRenderingContext2D;
 const W = 320,
@@ -487,6 +489,34 @@ function ufo(ctx: Ctx, p: number, seconds: number) {
   );
 }
 
+const CLASSICS: Record<ClassicArtwork, (ctx: Ctx, p: number, seconds: number) => void> = {
+  popcorn,
+  moon,
+  duckling,
+  race,
+  duel,
+  ufo,
+};
+
+let reel: Record<ReelArtwork, FilmModule> | undefined;
+let reeling: Promise<Record<ReelArtwork, FilmModule>> | undefined;
+/**
+ * The Starlight Reel's pictures are their own chunk, fetched as the screen starts to rise (or
+ * when a reel film is first asked for), so a daytime visit never downloads them.
+ */
+export function loadReel() {
+  reeling ??= import('../films').then((module) => (reel = module.REEL));
+  return reeling;
+}
+
+/** Shown for the moment it takes the reel to arrive, if someone sits down mid-film. */
+function threading(ctx: Ctx, film: CinemaFilm, seconds: number) {
+  nightSky(ctx, seconds);
+  words(ctx, 'forktown.', 86, 21);
+  words(ctx, film.title.toUpperCase(), 112, 9, '#DBBF89');
+  words(ctx, 'THREADING THE PROJECTOR...', 130, 7, '#ADBFBA');
+}
+
 /** Original shorts, drawn locally at any point in their own timeline. */
 export function drawCinemaFilm(ctx: Ctx, film: CinemaFilm, elapsed: number) {
   ctx.save();
@@ -494,7 +524,19 @@ export function drawCinemaFilm(ctx: Ctx, film: CinemaFilm, elapsed: number) {
   ctx.rect(0, 0, W, H);
   ctx.clip();
   const p = clamp((elapsed - 3) / (film.duration - 6));
-  ({ popcorn, moon, duckling, race, duel, ufo })[film.artwork](ctx, p, elapsed);
+  if (!(film.artwork in CLASSICS)) {
+    const module = reel?.[film.artwork as ReelArtwork];
+    if (module) {
+      module.draw(ctx, p, elapsed);
+      titles(ctx, film, elapsed, module.look);
+    } else {
+      void loadReel();
+      threading(ctx, film, elapsed);
+    }
+    ctx.restore();
+    return;
+  }
+  CLASSICS[film.artwork as ClassicArtwork](ctx, p, elapsed);
   if (elapsed < 3 || elapsed >= film.duration - 3) {
     box(ctx, 12, 52, 296, 63, '#293A48');
     words(ctx, elapsed < 3 ? 'FORKTOWN PICTURE HOUSE' : 'THE END', 70, 8, '#E5B97D');
