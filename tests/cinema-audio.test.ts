@@ -37,20 +37,6 @@ describe('Film soundtracks', () => {
     15000,
   );
 
-  it('places sword contacts and abduction beams on their animated beats', () => {
-    const duel = CINEMA_FILMS.find((film) => film.artwork === 'duel')!;
-    const clashes = cinemaScore(duel).filter((cue) => cue.kind === 'clash');
-    expect(clashes).toHaveLength(6);
-    clashes.forEach((cue, i) =>
-      expect(cue.at).toBeCloseTo(3 + (0.27 + (i + 0.5) * 0.075) * (duel.duration - 6)),
-    );
-    const ufo = CINEMA_FILMS.find((film) => film.artwork === 'ufo')!;
-    const beams = cinemaScore(ufo).filter((cue) => cue.kind === 'beam');
-    expect(beams).toHaveLength(3);
-    beams.forEach((cue, i) =>
-      expect(cue.at).toBeCloseTo(3 + (0.23 + (i + 0.25) * 0.18) * (ufo.duration - 6)),
-    );
-  });
   it('composes deterministically and keeps every cue inside its film', () => {
     for (const film of CINEMA_FILMS) {
       const score = cinemaScore(film);

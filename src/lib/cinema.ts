@@ -51,10 +51,14 @@ export function cinemaListening(
 export const CINEMA_CARD_SECONDS = 6;
 export const CINEMA_SCREEN_RISE = 20 * 60;
 export const CINEMA_SCREEN_ROLL_SECONDS = 6;
-/** The first library, drawn in `src/city/cinema-films.ts`. */
-export type ClassicArtwork = 'popcorn' | 'moon' | 'duckling' | 'race' | 'duel' | 'ufo';
-/** The Starlight Reel: longer stories, each a self-contained module in `src/films/`. */
-export type ReelArtwork =
+/** Every film is a self-contained module in `src/films/`, keyed by its artwork. */
+export type FilmArtwork =
+  | 'popcorn'
+  | 'moon'
+  | 'duckling'
+  | 'race'
+  | 'duel'
+  | 'ufo'
   | 'boat'
   | 'anglerfish'
   | 'orchestra'
@@ -65,7 +69,6 @@ export type ReelArtwork =
   | 'train'
   | 'mitten'
   | 'lanterns';
-export type FilmArtwork = ClassicArtwork | ReelArtwork;
 export type CinemaFilm = {
   id: string;
   title: string;
@@ -78,14 +81,14 @@ export const CINEMA_FILMS: readonly CinemaFilm[] = [
     id: 'runaway-popcorn',
     title: 'The Runaway Popcorn',
     description: 'One tiny kernel dreams of a very big entrance.',
-    duration: 42,
+    duration: 60,
     artwork: 'popcorn',
   },
   {
     id: 'miso-and-the-moon',
     title: 'Miso and the Moon',
     description: 'A rooftop cat discovers that the moon has a playful side.',
-    duration: 54,
+    duration: 60,
     artwork: 'moon',
   },
   {

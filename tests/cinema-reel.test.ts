@@ -1,25 +1,26 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { drawCinemaFilm, loadReel } from '../src/city/cinema-films';
 import { REEL } from '../src/films';
+import { CLASHES } from '../src/films/duel-at-dusk';
 import { REEL_SCORES } from '../src/films/scores';
 import { LAST_DROP, ROOM_DROPS, STREET_DROPS } from '../src/films/the-rain-orchestra';
-import { CINEMA_FILMS, type ReelArtwork } from '../src/lib/cinema';
+import { CINEMA_FILMS, type FilmArtwork } from '../src/lib/cinema';
 import { cinemaScore } from '../src/music/cinema-score';
 import { recordingContext } from './recording-context';
 
-const reel = CINEMA_FILMS.filter((film) => film.artwork in REEL);
-const module = (artwork: string) => REEL[artwork as ReelArtwork];
+const reel = CINEMA_FILMS;
+const module = (artwork: string) => REEL[artwork as FilmArtwork];
 const frame = (film: (typeof reel)[number], elapsed: number) => {
   const recording = recordingContext(320, 180);
   drawCinemaFilm(recording.ctx, film, elapsed);
   return recording.calls;
 };
 
-describe('The Starlight Reel', () => {
+describe('The film library', () => {
   beforeAll(() => loadReel());
 
-  it('registers ten films, each with its own module and end-card dedication', () => {
-    expect(reel).toHaveLength(10);
+  it('gives all sixteen films their own module and end-card dedication', () => {
+    expect(reel).toHaveLength(16);
     expect(Object.keys(REEL).sort()).toEqual(reel.map((film) => film.artwork).sort());
     expect(Object.keys(REEL_SCORES).sort()).toEqual(Object.keys(REEL).sort());
     for (const film of reel) {
@@ -52,7 +53,7 @@ describe('The Starlight Reel', () => {
   });
 
   it.each(reel)('$title plays the same score from the reel and from the audio registry', (film) => {
-    expect(module(film.artwork).score).toBe(REEL_SCORES[film.artwork as ReelArtwork]);
+    expect(module(film.artwork).score).toBe(REEL_SCORES[film.artwork as FilmArtwork]);
     expect(cinemaScore(film)).toEqual(module(film.artwork).score(film));
   });
 
@@ -64,5 +65,14 @@ describe('The Starlight Reel', () => {
       expect(bells.some((cue) => Math.abs(cue.at - (3 + drop.p * story)) < 1e-9)).toBe(true);
     expect([...ROOM_DROPS, ...STREET_DROPS].some((drop) => drop.degree === 12)).toBe(false);
     expect(LAST_DROP.degree).toBe(12);
+  });
+
+  it('lands every sword clash in Duel at Dusk on a blade contact the picture sparks', () => {
+    const film = reel.find((candidate) => candidate.artwork === 'duel')!;
+    const story = film.duration - 6;
+    const clashes = cinemaScore(film).filter((cue) => cue.kind === 'clash');
+    expect(clashes).toHaveLength(CLASHES.length);
+    for (const contact of CLASHES)
+      expect(clashes.some((cue) => Math.abs(cue.at - (3 + contact.p * story)) < 1e-9)).toBe(true);
   });
 });
