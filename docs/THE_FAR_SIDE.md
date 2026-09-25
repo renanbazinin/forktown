@@ -19,11 +19,15 @@ On the far ridge, at 11%, 79% and 91% of the screen width, stand three **sister 
 
 They matter because Forktown is one fork among many. Every house here started as a fork, and so did the town: somewhere over the hills, other towns keep their lanterns too.
 
+In winter the far ridge takes the season. As the town's snow cover builds, a snow line settles from the summits over the top three-tenths of the far ridge's rise, and it lifts again with the thaw. The snow is opaque rects in the hill's own colour mixed toward snow, so it arrives and leaves by colour, never by alpha, and it adds no path vertices. The sister forks get a line of snow on their roofs and canopies, and their lanterns light exactly as before. The near ridge stays clear. See [The turning year](THE_TURNING_YEAR.md).
+
 On a phone the opening view is mostly town, so the hills stay out of sight there until you zoom out.
 
 ## The far fields
 
 Beyond the northeast and northwest edges, the land keeps going for a little while. There are three strips, each two tiles deep, fading from 0.55 to 0.32 to 0.14 alpha. Two hedgerows sit at two and four tiles out, and 18 small far trees stand within two tiles of the edge. They are world-space pieces painted first inside the ground cache, before the earth slab. The slab, river and terrain are unchanged.
+
+The far trees keep the year from its whole day: fresh leaves in early spring, ochre deepening to russet in autumn, bare twigs through the winter, and a frosted top while the snow lies. One in five is a pine and stays green. Each season is only a partial mix, so the trees stay hazy. The strips and hedgerows keep their colours all year.
 
 ## Commit stones
 
@@ -31,18 +35,18 @@ Every road crossing has a flat paver at its centre, so the road grid reads as a 
 
 ## Performance
 
-- The sky is screen space and never cached. `drawSky` makes at most 400 drawing calls per frame at 1440 × 900 (about 160 in practice). The ridges are one path per layer. Only the steps where a ridge changes height become vertices, which is a few hundred per frame, and path building draws nothing.
-- Far fields and commit stones live in the ground cache. They repaint only when the cache does and add no `groundKey` inputs, because they depend only on `night`. The far fields take under 60 canvas calls: each strip is two rectangles drawn in tile space.
+- The sky is screen space and never cached. `drawSky` makes at most 400 drawing calls per frame at 1440 × 900 (about 160 in practice, and up to 213 with the winter snow on the far ridge and the sister forks). The ridges are one path per layer. Only the steps where a ridge changes height become vertices, which is a few hundred per frame, and path building draws nothing.
+- Far fields and commit stones live in the ground cache. They repaint only when the cache does. The commit stones depend only on `night`. The far trees also read the whole day of the year, which `groundKey` already carries for the seasons. The far fields take under 60 canvas calls in every season (51 today): each strip is two rectangles drawn in tile space, and a far tree's seasonal colour changes no calls.
 - The golden wash is at most one `fillRect` per frame.
 
 ## Determinism
 
-Everything here is a pure function of the town minute, the viewport size and the night flag. Ridge phases, sister-fork houses and far-tree positions come from `hash()` of fixed strings. There is no `Math.random`, no `Date`, and no canvas created at module load, so two renders with identical inputs produce identical call logs, and node tests can import the modules.
+Everything here is a pure function of the town day and minute, the viewport size and the night flag. Ridge phases, sister-fork houses and far-tree positions come from `hash()` of fixed strings. There is no `Math.random`, no `Date`, and no canvas created at module load, so two renders with identical inputs produce identical call logs, and node tests can import the modules.
 
 ## Code and verification
 
-- `src/city/horizon.ts`: `goldenHour`, the ridges, the sister forks, `drawHorizon`, `drawFarFields`, `drawCommitStone` and `drawGoldenHour`.
-- `src/city/sky.ts`: the warmer gradient and sun, and the horizon painted after the sun and moon.
+- `src/city/horizon.ts`: `goldenHour`, the ridges and their winter snow, the sister forks, `drawHorizon`, `drawFarFields` with the far trees' seasons, `drawCommitStone` and `drawGoldenHour`.
+- `src/city/sky.ts`: the warmer gradient and sun, and the horizon painted after the sun and moon with the town's snow cover.
 - `src/city/render.ts`: draws the far fields first in the ground cache, a commit stone on each road crossing, and the golden wash after the finished frame.
 - `tests/far-side.test.ts`: golden-hour timing and continuity, ridge bands and determinism, sister-fork placement and lighting, call budgets, stone colours and the wash.
 - `/tests/manual/sky.html` on the development server: buttons for 12:00, 19:25 golden hour, 20:01 nightfall and 06:15 dawn, a **Whole town** toggle, and a 1440 × 900 / 390 × 844 size switch. `?time=1165&size=390x844&view=whole` opens a scene directly.

@@ -6,6 +6,7 @@ import type { useTownClock } from '../lib/use-town-clock';
 import type { EveningTale, LanternHour } from '../lib/lanterns';
 import type { Place } from '../lib/schema';
 import { realWait } from '../lib/evening-copy';
+import { seasonNote } from '../lib/season-copy';
 import LanternGlyph from './LanternGlyph';
 import '../calendar.css';
 import '../stories.css';
@@ -71,6 +72,10 @@ export default function CalendarClock({
             <h2 id={`${id}-title`}>
               {calendar.season} <span>· Year {calendar.year}</span>
             </h2>
+            {/* Read from the almanac's own date, so the line turns at midnight with the grid. */}
+            <p className="calendar-season">
+              {seasonNote(calendar.seasonIndex * DAYS_PER_SEASON + calendar.date - 1)}
+            </p>
           </div>
           <button popoverTarget={id} popoverTargetAction="hide" aria-label="Close town calendar">
             <X size={16} />
@@ -135,7 +140,7 @@ export default function CalendarClock({
             {clock.playing ? 'Shared town time' : 'Your view is paused'} ·{' '}
             {timeLabel(clock.minutes)}
           </span>
-          <p>24 real minutes in a day. Four 28-day seasons in a year.</p>
+          <p>24 real minutes in a day. Four 28-day seasons, each about 11 real hours.</p>
           <p>
             One calendar for everyone, kept by UTC. Return tomorrow or refresh — the town keeps its
             place.

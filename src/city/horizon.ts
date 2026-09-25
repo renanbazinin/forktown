@@ -1,4 +1,6 @@
 import { hash, project, TILE_H, TILE_W, WORLD_HEIGHT, WORLD_WIDTH } from '../lib/world';
+import { canopyAt, seedFraction, type TownSeason } from '../lib/seasons';
+import { FOLIAGE, hexChannels, mixHex, pick, SNOW, toHex } from './season-palette';
 
 type Ctx = CanvasRenderingContext2D;
 type Rgb = readonly number[];
@@ -50,8 +52,14 @@ export function horizonY(u: number, height: number, layer: Layer) {
 }
 
 // The ridge is sampled once per four-pixel step, so it reads as terraced pixel hills.
-const ridgeAt = (x: number, width: number, height: number, layer: Layer) =>
-  horizonY((Math.floor(x / 4) * 4) / width, height, layer);
+// The steps only change with the screen size, so the last size's steps are kept: the sky walks
+// the ridge several times a frame.
+let steps: { width: number; height: number; rows: [number[], number[]] } | undefined;
+const ridgeAt = (x: number, width: number, height: number, layer: Layer) => {
+  if (steps?.width !== width || steps.height !== height) steps = { width, height, rows: [[], []] };
+  const i = Math.floor(x / 4);
+  return (steps.rows[layer][i] ??= horizonY((i * 4) / width, height, layer));
+};
 
 export const SISTER_FORKS = [0.11, 0.79, 0.91].map((u, i) => ({
   u,
@@ -90,6 +98,7 @@ function drawSisterFork(
   height: number,
   scale: number,
   lit: boolean,
+  snowTop?: string,
 ) {
   const size = (value: number) => Math.max(1, Math.round(value * scale));
   // Every piece stands on the lowest ridge step beneath it, so nothing floats.
@@ -124,6 +133,12 @@ function drawSisterFork(
     block(ground, dx, -h, w, h + 2);
     block(ground, dx + 1, -h - 2, w - 2, 2);
   }
+  if (snowTop) {
+    // A row of winter snow along each roof and on the canopy.
+    ctx.fillStyle = snowTop;
+    for (const { dx, w, h, ground } of houses) block(ground, dx + 1, -h - 2, w - 2, 1);
+    tree(-1, -13, 4, 1);
+  }
   ctx.save();
   if (lit) {
     ctx.fillStyle = '#FFE0A0';
@@ -140,6 +155,39 @@ function drawSisterFork(
   ctx.restore();
 }
 
+const SNOW_FAR = SNOW.top.map(hexChannels);
+// A ragged foot for the snow line, two rows up or down, in fixed slices of the ridge.
+const SNOW_FOOT = Array.from({ length: 90 }, (_, i) => 2 * ((hash(`ridge-snow:${i}`) % 3) - 1));
+
+// Winter snow on the far ridge: all of it above a snow line that settles from the summits as the
+// cover builds. Opaque rects in the hill's own colour mixed toward snow, so the first snow and
+// the thaw fade without alpha; one rect per run of steps that share a top and a foot.
+function drawRidgeSnow(ctx: Ctx, width: number, height: number, snow: number, color: string) {
+  const { base, amp } = RIDGES[0];
+  const line = 2 * Math.round((height * (base - amp * (1 - 0.3 * snow))) / 2);
+  ctx.fillStyle = color;
+  let start = 0,
+    top = 0,
+    foot = 0;
+  // One step past the edge closes the last run.
+  for (let x = 0; x < width + 4; x += 4) {
+    let nextTop = 0,
+      nextFoot = 0;
+    if (x < width) {
+      const y = ridgeAt(x, width, height, 0);
+      if (y < line) {
+        nextTop = y;
+        nextFoot = Math.max(y + 2, line + SNOW_FOOT[Math.floor((x / width) * 90)]);
+      }
+    }
+    if (nextTop === top && nextFoot === foot) continue;
+    if (foot > top) ctx.fillRect(start, top, x - start, foot - top);
+    start = x;
+    top = nextTop;
+    foot = nextFoot;
+  }
+}
+
 // Screen-space hills behind the town, painted by drawSky after the sun and moon so the
 // sun sets behind the far ridge. Two quiet layers fill the opening view's sky triangles.
 export function drawHorizon(
@@ -148,6 +196,7 @@ export function drawHorizon(
   height: number,
   daylight: number,
   minutes: number,
+  snow = 0,
 ) {
   const glow = goldenHour(minutes);
   ctx.save();
@@ -161,15 +210,32 @@ export function drawHorizon(
     ctx.globalAlpha = 1;
   }
   traceRidge(ctx, width, height, 0);
-  ctx.fillStyle = rgb(
-    mixRgb(mixRgb([44, 67, 65], [199, 211, 188], daylight), [217, 207, 163], 0.25 * glow),
+  const hill = mixRgb(
+    mixRgb([44, 67, 65], [199, 211, 188], daylight),
+    [217, 207, 163],
+    0.25 * glow,
   );
+  ctx.fillStyle = rgb(hill);
   ctx.fill();
+  const body = mixRgb([30, 49, 48], [122, 142, 110], daylight);
+  // Distant snow is hazed like the hill under it, and takes the low sun's warmth at golden hour.
+  const snowy = mixRgb(mixRgb(SNOW_FAR[1], SNOW_FAR[0], daylight), [242, 216, 168], 0.3 * glow);
+  // By night the far snow only just lifts the summits; bright, it reads as cloud by the moon.
+  const settle = snow * (0.16 + 0.64 * daylight);
+  if (snow > 0) drawRidgeSnow(ctx, width, height, snow, toHex(mixRgb(hill, snowy, settle)));
   const scale = Math.max(0.7, Math.min(1, width / 900));
   const lit = sisterForkLit(minutes);
   for (const site of sisterForkSites(width, height)) {
-    ctx.fillStyle = rgb(mixRgb([30, 49, 48], [122, 142, 110], daylight));
-    drawSisterFork(ctx, site, width, height, scale, lit);
+    ctx.fillStyle = rgb(body);
+    drawSisterFork(
+      ctx,
+      site,
+      width,
+      height,
+      scale,
+      lit,
+      snow > 0 ? toHex(mixRgb(body, snowy, settle)) : undefined,
+    );
   }
   traceRidge(ctx, width, height, 1);
   ctx.fillStyle = rgb(mixRgb([40, 61, 58], [183, 199, 166], daylight));
@@ -182,12 +248,38 @@ const FAR_TREES = Array.from({ length: 18 }, (_, i) => {
   const side = i % 2;
   const along = ((seed % 1000) / 1000) * (side ? WORLD_HEIGHT : WORLD_WIDTH);
   const beyond = 0.4 + ((seed >>> 10) % 120) / 100;
-  return side ? project(-beyond, along) : project(along, -beyond);
+  const { x, y } = side ? project(-beyond, along) : project(along, -beyond);
+  // One in five is a pine, which keeps its green all year.
+  return { x, y, s: seedFraction(`far-tree:${i}`), evergreen: (seed >>> 20) % 5 === 0 };
 });
+
+// A far tree's crown and top through the year, from the whole day only (it lives in the
+// ground cache). Hazy like the fields: each season is a partial mix from summer's green.
+function farTreeColors(
+  tree: (typeof FAR_TREES)[number],
+  day: number,
+  night: boolean,
+  green: string,
+) {
+  const canopy = canopyAt(day, tree.s, tree.evergreen ? 'evergreen' : 'deciduous');
+  let crown = green;
+  if (!tree.evergreen) {
+    // Fresh leaves in early spring, then autumn's ochre deepening to russet.
+    crown = mixHex(crown, pick(FOLIAGE.fresh.light, night), 0.6 * canopy.fresh);
+    const autumn = mixHex(
+      pick(FOLIAGE.ochre.leaf, night),
+      pick(FOLIAGE.russet.leaf, night),
+      canopy.deepen,
+    );
+    crown = mixHex(crown, autumn, 0.7 * canopy.turn);
+    crown = mixHex(crown, pick(FOLIAGE.dormant.leaf, night), 0.8 * canopy.dormant);
+  }
+  return [crown, mixHex(crown, pick(SNOW.frost, night), 0.9 * canopy.snow)];
+}
 
 // World-space fields beyond the NE (y < 0) and NW (x < 0) edges, painted in the ground
 // cache before the slab. Three fading strips, two hedgerows and a scatter of far trees.
-export function drawFarFields(ctx: Ctx, night: boolean) {
+export function drawFarFields(ctx: Ctx, night: boolean, season?: TownSeason) {
   const W = WORLD_WIDTH,
     H = WORLD_HEIGHT;
   ctx.save();
@@ -212,10 +304,20 @@ export function drawFarFields(ctx: Ctx, night: boolean) {
   ctx.restore();
   ctx.save();
   ctx.globalAlpha = 0.5;
-  ctx.fillStyle = night ? '#3C5650' : '#97AF80';
-  for (const { x, y } of FAR_TREES) {
-    ctx.fillRect(x - 6, y - 10, 12, 8);
-    ctx.fillRect(x - 4, y - 12, 8, 2);
+  const green = night ? '#3C5650' : '#97AF80';
+  // The season only changes colours, never the calls; a colour is set only when it changes.
+  let style = '';
+  const paint = (color: string) => {
+    if (color !== style) ctx.fillStyle = style = color;
+  };
+  for (const tree of FAR_TREES) {
+    const [crown, top] = season
+      ? farTreeColors(tree, season.groundDay, night, green)
+      : [green, green];
+    paint(crown);
+    ctx.fillRect(tree.x - 6, tree.y - 10, 12, 8);
+    paint(top);
+    ctx.fillRect(tree.x - 4, tree.y - 12, 8, 2);
   }
   ctx.restore();
 }

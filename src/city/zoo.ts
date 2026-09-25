@@ -9,6 +9,10 @@ import {
   zooTree,
 } from '../lib/zoo';
 import { project, TILE_W, type Point } from '../lib/world';
+import { canopyAt, seedFraction, type TownSeason } from '../lib/seasons';
+import { tint } from './houses';
+import { BLOSSOM, FALLEN_LEAVES, mixHex, pick, SNOW } from './season-palette';
+import { AUTUMNS, leafTone, LIMB } from './trees';
 import { drawVenueTitle } from './venue-title';
 
 type Ctx = CanvasRenderingContext2D;
@@ -65,18 +69,79 @@ function fence(ctx: Ctx, from: Point, to: Point, night: boolean) {
     box(ctx, p.x - 2, p.y - 23, 4, 3, night ? '#A3AF8A' : '#D0C09A');
   }
 }
-function tree(ctx: Ctx, point: Point, night: boolean, acacia = false) {
+// Blossom clumps on a flowering zoo tree, [x, y, pink]: the top first, then the lower leaves.
+const ZOO_BUDS = [
+  [-9, -55, 0],
+  [-15, -46, 1],
+  [4, -53, 1],
+  [-4, -42, 0],
+  [11, -45, 1],
+];
+// The zoo's trees keep the town's year; the giraffe's acacia stays green and only takes snow.
+const zooSeeds = new Map<string, number>();
+function tree(ctx: Ctx, point: Point, night: boolean, acacia = false, season?: TownSeason) {
   const p = project(point.x, point.y);
+  const key = `zoo-tree:${point.x},${point.y}`;
+  const seed = zooSeeds.get(key) ?? zooSeeds.set(key, seedFraction(key)).get(key)!;
+  const c =
+    season &&
+    canopyAt(season.yearDay, seed, acacia ? 'evergreen' : seed < 0.5 ? 'blossom' : 'deciduous');
+  let leaves = night ? '#4B7362' : '#6F965A',
+    crown = night ? '#63876B' : '#91AC68',
+    light = night ? '#76936D' : '#B0BF7F';
+  if (c && !acacia) {
+    const autumn = AUTUMNS[Math.floor(seed * 30) % 3];
+    leaves = leafTone(leaves, 'leaf', night, autumn, c);
+    crown = leafTone(crown, 'light', night, autumn, c);
+    // The sunlit patch stays a step brighter than the crown once it has turned or gone bare.
+    light = mixHex(
+      leafTone(light, 'light', night, autumn, c),
+      tint(crown, 14),
+      Math.max(c.turn, c.dormant),
+    );
+  }
   ctx.save();
   ctx.translate(p.x, p.y);
   if (acacia) ctx.scale(1.5, 1.5);
   p.x = 0;
   p.y = 0;
+  // Fallen leaves settle by the trunk.
+  if (c && c.leaves > 0.3) {
+    box(ctx, p.x - 11, p.y + 1, 2, 1, pick(FALLEN_LEAVES[0], night));
+    box(ctx, p.x + 7, p.y + 3, 2, 1, pick(FALLEN_LEAVES[1], night));
+  }
   box(ctx, p.x - 3, p.y - 38, 6, 38, '#8B795C');
-  const leaves = night ? '#4B7362' : '#6F965A';
-  box(ctx, p.x - (acacia ? 29 : 17), p.y - 49, acacia ? 58 : 34, 16, leaves);
-  box(ctx, p.x - (acacia ? 20 : 12), p.y - 58, acacia ? 42 : 24, 15, night ? '#63876B' : '#91AC68');
-  box(ctx, p.x - 13, p.y - 57, 18, 5, night ? '#76936D' : '#B0BF7F');
+  const half = acacia ? 29 : 17,
+    upper = acacia ? 20 : 12,
+    top = acacia ? 42 : 24;
+  // Bare like the town's trees: the limbs show through a thinned crown.
+  const bare = c && !acacia ? c.dormant : 0,
+    alpha = ctx.globalAlpha;
+  if (bare > 0) {
+    const limb = pick(LIMB, night);
+    box(ctx, p.x - 1, p.y - 52, 2, 16, limb);
+    box(ctx, p.x - 9, p.y - 48, 8, 2, limb);
+    box(ctx, p.x - 11, p.y - 55, 2, 7, limb);
+    box(ctx, p.x + 1, p.y - 51, 8, 2, limb);
+    box(ctx, p.x + 8, p.y - 57, 2, 6, limb);
+    ctx.globalAlpha = alpha * (1 - 0.45 * bare);
+  }
+  box(ctx, p.x - half, p.y - 49, half * 2, 16, leaves);
+  box(ctx, p.x - upper, p.y - 58, top, 15, crown);
+  box(ctx, p.x - 13, p.y - 57, 18, 5, light);
+  ctx.globalAlpha = alpha;
+  if (c && c.blossom > 0) {
+    // A few clumps of blossom open along the lit edges.
+    for (const [bx, by, k] of ZOO_BUDS.slice(0, Math.round(c.blossom * ZOO_BUDS.length)))
+      box(ctx, p.x + bx, p.y + by, 2, 2, pick(k ? BLOSSOM.pink : BLOSSOM.white, night));
+  }
+  if (c && c.snow > 0) {
+    // A line of snow along the top, and on the ledges where the lower leaves stick out.
+    ctx.globalAlpha *= c.snow;
+    box(ctx, p.x - upper, p.y - 58, top, 2, pick(SNOW.top, night));
+    box(ctx, p.x - half, p.y - 49, half - upper, 2, pick(SNOW.top, night));
+    box(ctx, p.x + top - upper, p.y - 49, half + upper - top, 2, pick(SNOW.shade, night));
+  }
   ctx.restore();
 }
 function sign(ctx: Ctx, point: Point, text: string, night: boolean, small = false) {
@@ -347,6 +412,7 @@ export function drawZoo(
   night: boolean,
   selected = false,
   day = 0,
+  season?: TownSeason,
 ): Object[] {
   const { left, right, top, bottom } = ZOO_GROUND;
   ground(ctx, left, top, right - left, bottom - top, night ? '#405F53' : '#A8C18C');
@@ -394,12 +460,15 @@ export function drawZoo(
       const point = zooTree(h);
       objects.push({
         depth: point.x + point.y,
-        paint: () => tree(ctx, point, night, h.animal === 'giraffe'),
+        paint: () => tree(ctx, point, night, h.animal === 'giraffe', season),
       });
     } else {
       for (let i = 0; i < 4; i++) {
         const point = { x: h.left + 0.9 + i * 1.4, y: h.top + 1.1 };
-        objects.push({ depth: point.x + point.y, paint: () => tree(ctx, point, night) });
+        objects.push({
+          depth: point.x + point.y,
+          paint: () => tree(ctx, point, night, false, season),
+        });
       }
       const point = { x: h.left + h.width / 2, y: h.top + h.height / 2 };
       objects.push({

@@ -47,6 +47,13 @@
   color: #7a846d;
   white-space: nowrap;
 }
+/* What the turning year shows in town today. Roman: this is the town speaking. */
+.calendar-season {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
 .calendar-heading button {
   display: grid;
   place-items: center;
@@ -135,7 +142,8 @@
   color: var(--dusk-ink);
   box-shadow: 0 16px 60px #0b1a1a66;
 }
-.town-app-night :is(.calendar-eyebrow, .calendar-heading h2 span, .calendar-footer p) {
+.town-app-night
+  :is(.calendar-eyebrow, .calendar-heading h2 span, .calendar-season, .calendar-footer p) {
   color: var(--dusk-muted);
 }
 .town-app-night .calendar-heading button:hover {

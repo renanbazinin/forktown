@@ -1,4 +1,6 @@
 import { hash, PLOTS, project, WORLD_HEIGHT, WORLD_WIDTH, type Plot } from '../lib/world';
+import { AUTUMN, SUMMER, snowAt, type TownSeason } from '../lib/seasons';
+import { BLOSSOM, FOLIAGE, SNOW, pick, type Pair } from './season-palette';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -18,28 +20,70 @@ const meadows = new Map(
           plot.x + 0.5 + cx + ((stem % 61) - 30) / 100,
           plot.y + 0.5 + cy + (((stem >>> 8) % 61) - 30) / 100,
         );
-        flowers.push({ ...point, height: 3 + (stem % 4), color: (stem >>> 16) % 4 });
+        // A second seed for the flower's year, so its place and colour stay as they were.
+        const year = hash(`bloom:${plot.id}:${patch}:${i}`);
+        flowers.push({
+          ...point,
+          height: 3 + (stem % 4),
+          color: (stem >>> 16) % 4,
+          when: (year % 1000) / 1000,
+          bare: (year >>> 12) % 3 === 0,
+        });
       }
     }
     return [plot.id, flowers.sort((a, b) => a.y - b.y)] as const;
   }),
 );
 
-export function drawMeadow(ctx: Ctx, plot: Plot, night: boolean) {
+// The meadow's year. Summer keeps the meadow's own palette; spring opens whites and pinks, autumn
+// dries the heads to ochre and russet seed (never lantern amber), and frost holds them in the snow.
+type Stage = 'spring' | 'summer' | 'seed' | 'frost';
+const HEADS: Record<'spring' | 'seed', readonly Pair[]> = {
+  spring: [BLOSSOM.white, BLOSSOM.pink, ['#B4A0C4', '#998AAB'], ['#89A569', '#71907A']],
+  // Seed heads sit a step softer than the turning crowns, so the grass never outshines the trees.
+  seed: [
+    ['#D3C499', '#8E8C74'],
+    ['#BA9C5C', '#716A4F'],
+    ['#A87D60', '#6A5B50'],
+    FOLIAGE.dormant.leaf,
+  ],
+};
+const DRY_STEM: Pair = ['#A09A6B', '#6C776A'];
+const SEED_CENTRE: Pair = ['#8E6E4A', '#5F5A4D'];
+
+/** Where one flower is in its year, in whole days: each keeps its own schedule. */
+function meadowStage(day: number, when: number): Stage {
+  if (day < Math.floor(when * 5)) return 'seed';
+  if (day < SUMMER - 3 + Math.floor(when * 6)) return 'spring';
+  if (day < AUTUMN + 2 + Math.floor(when * 10)) return 'summer';
+  return snowAt(day, when) > 0.5 ? 'frost' : 'seed';
+}
+
+export function drawMeadow(ctx: Ctx, plot: Plot, night: boolean, season?: TownSeason) {
   const colors = night
     ? ['#AABBA2', '#AFAB82', '#998AAB', '#71907A']
     : ['#F5EBCB', '#E3BD78', '#B4A0C4', '#89A569'];
   for (const flower of meadows.get(plot.id) ?? []) {
     const x = Math.round(flower.x),
       y = Math.round(flower.y);
-    ctx.fillStyle = night ? '#6B8B73' : '#7E9C60';
+    const stage = season ? meadowStage(season.groundDay, flower.when) : 'summer';
+    const dry = stage === 'seed' || stage === 'frost';
+    ctx.fillStyle = dry ? pick(DRY_STEM, night) : night ? '#6B8B73' : '#7E9C60';
     ctx.fillRect(x, y - flower.height, 1, flower.height);
     ctx.fillRect(x - 2, y - 2, 2, 1);
-    ctx.fillStyle = colors[flower.color];
+    // Some heads are lost to the snow; the rest keep a cap of frost.
+    if (stage === 'frost' && flower.bare) continue;
+    ctx.fillStyle =
+      stage === 'summer'
+        ? colors[flower.color]
+        : stage === 'frost'
+          ? pick(SNOW.frost, night)
+          : pick(HEADS[stage][flower.color], night);
     ctx.fillRect(x - 1, y - flower.height, 3, 2);
     if (flower.color === 0) {
       ctx.fillRect(x, y - flower.height - 1, 1, 4);
-      ctx.fillStyle = night ? '#B6A574' : '#D7AB62';
+      if (stage === 'frost') continue;
+      ctx.fillStyle = stage === 'seed' ? pick(SEED_CENTRE, night) : night ? '#B6A574' : '#D7AB62';
       ctx.fillRect(x, y - flower.height, 1, 1);
     }
   }

@@ -1,0 +1,1805 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forktown · The turning year</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      :root {
+        --page: #eef0e3;
+        --paper: #f8f8f0;
+        --well: #dfe4d2;
+        --ink: #304d40;
+        --ink-soft: #3b5142;
+        --muted: #5f6b57;
+        --line: #d9ddca;
+        --line-strong: #bcc3aa;
+        --night-rail: #4a615d;
+        --day-rail: #d3dcc0;
+        --serif: 'Fraunces', Georgia, serif;
+        --sans: 'DM Sans', system-ui, sans-serif;
+        --mono: 'Space Mono', ui-monospace, monospace;
+        --gutter: clamp(16px, 4vw, 40px);
+        --thumb: 14px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-padding-top: 76px;
+      }
+      body {
+        margin: 0;
+        background: var(--page);
+        color: var(--ink);
+        font: 15px/1.55 var(--sans);
+        -webkit-font-smoothing: antialiased;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .wrap {
+        max-width: 1240px;
+        margin: 0 auto;
+        padding: 0 var(--gutter);
+      }
+      canvas {
+        display: block;
+      }
+
+      /* Masthead. */
+      .masthead {
+        display: grid;
+        gap: 28px 64px;
+        padding-top: 56px;
+        padding-bottom: 36px;
+      }
+      .intro {
+        display: grid;
+        gap: 16px;
+      }
+      .eyebrow {
+        margin: 0;
+        font: 11px/1.4 var(--mono);
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      h1 {
+        margin: 0;
+        font: 500 clamp(40px, 6.4vw, 64px) / 1 var(--serif);
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        max-width: 62ch;
+        margin: 0;
+        font-size: 16px;
+        color: var(--ink-soft);
+      }
+      .facts {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px 24px;
+        margin: 0;
+        align-self: end;
+      }
+      .facts div {
+        border-top: 1px solid var(--line-strong);
+        padding-top: 8px;
+      }
+      .facts dt {
+        font: 10px/1.4 var(--mono);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .facts dd {
+        margin: 2px 0 0;
+        font: 500 17px/1.3 var(--serif);
+      }
+      @media (min-width: 960px) {
+        .masthead {
+          grid-template-columns: minmax(0, 1.5fr) minmax(360px, 1fr);
+        }
+      }
+
+      /* The controls that every town view shares. */
+      .controls {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        background: var(--page);
+        border-top: 1px solid var(--line-strong);
+        border-bottom: 1px solid var(--line);
+      }
+      .controls .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 18px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+      }
+      .jump {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        margin-right: auto;
+        font: 11px var(--mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .jump a {
+        color: var(--muted);
+        text-decoration: none;
+      }
+      .jump a:hover,
+      .jump a:focus-visible {
+        color: var(--ink);
+      }
+      .control {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .control-label {
+        font: 10px var(--mono);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .segmented {
+        display: inline-flex;
+        padding: 3px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--paper);
+      }
+      .segmented button {
+        padding: 6px 12px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--ink);
+        font: 500 13px/1.2 var(--sans);
+        white-space: nowrap;
+        cursor: pointer;
+      }
+      .segmented button small {
+        margin-left: 6px;
+        font: 10.5px var(--mono);
+        color: var(--muted);
+      }
+      .segmented button:hover {
+        background: #e7ead9;
+      }
+      .segmented button[aria-pressed='true'] {
+        background: var(--ink);
+        color: var(--page);
+      }
+      .segmented button[aria-pressed='true'] small {
+        color: #c8d3bd;
+      }
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible {
+        outline: 2px solid var(--ink);
+        outline-offset: 2px;
+      }
+
+      /* Sections. */
+      section {
+        padding-top: 64px;
+      }
+      .section-head {
+        display: grid;
+        gap: 10px 48px;
+        margin-bottom: 26px;
+      }
+      .section-head .eyebrow {
+        grid-column: 1 / -1;
+      }
+      h2 {
+        margin: 0;
+        font: 500 clamp(28px, 3.6vw, 38px) / 1.1 var(--serif);
+        letter-spacing: -0.01em;
+      }
+      .section-head p:not(.eyebrow) {
+        max-width: 64ch;
+        margin: 0;
+        color: var(--ink-soft);
+      }
+      @media (min-width: 960px) {
+        .section-head {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+          align-items: end;
+        }
+      }
+      h3 {
+        margin: 0;
+        font: 500 21px/1.2 var(--serif);
+      }
+      .meta {
+        margin: 0;
+        font: 11px/1.5 var(--mono);
+        letter-spacing: 0.03em;
+        color: var(--muted);
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 14px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--paper);
+        color: var(--ink);
+        font: 500 13px/1.2 var(--sans);
+        cursor: pointer;
+      }
+      .button:hover {
+        border-color: var(--ink);
+      }
+      .button[aria-pressed='true'] {
+        border-color: var(--ink);
+        background: var(--ink);
+        color: var(--page);
+      }
+      /* Play and pause glyphs, drawn in CSS so no emoji font can restyle them. */
+      .play::before {
+        content: '';
+        width: 0;
+        height: 0;
+        border-top: 5px solid transparent;
+        border-bottom: 5px solid transparent;
+        border-left: 8px solid currentColor;
+      }
+      .play[aria-pressed='true']::before {
+        width: 8px;
+        height: 10px;
+        border: 0;
+        border-left: 3px solid currentColor;
+        border-right: 3px solid currentColor;
+      }
+
+      /* Four seasons. */
+      .season-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 32px 24px;
+      }
+      .season-card {
+        margin: 0;
+      }
+      .scene-button {
+        display: block;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: 10px;
+        background: none;
+        cursor: pointer;
+      }
+      .scene-button:hover .scene {
+        box-shadow: 0 0 0 2px var(--ink);
+      }
+      .scene {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 10px;
+        background: var(--well);
+      }
+      .season-card figcaption {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 2px 12px;
+        padding: 14px 2px 0;
+      }
+      .season-card .meta,
+      .season-card .note {
+        grid-column: 1 / -1;
+      }
+      .note {
+        margin: 2px 0 0;
+        font-size: 14px;
+        color: var(--ink-soft);
+      }
+      .note:empty {
+        display: none;
+      }
+      .swatches {
+        display: flex;
+        gap: 3px;
+      }
+      .swatches i {
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        box-shadow: inset 0 0 0 1px #304d4020;
+      }
+
+      /* Through the year. */
+      .year-canvas {
+        width: 100%;
+        aspect-ratio: 16 / 9;
+        max-height: 76vh;
+        border-radius: 12px;
+        background: var(--well);
+      }
+      .year-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px 20px;
+        padding: 16px 0 6px;
+      }
+      .status {
+        margin: 0;
+        font-size: 14px;
+      }
+      .status strong {
+        font: 500 19px var(--serif);
+        margin-right: 4px;
+      }
+      .status .time {
+        margin-right: 12px;
+        white-space: nowrap;
+        font: 12px var(--mono);
+        color: var(--muted);
+      }
+      .status .said {
+        padding-left: 12px;
+        border-left: 1px solid var(--line-strong);
+        color: var(--ink-soft);
+      }
+      .status .said:empty {
+        display: none;
+      }
+      .plays {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .track {
+        margin-top: 10px;
+      }
+      .track-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        margin-bottom: 2px;
+      }
+      .track-head output {
+        font: 12px var(--mono);
+      }
+      /* Everything positioned along a slider shares the thumb's own travel. */
+      .along {
+        position: absolute;
+        left: calc(var(--thumb) / 2 + (100% - var(--thumb)) * var(--at));
+      }
+      .pips {
+        position: relative;
+        height: 30px;
+      }
+      .pip {
+        bottom: 0;
+        display: grid;
+        justify-items: center;
+        gap: 3px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: var(--muted);
+        font: 10.5px var(--mono);
+        white-space: nowrap;
+        transform: translateX(-50%);
+        cursor: pointer;
+      }
+      .pip::after {
+        content: '';
+        width: 5px;
+        height: 5px;
+        background: currentColor;
+        transform: rotate(45deg);
+      }
+      .pip:hover {
+        color: var(--ink);
+      }
+      .rail {
+        position: relative;
+        height: 28px;
+      }
+      .ribbon {
+        position: absolute;
+        top: 6px;
+        left: calc(var(--thumb) / 2 - (100% - var(--thumb)) / 222);
+        width: calc((100% - var(--thumb)) * 112 / 111);
+        height: 16px;
+        border-radius: 3px;
+        image-rendering: pixelated;
+      }
+      .daylight {
+        position: absolute;
+        top: 11px;
+        left: calc(var(--thumb) / 2);
+        right: calc(var(--thumb) / 2);
+        height: 6px;
+        border-radius: 3px;
+        background: linear-gradient(
+          90deg,
+          var(--night-rail) 0 25%,
+          var(--day-rail) 25% 83.33%,
+          var(--night-rail) 83.33%
+        );
+      }
+      .rail input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 28px;
+        margin: 0;
+        background: transparent;
+        -webkit-appearance: none;
+        appearance: none;
+        cursor: pointer;
+      }
+      .rail input::-webkit-slider-runnable-track {
+        height: 28px;
+        background: transparent;
+      }
+      .rail input::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        box-sizing: border-box;
+        width: var(--thumb);
+        height: 28px;
+        border: 3px solid var(--paper);
+        border-radius: 4px;
+        background: var(--ink);
+        box-shadow: 0 0 0 1px var(--ink);
+      }
+      .rail input::-moz-range-track {
+        height: 28px;
+        background: transparent;
+      }
+      .rail input::-moz-range-thumb {
+        box-sizing: border-box;
+        width: var(--thumb);
+        height: 28px;
+        border: 3px solid var(--paper);
+        border-radius: 4px;
+        background: var(--ink);
+        box-shadow: 0 0 0 1px var(--ink);
+      }
+      .ticks {
+        position: relative;
+        height: 20px;
+        font: 10.5px var(--mono);
+        letter-spacing: 0.04em;
+        color: var(--muted);
+      }
+      .ticks span {
+        top: 2px;
+        padding-left: 6px;
+        border-left: 1px solid var(--line-strong);
+        line-height: 16px;
+      }
+      .ticks span.end {
+        padding: 0 6px 0 0;
+        border-left: 0;
+        border-right: 1px solid var(--line-strong);
+        transform: translateX(-100%);
+      }
+      .jumps {
+        display: none;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 12px;
+      }
+      .jumps .button {
+        padding: 5px 10px;
+        font-size: 12px;
+      }
+
+      /* Details. */
+      .gallery-tools {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px 18px;
+        margin-bottom: 8px;
+      }
+      .gallery-tools .meta {
+        margin-left: auto;
+      }
+      .subject {
+        display: grid;
+        grid-template-columns: 210px minmax(0, 1fr);
+        gap: 16px 28px;
+        padding: 26px 0;
+        border-top: 1px solid var(--line);
+      }
+      .subject header .meta {
+        margin-top: 4px;
+      }
+      .subject header p:not(.meta) {
+        margin: 10px 0 0;
+        font-size: 13.5px;
+        color: var(--ink-soft);
+      }
+      .cells {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 18px 12px;
+      }
+      .cell {
+        display: grid;
+        gap: 7px;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: zoom-in;
+      }
+      .cell canvas {
+        width: 100%;
+        aspect-ratio: 24 / 17;
+        border-radius: 8px;
+        background: var(--well);
+      }
+      .cell:hover canvas {
+        box-shadow: 0 0 0 2px var(--ink);
+      }
+      .cell-label {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font: 10.5px/1.3 var(--mono);
+        color: var(--muted);
+      }
+      .cell-label b {
+        font-weight: 400;
+        color: var(--ink);
+      }
+
+      /* The closer look. */
+      dialog {
+        width: min(1000px, calc(100vw - 24px));
+        max-height: calc(100dvh - 24px);
+        padding: 0;
+        border: 0;
+        border-radius: 14px;
+        background: var(--paper);
+        color: var(--ink);
+        box-shadow: 0 24px 64px #14231e59;
+      }
+      dialog::backdrop {
+        background: #1c2e2d8c;
+      }
+      .closer-head,
+      .closer-foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px 14px;
+        padding: 16px 18px;
+      }
+      .closer-head .meta {
+        margin-right: auto;
+      }
+      #closer-canvas {
+        width: 100%;
+        aspect-ratio: 24 / 17;
+        max-height: calc(100dvh - 190px);
+        background: var(--well);
+      }
+      .closer-foot .meta {
+        margin-left: auto;
+      }
+
+      /* Night and weather. */
+      .live-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 28px 20px;
+      }
+      .live {
+        margin: 0;
+      }
+      .live .frame {
+        position: relative;
+      }
+      .live canvas {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        border-radius: 10px;
+        background: var(--well);
+      }
+      .live .toggle {
+        position: absolute;
+        right: 10px;
+        bottom: 10px;
+        width: 34px;
+        height: 34px;
+        justify-content: center;
+        padding: 0;
+        border-color: transparent;
+        background: #f8f8f0e6;
+      }
+      /* A pale chip reads on day and night scenes alike. */
+      .live .toggle[aria-pressed='true'] {
+        border-color: transparent;
+        background: #f8f8f0e6;
+        color: var(--ink);
+      }
+      .live figcaption {
+        padding: 12px 2px 0;
+      }
+      .live figcaption h3 {
+        font-size: 18px;
+      }
+      .live figcaption p:not(.meta) {
+        margin: 4px 0 0;
+        font-size: 13.5px;
+        color: var(--ink-soft);
+      }
+      .motion-note {
+        margin: -10px 0 18px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+
+      footer {
+        margin-top: 80px;
+        border-top: 1px solid var(--line-strong);
+      }
+      footer .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px 24px;
+        padding-top: 18px;
+        padding-bottom: 48px;
+        font: 12px/1.6 var(--mono);
+        color: var(--muted);
+      }
+      footer p {
+        margin: 0;
+      }
+      footer a {
+        color: var(--ink);
+      }
+
+      .problem {
+        position: fixed;
+        right: 12px;
+        bottom: 12px;
+        left: 12px;
+        z-index: 20;
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 10px 14px;
+        border: 1px solid #dcb8a4;
+        border-radius: 8px;
+        background: #f7e8de;
+        color: #6b3424;
+        font: 12px/1.5 var(--mono);
+      }
+
+      @media (max-width: 899px) {
+        .subject {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 719px) {
+        html {
+          scroll-padding-top: 12px;
+        }
+        .controls {
+          position: static;
+        }
+        .jump {
+          display: none;
+        }
+        .control {
+          width: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 6px;
+        }
+        .segmented button {
+          flex: 1;
+          padding: 6px 4px;
+          white-space: normal;
+        }
+        .segmented button small {
+          display: block;
+          margin: 2px 0 0;
+        }
+        .season-grid {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .year-canvas {
+          aspect-ratio: 1;
+        }
+        .pip {
+          font-size: 0;
+        }
+        .jumps {
+          display: flex;
+        }
+        .cells {
+          grid-template-columns: none;
+          grid-auto-flow: column;
+          grid-auto-columns: 74%;
+          overflow-x: auto;
+          padding-bottom: 8px;
+          scroll-snap-type: x mandatory;
+        }
+        .cell {
+          scroll-snap-align: start;
+        }
+        .facts dd {
+          font-size: 16px;
+        }
+        .status .said {
+          display: block;
+          margin-top: 4px;
+          padding-left: 0;
+          border-left: 0;
+        }
+        .ticks span.end {
+          display: none;
+        }
+      }
+    </style>
+    <script>
+      // Shows any failure on the page itself: the art is built by several hands at once, and a
+      // module caught mid-edit should say so instead of leaving blank canvases.
+      window.seasonsProblem = (message) => {
+        const box = document.querySelector('#problem');
+        if (!box) return;
+        const text = String(message).split('\n')[0];
+        if (!box.textContent.includes(text))
+          box.textContent = `${box.textContent ? box.textContent + ' · ' : ''}${text}`;
+        box.hidden = false;
+      };
+      addEventListener('error', (event) =>
+        window.seasonsProblem(event.message || 'A script failed to load.'),
+      );
+      addEventListener('unhandledrejection', (event) =>
+        window.seasonsProblem(event.reason?.message ?? event.reason),
+      );
+    </script>
+  </head>
+  <body>
+    <header class="wrap masthead">
+      <div class="intro">
+        <p class="eyebrow">Forktown · a study of the seasons</p>
+        <h1>The turning year.</h1>
+        <p class="lede">
+          The town keeps one calendar for everyone. Four seasons of 28 town days make a year; a town
+          day lasts 24 real minutes, so a season passes in about 11 real hours. Blossom, fireflies,
+          turning leaves and snow all follow the shared UTC clock, so every visitor sees the same
+          weather at the same moment. Nothing is saved and nothing is random.
+        </p>
+      </div>
+      <dl class="facts">
+        <div>
+          <dt>A town day</dt>
+          <dd>24 real minutes</dd>
+        </div>
+        <div>
+          <dt>A season</dt>
+          <dd>About 11 real hours</dd>
+        </div>
+        <div>
+          <dt>A year</dt>
+          <dd>About 45 real hours</dd>
+        </div>
+        <div>
+          <dt>Shown here</dt>
+          <dd id="shown-year">Year 3</dd>
+        </div>
+      </dl>
+    </header>
+
+    <nav class="controls" aria-label="Scene controls">
+      <div class="wrap">
+        <div class="jump">
+          <a href="#seasons">Seasons</a>
+          <a href="#year">The year</a>
+          <a href="#details">Details</a>
+          <a href="#weather">Weather</a>
+        </div>
+        <div class="control">
+          <span class="control-label" id="time-label">Time of day</span>
+          <div class="segmented" role="group" aria-labelledby="time-label" id="times"></div>
+        </div>
+        <div class="control">
+          <span class="control-label" id="view-label">View</span>
+          <div class="segmented" role="group" aria-labelledby="view-label">
+            <button type="button" data-view="opening" aria-pressed="true">Opening view</button>
+            <button type="button" data-view="whole" aria-pressed="false">Whole town</button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="wrap">
+      <section id="seasons" aria-labelledby="seasons-title">
+        <div class="section-head">
+          <p class="eyebrow">01 · A day in each season</p>
+          <h2 id="seasons-title">Four seasons.</h2>
+          <p>
+            One characteristic day from each season, drawn the way a visitor first sees the town.
+            The time of day and the view above apply to all four. Choose a scene to follow it
+            through the year.
+          </p>
+        </div>
+        <div class="season-grid" id="season-grid"></div>
+      </section>
+
+      <section id="year" aria-labelledby="year-title">
+        <div class="section-head">
+          <p class="eyebrow">02 · The scrubber</p>
+          <h2 id="year-title">Through the year.</h2>
+          <p>
+            Move through the 112 days of the town year and any minute of the day. The ribbon is the
+            season model itself, one pixel a day: fresh leaves, blossom, summer green, ochre and
+            russet, bare twigs and snow.
+          </p>
+        </div>
+        <canvas
+          class="year-canvas"
+          id="year-canvas"
+          aria-label="The town on the chosen day"
+        ></canvas>
+        <div class="year-bar">
+          <p class="status" id="year-status" aria-live="polite"></p>
+          <div class="plays">
+            <button class="button play" type="button" id="play-year" aria-pressed="false">
+              Play the year
+            </button>
+            <button class="button play" type="button" id="run-clock" aria-pressed="false">
+              Run the clock
+            </button>
+          </div>
+        </div>
+        <div class="track">
+          <div class="pips" id="pips"></div>
+          <div class="rail">
+            <canvas class="ribbon" id="ribbon" width="112" height="1"></canvas>
+            <input
+              id="year-day"
+              type="range"
+              min="0"
+              max="111"
+              step="1"
+              value="8"
+              aria-label="Day of the town year"
+            />
+          </div>
+          <div class="ticks" id="season-ticks"></div>
+        </div>
+        <div class="jumps" id="jumps"></div>
+        <div class="track">
+          <div class="track-head">
+            <label class="control-label" for="year-time">Time of day</label>
+            <output id="year-time-out" for="year-time">12:00</output>
+          </div>
+          <div class="rail">
+            <div class="daylight"></div>
+            <input id="year-time" type="range" min="0" max="1439" step="1" value="720" />
+          </div>
+          <div class="ticks" id="hour-ticks"></div>
+        </div>
+      </section>
+
+      <section id="details" aria-labelledby="details-title">
+        <div class="section-head">
+          <p class="eyebrow">03 · Close-ups</p>
+          <h2 id="details-title">Details.</h2>
+          <p>
+            Ten corners of the town at eight moments of the year, each at noon unless it says
+            otherwise. Scenes render as they scroll into view. Choose one for a closer look; the
+            arrow keys then walk through the stages and the subjects.
+          </p>
+        </div>
+        <div class="gallery-tools">
+          <div class="segmented" role="group" aria-label="Hour of the details">
+            <button type="button" data-hour="own" aria-pressed="true">Their own hour</button>
+            <button type="button" data-hour="night" aria-pressed="false">
+              All at night <small>22:00</small>
+            </button>
+          </div>
+          <p class="meta" id="gallery-progress"></p>
+        </div>
+        <div id="gallery"></div>
+      </section>
+
+      <section id="weather" aria-labelledby="weather-title">
+        <div class="section-head">
+          <p class="eyebrow">04 · In motion</p>
+          <h2 id="weather-title">Night and weather.</h2>
+          <p>
+            Four small scenes running at town speed, one town minute each real second, as they do in
+            the live town. They rest while they are off-screen.
+          </p>
+        </div>
+        <p class="motion-note" id="motion-note" hidden>
+          Your system asks for reduced motion, so these start paused. Each has its own play button.
+        </p>
+        <div class="live-grid" id="live-grid"></div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <p>Development fixture. It uses the real renderer and never changes the live town clock.</p>
+        <a href="/">Back to the town</a>
+      </div>
+    </footer>
+
+    <dialog id="closer" aria-labelledby="closer-title">
+      <div class="closer-head">
+        <h3 id="closer-title"></h3>
+        <p class="meta" id="closer-meta"></p>
+        <form method="dialog"><button class="button" type="submit">Close</button></form>
+      </div>
+      <canvas id="closer-canvas" aria-label="A closer look"></canvas>
+      <div class="closer-foot">
+        <button class="button" type="button" id="closer-prev">Earlier</button>
+        <button class="button" type="button" id="closer-next">Later</button>
+        <button class="button" type="button" id="closer-year">Open in the scrubber</button>
+        <p class="meta">← → stages · ↑ ↓ subjects</p>
+      </div>
+    </dialog>
+
+    <p class="problem" id="problem" role="alert" hidden></p>
+
+    <script type="module">
+      // Development fixture: ?day=95&time=1320&view=whole opens the scrubber on a scene,
+      // ?closer=0,6 opens a closer look (subject, stage), and ?eager=1 renders every close-up at
+      // once (for screenshots). It uses the real renderer, passes explicit days and minutes, and
+      // never changes the live town clock.
+      import '@fontsource/fraunces/500.css';
+      import '@fontsource/dm-sans/400.css';
+      import '@fontsource/dm-sans/500.css';
+      import '@fontsource/space-mono/400.css';
+      import { renderCity, DAY, NIGHT } from '/src/city/render.ts';
+      import {
+        BLOSSOM,
+        FIREFLY,
+        FOLIAGE,
+        PUMPKIN,
+        SNOW,
+        mixHex,
+      } from '/src/city/season-palette.ts';
+      import { places } from '/src/lib/places.ts';
+      import { VENUES } from '/src/lib/events.ts';
+      import { FORK_PLOT } from '/src/lib/lanterns.ts';
+      import { FARM_CENTER } from '/src/lib/farm.ts';
+      import { WORLD_BOUNDS, WORLD_WIDTH, getPlot, plotCenter, project } from '/src/lib/world.ts';
+      import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt } from '/src/lib/town-calendar.ts';
+      import { canopyAt, snowCoverAt, yearDayAt } from '/src/lib/seasons.ts';
+      import { timeLabel } from '/src/lib/simulation.ts';
+
+      const query = new URLSearchParams(location.search);
+      const eager = query.has('eager');
+      const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const report = (error) => window.seasonsProblem?.(error?.message ?? error);
+
+      // Every scene is Year 3: a whole day of the year plus a minute of that day.
+      const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2;
+      const isNight = (minutes) => minutes < 360 || minutes >= 1200;
+      const calendarAt = (yearDay, minutes) => townCalendarAt(YEAR + yearDay, minutes);
+      const dateOf = (yearDay) => {
+        const calendar = calendarAt(yearDay, 720);
+        return `${calendar.season} ${calendar.date}`;
+      };
+      document.querySelector('#shown-year').textContent = `Year ${calendarAt(0, 0).year}`;
+
+      // The almanac's season line lives in season-copy.ts. It is optional here: while that module
+      // is missing or mid-edit, the page renders without the line.
+      const noNote = () => '';
+      let noteFor = noNote;
+      const refreshNotes = [];
+      import(/* @vite-ignore */ ['/src/lib', 'season-copy.ts'].join('/'))
+        .then((copy) => {
+          if (typeof copy.seasonNote !== 'function') return;
+          noteFor = (yearDay) => {
+            try {
+              return String(copy.seasonNote(yearDay) ?? '');
+            } catch {
+              return '';
+            }
+          };
+          refreshNotes.forEach((refresh) => refresh());
+        })
+        .catch(() => {});
+
+      // The same framing as the map. The app keeps a margin for its panels around the opening
+      // view; a study canvas has none, so the margin shrinks with the canvas.
+      function wholeTown(width, height) {
+        const zoom = Math.max(
+          0.01,
+          Math.min(
+            (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
+            (height - 85) / (WORLD_BOUNDS.bottom + 98),
+          ),
+        );
+        return {
+          x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
+          y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
+          zoom,
+        };
+      }
+      const FRAME = (() => {
+        const all = [
+          ...places.map((place) => place.plot),
+          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
+            (venue) => venue.plot,
+          ),
+        ].flatMap((id) => {
+          const plot = getPlot(id);
+          return plot ? [plotCenter(plot)] : [];
+        });
+        const median = (values) => values.sort((a, b) => a - b)[values.length >> 1];
+        const mid = { x: median(all.map((p) => p.x)), y: median(all.map((p) => p.y)) };
+        const distance = (p) => Math.hypot(p.x - mid.x, p.y - mid.y);
+        const typical = median(all.map(distance));
+        const points = all.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
+        return {
+          left: Math.min(...points.map((point) => point.x)) - 110,
+          right: Math.max(...points.map((point) => point.x)) + 110,
+          top: Math.min(...points.map((point) => point.y)) - 145,
+          bottom: Math.max(...points.map((point) => point.y)) + 80,
+        };
+      })();
+      function openingView(width, height) {
+        const { left, right, top, bottom } = FRAME;
+        const zoom = Math.max(
+          wholeTown(width, height).zoom,
+          Math.min(
+            0.85,
+            (width < 600 ? width * 1.6 : width - Math.min(150, width * 0.08)) / (right - left),
+            (height - Math.min(160, height * 0.08)) / (bottom - top),
+          ),
+        );
+        return {
+          x: width / 2 - ((left + right) / 2) * zoom,
+          y: height / 2 - ((top + bottom) / 2) * zoom,
+          zoom,
+        };
+      }
+      // A close-up keeps the same patch of town at any canvas width: `zoom` is set for `base` px.
+      const closeUp =
+        ({ focus, zoom, lift = 0 }, base = 0) =>
+        (width, height) => {
+          const z = base ? zoom * (width / base) : zoom;
+          return { x: width / 2 - focus.x * z, y: height / 2 - (focus.y - lift) * z, zoom: z };
+        };
+
+      /** Paints one scene into a canvas at its CSS size. Returns false while it has no size. */
+      function paint(canvas, yearDay, minutes, camera) {
+        const width = canvas.clientWidth,
+          height = canvas.clientHeight;
+        if (!width || !height) return false;
+        const ratio = Math.min(devicePixelRatio || 1, 2);
+        const pixelWidth = Math.round(width * ratio),
+          pixelHeight = Math.round(height * ratio);
+        if (canvas.width !== pixelWidth) canvas.width = pixelWidth;
+        if (canvas.height !== pixelHeight) canvas.height = pixelHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+        // Minutes past midnight carry into the next day, as the live clock does.
+        const day = YEAR + Math.floor(yearDay) + Math.floor(minutes / 1440);
+        const minute = ((minutes % 1440) + 1440) % 1440;
+        try {
+          renderCity({
+            ctx,
+            width,
+            height,
+            places,
+            minutes: minute,
+            day,
+            camera: camera(width, height),
+            night: isNight(minute),
+            selectedPlot: null,
+            hoveredPlot: null,
+            showPlots: false,
+          });
+        } catch (error) {
+          report(error);
+        }
+        return true;
+      }
+
+      const state = { minutes: 720, view: query.get('view') === 'whole' ? 'whole' : 'opening' };
+      const townView = () => (state.view === 'whole' ? wholeTown : openingView);
+      const pressed = (buttons, active) =>
+        buttons.forEach((button) => button.setAttribute('aria-pressed', String(button === active)));
+
+      // Four seasons.
+      const at = (pair) => (Array.isArray(pair) ? pair : [pair, pair]);
+      const SEASON_CARDS = [
+        {
+          name: 'Spring',
+          day: 8,
+          swatch: [BLOSSOM.pink, BLOSSOM.white, FOLIAGE.fresh.light, FOLIAGE.fresh.leaf],
+        },
+        {
+          name: 'Summer',
+          day: 42,
+          swatch: [
+            [DAY.leafLight, NIGHT.leafLight],
+            [DAY.leaf, NIGHT.leaf],
+            FIREFLY.halo,
+            FIREFLY.core,
+          ],
+        },
+        {
+          name: 'Autumn',
+          day: 68,
+          swatch: [FOLIAGE.ochre.leaf, FOLIAGE.russet.leaf, FOLIAGE.rust.leaf, PUMPKIN.body],
+        },
+        { name: 'Winter', day: 95, swatch: [SNOW.top, SNOW.shade, SNOW.frost, SNOW.ice] },
+      ];
+      const seasonGrid = document.querySelector('#season-grid');
+      const seasonCards = SEASON_CARDS.map((card) => {
+        const figure = document.createElement('figure');
+        figure.className = 'season-card';
+        figure.innerHTML = `
+          <button class="scene-button" type="button"><canvas class="scene"></canvas></button>
+          <figcaption>
+            <h3>${card.name}.</h3>
+            <span class="swatches" aria-hidden="true">${'<i></i>'.repeat(card.swatch.length)}</span>
+            <p class="meta"></p>
+            <p class="note"></p>
+          </figcaption>`;
+        seasonGrid.append(figure);
+        const button = figure.querySelector('button');
+        button.setAttribute('aria-label', `Follow ${dateOf(card.day)} in the year scrubber`);
+        button.addEventListener('click', () => openInYear(card.day, state.minutes));
+        return {
+          ...card,
+          canvas: figure.querySelector('canvas'),
+          meta: figure.querySelector('.meta'),
+          note: figure.querySelector('.note'),
+          chips: [...figure.querySelectorAll('.swatches i')],
+          dirty: true,
+        };
+      });
+      function paintSeasons() {
+        for (const card of seasonCards) {
+          if (!card.dirty) continue;
+          card.dirty = !paint(card.canvas, card.day, state.minutes, townView());
+          const calendar = calendarAt(card.day, state.minutes);
+          card.meta.textContent = `${calendar.label} · ${timeLabel(state.minutes)}`;
+          card.note.textContent = noteFor(yearDayAt(YEAR + card.day, state.minutes));
+          card.chips.forEach((chip, k) => {
+            const colour = at(card.swatch[k])[isNight(state.minutes) ? 1 : 0];
+            chip.style.background = colour;
+            chip.title = colour;
+          });
+        }
+      }
+      const dirtySeasons = () => seasonCards.forEach((card) => (card.dirty = true));
+      refreshNotes.push(dirtySeasons);
+
+      // The shared time of day and view.
+      const TIMES = [
+        { label: 'Dawn', minutes: 375 },
+        { label: 'Noon', minutes: 720 },
+        { label: 'Golden hour', minutes: 1165 },
+        { label: 'Night', minutes: 1320 },
+      ];
+      const timeButtons = TIMES.map(({ label, minutes }) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.innerHTML = `${label} <small>${timeLabel(minutes)}</small>`;
+        button.setAttribute('aria-pressed', String(minutes === state.minutes));
+        button.addEventListener('click', () => {
+          pressed(timeButtons, button);
+          state.minutes = minutes;
+          dirtySeasons();
+          setYear({ minutes });
+        });
+        document.querySelector('#times').append(button);
+        return button;
+      });
+      const viewButtons = [...document.querySelectorAll('[data-view]')];
+      pressed(
+        viewButtons,
+        viewButtons.find((button) => button.dataset.view === state.view),
+      );
+      viewButtons.forEach((button) =>
+        button.addEventListener('click', () => {
+          pressed(viewButtons, button);
+          state.view = button.dataset.view;
+          dirtySeasons();
+          year.dirty = true;
+          updateLink();
+        }),
+      );
+
+      // Through the year.
+      const clampInt = (value, max) => Math.min(max, Math.max(0, Math.round(Number(value) || 0)));
+      const year = {
+        day: query.has('day') ? clampInt(query.get('day'), 111) : 8,
+        minutes: query.has('time') ? clampInt(query.get('time'), 1439) : 720,
+        playing: false,
+        running: false,
+        carry: 0,
+        dirty: true,
+        visible: true,
+        shown: '',
+        painted: 0,
+      };
+      const yearCanvas = document.querySelector('#year-canvas');
+      const dayInput = document.querySelector('#year-day');
+      const timeInput = document.querySelector('#year-time');
+      const playYear = document.querySelector('#play-year');
+      const runClock = document.querySelector('#run-clock');
+      function setYear(change) {
+        Object.assign(year, change);
+        year.dirty = true;
+        updateLink();
+      }
+      // The controls and the status follow the scrubber at once; the canvas waits until it is on
+      // screen.
+      function paintYear() {
+        if (year.visible) year.dirty = !paint(yearCanvas, year.day, year.minutes, townView());
+        const minutes = Math.floor(year.minutes);
+        const shown = `${year.day}:${minutes}:${noteFor === noNote}`;
+        if (year.shown === shown) return;
+        year.shown = shown;
+        dayInput.value = String(year.day);
+        timeInput.value = String(minutes);
+        dayInput.setAttribute('aria-valuetext', calendarAt(year.day, minutes).label);
+        timeInput.setAttribute('aria-valuetext', timeLabel(minutes));
+        document.querySelector('#year-time-out').textContent = timeLabel(minutes);
+        const status = document.querySelector('#year-status');
+        status.replaceChildren();
+        const date = document.createElement('strong');
+        date.textContent = calendarAt(year.day, minutes).label;
+        const time = document.createElement('span');
+        time.className = 'time';
+        time.textContent = `${timeLabel(minutes)} · day ${year.day + 1} of 112`;
+        const said = document.createElement('span');
+        said.className = 'said';
+        said.textContent = noteFor(yearDayAt(YEAR + year.day, minutes));
+        status.append(date, ' ', time, said);
+      }
+      refreshNotes.push(() => (year.dirty = true));
+      function openInYear(day, minutes) {
+        setYear({ day, minutes, playing: false });
+        setPlaying();
+        document.querySelector('#year').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      function setPlaying() {
+        playYear.setAttribute('aria-pressed', String(year.playing));
+        playYear.lastChild.textContent = year.playing ? 'Pause the year' : 'Play the year';
+        runClock.setAttribute('aria-pressed', String(year.running));
+        runClock.lastChild.textContent = year.running ? 'Stop the clock' : 'Run the clock';
+      }
+      playYear.addEventListener('click', () => {
+        year.playing = !year.playing;
+        setPlaying();
+        updateLink();
+      });
+      runClock.addEventListener('click', () => {
+        year.running = !year.running;
+        setPlaying();
+        updateLink();
+      });
+      dayInput.addEventListener('input', () => {
+        setYear({ day: Number(dayInput.value), playing: false });
+        setPlaying();
+      });
+      timeInput.addEventListener('input', () => {
+        setYear({ minutes: Number(timeInput.value), running: false });
+        setPlaying();
+      });
+      // The link follows the scrubber, so a scene can be shared or reopened.
+      function updateLink() {
+        const params = new URLSearchParams();
+        params.set('day', String(year.day));
+        params.set('time', String(Math.floor(year.minutes)));
+        if (state.view === 'whole') params.set('view', 'whole');
+        if (eager) params.set('eager', '1');
+        history.replaceState(null, '', `?${params}${location.hash}`);
+      }
+
+      // The ribbon: one pixel per day, from the same model the trees read, for a middling tree.
+      (function paintRibbon() {
+        const ctx = document.querySelector('#ribbon').getContext('2d');
+        for (let d = 0; d < DAYS_PER_YEAR; d++) {
+          const t = d + 0.5;
+          const tree = canopyAt(t, 0.5, 'deciduous'),
+            bloom = canopyAt(t, 0.5, 'blossom');
+          let colour = mixHex(DAY.leaf, FOLIAGE.fresh.leaf[0], tree.fresh);
+          colour = mixHex(
+            colour,
+            mixHex(FOLIAGE.ochre.leaf[0], FOLIAGE.russet.leaf[0], tree.deepen),
+            tree.turn,
+          );
+          colour = mixHex(colour, BLOSSOM.pink[0], bloom.blossom * 0.9);
+          colour = mixHex(colour, FOLIAGE.dormant.leaf[0], tree.dormant);
+          ctx.fillStyle = mixHex(colour, SNOW.top[0], snowCoverAt(t));
+          ctx.fillRect(d, 0, 1, 1);
+        }
+      })();
+      const along = (element, fraction) => {
+        element.classList.add('along');
+        element.style.setProperty('--at', String(fraction));
+        return element;
+      };
+      const MARKERS = [
+        { label: 'Blossom', day: 4, minutes: 720 },
+        { label: 'Petals', day: 19, minutes: 720 },
+        { label: 'Fireflies', day: 32, minutes: 1320 },
+        { label: 'Turning', day: 60, minutes: 720 },
+        { label: 'Leaf fall', day: 73, minutes: 720 },
+        { label: 'First snow', day: 84, minutes: 1040 },
+        { label: 'Thaw', day: 108, minutes: 720 },
+      ];
+      for (const marker of MARKERS) {
+        const title = `${marker.label} · ${dateOf(marker.day)}, ${timeLabel(marker.minutes)}`;
+        const jump = () => {
+          setYear({ day: marker.day, minutes: marker.minutes, playing: false });
+          setPlaying();
+        };
+        const pip = document.createElement('button');
+        pip.type = 'button';
+        pip.className = 'pip';
+        pip.textContent = marker.label;
+        pip.title = title;
+        pip.setAttribute('aria-label', title);
+        pip.addEventListener('click', jump);
+        document.querySelector('#pips').append(along(pip, marker.day / 111));
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'button';
+        chip.textContent = marker.label;
+        chip.title = title;
+        chip.addEventListener('click', jump);
+        document.querySelector('#jumps').append(chip);
+      }
+      ['Spring', 'Summer', 'Autumn', 'Winter'].forEach((name, k) => {
+        const tick = document.createElement('span');
+        tick.textContent = name;
+        document.querySelector('#season-ticks').append(along(tick, (k * 28) / 111));
+      });
+      [0, 360, 720, 1080, 1440].forEach((minutes) => {
+        const tick = document.createElement('span');
+        tick.textContent = minutes === 1440 ? '24:00' : timeLabel(minutes);
+        if (minutes === 1440) tick.className = 'end';
+        document.querySelector('#hour-ticks').append(along(tick, Math.min(minutes, 1439) / 1439));
+      });
+
+      // Details: close-up subjects in rows, stages of the year in columns.
+      const plotPoint = (id) => plotCenter(getPlot(id));
+      const house = (id) => places.find((place) => place.plot === id)?.name;
+      const where = (id) => [house(id), `plot ${id}`].filter(Boolean).join(' · ');
+      const fork = plotPoint(FORK_PLOT);
+      const SUBJECTS = [
+        {
+          name: 'Gable roof',
+          where: where('C3'),
+          look: 'Snow on both slopes. The roof keeps the colour its neighbour chose.',
+          focus: plotPoint('C3'),
+          zoom: 1.4,
+          lift: 22,
+        },
+        {
+          name: 'Flat roof',
+          where: where('A2'),
+          look: 'Snow fills the flat top inside a rim of roof colour.',
+          focus: plotPoint('A2'),
+          zoom: 1.4,
+          lift: 14,
+        },
+        {
+          name: 'Observatory dome',
+          where: where('D4'),
+          look: 'Snow settling on the curve of a dome.',
+          focus: plotPoint('D4'),
+          zoom: 1.3,
+          lift: 30,
+        },
+        {
+          name: 'The Lantern Fork',
+          where: `the shared tree · plot ${FORK_PLOT}`,
+          look: 'The town tree through the year. Its lanterns keep their own colour.',
+          focus: { x: fork.x + 4, y: fork.y },
+          zoom: 1,
+          lift: 62,
+        },
+        {
+          name: 'Edge trees',
+          where: 'the western edge · tiles 0,9 to 0,12',
+          look: 'Round crowns: blossom, summer green, ochre and russet, bare twigs, snow.',
+          focus: project(1.6, 9.6),
+          zoom: 1.2,
+          lift: 44,
+        },
+        {
+          name: 'Inner conifers and larches',
+          where: `plot corners beside ${house('D4') ?? 'plot D4'}`,
+          look: 'Conifers carry snow; the larches among them turn gold and let go.',
+          focus: project(16.4, 16.4),
+          zoom: 1.1,
+          lift: 26,
+        },
+        {
+          name: 'The farm',
+          where: `the fields · tile ${Math.floor(FARM_CENTER.x)},${Math.floor(FARM_CENTER.y)}`,
+          look: 'Beds and crops through the year, and the pumpkins at harvest.',
+          focus: project(FARM_CENTER.x, FARM_CENTER.y),
+          zoom: 1.3,
+          lift: 8,
+        },
+        {
+          name: 'A meadow plot',
+          where: 'plot B1, still free',
+          look: 'Wildflowers on an empty plot, fireflies after dark, frost and snow.',
+          focus: project(4.4, 7.2),
+          zoom: 2,
+          lift: 4,
+        },
+        {
+          name: 'The river',
+          where: `the eastern edge · tile ${WORLD_WIDTH - 2},20`,
+          look: 'Water, glints and the bank trees through the seasons.',
+          focus: project(WORLD_WIDTH - 2 + 0.5, 20.5),
+          zoom: 1.5,
+          lift: 14,
+        },
+        {
+          name: 'The zoo',
+          where: 'the grove paddock',
+          look: 'The habitat trees turn and whiten with the town.',
+          focus: project(32.6, 59.9),
+          zoom: 1,
+          lift: 40,
+        },
+      ];
+      const STAGES = [
+        { label: 'Bloom', day: 8, minutes: 720 },
+        { label: 'Petals', day: 19, minutes: 720 },
+        { label: 'Summer night', day: 42, minutes: 1320 },
+        { label: 'Turning', day: 62, minutes: 720 },
+        { label: 'Leaf fall', day: 76, minutes: 720 },
+        { label: 'First snow', day: 85, minutes: 480 },
+        { label: 'Deep snow', day: 95, minutes: 720 },
+        { label: 'Thaw', day: 109, minutes: 720 },
+      ];
+      const gallery = { night: false };
+      const stageMinutes = (stage) => (gallery.night ? 1320 : stage.minutes);
+      const cells = [];
+      const galleryRoot = document.querySelector('#gallery');
+      SUBJECTS.forEach((subject, s) => {
+        const article = document.createElement('article');
+        article.className = 'subject';
+        article.innerHTML = `
+          <header>
+            <h3>${subject.name}.</h3>
+            <p class="meta">${subject.where}</p>
+            <p>${subject.look}</p>
+          </header>
+          <div class="cells"></div>`;
+        const row = article.querySelector('.cells');
+        STAGES.forEach((stage, k) => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'cell';
+          button.innerHTML = `<canvas></canvas><span class="cell-label"><b>${stage.label}</b><span></span></span>`;
+          button.addEventListener('click', () => openCloser(s, k));
+          row.append(button);
+          cells.push({
+            subject,
+            stage,
+            button,
+            canvas: button.querySelector('canvas'),
+            when: button.querySelector('.cell-label > span'),
+            dirty: true,
+            near: false,
+            queued: false,
+          });
+        });
+        galleryRoot.append(article);
+      });
+      const labelCell = (cell) => {
+        const minutes = stageMinutes(cell.stage);
+        cell.when.textContent = `${dateOf(cell.stage.day)} · ${timeLabel(minutes)}`;
+        cell.button.setAttribute(
+          'aria-label',
+          `${cell.subject.name}, ${cell.stage.label}, ${dateOf(cell.stage.day)} at ${timeLabel(minutes)}. Open a closer look.`,
+        );
+      };
+      cells.forEach(labelCell);
+
+      // Close-ups render lazily, a few per frame, so the page stays responsive.
+      const queue = [];
+      let pumping = false;
+      const progress = document.querySelector('#gallery-progress');
+      const showProgress = () => {
+        const done = cells.filter((cell) => !cell.dirty).length;
+        progress.textContent =
+          done === cells.length ? `${done} scenes rendered` : `${done} of ${cells.length} rendered`;
+      };
+      function enqueue(cell) {
+        if (!cell.queued) {
+          cell.queued = true;
+          queue.push(cell);
+        }
+        if (!pumping) {
+          pumping = true;
+          requestAnimationFrame(pump);
+        }
+      }
+      function pump() {
+        const start = performance.now();
+        while (queue.length && performance.now() - start < 12) {
+          const cell = queue.shift();
+          cell.queued = false;
+          if (!cell.dirty) continue;
+          cell.dirty = !paint(
+            cell.canvas,
+            cell.stage.day,
+            stageMinutes(cell.stage),
+            closeUp(cell.subject, 240),
+          );
+        }
+        showProgress();
+        if (queue.length) requestAnimationFrame(pump);
+        else pumping = false;
+      }
+      const cellByCanvas = new Map(cells.map((cell) => [cell.canvas, cell]));
+      const nearby = new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            const cell = cellByCanvas.get(entry.target);
+            cell.near = entry.isIntersecting;
+            if (cell.near && cell.dirty) enqueue(cell);
+          }
+        },
+        { rootMargin: '600px 0px' },
+      );
+      cells.forEach((cell) => nearby.observe(cell.canvas));
+      const hourButtons = [...document.querySelectorAll('[data-hour]')];
+      hourButtons.forEach((button) =>
+        button.addEventListener('click', () => {
+          pressed(hourButtons, button);
+          gallery.night = button.dataset.hour === 'night';
+          for (const cell of cells) {
+            cell.dirty = true;
+            labelCell(cell);
+            if (cell.near || eager) enqueue(cell);
+          }
+          showProgress();
+        }),
+      );
+      showProgress();
+
+      // A closer look: the same spot at twice the zoom, with the stages a key press apart.
+      const dialog = document.querySelector('#closer');
+      const closerCanvas = document.querySelector('#closer-canvas');
+      const closer = { subject: 0, stage: 0 };
+      function openCloser(subject, stage) {
+        Object.assign(closer, { subject, stage });
+        if (!dialog.open) dialog.showModal();
+        paintCloser();
+      }
+      function paintCloser() {
+        const subject = SUBJECTS[closer.subject],
+          stage = STAGES[closer.stage];
+        const minutes = stageMinutes(stage);
+        paint(closerCanvas, stage.day, minutes, closeUp({ ...subject, zoom: subject.zoom * 2 }));
+        document.querySelector('#closer-title').textContent = `${subject.name}.`;
+        document.querySelector('#closer-meta').textContent =
+          `${stage.label} · ${calendarAt(stage.day, minutes).label} · ${timeLabel(minutes)} · zoom ${(subject.zoom * 2).toFixed(1)}`;
+      }
+      const step = (key, delta) => {
+        const length = key === 'stage' ? STAGES.length : SUBJECTS.length;
+        closer[key] = (closer[key] + delta + length) % length;
+        paintCloser();
+      };
+      document.querySelector('#closer-prev').addEventListener('click', () => step('stage', -1));
+      document.querySelector('#closer-next').addEventListener('click', () => step('stage', 1));
+      document.querySelector('#closer-year').addEventListener('click', () => {
+        const stage = STAGES[closer.stage];
+        dialog.close();
+        openInYear(stage.day, stageMinutes(stage));
+      });
+      dialog.addEventListener('keydown', (event) => {
+        const moves = { ArrowLeft: ['stage', -1], ArrowRight: ['stage', 1] };
+        Object.assign(moves, { ArrowUp: ['subject', -1], ArrowDown: ['subject', 1] });
+        if (!moves[event.key]) return;
+        event.preventDefault();
+        step(...moves[event.key]);
+      });
+      dialog.addEventListener('click', (event) => {
+        if (event.target === dialog) dialog.close();
+      });
+
+      // Night and weather: small scenes that run at town speed while they are on screen.
+      const LIVE = [
+        {
+          title: 'Fireflies',
+          note: 'A summer night on the river, over the water, the far bank and a meadow.',
+          day: 42,
+          minutes: 1300,
+          focus: project(WORLD_WIDTH - 1.6, 16.5),
+          zoom: 1.5,
+          lift: 10,
+        },
+        {
+          title: 'First snow',
+          note: 'The first flakes of the year. Watch the roof whiten as they settle.',
+          day: 84,
+          minutes: 1040,
+          focus: plotPoint('C3'),
+          zoom: 1.5,
+          lift: 24,
+        },
+        {
+          title: 'Petals',
+          note: 'Late spring. The blossom lets go at the edge of town.',
+          day: 19,
+          minutes: 720,
+          focus: project(1.2, 10.2),
+          zoom: 1.8,
+          lift: 26,
+        },
+        {
+          title: 'Falling leaves',
+          note: 'Late autumn under the round trees of the northern edge.',
+          day: 74,
+          minutes: 720,
+          focus: project(5.4, 1),
+          zoom: 1.6,
+          lift: 28,
+        },
+      ];
+      if (reduceMotion) document.querySelector('#motion-note').hidden = false;
+      const liveScenes = LIVE.map((scene) => {
+        const figure = document.createElement('figure');
+        figure.className = 'live';
+        figure.innerHTML = `
+          <div class="frame">
+            <canvas aria-label="${scene.title}"></canvas>
+            <button class="button play toggle" type="button"></button>
+          </div>
+          <figcaption>
+            <h3>${scene.title}.</h3>
+            <p class="meta"></p>
+            <p>${scene.note}</p>
+          </figcaption>`;
+        document.querySelector('#live-grid').append(figure);
+        const live = {
+          ...scene,
+          canvas: figure.querySelector('canvas'),
+          toggle: figure.querySelector('.toggle'),
+          meta: figure.querySelector('.meta'),
+          elapsed: 0,
+          playing: !reduceMotion,
+          visible: false,
+          dirty: true,
+          painted: 0,
+        };
+        const setToggle = () => {
+          live.toggle.setAttribute('aria-pressed', String(live.playing));
+          live.toggle.setAttribute(
+            'aria-label',
+            `${live.playing ? 'Pause' : 'Play'} ${scene.title}`,
+          );
+        };
+        live.toggle.addEventListener('click', () => {
+          live.playing = !live.playing;
+          setToggle();
+        });
+        setToggle();
+        return live;
+      });
+      // Moving scenes, the scrubber among them, only paint while they are on screen.
+      const onScreen = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const scene =
+            entry.target === yearCanvas
+              ? year
+              : liveScenes.find((live) => live.canvas === entry.target);
+          scene.visible = entry.isIntersecting;
+        }
+      });
+      liveScenes.forEach((live) => onScreen.observe(live.canvas));
+      onScreen.observe(yearCanvas);
+      function paintLive(live) {
+        const minutes = live.minutes + live.elapsed;
+        live.dirty = !paint(live.canvas, live.day, minutes, closeUp(live, 300));
+        const whole = live.day + Math.floor(minutes / 1440);
+        live.meta.textContent = `${dateOf(whole % DAYS_PER_YEAR)} · ${timeLabel(minutes)}`;
+      }
+
+      // Resizing repaints only what it touched; close-ups wait for their turn in the queue.
+      const sized = new ResizeObserver((entries) => {
+        for (const { target } of entries) {
+          const cell = cellByCanvas.get(target);
+          if (cell) {
+            cell.dirty = true;
+            if (cell.near || eager) enqueue(cell);
+            continue;
+          }
+          const card = seasonCards.find((card) => card.canvas === target);
+          if (card) card.dirty = true;
+          const live = liveScenes.find((scene) => scene.canvas === target);
+          if (live) live.dirty = true;
+          if (target === yearCanvas) year.dirty = true;
+          if (target === closerCanvas && dialog.open) paintCloser();
+        }
+      });
+      [...seasonCards, ...cells, ...liveScenes].forEach(({ canvas }) => sized.observe(canvas));
+      sized.observe(yearCanvas);
+      sized.observe(closerCanvas);
+
+      // One frame loop for everything that moves. The year plays at four town days a second;
+      // the clock and the live scenes run at town speed, one town minute a real second.
+      let last = performance.now();
+      function tick(now) {
+        const seconds = Math.min(0.25, Math.max(0, (now - last) / 1000));
+        last = now;
+        if (year.playing) {
+          year.carry += seconds * 4;
+          if (year.carry >= 1) {
+            year.day = (year.day + Math.floor(year.carry)) % DAYS_PER_YEAR;
+            year.carry %= 1;
+            year.dirty = true;
+          }
+        }
+        if (year.running) {
+          year.minutes += seconds;
+          if (year.minutes >= 1440) {
+            year.minutes -= 1440;
+            year.day = (year.day + 1) % DAYS_PER_YEAR;
+          }
+          year.dirty = true;
+        }
+        if (year.dirty && now - year.painted >= 1000 / 30) {
+          year.painted = now;
+          paintYear();
+        }
+        paintSeasons();
+        for (const live of liveScenes) {
+          if (!live.visible) continue;
+          if (live.playing) {
+            live.elapsed += seconds;
+            live.dirty = true;
+          }
+          if (live.dirty && now - live.painted >= 1000 / 30) {
+            live.painted = now;
+            paintLive(live);
+          }
+        }
+        requestAnimationFrame(tick);
+      }
+      if (query.has('day') || query.has('time'))
+        requestAnimationFrame(() => document.querySelector('#year').scrollIntoView());
+      if (eager) cells.forEach(enqueue);
+      if (query.has('closer')) {
+        const [subject, stage] = query.get('closer').split(',');
+        openCloser(clampInt(subject, SUBJECTS.length - 1), clampInt(stage, STAGES.length - 1));
+      }
+      paintYear();
+      setPlaying();
+      requestAnimationFrame(tick);
+      window.seasonsStudy = { state, year, gallery, cells, liveScenes };
+    </script>
+  </body>
+</html>
