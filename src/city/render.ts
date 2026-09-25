@@ -7,6 +7,11 @@ import { drawHouse, houseBounds } from './houses';
 import { drawResident } from './residents';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
+import { drawTownTree } from './trees';
+import { drawFireflies, drawSeasonLight, drawSnowfall } from './weather';
+import { groundTuft, riverGlint } from './season-ground';
+import { SNOW, pick } from './season-palette';
+import { seedFraction, snowAt, townSeasonAt } from '../lib/seasons';
 import { paintGroundLayer } from './ground-cache';
 import { drawFootball } from './football';
 import { drawTownCat } from './cat';
@@ -71,6 +76,7 @@ type Palette = {
   leaf: string;
   leafLight: string;
   ink: string;
+  night: boolean;
 };
 export type Camera = { x: number; y: number; zoom: number };
 const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
@@ -107,6 +113,8 @@ function taleFor(roster: readonly Place[], eveningDay: number) {
   return tale;
 }
 const residentDepth = (resident: ResidentState) => resident.position.x + resident.position.y;
+/** Each streetlamp's snow schedule, fixed by where it stands. */
+const LAMP_SNOW = LAMPS.map(({ x, y }) => seedFraction(`lamp:${x},${y}`));
 // World geometry and seeds are fixed between builds; only their palette changes.
 const terrain = Array.from({ length: WORLD_WIDTH * WORLD_HEIGHT }, (_, i) => {
   const x = Math.floor(i / WORLD_HEIGHT),
@@ -155,6 +163,7 @@ export const DAY: Palette = {
   leaf: '#688F59',
   leafLight: '#87A66A',
   ink: '#4C6445',
+  night: false,
 };
 export const NIGHT: Palette = {
   grass: '#526E63',
@@ -168,6 +177,7 @@ export const NIGHT: Palette = {
   leaf: '#365A4F',
   leafLight: '#507569',
   ink: '#C3D4C2',
+  night: true,
 };
 
 function poly(ctx: Ctx, points: number[][], fill: string, stroke?: string) {
@@ -212,90 +222,6 @@ function diamond(ctx: Ctx, x: number, y: number, rx: number, ry: number, fill: s
     fill,
   );
 }
-function tree(ctx: Ctx, x: number, y: number, s: number, p: Palette, variant = 0) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(s, s);
-  diamond(ctx, 4, 3, 16, 7, '#23341B20');
-  rect(ctx, -2, -12, 4, 15, '#867459');
-  if (variant % 2) {
-    poly(
-      ctx,
-      [
-        [0, -43],
-        [10, -28],
-        [6, -28],
-        [15, -15],
-        [10, -15],
-        [18, -4],
-        [-18, -4],
-        [-10, -15],
-        [-15, -15],
-        [-6, -28],
-        [-10, -28],
-      ],
-      p.leaf,
-    );
-    poly(
-      ctx,
-      [
-        [0, -43],
-        [0, -4],
-        [-18, -4],
-        [-10, -15],
-        [-15, -15],
-        [-6, -28],
-        [-10, -28],
-      ],
-      p.leafLight,
-    );
-  } else {
-    poly(
-      ctx,
-      [
-        [-5, -39],
-        [7, -39],
-        [7, -35],
-        [14, -35],
-        [14, -29],
-        [19, -29],
-        [19, -16],
-        [14, -16],
-        [14, -10],
-        [-12, -10],
-        [-12, -14],
-        [-18, -14],
-        [-18, -29],
-        [-13, -29],
-        [-13, -35],
-        [-5, -35],
-      ],
-      p.leaf,
-    );
-    poly(
-      ctx,
-      [
-        [-5, -39],
-        [7, -39],
-        [7, -35],
-        [4, -35],
-        [4, -28],
-        [-3, -28],
-        [-3, -19],
-        [-13, -19],
-        [-13, -24],
-        [-18, -24],
-        [-18, -29],
-        [-13, -29],
-        [-13, -35],
-        [-5, -35],
-      ],
-      p.leafLight,
-    );
-    rect(ctx, -7, -31, 5, 4, shade(p.leafLight, 14));
-  }
-  ctx.restore();
-}
 type RenderOptions = {
   ctx: Ctx;
   width: number;
@@ -339,6 +265,8 @@ export function renderCity({
   ctx.clearRect(0, 0, width, height);
   drawSky(ctx, width, height, day, minutes);
   const p = night ? NIGHT : DAY;
+  // The turning year: one snapshot per frame, from the same day and minute as the sky.
+  const season = townSeasonAt(day, minutes);
   // Every light on the map reads the same lantern-hour clock, so the Fork, the windows, the
   // posts and the lamps can never disagree.
   const register = registerFor(ufoPlaces, arrivals);
@@ -368,9 +296,11 @@ export function renderCity({
     width,
     height,
     [...byPlot.keys()].sort().join(','),
+    // Seasonal ground art reads the whole day of the year, so the layer repaints once a town day.
+    season.groundDay,
   ].join(':');
   paintGroundLayer(ctx, groundKey, (ctx) => {
-    drawFarFields(ctx, night);
+    drawFarFields(ctx, night, season);
     const terrainPoint = (x: number, y: number) => project(x, y);
     const b = terrainPoint(WORLD_WIDTH, 0),
       c = terrainPoint(WORLD_WIDTH, WORLD_HEIGHT),
@@ -410,8 +340,9 @@ export function renderCity({
       if (seed % 4 === 0) diamond(ctx, pt.x, pt.y, 38, 19, p.grassAlt);
       if (x === WORLD_WIDTH - 2 || (x === WORLD_WIDTH - 1 && y < 8)) {
         diamond(ctx, pt.x, pt.y, 38, 19, p.water);
-        rect(ctx, pt.x - 12 + (seed % 16), pt.y, 12, 1, p.waterLight);
-        if (y % 3 === 0) rect(ctx, pt.x + 3, pt.y + 6, 7, 1, p.waterLight);
+        const glint = riverGlint(p.waterLight, night, season, seed);
+        rect(ctx, pt.x - 12 + (seed % 16), pt.y, 12, 1, glint);
+        if (y % 3 === 0) rect(ctx, pt.x + 3, pt.y + 6, 7, 1, glint);
       } else if (road) {
         diamond(ctx, pt.x, pt.y, 38, 19, p.roadEdge);
         diamond(ctx, pt.x, pt.y - 1, 36, 18, p.road);
@@ -422,7 +353,8 @@ export function renderCity({
         for (let k = 0; k < 3; k++) {
           const gx = pt.x - 19 + ((seed >> (k * 3)) % 35),
             gy = pt.y - 5 + ((seed >> (k * 2)) % 10);
-          rect(ctx, gx, gy, 2, 2, night ? '#638171' : '#A4BE81');
+          const tuft = groundTuft(seed, k, night, season);
+          rect(ctx, gx, gy, tuft.w, tuft.h, tuft.fill);
         }
       }
     }
@@ -449,7 +381,7 @@ export function renderCity({
           diamond(ctx, stone.x, stone.y, 7, 3.5, night ? '#899483' : '#E3DABF');
         }
       }
-      if (!occupied) drawMeadow(ctx, plot, night);
+      if (!occupied) drawMeadow(ctx, plot, night, season);
       if (active || hover) diamond(ctx, pt.x, pt.y, 108, 54, night ? '#B5C59B40' : '#F4EDCD80');
       if (!occupied && (showPlots || hover || active)) {
         const corners = [
@@ -475,7 +407,7 @@ export function renderCity({
       // An empty plot waits for its lantern: the stake stands where the post will go.
       if (!occupied) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
     }
-    drawFarmGround(ctx, night);
+    drawFarmGround(ctx, night, season);
   });
   const objects = drawFootball(
     ctx,
@@ -491,6 +423,7 @@ export function renderCity({
       night,
       isZooPlot(selectedPlot ?? '') || isZooPlot(hoveredPlot ?? ''),
       day,
+      season,
     ),
   );
   // Rugs are floor paint: they must never be drawn over seated guests.
@@ -520,7 +453,10 @@ export function renderCity({
   }
   for (const { point, depth, scale, seed } of trees) {
     if (!visible(point, 38, 80, 18)) continue;
-    objects.push({ depth, paint: () => tree(ctx, point.x, point.y, scale, p, seed) });
+    objects.push({
+      depth,
+      paint: () => drawTownTree(ctx, point.x, point.y, scale, p, seed, season),
+    });
   }
   for (const venue of VENUES) {
     if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
@@ -544,6 +480,7 @@ export function renderCity({
         night,
         leaf: p.leaf,
         leafLight: p.leafLight,
+        season,
       }),
     );
   for (const place of places) {
@@ -564,24 +501,33 @@ export function renderCity({
           minutes,
           activity: residentsByHome.get(place.id)?.activity,
           lantern,
+          season,
         }),
     });
   }
   // After the lanterns, the lamps carry the light outward from the Fork.
-  for (const { x, y, distance } of LAMPS) {
+  LAMPS.forEach(({ x, y, distance }, i) => {
     const pt = project(x + 0.5, y + 0.5);
-    if (!visible(pt, 26, 57, 2)) continue;
+    if (!visible(pt, 26, 57, 2)) return;
     const lit = night && lampOn(distance, minutes);
+    const snow = snowAt(season.yearDay, LAMP_SNOW[i]);
     objects.push({
       depth: x + y,
       paint: () => {
         rect(ctx, pt.x, pt.y - 29, 2, 30, night ? '#637266' : '#8B9073');
         rect(ctx, pt.x - 3, pt.y - 33, 8, 6, lit ? '#F4D79A' : night ? '#7C8272' : '#EDE5C1');
         rect(ctx, pt.x - 4, pt.y - 35, 10, 2, night ? '#7A8C7D' : '#748269');
+        if (snow > 0) {
+          // A line of snow on the hood, settling and thawing with the roofs around it.
+          const alpha = ctx.globalAlpha;
+          ctx.globalAlpha = alpha * snow;
+          rect(ctx, pt.x - 3, pt.y - 36, 8, 1, pick(SNOW.top, night));
+          ctx.globalAlpha = alpha;
+        }
         if (lit) drawGlow(ctx, pt.x + 1, pt.y - 30, 24, 0.19);
       },
     });
-  }
+  });
   for (const resident of residents) {
     if (resident.activity !== 'stroll') continue;
     const pt = project(resident.position.x, resident.position.y);
@@ -605,11 +551,15 @@ export function renderCity({
       depth: cat.position.x + cat.position.y,
       paint: () => drawTownCat(ctx, cat, night, followed === TOWN_CAT_ID),
     });
+  // Summer fireflies hover among the houses and trees, so they take part in the depth sort.
+  objects.push(...drawFireflies(ctx, season, night, visible));
   objects.sort((a, b) => a.depth - b.depth).forEach((object) => object.paint());
   drawBirds(ctx, minutes, night);
   drawUfo(ctx, minutes, day, ufoPlaces);
   ctx.restore();
+  drawSnowfall(ctx, width, height, season, night);
   drawGoldenHour(ctx, width, height, minutes);
+  drawSeasonLight(ctx, width, height, season, night);
 }
 
 export function buildingHit(point: Point, places: Place[]): string | undefined {

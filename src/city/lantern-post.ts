@@ -1,4 +1,5 @@
 import { drawGlow, LIGHT } from './glow';
+import { SNOW, pick } from './season-palette';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -16,13 +17,22 @@ function rect(ctx: Ctx, x: number, y: number, w: number, h: number, fill: string
   ctx.fillRect(x, y, w, h);
 }
 
-/** A house's own lantern, in house-local coordinates; it lights with its lantern on the Fork. */
-export function drawLanternPost(ctx: Ctx, lantern: HouseLantern, night: boolean) {
+/**
+ * A house's own lantern, in house-local coordinates; it lights with its lantern on the Fork.
+ * `snow` is the house's own winter snow, 0..1, which settles on the crook.
+ */
+export function drawLanternPost(ctx: Ctx, lantern: HouseLantern, night: boolean, snow = 0) {
   const wood = night ? '#4A4538' : '#6F5A3C';
   rect(ctx, -49, 14, 4, 1, night ? '#0B171540' : '#23341B30');
   rect(ctx, -48, 1, 1, 14, wood);
   // A crook reaches right and the lantern hangs from its hook, as on the mark.
   rect(ctx, -48, 1, 4, 1, wood);
+  if (snow > 0) {
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * snow;
+    rect(ctx, -48, 0, 4, 1, pick(SNOW.top, night));
+    ctx.globalAlpha = alpha;
+  }
   rect(ctx, -45, 2, 1, 1, wood);
   rect(ctx, -46, 3, 3, 1, night ? LIGHT.capNight : LIGHT.cap);
   rect(ctx, -46, 4, 3, 3, lantern.lit ? LIGHT.lit : night ? LIGHT.unlitNight : LIGHT.paper[0]);

@@ -1,4 +1,5 @@
 import { moonSlice, townSkyAt } from '../lib/town-calendar';
+import { snowCoverAt, yearDayAt } from '../lib/seasons';
 import { hash } from '../lib/world';
 import { drawHorizon, goldenHour, mixRgb, rgb } from './horizon';
 
@@ -70,6 +71,6 @@ export function drawSky(
     }
   }
   // Stars are already down, so the ridge hides the lowest of them and the setting sun.
-  drawHorizon(ctx, width, height, sky.daylight, minutes);
+  drawHorizon(ctx, width, height, sky.daylight, minutes, snowCoverAt(yearDayAt(day, minutes)));
   ctx.restore();
 }

@@ -125,6 +125,8 @@ Interface strings owned by the identity (the welcome, the guide steps, and the e
 
 Amber is for light: lit lanterns, windows, lamps, and the live indicator on the Events button. It never marks anything else. Tonight's tale gets a cream paper tag and the newest neighbor gets a terracotta pennant, so a lantern always means one neighbor.
 
+The seasons keep to it. Autumn leaves are ochre and russet, fireflies are green-gold, and pumpkins never glow: none of them is light. See [The turning year](THE_TURNING_YEAR.md).
+
 ## The welcome card
 
 A first visit (no saved flag and no `#place=` or `#venue=` link) shows a quiet card above the dock: the tiled mark, **Every house here started as a fork.**, the neighbor count and the newest arrival, and when nightfall comes. It is an `aside`, not a dialog, and never takes focus. It hides while a panel is open. Any of its actions, or its close button, stores `forktown-welcomed-v1` in local storage. When storage is blocked it greets once per page load. `/live` never shows it.
