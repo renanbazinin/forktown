@@ -19,18 +19,30 @@ export type HouseAppearance = Pick<
   Place,
   'id' | 'building' | 'color' | 'decoration' | 'design' | 'sign'
 >;
+// A town repeats the same few hundred colours every frame, so each shade is worked out once. The
+// palette grows only with the neighbours, and the builder's colour pickers cannot grow it forever.
+const tints = new Map<string, Map<number, string>>();
 export function tint(color: string, delta: number) {
-  const n = parseInt(color.slice(1), 16);
-  return (
-    '#' +
-    [n >> 16, (n >> 8) & 255, n & 255]
-      .map((value) =>
-        Math.max(0, Math.min(255, value + delta))
-          .toString(16)
-          .padStart(2, '0'),
-      )
-      .join('')
-  );
+  let shades = tints.get(color);
+  if (!shades) {
+    if (tints.size >= 4096) tints.clear();
+    tints.set(color, (shades = new Map()));
+  }
+  let shade = shades.get(delta);
+  if (shade === undefined) {
+    const n = parseInt(color.slice(1), 16);
+    shade =
+      '#' +
+      [n >> 16, (n >> 8) & 255, n & 255]
+        .map((value) =>
+          Math.max(0, Math.min(255, value + delta))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('');
+    shades.set(delta, shade);
+  }
+  return shade;
 }
 function polygon(ctx: Ctx, points: number[][], fill: string) {
   ctx.beginPath();

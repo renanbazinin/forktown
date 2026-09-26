@@ -1,3 +1,5 @@
+import { fontReady } from './font-check';
+
 type Ctx = CanvasRenderingContext2D;
 type GroundLayer = { canvas: HTMLCanvasElement; ctx: Ctx; key: string };
 
@@ -31,7 +33,7 @@ export function paintGroundLayer(ctx: Ctx, sceneKey: string, paint: (ctx: Ctx) =
     transform.e,
     transform.f,
     document.fonts?.status,
-    document.fonts?.check('10px "Space Mono"'),
+    fontReady('10px "Space Mono"'),
   ].join('|');
   let layer = layers.get(ctx);
   if (!layer) {

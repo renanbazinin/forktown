@@ -14,6 +14,7 @@ import {
   type HairStyle,
 } from '../lib/football';
 import { project, type Point } from '../lib/world';
+import { fontReady } from './font-check';
 import { drawGlow, LIGHT } from './glow';
 import { tint } from './houses';
 import { mixHex, pick, type Pair } from './season-palette';
@@ -274,7 +275,7 @@ function cachedLayer(
     if (!layer) return null;
     cache = all[name] = { canvas, ctx: layer, key: '', want: '', since: 0 };
   }
-  const key = `${night}:${frame.scale}:${document.fonts?.check(FONT(5))}`;
+  const key = `${night}:${frame.scale}:${fontReady(FONT(5))}`;
   if (cache.key !== key) {
     const now = performance.now();
     if (cache.want !== key) {

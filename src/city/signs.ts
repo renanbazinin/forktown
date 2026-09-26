@@ -1,15 +1,33 @@
 import type { Place } from '../lib/schema';
 import { compileSign, type SignArtwork, type SignLine } from '../lib/sign';
+import { PLOTS } from '../lib/world';
 
 export const SIGN_WIDTH = 240;
 export const SIGN_HEIGHT = 100;
-const cache = new Map<string, SignArtwork>();
+// A published sign keeps its object, so the map finds its artwork by identity every frame. Signs
+// made afresh with the same words, as the builder does on every keystroke, share an entry in a
+// small least-recently-used cache with room for every plot twice over, so a town that grows past
+// its old cap does not re-lay out every sign on every frame.
+const bySign = new WeakMap<Place['sign'], SignArtwork>();
+const byContent = new Map<string, SignArtwork>();
+const CAPACITY = Math.max(256, PLOTS.length * 2);
 
 export function signArtwork(sign: Place['sign']): SignArtwork | null {
   if (sign.mode === 'none') return null;
-  const key = JSON.stringify(sign);
-  const cached = cache.get(key);
-  if (cached) return cached;
+  const known = bySign.get(sign);
+  if (known) return known;
+  // Only the fields this mode draws are part of its key.
+  const key =
+    sign.mode === 'html'
+      ? `html\n${sign.html}`
+      : `text\n${sign.color}\n${sign.background}\n${sign.text}`;
+  const cached = byContent.get(key);
+  if (cached) {
+    byContent.delete(key);
+    byContent.set(key, cached);
+    bySign.set(sign, cached);
+    return cached;
+  }
   let art: SignArtwork;
   try {
     if (sign.mode === 'html') art = compileSign(sign.html);
@@ -42,8 +60,9 @@ export function signArtwork(sign: Place['sign']): SignArtwork | null {
       lines: [{ text: 'Your sign', color: '#FFF4D4', size: 24, bold: true, align: 'center' }],
     };
   }
-  if (cache.size >= 150) cache.clear();
-  cache.set(key, art);
+  if (byContent.size >= CAPACITY) byContent.delete(byContent.keys().next().value!);
+  byContent.set(key, art);
+  bySign.set(sign, art);
   return art;
 }
 
