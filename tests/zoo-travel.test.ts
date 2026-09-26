@@ -2,19 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { placeSchema, type Place } from '../src/lib/schema';
 import { HOUSE_PLOTS, eventsForDay, insideVenue, venueAt } from '../src/lib/events';
-import { getPlot, isRoad, plotEntrance, project, unproject, STREETLIGHTS } from '../src/lib/world';
+import { getPlot, isRoad, plotEntrance, project, STREETLIGHTS } from '../src/lib/world';
 import {
   ZOO_GROUND,
   ZOO_HABITATS,
   ZOO_PLOTS,
   ZOO_SPOTS,
   ZOO_ENTRANCE,
+  ZOO_GATE,
   insideZoo,
   insideZooHabitat,
   zooAnimalsAt,
 } from '../src/lib/zoo';
 import { cityHit } from '../src/city/render';
-import { ZOO_SIGN, zooSignHit } from '../src/city/zoo';
+import { ZOO_GATE_PILLARS, ZOO_SIGN, zooSignHit } from '../src/city/zoo';
 import {
   MAX_TRAVEL_SPEED_MULTIPLIER,
   MIN_VISIT_MINUTES,
@@ -100,15 +101,28 @@ describe('Willow Grove Zoo and physical journey times', () => {
       kind: 'place',
       id: 'O6',
     });
+    // The gate's pillars stand on zoo ground either side of the side path, outside every
+    // habitat, and the plaque raised between them selects the zoo from every corner.
+    for (const pillar of ZOO_GATE_PILLARS) {
+      expect(insideZoo(pillar)).toBe(true);
+      expect(insideZooHabitat(pillar)).toBe(false);
+    }
+    expect(ZOO_GATE_PILLARS[0].x).toBeLessThan(ZOO_GATE.x - 0.25);
+    expect(ZOO_GATE_PILLARS[1].x).toBeGreaterThan(ZOO_GATE.x + 0.25);
+    expect(insideZoo(ZOO_SIGN.point)).toBe(true);
+    expect(insideZooHabitat(ZOO_SIGN.point)).toBe(false);
     const sign = project(ZOO_SIGN.point.x, ZOO_SIGN.point.y);
     for (const x of [-ZOO_SIGN.width / 2, 0, ZOO_SIGN.width / 2]) {
       for (const y of [-ZOO_SIGN.rise, -ZOO_SIGN.rise + ZOO_SIGN.height]) {
         const corner = { x: sign.x + x, y: sign.y + y + x * 0.5 };
-        expect(insideZoo(unproject(corner.x, corner.y))).toBe(true);
         expect(zooSignHit(corner)).toBe(true);
         expect(cityHit(corner, [], [])).toEqual({ kind: 'place', id: 'O6' });
       }
     }
+    // Nothing of the plaque is left inside the elephant pen.
+    const pen = ZOO_HABITATS.find((h) => h.animal === 'elephant')!;
+    const penMiddle = project(pen.left + pen.width / 2, pen.top + 1.3);
+    expect(zooSignHit({ x: penMiddle.x, y: penMiddle.y - 40 })).toBe(false);
     const oldGate = project(ZOO_ENTRANCE.x, ZOO_ENTRANCE.y);
     expect(zooSignHit({ x: oldGate.x, y: oldGate.y - 30 })).toBe(false);
   });

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderCity } from '../src/city/render';
 import { eventsForDay } from '../src/lib/events';
+import { ZOO_FRAME } from '../src/lib/zoo';
 import { places } from './house-variety';
 import { recordingContext } from './recording-context';
 
@@ -8,7 +9,11 @@ import { recordingContext } from './recording-context';
 // culling or a new neighbor changed what was drawn before it.
 const WORDS: Record<string, string> = { '♪': 'start', '♫': 'start', 'ROOM TO GROW': 'center' };
 
-function alignments(start: CanvasTextAlign, minutes: number) {
+const OPENING = { x: 720, y: 88, zoom: 0.7 };
+// The zoo is culled from the opening view, so its words are read with the zoo in view.
+const ZOO = { x: 720 - ZOO_FRAME.center.x * 0.7, y: 450 - ZOO_FRAME.center.y * 0.7, zoom: 0.7 };
+
+function alignments(start: CanvasTextAlign, minutes: number, camera = OPENING) {
   const { ctx } = recordingContext(1440, 900);
   const seen: string[] = [];
   const traced = new Proxy(ctx, {
@@ -28,7 +33,7 @@ function alignments(start: CanvasTextAlign, minutes: number) {
     ctx: traced,
     width: 1440,
     height: 900,
-    camera: { x: 720, y: 88, zoom: 0.7 },
+    camera,
     places,
     selectedPlot: null,
     hoveredPlot: null,
@@ -45,7 +50,12 @@ function alignments(start: CanvasTextAlign, minutes: number) {
 describe('Words on the map', () => {
   it('keep their own alignment whatever was drawn before them', () => {
     for (const minutes of [720, 1150]) {
-      const seen = [...alignments('end', minutes), ...alignments('left', minutes)];
+      const seen = [
+        ...alignments('end', minutes),
+        ...alignments('left', minutes),
+        ...alignments('end', minutes, ZOO),
+        ...alignments('left', minutes, ZOO),
+      ];
       expect(seen.some((word) => word.startsWith('ROOM TO GROW'))).toBe(true);
       for (const word of seen) {
         const text = word.slice(0, word.lastIndexOf(' '));

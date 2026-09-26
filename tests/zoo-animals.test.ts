@@ -136,21 +136,36 @@ describe('Occasional zoo antics', () => {
       expect(swimmer.action?.phase).toBe('swim');
       expect(inPool(swimmer.position)).toBe(true);
     }
-    expect(actorAt('penguin', start + 21).action?.phase).toBe('hop-out');
+    // It swims flat to the kerb by the rock, then hops out.
+    expect(actorAt('penguin', start + 20.8).action?.phase).toBe('swim');
+    expect(actorAt('penguin', start + 20.8).swim).toBe(1);
+    expect(actorAt('penguin', start + 21.6).action?.phase).toBe('hop-out');
     for (let time = 0; time < 1440; time += 0.7)
       for (const penguin of zooAnimalsAt(time).filter((a) => a.species === 'penguin' && !a.action))
         expect(inPool(penguin.position)).toBe(false);
   });
 
-  it('runs zebras faster than a normal wander and stretches giraffes for a wobbly snack', () => {
+  it('runs zebras faster than a normal walk and stretches giraffes for a wobbly snack', () => {
     const start = startFor('zebra'),
       runner = actorAt('zebra', start + 14);
     const next = actorAt('zebra', start + 14.01);
     expect(runner.action?.phase).toBe('run');
-    expect(distance(runner.position, next.position) / 0.01).toBeGreaterThan(1);
-    const idle = zooAnimalsAt(start + 60).find((a) => a.id === runner.id)!;
-    const idleNext = zooAnimalsAt(start + 60.01).find((a) => a.id === runner.id)!;
-    expect(distance(idle.position, idleNext.position) / 0.01).toBeLessThan(0.1);
+    const zoomies = distance(runner.position, next.position) / 0.01;
+    expect(zoomies).toBeGreaterThan(1);
+    // The zoomies are at least three times the fastest idle walk of the day.
+    let fastest = 0;
+    for (let time = 0; time < 1440; time += 0.5) {
+      // The other two step aside during the zoomies; that is not an idle walk.
+      if (zooMomentAt('zebra', time).active || zooMomentAt('zebra', time + 0.05).active) continue;
+      const now = zooAnimalsAt(time),
+        later = zooAnimalsAt(time + 0.05);
+      now.forEach((a, index) => {
+        if (a.species === 'zebra' && a.moving && !a.action && a.rest === 0 && !later[index].action)
+          fastest = Math.max(fastest, distance(a.position, later[index].position) / 0.05);
+      });
+    }
+    expect(fastest).toBeGreaterThan(0);
+    expect(zoomies).toBeGreaterThan(3 * fastest);
     expect(actorAt('zebra', start + 21).action?.phase).toBe('skid');
     const giraffeStart = startFor('giraffe');
     expect(actorAt('giraffe', giraffeStart + 10).action?.phase).toBe('stretch');
@@ -171,6 +186,8 @@ describe('Occasional zoo antics', () => {
           expect(Math.abs(a.lift - after[index].lift)).toBeLessThan(0.02);
           expect(Math.abs(a.stretch - after[index].stretch)).toBeLessThan(0.02);
           expect(Math.abs(a.submerged - after[index].submerged)).toBeLessThan(0.002);
+          for (const key of ['graze', 'look', 'ear', 'tail', 'swim'] as const)
+            expect(Math.abs(a[key] - after[index][key])).toBeLessThan(0.01);
         });
       }
     }
@@ -184,9 +201,11 @@ describe('Occasional zoo antics', () => {
       }
     const before = zooAnimalsAt(1439.999, 9),
       after = zooAnimalsAt(0.001, 10);
-    before.forEach((a, index) =>
-      expect(distance(a.position, after[index].position)).toBeLessThan(0.02),
-    );
+    before.forEach((a, index) => {
+      expect(distance(a.position, after[index].position)).toBeLessThan(0.02);
+      for (const key of ['graze', 'look', 'ear', 'tail', 'swim'] as const)
+        expect(Math.abs(a[key] - after[index][key])).toBeLessThan(0.02);
+    });
     expect(zooAnimalsAt(1441, 9)).toEqual(zooAnimalsAt(1, 10));
     const first = zooAnimalsAt(816.2, 100);
     zooAnimalsAt(20, 250);
