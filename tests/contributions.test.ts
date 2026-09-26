@@ -21,6 +21,13 @@ import { buildingHit, shade } from '../src/city/render';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { FOOTBALL_PLOTS } from '../src/lib/football';
 import { CINEMA_PLOTS } from '../src/lib/cinema';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readPlaceFiles } from '../scripts/place-files';
+import { readdirSync, readFileSync } from 'node:fs';
+import { places } from '../src/lib/places';
 
 const sample: Place = placeSchema.parse({
   id: 'tiny-library',
@@ -205,4 +212,118 @@ describe('The world stays predictable as people contribute', () => {
     expect(buildingHit({ x: center.x, y: center.y - 75 }, [sample])).toBe('A1');
     expect(buildingHit({ x: center.x + 200, y: center.y - 75 }, [sample])).toBeUndefined();
   });
+});
+
+describe('Place files on disk', () => {
+  const folder = async () => {
+    const root = await mkdtemp(join(tmpdir(), 'forktown-place-files-'));
+    await mkdir(join(root, 'places'));
+    await mkdir(join(root, 'docs'));
+    await writeFile(join(root, 'places', 'tiny-library.json'), JSON.stringify(sample));
+    await writeFile(join(root, 'docs', 'real.json'), JSON.stringify({ ...sample, plot: 'A3' }));
+    return root;
+  };
+  const read = (root: string, name = 'places') =>
+    readPlaceFiles(pathToFileURL(join(root, name) + '/'));
+
+  it('reads plain JSON files and skips other plain files', async () => {
+    const root = await folder();
+    try {
+      await writeFile(join(root, 'places', '.DS_Store'), '');
+      expect(await read(root)).toEqual({
+        files: 1,
+        entries: [{ file: 'tiny-library.json', data: sample }],
+        errors: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects links and folders, which the build would follow somewhere else', async () => {
+    const root = await folder();
+    try {
+      await mkdir(join(root, 'places', 'folder.json'));
+      // A folder link works without extra rights on Windows; a file link may not.
+      await symlink(
+        join(root, 'docs'),
+        join(root, 'places', 'linked-folder'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      let fileLink = true;
+      try {
+        await symlink(join(root, 'docs', 'real.json'), join(root, 'places', 'linked.json'));
+      } catch {
+        fileLink = false;
+      }
+      const result = await read(root);
+      expect(result.entries.map((entry) => entry.file)).toEqual(['tiny-library.json']);
+      expect(result.errors.map((error) => error.split(':')[0])).toEqual(
+        ['folder.json', 'linked-folder', ...(fileLink ? ['linked.json'] : [])].sort(),
+      );
+      expect(result.errors[0]).toContain('Keep only plain files in places/');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a places folder that is itself a link', async () => {
+    const root = await folder();
+    try {
+      await symlink(
+        join(root, 'places'),
+        join(root, 'linked-places'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      expect((await read(root, 'linked-places')).errors).toEqual([
+        'places/ must be a plain folder, not a link.',
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('The examples a newcomer copies', () => {
+  it.each(['examples/my-little-place.json', 'examples/living-place.json'])(
+    '%s is a valid house on a house plot, with a placeholder id',
+    (file) => {
+      const example = placeSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+      expect(HOUSE_PLOTS.map((plot) => plot.id)).toContain(example.plot);
+      // It matches the documented copy target, places/your-unique-id.json.
+      expect(example.id).toBe('your-unique-id');
+      expect(
+        places.map((place) => place.id),
+        'A house still uses the example id "your-unique-id". Choose your own id and rename the file to match.',
+      ).not.toContain(example.id);
+    },
+  );
+});
+
+describe('The buttons the guides tell newcomers to click', () => {
+  const sources = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? sources(join(dir, entry.name))
+        : /\.tsx?$/.test(entry.name)
+          ? [readFileSync(join(dir, entry.name), 'utf8')]
+          : [],
+    );
+  const app = sources('src').join('\n');
+  // GitHub's own buttons, which the README walks through too.
+  const github = new Set(['Create fork', 'Compare & pull request', 'Create pull request']);
+
+  it.each(['README.md', 'CONTRIBUTING.md'])(
+    '%s names only labels the town really shows',
+    (file) => {
+      const labels = [
+        ...readFileSync(file, 'utf8').matchAll(
+          /\b(?:click|choose|select|press|says|see|opens?|in the) \*\*([^*]+)\*\*/gi,
+        ),
+      ].flatMap(([, label]) => label.split('→').map((part) => part.trim()));
+      expect(labels.length).toBeGreaterThan(5);
+      for (const label of labels)
+        if (!github.has(label)) expect(app.includes(label), label).toBe(true);
+    },
+  );
 });

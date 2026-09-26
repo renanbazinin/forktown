@@ -20,6 +20,6 @@ A commented PR review also triggered the no-permission review signal and the tru
 
 GitHub API verification confirmed main requires both `check` and `Contribution policy`, each from GitHub Actions (app 15368), with strict up-to-date checking. Pull requests are required, administrators are included, force pushes and branch deletion are disabled, and stale reviews are dismissed. General review count is zero because the trusted policy enforces review for ownership changes. No bypass or merge queue is configured.
 
-## Remaining human trial
+## The outside trial
 
-Issue #6 stays open by the owner's request. The owner will arrange a tester with repository access. Follow EXTERNAL_CONTRIBUTOR_TRIAL.md to verify a real fork, first-time workflow approval, beginner usability, and an accepted house through publication. The repository remains private.
+At the time of these checks the repository was private and the outside trial was still to come. The repository is public now, and issue #6 closed on September 24, 2026, after an outside contributor's fork PR (#41) was merged and published. See [External contributor trial](EXTERNAL_CONTRIBUTOR_TRIAL.md) for what it covered.

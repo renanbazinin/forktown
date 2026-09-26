@@ -32,6 +32,7 @@ import {
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { hash, type Point } from '../src/lib/world';
 import { recordingContext, type RecordedCall } from './recording-context';
+import { openingViewBudget } from './render-budget';
 
 // The turning year, seen through the renderer: every season stays inside the town's budgets and
 // bounds, paints the same frame for the same moment, and shows its colours only in its season.
@@ -142,11 +143,13 @@ describe('The opening view through the year', () => {
       const calls = frame(day, minutes).length,
         base = frame(summer, minutes).length;
       expect(calls, `${minutes}`).toBeGreaterThan(1000);
-      expect(calls, `${minutes}`).toBeLessThan(40_000);
-      // Measured: -754 to +287 over these moments (with the Millpond, whose ice, boats and lily
-      // pads follow the year). A season only rests on top of the town;
-      // it never adds a layer, and never loses one (the houses alone are ~3,000 calls).
-      expect(calls - base, `${minutes}`).toBeLessThanOrEqual(1_000);
+      expect(calls, `${minutes}`).toBeLessThan(openingViewBudget(places.length));
+      // Measured: -998 to +232 over these moments with no houses at all (with the Millpond,
+      // whose ice, boats and lily pads follow the year), and -719 to +322 with today's 18. Each
+      // house adds at most 37 in deep winter, with snow on its roof and pumpkins in its beds:
+      // +5,217 with the heaviest house on all 141 plots. A season only rests on top of the town;
+      // it never adds a layer, and never loses one (each house alone is ~180 calls).
+      expect(calls - base, `${minutes}`).toBeLessThanOrEqual(1_000 + 40 * places.length);
       expect(calls - base, `${minutes}`).toBeGreaterThanOrEqual(-1_500);
     }
   });
@@ -197,6 +200,8 @@ describe('The opening view through the year', () => {
     expect(noon.filter((call) => call.fillStyle === FIREFLY.core)).toHaveLength(0);
   });
 
+  // A whole frame for every day of the year, so it grows with the town: about 3.5 s alone with
+  // all 141 plots taken.
   it('keeps every signature colour inside its season, all year', () => {
     // Every town day, alternating noon and 22:00, so both palettes are swept.
     const violations: string[] = [];
@@ -225,7 +230,7 @@ describe('The opening view through the year', () => {
       }
     }
     expect(violations).toEqual([]);
-  });
+  }, 30_000);
 
   // The cached ground reads snow at the day's first minute, so on Winter 1 at 00:00, before any
   // flake has fallen, the lawns, meadows and furrows are still bare; they whiten from Winter 2.
