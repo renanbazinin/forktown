@@ -16,6 +16,10 @@
   "engines": {
     "node": ">=22.12.0"
   },
+  "allowScripts": {
+    "esbuild": true,
+    "fsevents": true
+  },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "validate": "tsx scripts/validate-places.ts",

@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { SUBPROCESS_TEST } from './subprocess-timeout';
 import { thirdPartyLicenses, thirdPartyNotices } from '../scripts/third-party-licenses';
 import { CANONICAL_SITE, sharePreview, siteUrl } from '../scripts/share-preview';
+import { CHUNK_WARNING_KB, chunkBudget } from '../scripts/chunk-budget';
 
 const script = fileURLToPath(new URL('../scripts/configure-pages.mjs', import.meta.url));
 const created: string[] = [];
@@ -227,5 +228,26 @@ describe('Link previews', () => {
     expect(html).not.toContain('%SITE_URL%');
     expect(meta(html, 'og:image')).toBe('https://neighbor.github.io/forktown/og-image.png');
     expect(readFileSync('vite.config.ts', 'utf8')).toMatch(/plugins: \[[^\]]*sharePreview\(\)/);
+  });
+});
+
+describe('A quiet first install and build', () => {
+  it('names every package whose install script may run, so npm has nothing to warn about', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
+    const withScripts = Object.entries<{ hasInstallScript?: boolean }>(lock.packages)
+      .filter(([, entry]) => entry.hasInstallScript)
+      .map(([path]) => path.split('node_modules/').at(-1));
+    const { allowScripts } = JSON.parse(readFileSync('package.json', 'utf8'));
+    expect(withScripts.length).toBeGreaterThan(0);
+    for (const name of withScripts) expect(allowScripts, name).toHaveProperty([name!], true);
+  });
+
+  it('keeps the chunk-size warning for chunks that really grew', () => {
+    expect(readFileSync('vite.config.ts', 'utf8')).toMatch(/plugins: \[[^\]]*chunkBudget\(\)/);
+    const plugin = chunkBudget();
+    expect((plugin.config as () => unknown)()).toEqual({
+      build: { chunkSizeWarningLimit: CHUNK_WARNING_KB },
+    });
+    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1000);
   });
 });
