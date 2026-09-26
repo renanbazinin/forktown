@@ -84,7 +84,7 @@ const allowed = (trip: ResidentTrip, state: ReturnType<typeof tripState>) => {
 };
 
 describe('Riding the Treeline over a whole year', () => {
-  it('plans every trip before a ride exactly as without the tube', () => {
+  it('plans every trip before a ride exactly as on foot', () => {
     // Synthetic full town for a week, then the real roster for a year.
     const crowd = HOUSE_PLOTS.map((plot, i) => ({
       ...sample,
@@ -111,7 +111,7 @@ describe('Riding the Treeline over a whole year', () => {
         for (const home of homes) {
           const trips = now.get(home.id)!,
             old = walking.get(home.id)!;
-          // Without the tube nobody has legs.
+          // On foot nobody has legs.
           for (const trip of old) expect('legs' in trip || 'returnLegs' in trip).toBe(false);
           const first = trips.findIndex(rides);
           if (first < 0) {

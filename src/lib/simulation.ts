@@ -23,7 +23,8 @@ export type ResidentState = {
   nightWalk?: boolean;
   nightPorch?: boolean;
   pose?: EventPose;
-  event?: { name: string; id: string; phase: 'going' | 'attending' | 'returning' };
+  /** `waiting` is at their spot, early for a show that hasn't started. */
+  event?: { name: string; id: string; phase: 'going' | 'waiting' | 'attending' | 'returning' };
   /** Only while boarding, riding or stepping off the tube on the way to or from an event. */
   transit?: ResidentTransit;
 };
@@ -60,6 +61,8 @@ function tubeLabel(transit: ResidentTransit, event: NonNullable<ResidentState['e
 export function residentActivityLabel(state: ResidentState): string {
   if (state.duckLove) return 'Stopped to admire the ducklings';
   if (state.transit && state.event) return tubeLabel(state.transit, state.event);
+  if (state.event?.phase === 'waiting')
+    return `Waiting for ${state.event.id === 'cinema' ? 'the film to start' : state.event.name}`;
   if (state.event?.id === 'zoo')
     return state.event.phase === 'going'
       ? 'Walking to Willow Grove Zoo'
