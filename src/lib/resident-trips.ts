@@ -185,7 +185,12 @@ export function planResidentTrips(
           !excluded.includes(home.id) &&
           getPlot(home.plot),
       )
-      .sort((a, b) => hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) || a.id.localeCompare(b.id));
+      // Ids break a tie by code unit, never by the browser's language.
+      .sort(
+        (a, b) =>
+          hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      );
   /** Seat guests in line order until the seats are full or nobody else can make it. */
   const seat = (event: VisitEvent, line: readonly Place[], seats: number) => {
     const guests: string[] = [];

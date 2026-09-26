@@ -1,9 +1,10 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { placeSchema, validatePlaces, type Place } from '../src/lib/schema';
-import { EVENT_SPOTS, HOUSE_PLOTS } from '../src/lib/events';
+import { EVENT_SPOTS, eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
+import { hash } from '../src/lib/world';
 import { planResidentTrips, type ResidentTrip } from '../src/lib/resident-trips';
-import { cinemaGuests } from '../src/lib/cinema';
+import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
 import { millpondSkatingDay } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { nightBedtime } from '../src/lib/night-routine';
@@ -171,5 +172,61 @@ describe('Event seats at a full town', () => {
         backward = planResidentTrips([...homes].reverse(), day);
       for (const home of homes) expect(backward.get(home.id)).toEqual(forward.get(home.id));
     }
+  });
+});
+
+/** Run with the default collation set to another language, as a visitor's browser would. */
+function inLanguage<T>(locale: string, run: () => T): T {
+  const original = String.prototype.localeCompare;
+  String.prototype.localeCompare = function (
+    this: string,
+    that: string,
+    locales?: Intl.LocalesArgument,
+    options?: Intl.CollatorOptions,
+  ) {
+    return original.call(this, that, locales ?? locale, options);
+  } as typeof original;
+  try {
+    return run();
+  } finally {
+    String.prototype.localeCompare = original;
+  }
+}
+
+describe('Event seats in every browser language', () => {
+  it('draws the same guests, seats and films when two ids tie', () => {
+    const day = CALENDAR_EPOCH_DAY;
+    // Pairs whose daily draw ties exactly, so only the ids can order them. Lithuanian sorts "y"
+    // with "i", before "j"; English and code units put "j" first.
+    const lunch = ['tie-j41488', 'tie-y563242'],
+      film = ['tie-j101642', 'tie-y1769200'],
+      bill = ['tie-j31989', 'tie-y5994356'];
+    const picnic = eventsForDay(day)[0].id;
+    expect(hash(`${day}:${picnic}:${lunch[0]}`)).toBe(hash(`${day}:${picnic}:${lunch[1]}`));
+    expect(hash(`cinema-guests:${day}:${film[0]}`)).toBe(hash(`cinema-guests:${day}:${film[1]}`));
+    expect(hash(`cinema:${day}:${bill[0]}`)).toBe(hash(`cinema:${day}:${bill[1]}`));
+    expect(inLanguage('lt', () => lunch[1].localeCompare(lunch[0]))).toBeLessThan(0);
+    const homes = [...lunch, ...film].map((id, index) =>
+      placeSchema.parse({
+        ...sample,
+        id,
+        plot: HOUSE_PLOTS[index].id,
+        resident: { ...sample.resident, routine: routine(index < 2 ? 47 : 8) },
+      }),
+    );
+    const library = CINEMA_FILMS.slice(0, 3).map((film, index) => ({
+      ...film,
+      id: bill[index] ?? film.id,
+    }));
+    const draw = () => ({
+      trips: [...planResidentTrips(homes, day)],
+      town: [...planResidentTrips(real, day)],
+      guests: cinemaGuests(homes, day),
+      films: cinemaProgram(day, library).films.map((film) => film.id),
+    });
+    const english = inLanguage('en', draw);
+    expect(english.guests).toEqual([film[0]]);
+    for (const locale of ['lt', 'haw', 'da', 'cs'])
+      expect(inLanguage(locale, draw)).toEqual(english);
   });
 });
