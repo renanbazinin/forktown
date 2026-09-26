@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   EVENING_COPY,
@@ -15,14 +14,10 @@ import {
 } from '../src/lib/builder-nudges';
 import { FORK_PLOT, lanternHourAt, lanternRegister } from '../src/lib/lanterns';
 import { HOUSE_PLOTS } from '../src/lib/events';
-import { DEFAULT_DESIGN, placeSchema } from '../src/lib/schema';
+import { DEFAULT_DESIGN } from '../src/lib/schema';
 import { ARRIVALS, TOWN } from './lantern-town';
 
 const places = TOWN;
-// Every house file, for checks about the plots they occupy today.
-const everyHouse = readdirSync('places')
-  .filter((name) => name.endsWith('.json'))
-  .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
 const nameOf = (id: string) => places.find((place) => place.id === id)?.name ?? id;
 
 describe('Lantern hour words', () => {
@@ -126,9 +121,9 @@ describe('The builder asks for a story of its own', () => {
   });
 
   it('moves a restored draft off a taken or reserved plot', () => {
-    const available = HOUSE_PLOTS.filter(
-      (plot) => !everyHouse.some((place) => place.plot === plot.id),
-    );
+    // A small town of its own, so the check holds however full the real one gets.
+    const taken = new Set(['C6', 'D4', 'E5']);
+    const available = HOUSE_PLOTS.filter((plot) => !taken.has(plot.id));
     expect(restoreDraftPlot(available[3].id, available)).toBe(available[3].id);
     expect(restoreDraftPlot(FORK_PLOT, available)).toBe(available[0].id);
     expect(restoreDraftPlot('C6', available)).toBe(available[0].id);
