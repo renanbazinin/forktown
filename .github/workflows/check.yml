@@ -26,7 +26,8 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
-      - run: npm ci
+      - id: install
+        run: npm ci
       - name: Test, validate, and build the town
         run: npm run check
       - name: Save the preview build
@@ -36,3 +37,7 @@ jobs:
           path: dist/
           retention-days: 7
           if-no-files-found: error
+      # Runs even when the check above fails, so both results show; npm run format tidies files.
+      - name: Check formatting
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run format:check

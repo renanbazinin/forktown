@@ -6,7 +6,7 @@ One house. One neighbor. One lantern. The lantern is the town's unit of belongin
 
 ## The mark
 
-The mark is drawn on a 32 x 32 pixel grid from a single list, `MARK_PIXELS` in `src/lib/brand.ts`. The header (`BrandMark`), the favicon, and the `/live` watermark all read that list, and `tests/brand.test.ts` pins `public/favicon.svg` to `markSvg({ tile: true })` byte for byte.
+The mark is drawn on a 32 x 32 pixel grid from a single list, `MARK_PIXELS` in `src/lib/brand.ts`. The header (`BrandMark`), the favicon, the home-screen icon, and the `/live` watermark all read that list. `tests/brand.test.ts` pins `public/favicon.svg` to `markSvg({ tile: true })` byte for byte, and `public/apple-touch-icon.png` to `scripts/touch-icon.ts` pixel for pixel: the mark at 5x on a square day tile, 180 x 180, since iOS rounds the corners itself.
 
 | Part                   | Rects `[x, y, w, h]`                                                                | Day       | Night     |
 | ---------------------- | ----------------------------------------------------------------------------------- | --------- | --------- |

@@ -20,6 +20,7 @@ For example, change this to `{ rows: 20, columns: 14 }` for 280 plots, or `{ row
 - Row letters and column numbers are independent of the current town size. Row Z is followed by AA, AB, and so on; A10 follows A9. Existing IDs are never renumbered.
 - Place links use the place ID, not an array index or map coordinate. Leave existing place IDs intact.
 - Walking destinations may change when roads grow, but resident data and simple routines remain compatible. Shoreline and border scenery move to the new edge.
+- The duck family walks a fixed 40.7 tiles each way from the river along the Lunch Green street, so in a wider town they turn back before its far end instead of hurrying to reach it.
 
 ## Before publishing an expansion
 
@@ -31,7 +32,7 @@ This configuration supports future expansion without scattering size constants a
 
 ## Long-distance visits
 
-Event trips use 0.32 tiles per town minute. The planner measures the road and venue path, aims to arrive five minutes early, and starts earlier when the resident has free time. Work, home, and sleep routines limit the available window. If a previous outing or work delays departure, residents may arrive late; trips that cannot reach the event before it ends and return before the next commitment are skipped. When necessary they leave the event early to get home on time. Return journeys use the same speed. A trip is planned for the whole day, so crossing noon, evening, or midnight never changes its destination or teleports its resident.
+Event trips use 0.32 tiles per town minute. The planner measures the road and venue path, aims to arrive five minutes early, and starts earlier when the resident has free time. Work, home, and sleep routines limit the available window. If a previous outing or work delays departure, residents may arrive late; trips that cannot reach the event before it ends and return before the next commitment are skipped, and the seat goes to the next neighbor in line who can make it. When necessary they leave the event early to get home on time. Return journeys use the same speed. A trip is planned for the whole day, so crossing noon, evening, or midnight never changes its destination or teleports its resident.
 
 Far trips can ride the Treeline, the glass tube behind the northwest trees. A journey takes the tube only when, door to door, it is at least ten unhurried minutes faster than walking the whole way. The tube's fixed minutes are 2 to board (the short walk from the road to the station's glass stack included), about 5.45 in the glass between Hedgerow Halt on C1 and Willow Halt on N1, and 2 to step off and walk back out to the road. Only the walking legs hurry, never past 1.4 times the usual pace; the glass keeps its own speed. The way home is the same choice, never decided again. Nearby trips stay on foot. See [The Treeline](TUBES.md) and `tests/manual/tubes.html`.
 

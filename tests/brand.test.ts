@@ -1,5 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { inflateSync } from 'node:zlib';
+import { touchIconScanlines } from '../scripts/touch-icon';
 import { describe, expect, it } from 'vitest';
 import {
   BRAND,
@@ -35,6 +37,19 @@ const storage = (items: Record<string, string> = {}) => ({
 describe('The Lantern Fork mark', () => {
   it('is the favicon, byte for byte', () => {
     expect(readFileSync('public/favicon.svg', 'utf8').trim()).toBe(markSvg({ tile: true }));
+  });
+
+  it('is the home-screen icon, pixel for pixel', () => {
+    const png = readFileSync('public/apple-touch-icon.png');
+    const data: Buffer[] = [];
+    for (let at = 8; at < png.length;) {
+      const length = png.readUInt32BE(at);
+      const type = png.subarray(at + 4, at + 8).toString('ascii');
+      if (type === 'IHDR') expect([...png.subarray(at + 16, at + 18)]).toEqual([8, 2]);
+      if (type === 'IDAT') data.push(png.subarray(at + 8, at + 8 + length));
+      at += 12 + length;
+    }
+    expect(inflateSync(Buffer.concat(data)).equals(touchIconScanlines())).toBe(true);
   });
 
   it('draws 19 whole-pixel rects inside a 32x32 grid', () => {
@@ -88,6 +103,7 @@ describe('One tagline', () => {
   it('names the town the same way everywhere', () => {
     const index = readFileSync('index.html', 'utf8');
     expect(index.match(/<title>(.*)<\/title>/)![1]).toBe(TITLE);
+    expect(index.match(/property="og:title"\s+content="([^"]*)"/)![1]).toBe(TITLE);
     expect(index.match(/name="description"\s+content="([^"]*)"/)![1].startsWith(TAGLINE)).toBe(
       true,
     );

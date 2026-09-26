@@ -115,150 +115,187 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
     byDay = new Map();
     plans.set(places, byDay);
   }
-  if (byDay.size >= 3) byDay.clear();
+  // Drop the oldest day: tomorrow's plan, prefetched before 06:00, must not evict today's.
+  if (byDay.size >= 3) byDay.delete(byDay.keys().next().value!);
   byDay.set(day, result);
   return result;
 }
 
+/** Football uses the same physical travel rules, with a morning or afternoon visit. */
+function footballVisit(period: 'morning' | 'afternoon'): VisitEvent {
+  const start = period === 'morning' ? 360 : 720;
+  return {
+    id: 'football',
+    name: 'The Meadow Ground',
+    description: 'Watching the football',
+    venue: FOOTBALL_VENUE,
+    period,
+    depart: start,
+    start: start + 70,
+    end: start + 285,
+    homeBy: start + 350,
+  };
+}
+
+const skatingVisit: VisitEvent = {
+  id: 'millpond',
+  name: 'Skating on the Millpond',
+  description: 'Skating on the frozen millpond',
+  venue: MILLPOND_VENUE,
+  period: 'afternoon',
+  ...SKATING,
+  // Whoever leaves last (stagger 5 × 1.3) is still off the ice by the posted 16:40.
+  end: SKATING.end - 6.5,
+};
+
+const previews = new WeakMap<Place[], { roster: Place[]; newcomers: Place[] }>();
+
 /**
- * The day's plan, uncached. With `tube: false` nobody rides: that is the walking-only planner. A
- * tube plan equals it for every trip before a resident's first ride, and never drops one of its
- * trips for a trip only the tube makes possible.
+ * The town with a builder's draft house in it, for "Preview in town". Everyone already in town is
+ * planned exactly as without the draft, and the draft's neighbor only takes a seat they leave
+ * free, so a preview never moves anyone else.
+ */
+export function withPreview(places: Place[], draft: Place): Place[] {
+  const town = [...places, draft];
+  previews.set(town, { roster: places, newcomers: [draft] });
+  return town;
+}
+
+/**
+ * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
+ * neighbor in line whenever someone ahead can't make it (too far to get there, on foot or by tube,
+ * and home in time, or an earlier outing runs late), so a seat is only given out when it will be
+ * filled. A far neighbor who can only make it by tube keeps their turn, so the tube changes who
+ * gets a seat as well as how they travel.
+ *
+ * With `tube: false` the same guests are seated but nobody rides. That is not the town without
+ * the tube, whose lines would pass a rider's seat on. A tube plan equals it for every trip before
+ * a resident's first ride, and never drops one of its trips for a trip only the tube makes
+ * possible, because a guest is only seated when the tube plan keeps every one of their outings.
  */
 export function planResidentTrips(
   places: Place[],
   day: number,
   options: { tube?: boolean } = {},
 ): Map<string, ResidentTrip[]> {
-  const candidates = new Map<string, Candidate[]>();
   const program = eventsForDay(day);
-  const movieGuests = cinemaGuests(places, day);
-  const sorted = (period: Period, key: string, excluded: string[] = []) =>
-    places
-      .filter((home) => home.resident.routine[period] === 'stroll' && !excluded.includes(home.id))
-      .sort((a, b) => hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) || a.id.localeCompare(b.id));
-  const add = (event: VisitEvent, ids: string[], period: Period = event.period) => {
-    ids.forEach((id, seat) => {
-      const list = candidates.get(id) ?? [];
-      list.push({ event, seat, period });
-      candidates.set(id, list);
-    });
+  // A previewed draft joins every line behind the whole town.
+  const { roster, newcomers } = previews.get(places) ?? { roster: places, newcomers: [] };
+  // Each home's invitations so far, and the day they make.
+  const days = new Map<string, { list: Candidate[]; trips: ResidentTrip[] }>();
+  const empty = { list: [], trips: [] };
+  const invite = (home: Place, candidate: Candidate) => {
+    const before = days.get(home.id) ?? empty;
+    const list = [...before.list, candidate].sort((a, b) => a.event.start - b.event.start);
+    const trips = planHome(home, list, tubeJourneys(home, list));
+    // A visit that costs an outing already planned would leave that seat empty. That rule alone
+    // keeps every trip the walking-only plan makes: all of them are among the outings.
+    if (trips.length < list.length) return false;
+    days.set(home.id, { list, trips });
+    return true;
   };
-  const picnic = program[0],
-    concert = program[1],
-    party = program.find((e) => e.id === 'night-party')!;
-  const picnicIds = sorted('afternoon', `${day}:${picnic.id}`)
-    .slice(0, EVENT_SPOTS.green.length)
-    .map((h) => h.id);
-  add(picnic, picnicIds);
-  add(
-    concert,
-    sorted('evening', `${day}:${concert.id}`, movieGuests)
-      .slice(0, EVENT_SPOTS.stage.length)
-      .map((h) => h.id),
+  const sorted = (period: Period, key: string, excluded: readonly string[] = []) =>
+    [roster, newcomers].map((homes) =>
+      homes
+        .filter(
+          (home) =>
+            home.resident.routine[period] === 'stroll' &&
+            !excluded.includes(home.id) &&
+            getPlot(home.plot),
+        )
+        .map((home) => ({ home, draw: hash(`${key}:${home.id}`) }))
+        // Ids break a tie by code unit, never by the browser's language.
+        .sort(
+          (a, b) => a.draw - b.draw || (a.home.id < b.home.id ? -1 : a.home.id > b.home.id ? 1 : 0),
+        )
+        .map(({ home }) => home),
+    );
+  /**
+   * Seat guests in line order until the seats are full or nobody else can make it. `seats` counts
+   * the spots for a line of that many; newcomers get only the spots the town's line leaves.
+   */
+  const seat = (
+    event: VisitEvent,
+    [line, late]: Place[][],
+    seats: (entrants: number) => number,
+  ) => {
+    const guests: string[] = [];
+    for (const [homes, spots] of [
+      [line, seats(line.length)],
+      [late, seats(line.length + late.length)],
+    ] as const)
+      for (const home of homes) {
+        if (guests.length >= spots) break;
+        if (invite(home, { event, seat: guests.length, period: event.period }))
+          guests.push(home.id);
+      }
+    return guests;
+  };
+  const all = (spots: number) => () => spots;
+  const half = (spots: number) => (entrants: number) => Math.min(spots, Math.ceil(entrants / 2));
+  // Cinema guests keep their seats whatever happens; their evening is planned around the film.
+  const cinema = program.find((e) => e.id === 'cinema')!;
+  const movieGuests = cinemaGuests(roster, day);
+  // A newcomer sees the film only from a seat the town's own guests leave free.
+  const filmSeats = cinemaGuests(places, day).length;
+  for (const { id, resident } of newcomers)
+    if (
+      movieGuests.length < filmSeats &&
+      resident.routine.evening === 'stroll' &&
+      resident.routine.night === 'stroll'
+    )
+      movieGuests.push(id);
+  movieGuests.forEach((id, seat) => {
+    const home = places.find((place) => place.id === id);
+    if (home && getPlot(home.plot)) invite(home, { event: cinema, seat, period: 'evening' });
+  });
+  // The rest in time order, so an outing is planned around the ones earlier in the day.
+  seat(footballVisit('morning'), sorted('morning', `fans:${day}:morning`), half(6));
+  const picnic = program[0];
+  const picnicIds = seat(
+    picnic,
+    sorted('afternoon', `${day}:${picnic.id}`),
+    all(EVENT_SPOTS.green.length),
   );
-  add(
-    party,
-    sorted('night', `${day}:${party.id}`)
-      .slice(0, EVENT_SPOTS.stage.length)
-      .map((h) => h.id),
-  );
-  add(
-    program.find((e) => e.id === 'cinema')!,
-    movieGuests,
-    'evening',
-  );
-  const zooCandidates = sorted('afternoon', `zoo:${day}`, picnicIds);
-  const zooIds = zooCandidates
-    .slice(0, Math.min(EVENT_SPOTS.zoo.length, Math.ceil(zooCandidates.length / 2)))
-    .map((h) => h.id);
-  add(
+  const zooIds = seat(
     program.find((e) => e.id === 'zoo')!,
-    zooIds,
+    sorted('afternoon', `zoo:${day}`, picnicIds),
+    half(EVENT_SPOTS.zoo.length),
   );
-  for (const period of ['morning', 'afternoon'] as const) {
-    const fans = sorted(
-      period,
-      `fans:${day}:${period}`,
-      period === 'afternoon' ? [...picnicIds, ...zooIds] : [],
-    );
-    const start = period === 'morning' ? 360 : 720;
-    // Football uses the same physical travel rules, with a morning or afternoon visit.
-    const football: VisitEvent = {
-      id: 'football',
-      name: 'The Meadow Ground',
-      description: 'Watching the football',
-      venue: FOOTBALL_VENUE,
-      period,
-      depart: start,
-      start: start + 70,
-      end: start + 285,
-      homeBy: start + 350,
-    };
-    add(
-      football,
-      fans.slice(0, Math.min(6, Math.ceil(fans.length / 2))).map((h) => h.id),
-      period,
-    );
-  }
+  const fanIds = seat(
+    footballVisit('afternoon'),
+    sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]),
+    half(6),
+  );
   // Winter skating on the frozen Millpond, for afternoon strollers nobody else has claimed.
-  if (millpondSkatingDay(day)) {
-    const afternoonFans = sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]);
-    const fanIds = afternoonFans
-      .slice(0, Math.min(6, Math.ceil(afternoonFans.length / 2)))
-      .map((h) => h.id);
-    const skaters = sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]);
-    add(
-      {
-        id: 'millpond',
-        name: 'Skating on the Millpond',
-        description: 'Skating on the frozen millpond',
-        venue: MILLPOND_VENUE,
-        period: 'afternoon',
-        ...SKATING,
-        // Whoever leaves last (stagger 5 × 1.3) is still off the ice by the posted 16:40.
-        end: SKATING.end - 6.5,
-      },
-      skaters.slice(0, Math.min(6, Math.ceil(skaters.length / 2))).map((h) => h.id),
+  if (millpondSkatingDay(day))
+    seat(
+      skatingVisit,
+      sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]),
+      half(6),
     );
-  }
+  const concert = program[1];
+  seat(
+    concert,
+    sorted('evening', `${day}:${concert.id}`, movieGuests),
+    all(EVENT_SPOTS.stage.length),
+  );
+  const party = program.find((e) => e.id === 'night-party')!;
+  seat(party, sorted('night', `${day}:${party.id}`), all(EVENT_SPOTS.stage.length));
   const result = new Map<string, ResidentTrip[]>();
   for (const home of places) {
     if (!getPlot(home.plot)) continue;
-    const list = (candidates.get(home.id) ?? []).sort((a, b) => a.event.start - b.event.start);
-    result.set(home.id, options.tube === false ? planHome(home, list) : planWithTube(home, list));
+    const { list, trips } = days.get(home.id) ?? empty;
+    result.set(home.id, options.tube === false ? planHome(home, list) : trips);
   }
   return result;
 }
 
 type TubeJourney = NonNullable<ReturnType<typeof eventTubeJourney>>;
 
-/**
- * The tube plan, keeping every trip the walking-only plan keeps. The planner is greedy, so a trip
- * only the tube makes possible (one the walking plan leaves out) could take time a later walking
- * trip needs: then the nearest such trip before the lost one gives way and the day is planned
- * again, until every walking trip is back.
- */
-function planWithTube(home: Place, list: readonly Candidate[]): ResidentTrip[] {
-  const journeys = new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
-  const skip = new Set<VisitEvent>();
-  let trips = planHome(home, list, journeys, skip);
-  // Without any ride on offer the tube plan is the walking plan.
-  if (![...journeys.values()].some(Boolean)) return trips;
-  const kept = new Set(planHome(home, list).map((trip) => trip.event));
-  for (;;) {
-    const planned = new Set(trips.map((trip) => trip.event));
-    const lost = list.findIndex((c) => kept.has(c.event) && !planned.has(c.event));
-    if (lost < 0) return trips;
-    let extra: VisitEvent | undefined;
-    for (let i = lost - 1; i >= 0 && !extra; i--)
-      if (planned.has(list[i].event) && !kept.has(list[i].event)) extra = list[i].event;
-    // Nothing the tube added comes before it (the planner's own greed); keep the day as it is.
-    if (!extra) return trips;
-    skip.add(extra);
-    trips = planHome(home, list, journeys, skip);
-  }
-}
+/** Each outing's tube journey, or undefined where walking is as good. */
+const tubeJourneys = (home: Place, list: readonly Candidate[]) =>
+  new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
 
 /** One home's day: each candidate in start order, kept when it fits after the trip before. With
  *  `journeys`, a candidate that has a tube journey rides it; without, everyone walks. */
@@ -266,11 +303,9 @@ function planHome(
   home: Place,
   list: readonly Candidate[],
   journeys?: ReadonlyMap<VisitEvent, TubeJourney | undefined>,
-  skip: ReadonlySet<VisitEvent> = new Set(),
 ): ResidentTrip[] {
   const trips: ResidentTrip[] = [];
   for (const { event, seat, period } of list) {
-    if (skip.has(event)) continue;
     const window = availableWindow(home, period);
     const previous = trips.at(-1);
     const previousReturn = previous?.homeBy ?? window.availableFrom;
@@ -315,11 +350,22 @@ function planHome(
         continue;
       }
     }
+    const walkTiles = tube ? walkedTiles(tube.legs) : routeLength(route);
+    const fixed = tube ? fixedMinutes(tube.legs) : 0;
+    // Night owls drift in through the party's first hour, but never so late that their bedtime
+    // leaves less than fifteen minutes to dance and an unhurried walk home.
+    const unhurried = walkTiles / WALK_SPEED + fixed;
+    const lateness = Math.floor(
+      window.availableUntil - unhurried - event.start - MIN_VISIT_MINUTES,
+    );
+    const arrival = partyVisit
+      ? hash(`party-arrival:${home.id}`) % (Math.min(60, Math.max(0, lateness)) + 1)
+      : 0;
     // Only the walking picks up the pace; boarding, riding and stepping off keep their minutes.
     const plan = planJourney(
-      tube ? walkedTiles(tube.legs) : routeLength(route),
-      tube ? fixedMinutes(tube.legs) : 0,
-      event.start + (partyVisit ? hash(`party-arrival:${home.id}`) % 61 : 0),
+      walkTiles,
+      fixed,
+      event.start + arrival,
       end,
       Math.max(window.availableFrom, previousReturn),
       window.availableUntil,
@@ -377,14 +423,19 @@ export function tripState(
     legs,
     returnLegs,
   } = trip;
-  // Skaters step onto the ice at their loop's south point and glide from that moment on.
+  // Skaters step onto the ice at their loop's south point and glide from that moment on. Zoo
+  // visitors and football fans likewise join in on arrival: the animals and the match are already
+  // there. Anyone early for a show waits at their spot until it starts.
   const skating = event.venue.kind === 'millpond';
+  const underway = skating || event.venue.kind === 'zoo' || event.venue.kind === 'football';
   const phase =
-    time < (skating ? arrive : Math.max(arrive, event.start))
+    time < arrive
       ? 'going'
-      : time < leave
-        ? 'attending'
-        : 'returning';
+      : time < (underway ? arrive : event.start)
+        ? 'waiting'
+        : time < leave
+          ? 'attending'
+          : 'returning';
   if (skating && phase === 'attending')
     return {
       ...skateGlide(seat, arrive, leave, time),
@@ -431,5 +482,9 @@ export function tripState(
     activity: 'stroll',
     event: { id: event.id, name: event.name, phase },
     ...(phase === 'attending' ? { pose, walkPhase: (time / 5 + seat / 10) % 1 } : {}),
+    // A blanket or a cinema seat is for sitting on while the show gets ready; the lawn stands.
+    ...(phase === 'waiting' && (event.venue.kind === 'green' || event.venue.kind === 'cinema')
+      ? { pose: 'sit' as const }
+      : {}),
   };
 }
