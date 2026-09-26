@@ -90,7 +90,8 @@ function followable(program: LiveProgram, residents: ResidentState[], time: numb
 }
 
 export function liveProgram(places: Place[], day: number): LiveProgram {
-  const homes = [...places].sort((a, b) => a.id.localeCompare(b.id));
+  // Code-unit order, never the viewer's language: every visitor casts the same neighbors.
+  const homes = [...places].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const program: LiveProgram = {
     day,
     homes,

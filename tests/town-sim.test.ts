@@ -2,9 +2,12 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { DUCK_WALK_END, DUCK_WALK_START } from '../src/lib/ducks';
 import { HOUSE_PLOTS } from '../src/lib/events';
+import { liveProgram, liveShotAt } from '../src/lib/live-director';
 import { placeSchema, type Place } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
+import { townCatAt } from '../src/lib/town-cat';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
+import { tubeRides } from '../src/lib/tube-traffic';
 import { roadNodes, roadPath, WALK_SPEED } from '../src/lib/walking';
 import {
   getPlot,
@@ -102,6 +105,24 @@ function referenceRoadPath(from: Point, to: Point): Point[] {
   for (let current: Point | null = to; current; current = previous.get(key(current)) ?? null)
     path.unshift(current);
   return path;
+}
+
+/** Run with the visitor's browser set to another language, as String#localeCompare sees it. */
+function inLocale<T>(locale: string, run: () => T): T {
+  const original = String.prototype.localeCompare;
+  String.prototype.localeCompare = function (
+    this: string,
+    that: string,
+    locales?: Intl.LocalesArgument,
+    options?: Intl.CollatorOptions,
+  ) {
+    return original.call(this, that, locales ?? locale, options);
+  };
+  try {
+    return run();
+  } finally {
+    String.prototype.localeCompare = original;
+  }
 }
 
 describe('The town simulation at any size', () => {
@@ -214,4 +235,26 @@ describe('The town simulation at any size', () => {
     }
     expect(greetings).toBeGreaterThan(100);
   }, 20_000);
+
+  it('shows every visitor the same cat, broadcast and tube, whatever their language', () => {
+    // Fresh rosters each time, so nothing is answered from a cache built in another language.
+    const town = (homes: Place[]) => {
+      const roster = [...homes];
+      const cat = Array.from({ length: 200 }, (_, day) => townCatAt(roster, 1300, day).homePlot);
+      const broadcast = [12, 13].map((day) => {
+        const program = liveProgram(roster, day);
+        const shots = Array.from({ length: 96 }, (_, i) => i * 15).map(
+          (minute) => liveShotAt(program, minute, simulateResidents(roster, minute, day)).id,
+        );
+        return { cast: program.cast, shots };
+      });
+      const rides = tubeRides(roster, DAYS[0]).map((ride) => `${ride.residentId}@${ride.board}`);
+      return { cat, broadcast, rides };
+    };
+    for (const homes of [places, fullTown]) {
+      const english = inLocale('en', () => town(homes));
+      for (const locale of ['lt', 'haw'])
+        expect(inLocale(locale, () => town(homes))).toEqual(english);
+    }
+  }, 30_000);
 });
