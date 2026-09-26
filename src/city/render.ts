@@ -11,8 +11,9 @@ import {
   millpondSignHit,
   MILLPOND_SIGN_DEPTH,
 } from './millpond';
-import { drawHouse, houseBounds } from './houses';
-import { drawResident } from './residents';
+import { houseBounds, houseReach } from './houses';
+import { housePainter } from './house-sprites';
+import { drawResident, residentReach } from './residents';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
 import { drawTownTree } from './trees';
@@ -20,7 +21,7 @@ import { drawFireflies, drawSeasonLight, drawSnowfall } from './weather';
 import { groundTuft, riverGlint } from './season-ground';
 import { SNOW, pick } from './season-palette';
 import { seedFraction, snowAt, townSeasonAt } from '../lib/seasons';
-import { paintGroundLayer } from './ground-cache';
+import { paintGroundLayer, type GroundArea } from './ground-cache';
 import {
   drawFootball,
   footballFurnitureHit,
@@ -104,6 +105,10 @@ type Palette = {
 };
 export type Camera = { x: number; y: number; zoom: number };
 const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
+/** Houses stand a little larger than their plot art. */
+const HOUSE_SCALE = 1.12;
+/** Walkers are drawn at 1.25 times their preview size. */
+const RESIDENT_SCALE = 1.25;
 const venueDepth = (plot: Plot) => plot.x + plot.y + 0.1;
 export const forkPlot = getPlot(FORK_PLOT)!;
 const forkPt = plotCenter(forkPlot);
@@ -302,28 +307,55 @@ export function renderCity({
   ctx.scale(camera.zoom, camera.zoom);
   const byPlot = new Map(places.map((place) => [place.plot, place]));
   const residentsByHome = new Map(residents.map((resident) => [resident.id, resident]));
+  const paintHouse = housePainter(ctx);
   const view = {
     left: -camera.x / camera.zoom,
     right: (width - camera.x) / camera.zoom,
     top: -camera.y / camera.zoom,
     bottom: (height - camera.y) / camera.zoom,
   };
-  const visible = (point: Point, rx: number, above: number, below: number) =>
-    point.x + rx >= view.left &&
-    point.x - rx <= view.right &&
-    point.y + below >= view.top &&
-    point.y - above <= view.bottom;
+  const within = (area: GroundArea) => (point: Point, rx: number, above: number, below: number) =>
+    point.x + rx >= area.left &&
+    point.x - rx <= area.right &&
+    point.y + below >= area.top &&
+    point.y - above <= area.bottom;
+  const visible = within(view);
   const groundKey = [
     night,
     showPlots,
-    selectedPlot,
-    hoveredPlot,
     width,
     height,
     [...byPlot.keys()].sort().join(','),
     // Seasonal ground art reads the whole day of the year, so the layer repaints once a town day.
     season.groundDay,
   ].join(':');
+  // The hover and selection marks stay out of the key: moving the pointer to another plot
+  // repaints just the plots it leaves and reaches. A station lights the whole Treeline, so it
+  // repaints the layer; the venues with their own art mark themselves outside it.
+  const mark = (id: string | null) => {
+    const plot = getPlot(id ?? '');
+    if (
+      !plot ||
+      isFootballPlot(plot.id) ||
+      isCinemaPlot(plot.id) ||
+      isZooPlot(plot.id) ||
+      isFarmPlot(plot.id) ||
+      isMillpondPlot(plot.id)
+    )
+      return '';
+    return isTubePlot(plot.id) ? 'tube' : plot.id;
+  };
+  const marks = {
+    key: `${mark(selectedPlot)} ${mark(hoveredPlot)}`,
+    areas: (key: string) => {
+      const ids = key.split(' ').filter(Boolean);
+      if (ids.includes('tube')) return null;
+      return ids.map((id) => {
+        const pt = plotCenter(getPlot(id)!);
+        return { left: pt.x - 112, right: pt.x + 112, top: pt.y - 58, bottom: pt.y + 58 };
+      });
+    },
+  };
   // The Treeline: both station plots light up together, and its parcels are read at most once a
   // frame, only if some of the line is in view.
   const emphasis = isTubePlot(selectedPlot ?? '')
@@ -344,7 +376,9 @@ export function renderCity({
     followed,
     parcels: () => (parcels ??= tubeParcelsAt(places, minutes, day)),
   } as const;
-  paintGroundLayer(ctx, groundKey, (ctx) => {
+  const paintGround = (ctx: Ctx, area?: GroundArea) => {
+    // A partial repaint culls tiles and plots to its own area; the canvas clips the rest.
+    const near = area ? within(area) : visible;
     drawFarFields(ctx, night, season);
     const terrainPoint = (x: number, y: number) => project(x, y);
     const b = terrainPoint(WORLD_WIDTH, 0),
@@ -381,7 +415,7 @@ export function renderCity({
       p.grass,
     );
     for (const { x, y, point: pt, seed, road } of terrain) {
-      if (!visible(pt, 60, 24, 24)) continue;
+      if (!near(pt, 60, 24, 24)) continue;
       if (insideMillpond({ x, y })) continue;
       if (seed % 4 === 0) diamond(ctx, pt.x, pt.y, 38, 19, p.grassAlt);
       if (x === WORLD_WIDTH - 2 || (x === WORLD_WIDTH - 1 && y < 8)) {
@@ -415,7 +449,7 @@ export function renderCity({
       )
         continue;
       const pt = plotCenter(plot);
-      if (!visible(pt, 110, 60, 60)) continue;
+      if (!near(pt, 110, 60, 60)) continue;
       const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
       // A tube station keeps its meadow and loses only the stake, label and outline.
       const tubePlot = isTubePlot(plot.id);
@@ -459,7 +493,8 @@ export function renderCity({
     drawFarmGround(ctx, night, season);
     drawMillpondGround(ctx, night, season, p.water, p.waterLight);
     drawTubeGround(ctx, tube);
-  });
+  };
+  paintGroundLayer(ctx, groundKey, paintGround, marks);
   // Riders in the glass behind the tree line: every edge tree stands in front of them.
   drawTubeTraffic(ctx, tube);
   const objects = drawFootball(
@@ -551,9 +586,16 @@ export function renderCity({
       }),
     );
   for (const place of places) {
-    const plot = PLOTS.find((v) => v.id === place.plot);
+    const plot = getPlot(place.plot);
     if (!plot) continue;
     const pt = plotCenter(plot);
+    // Like the trees, a house off screen is skipped: its box holds the roof, the sign, the
+    // lantern post and the chimney smoke.
+    const reach = houseReach(place);
+    if (
+      !visible(pt, reach.right * HOUSE_SCALE, reach.top * HOUSE_SCALE, reach.bottom * HOUSE_SCALE)
+    )
+      continue;
     // Drafts are not on the register, so a local preview gets no lantern post.
     const entry = register.byId.get(place.id);
     const lantern = entry && {
@@ -564,7 +606,7 @@ export function renderCity({
     objects.push({
       depth: houseDepth(plot),
       paint: () =>
-        drawHouse(ctx, place, pt.x, pt.y, night, 1.12, {
+        paintHouse(place, pt.x, pt.y, night, HOUSE_SCALE, {
           minutes,
           activity: residentsByHome.get(place.id)?.activity,
           lantern,
@@ -605,6 +647,18 @@ export function renderCity({
     if (inTubeGlass(resident.transit)) continue;
     const ground = project(resident.position.x, resident.position.y);
     const pt = { x: ground.x + (offsets.get(resident.id) ?? 0), y: ground.y };
+    // Walkers off screen are skipped too. The ring round a followed one, 10px either way and 7px
+    // below the feet, gets the same 2px to spare.
+    const reach = residentReach(ctx, resident.resident, resident);
+    if (
+      !visible(
+        pt,
+        Math.max(reach.x * RESIDENT_SCALE, 12),
+        reach.above * RESIDENT_SCALE,
+        Math.max(reach.below * RESIDENT_SCALE, 9),
+      )
+    )
+      continue;
     objects.push({
       depth: residentDepth(resident),
       paint: () => {
@@ -614,7 +668,7 @@ export function renderCity({
         const alpha = ctx.globalAlpha;
         if (resident.event?.id === 'football')
           ctx.globalAlpha = alpha * spectatorAlpha(football, pt);
-        drawResident(ctx, resident.resident, pt.x, pt.y, 1.25, resident);
+        drawResident(ctx, resident.resident, pt.x, pt.y, RESIDENT_SCALE, resident);
         ctx.globalAlpha = alpha;
       },
     });
@@ -649,7 +703,7 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
     .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
   for (const { place, plot } of ordered) {
     const p = plotCenter(plot);
-    const tall = houseBounds(place).top * 1.12;
+    const tall = houseBounds(place).top * HOUSE_SCALE;
     if (point.x >= p.x - 55 && point.x <= p.x + 55 && point.y >= p.y - tall && point.y <= p.y + 20)
       return plot.id;
   }

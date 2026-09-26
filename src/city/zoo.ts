@@ -477,6 +477,7 @@ export function drawZoo(
           sign(ctx, point, 'Future habitat', night, true);
           const p = project(point.x, point.y);
           ctx.font = '9px "Space Mono", monospace';
+          ctx.textAlign = 'center';
           ctx.fillStyle = night ? '#BDCEA4' : '#48674D';
           ctx.fillText('ROOM TO GROW', p.x, p.y + 16);
         },

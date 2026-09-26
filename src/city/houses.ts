@@ -19,18 +19,30 @@ export type HouseAppearance = Pick<
   Place,
   'id' | 'building' | 'color' | 'decoration' | 'design' | 'sign'
 >;
+// A town repeats the same few hundred colours every frame, so each shade is worked out once. The
+// palette grows only with the neighbours, and the builder's colour pickers cannot grow it forever.
+const tints = new Map<string, Map<number, string>>();
 export function tint(color: string, delta: number) {
-  const n = parseInt(color.slice(1), 16);
-  return (
-    '#' +
-    [n >> 16, (n >> 8) & 255, n & 255]
-      .map((value) =>
-        Math.max(0, Math.min(255, value + delta))
-          .toString(16)
-          .padStart(2, '0'),
-      )
-      .join('')
-  );
+  let shades = tints.get(color);
+  if (!shades) {
+    if (tints.size >= 4096) tints.clear();
+    tints.set(color, (shades = new Map()));
+  }
+  let shade = shades.get(delta);
+  if (shade === undefined) {
+    const n = parseInt(color.slice(1), 16);
+    shade =
+      '#' +
+      [n >> 16, (n >> 8) & 255, n & 255]
+        .map((value) =>
+          Math.max(0, Math.min(255, value + delta))
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join('');
+    shades.set(delta, shade);
+  }
+  return shade;
 }
 function polygon(ctx: Ctx, points: number[][], fill: string) {
   ctx.beginPath();
@@ -69,12 +81,13 @@ const BASE_HEIGHT = {
 // Each home's seasonal schedule is fixed by its id, so it is worked out once, not every frame.
 const schedules = new Map<
   string,
-  { roof: number; doorstep: boolean; squash: number; beds: number[] }
+  { seed: number; roof: number; doorstep: boolean; squash: number; beds: number[] }
 >();
 function scheduleOf(id: string) {
   let schedule = schedules.get(id);
   if (!schedule) {
     schedule = {
+      seed: hash(id),
       roof: seedFraction(`roof:${id}`),
       doorstep: seedFraction(`pumpkin:${id}`) < 0.45,
       squash: hash(`squash:${id}`),
@@ -94,6 +107,112 @@ export function houseBounds(place: HouseAppearance) {
         : 34;
   return { height, top: height + roof + 8, bottom: 46, left: 72, right: 72 };
 }
+export type HouseLife = {
+  minutes: number;
+  activity?: ResidentState['activity'];
+  lantern?: HouseLantern;
+  /** Only the map passes a season: previews and the builder keep the neighbour's own colours. */
+  season?: TownSeason;
+};
+const CHIMNEYS = new Set(['cottage', 'cafe', 'bookshop', 'studio']);
+/** Where the chimney stands in house-local px, or null for the homes built without one. */
+function chimneyOf(place: HouseAppearance, h: number) {
+  if (!CHIMNEYS.has(place.building)) return null;
+  const d = place.design;
+  const flat =
+    d.roof === 'flat' || (d.roof === 'classic' && ['studio', 'cafe'].includes(place.building));
+  return { x: -18, y: -h - (flat ? 2 : 16) };
+}
+/**
+ * Everything a home paints, smoke included, in house-local px: the map skips a house when this
+ * box is off screen. The plume climbs up to 57px above the chimney's top edge, and 2px more
+ * leaves room for its soft edge.
+ */
+export function houseReach(place: HouseAppearance) {
+  const bounds = houseBounds(place);
+  const chimney = chimneyOf(place, bounds.height);
+  return chimney ? { ...bounds, top: Math.max(bounds.top, 59 - chimney.y) } : bounds;
+}
+/** What the clock and the calendar do to one home: its lit windows, its snow and its pumpkins. */
+function houseMoment(place: HouseAppearance, night: boolean, life?: HouseLife) {
+  const schedule = scheduleOf(place.id);
+  const { roof: roofSeed, doorstep, squash, beds } = schedule;
+  const season = life?.season;
+  // The garden's pumpkins are picked when the first snow settles on this roof.
+  const beforeSnow = !!season && season.yearDay >= AUTUMN && season.yearDay < firstSnowAt(roofSeed);
+  // Two vegetable beds ripen into pumpkins through early autumn, each on its own day, and a
+  // third where no pumpkin waits on the doorstep. One bit per bed.
+  let ripe = 0;
+  if (beforeSnow && place.design.garden === 'vegetables')
+    for (let bed = 0; bed < BEDS.length; bed++)
+      if (
+        (bed === squash % 7 ||
+          bed === (squash + 3) % 7 ||
+          (!doorstep && squash & 8 && bed === (squash + 5) % 7)) &&
+        season.yearDay >= AUTUMN + 2 + 5 * beds[bed]
+      )
+        ripe |= 1 << bed;
+  return {
+    seed: schedule.seed,
+    awakeInside: life?.activity === 'home' || life?.activity === 'work',
+    // On the map a home's windows wait for its lantern; previews without one keep the old glow.
+    windowsLit: night && (life?.lantern?.lit ?? true),
+    // The turning year rests on top of the neighbour's own colours and never repaints them.
+    // Each roof keeps its own snow schedule, and its doorstep pumpkin goes in as that snow comes.
+    snow: season ? snowAt(season.yearDay, roofSeed) : 0,
+    onDoorstep: !!season && doorstep && pumpkinOut(season.yearDay, roofSeed),
+    ripe,
+  };
+}
+/**
+ * One number for everything that changes a home's still picture, apart from its appearance and
+ * where it is drawn: two frames with the same look paint the same pixels, smoke aside. Undefined
+ * while its snow settles or thaws, which fades a little every frame.
+ */
+export function houseLook(place: HouseAppearance, night: boolean, life?: HouseLife) {
+  const { awakeInside, windowsLit, snow, onDoorstep, ripe } = houseMoment(place, night, life);
+  if (snow > 0 && snow < 1) return undefined;
+  const lantern = life?.lantern;
+  return (
+    (night ? 1 : 0) |
+    (windowsLit ? 2 : 0) |
+    (windowsLit && awakeInside ? 4 : 0) |
+    (lantern ? 8 : 0) |
+    (lantern?.lit ? 16 : 0) |
+    (lantern?.tale ? 32 : 0) |
+    (lantern?.newest ? 64 : 0) |
+    (snow ? 128 : 0) |
+    (onDoorstep ? 256 : 0) |
+    (ripe << 9)
+  );
+}
+/** The chimney smoke on its own, exactly where drawHouse puts it: sprites leave it out. */
+export function drawHouseSmoke(
+  ctx: Ctx,
+  place: HouseAppearance,
+  x: number,
+  y: number,
+  night: boolean,
+  scale: number,
+  life: HouseLife,
+) {
+  if (life.activity !== 'home' && life.activity !== 'work') return;
+  const chimney = chimneyOf(place, houseBounds(place).height);
+  if (!chimney) return;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  drawChimneySmoke(
+    ctx,
+    chimney.x + 5,
+    chimney.y - 17,
+    life.minutes,
+    scheduleOf(place.id).seed,
+    night,
+  );
+  ctx.restore();
+}
+/** `smoke: false` paints the still picture a sprite keeps; drawHouseSmoke adds the plume. */
 export function drawHouse(
   ctx: Ctx,
   place: HouseAppearance,
@@ -101,29 +220,16 @@ export function drawHouse(
   y: number,
   night = false,
   scale = 1,
-  life?: {
-    minutes: number;
-    activity?: ResidentState['activity'];
-    lantern?: HouseLantern;
-    /** Only the map passes a season: previews and the builder keep the neighbour's own colours. */
-    season?: TownSeason;
-  },
+  life?: HouseLife,
+  smoke = true,
 ) {
   const d = place.design,
     { height: h } = houseBounds(place);
   const roof = tint(place.color, night ? -35 : 0),
     wall = tint(d.wall, night ? -55 : 0),
     trim = tint(d.trim, night ? -25 : 0);
-  const seed = hash(place.id);
-  const awakeInside = life?.activity === 'home' || life?.activity === 'work';
-  // On the map a home's windows wait for its lantern; previews without one keep the old glow.
-  const windowsLit = night && (life?.lantern?.lit ?? true);
-  // The turning year rests on top of the neighbour's own colours and never repaints them.
-  // Each roof keeps its own snow schedule, and its doorstep pumpkin goes in as that snow comes.
-  const season = life?.season;
-  const { roof: roofSeed, doorstep, squash, beds } = scheduleOf(place.id);
-  const snow = season ? snowAt(season.yearDay, roofSeed) : 0,
-    snowTop = pick(SNOW.top, night),
+  const { seed, awakeInside, windowsLit, snow, onDoorstep, ripe } = houseMoment(place, night, life);
+  const snowTop = pick(SNOW.top, night),
     snowShade = pick(SNOW.shade, night);
   /** Snow settles and thaws by fading, one roof at a time; the rest of the winter it is opaque. */
   const frosted = (paint: () => void) => {
@@ -133,17 +239,6 @@ export function drawHouse(
     paint();
     ctx.globalAlpha = alpha;
   };
-  // The garden's pumpkins are picked when the first snow settles on this roof.
-  const beforeSnow = season && season.yearDay >= AUTUMN && season.yearDay < firstSnowAt(roofSeed);
-  const onDoorstep = !!season && doorstep && pumpkinOut(season.yearDay, roofSeed);
-  // Two vegetable beds ripen into pumpkins through early autumn, each on its own day, and a
-  // third where no pumpkin waits on the doorstep.
-  const ripe = (bed: number) =>
-    beforeSnow &&
-    (bed === squash % 7 ||
-      bed === (squash + 3) % 7 ||
-      (!doorstep && squash & 8 && bed === (squash + 5) % 7)) &&
-    season.yearDay >= AUTUMN + 2 + 5 * beds[bed];
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -173,7 +268,7 @@ export function drawHouse(
       gy = 24 - Math.abs(gx) * 0.35;
     if (d.garden === 'vegetables') {
       box(ctx, gx, gy, 7, 4, '#957453');
-      if (ripe(i)) {
+      if ((ripe >> i) & 1) {
         box(ctx, gx + 1, gy - 2, 5, 4, pick(PUMPKIN.body, night));
         box(ctx, gx + 3, gy - 4, 1, 2, pick(PUMPKIN.stem, night));
       } else box(ctx, gx + 2, gy - 4, 3, 6, '#567B44');
@@ -502,9 +597,9 @@ export function drawHouse(
       );
     });
   }
-  if (['cottage', 'cafe', 'bookshop', 'studio'].includes(place.building)) {
-    const chimneyX = -18,
-      chimneyY = -h - (flat ? 2 : 16);
+  const chimney = chimneyOf(place, h);
+  if (chimney) {
+    const { x: chimneyX, y: chimneyY } = chimney;
     const brick = night ? '#827E6C' : '#B3977F';
     box(ctx, chimneyX, chimneyY - 13, 7, 14, brick);
     polygon(
@@ -526,7 +621,7 @@ export function drawHouse(
       if (flat) box(ctx, chimneyX - 1, chimneyY - 16, 3, 1, snowTop);
       box(ctx, chimneyX + 8, chimneyY - 16, 3, 1, snowTop);
     });
-    if (awakeInside && life)
+    if (smoke && awakeInside && life)
       drawChimneySmoke(ctx, chimneyX + 5, chimneyY - 17, life.minutes, seed, night);
   }
   if (d.feature === 'balcony') {
