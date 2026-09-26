@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 import { placeSchema, validatePlaces, type Place } from '../src/lib/schema';
 import { EVENT_SPOTS, eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
 import { hash } from '../src/lib/world';
-import { planResidentTrips, withPreview, type ResidentTrip } from '../src/lib/resident-trips';
+import {
+  eventRoute,
+  eventTubeJourney,
+  planResidentTrips,
+  withPreview,
+  type ResidentTrip,
+} from '../src/lib/resident-trips';
+import { legsMinutes } from '../src/lib/tube-journeys';
+import { MIN_VISIT_MINUTES, routeLength, WALK_SPEED } from '../src/lib/walking';
 import { simulateResidents } from '../src/lib/simulation';
 import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
 import { millpondSkatingDay } from '../src/lib/millpond';
@@ -137,71 +145,71 @@ describe('Event seats at a full town', () => {
     expect(seen.get('millpond')!.size).toBeGreaterThan(50);
   }, 60_000);
 
-  it('lets every night owl who can reach the stage before bedtime dance on some nights', () => {
+  it('lets every night owl with time to dance before bedtime dance on some nights', () => {
+    const party = eventsForDay(YEAR[0]).find((event) => event.id === 'night-party')!;
+    /** Minutes to spare after reaching the stage by 23:30, dancing fifteen and going home unhurried. */
+    const spare = (owl: Place) => {
+      const tube = eventTubeJourney(owl, party, 0);
+      const trip = tube
+        ? legsMinutes(tube.legs)
+        : routeLength(eventRoute(owl, party, 0)) / WALK_SPEED;
+      return nightBedtime(owl) - party.start - MIN_VISIT_MINUTES - trip;
+    };
     const dancers = (homes: Place[]) =>
       new Set(
         year(homes).flatMap(({ guests }) => (guests.get('night-party') ?? []).map(([id]) => id)),
       );
     for (const homes of [TOWNS.eager, TOWNS.mixed, TOWNS.real]) {
       const danced = dancers(homes);
-      // Alone in town, with the whole dance floor free: can this owl ever dance at all?
-      const able = homes.filter(
-        (owl) =>
-          owl.resident.routine.night === 'stroll' &&
-          YEAR.some((day) =>
-            planResidentTrips([owl], day)
-              .get(owl.id)!
-              .some((trip) => trip.event.id === 'night-party'),
-          ),
-      );
-      for (const owl of able) expect(danced.has(owl.id), owl.id).toBe(true);
+      for (const owl of homes)
+        if (owl.resident.routine.night === 'stroll' && spare(owl) >= 2)
+          expect(danced.has(owl.id), owl.id).toBe(true);
     }
     // A bedtime between midnight and one leaves room to dance when the stage is near enough.
     const early = [...dancers(TOWNS.eager)].filter(
       (id) => nightBedtime(TOWNS.eager.find((home) => home.id === id)!) < 1500,
     );
     expect(early.length).toBeGreaterThan(3);
-    // Today's town: every owl but the one two hours away by tube, whose bedtime is 00:34.
-    const owls = TOWNS.real.filter((home) => home.resident.routine.night === 'stroll');
-    expect(dancers(TOWNS.real).size).toBeGreaterThanOrEqual(owls.length - 1);
   }, 60_000);
 
   it('previews a draft house without moving anyone already in town', () => {
-    const free = HOUSE_PLOTS.filter((plot) => !real.some((home) => home.plot === plot.id));
     let outings = 0;
-    // A night owl out all day beside the stage, an evening stroller, and a far lunch-goer.
+    // A night owl out all day beside the stage, an evening stroller, and a far lunch-goer, each
+    // previewed in today's town and in a town a third full.
     for (const [plot, k] of [
-      [free[0], 0],
-      [free[12], 35],
-      [free.at(-1)!, 46],
+      ['A4', 0],
+      ['B10', 35],
+      ['T10', 46],
     ] as const) {
       const draft = placeSchema.parse({
         ...sample,
         id: 'my-draft',
-        plot: plot.id,
+        plot,
         resident: { ...sample.resident, routine: routine(k) },
       });
-      const town = withPreview(real, draft);
-      for (const day of YEAR.filter((_, i) => i % 3 === 0)) {
-        const before = planResidentTrips(real, day),
-          after = planResidentTrips(town, day);
-        for (const home of real) expect(after.get(home.id)).toEqual(before.get(home.id));
-        // The draft's neighbor sits only where nobody else does.
-        for (const trip of after.get(draft.id)!) {
-          outings++;
-          const others = [...before.values()].flat().filter((t) => outing(t) === outing(trip));
-          expect(others.map((t) => t.seat)).not.toContain(trip.seat);
-          expect(others.length).toBeLessThan(CAPACITY[outing(trip)]);
+      for (const homes of [real, TOWNS.mixed.filter((_, index) => index % 3 === 0)]) {
+        const roster = homes.filter((home) => home.plot !== plot);
+        const town = withPreview(roster, draft);
+        for (const day of YEAR.filter((_, index) => index % 3 === 0)) {
+          const before = planResidentTrips(roster, day),
+            after = planResidentTrips(town, day);
+          for (const home of roster) expect(after.get(home.id)).toEqual(before.get(home.id));
+          // The draft's neighbor sits only where nobody else does.
+          for (const trip of after.get(draft.id)!) {
+            outings++;
+            const others = [...before.values()].flat().filter((t) => outing(t) === outing(trip));
+            expect(others.map((t) => t.seat)).not.toContain(trip.seat);
+            expect(others.length).toBeLessThan(CAPACITY[outing(trip)]);
+          }
         }
-      }
-      for (const minutes of [500, 790, 845, 1150, 1225, 1300, 1430]) {
-        const day = YEAR[5];
-        const alone = simulateResidents(real, minutes, day),
-          shown = simulateResidents(town, minutes, day);
-        alone.forEach((state, index) => {
-          expect(shown[index].position).toEqual(state.position);
-          expect(shown[index].event).toEqual(state.event);
-        });
+        for (const minutes of [500, 790, 845, 1150, 1225, 1300, 1430]) {
+          const alone = simulateResidents(roster, minutes, YEAR[5]),
+            shown = simulateResidents(town, minutes, YEAR[5]);
+          alone.forEach((state, index) => {
+            expect(shown[index].position).toEqual(state.position);
+            expect(shown[index].event).toEqual(state.event);
+          });
+        }
       }
     }
     expect(outings).toBeGreaterThan(20);
@@ -248,6 +256,7 @@ describe('Event seats in every browser language', () => {
     expect(hash(`cinema-guests:${day}:${film[0]}`)).toBe(hash(`cinema-guests:${day}:${film[1]}`));
     expect(hash(`cinema:${day}:${bill[0]}`)).toBe(hash(`cinema:${day}:${bill[1]}`));
     expect(inLanguage('lt', () => lunch[1].localeCompare(lunch[0]))).toBeLessThan(0);
+    // Two lunch-goers who both get the green, and two evening owls who share one film seat.
     const homes = [...lunch, ...film].map((id, index) =>
       placeSchema.parse({
         ...sample,
@@ -256,9 +265,9 @@ describe('Event seats in every browser language', () => {
         resident: { ...sample.resident, routine: routine(index < 2 ? 47 : 8) },
       }),
     );
-    const library = CINEMA_FILMS.slice(0, 3).map((film, index) => ({
-      ...film,
-      id: bill[index] ?? film.id,
+    const library = CINEMA_FILMS.slice(0, 3).map((entry, index) => ({
+      ...entry,
+      id: bill[index] ?? entry.id,
     }));
     const draw = () => ({
       trips: [...planResidentTrips(homes, day)],
