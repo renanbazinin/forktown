@@ -7,10 +7,15 @@ import {
   lanternHourStatus,
   realWait,
 } from '../src/lib/evening-copy';
-import { restoreDraftPlot, storyPrompt, STORY_PROMPTS } from '../src/lib/builder-nudges';
+import {
+  restoreDraftDesign,
+  restoreDraftPlot,
+  storyPrompt,
+  STORY_PROMPTS,
+} from '../src/lib/builder-nudges';
 import { FORK_PLOT, lanternHourAt, lanternRegister } from '../src/lib/lanterns';
 import { HOUSE_PLOTS } from '../src/lib/events';
-import { placeSchema } from '../src/lib/schema';
+import { DEFAULT_DESIGN, placeSchema } from '../src/lib/schema';
 import { ARRIVALS, TOWN } from './lantern-town';
 
 const places = TOWN;
@@ -128,6 +133,15 @@ describe('The builder asks for a story of its own', () => {
     expect(restoreDraftPlot(FORK_PLOT, available)).toBe(available[0].id);
     expect(restoreDraftPlot('C6', available)).toBe(available[0].id);
     expect(restoreDraftPlot('C6', [])).toBe('A1');
+  });
+
+  it('brings back a three-floor draft with two floors', () => {
+    const tall = { ...DEFAULT_DESIGN, floors: 3 as const, feature: 'balcony' as const };
+    expect(restoreDraftDesign(tall)).toEqual({ ...tall, floors: 2 });
+    for (const floors of [1, 2] as const) {
+      const design = { ...DEFAULT_DESIGN, floors };
+      expect(restoreDraftDesign(design)).toBe(design);
+    }
   });
 });
 
