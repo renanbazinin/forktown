@@ -1,4 +1,4 @@
-import { evaluatePolicy, paginate, approvedByMaintainer } from './pr-policy.mjs';
+import { evaluatePolicy, paginate, approvedByMaintainer, headModes } from './pr-policy.mjs';
 import { readFileSync } from 'node:fs';
 
 const repo = process.env.GITHUB_REPOSITORY;
@@ -76,6 +76,7 @@ try {
       throw new Error('House JSON must be a readable file under 16 KB.');
     return JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
   };
+  const modes = await headModes(api, root, head);
   const result = await evaluatePolicy({
     files,
     author: pr.user.login,
@@ -92,6 +93,7 @@ try {
           `${root}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${base}`,
         ),
       ),
+    modeOf: (path) => modes.get(path),
   });
   const latest = await api(`${root}/pulls/${number}`);
   if (latest.head.sha !== head || latest.base.sha !== base || latest.state !== 'open')

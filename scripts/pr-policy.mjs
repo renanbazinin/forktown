@@ -7,6 +7,8 @@ export const isReaderOnly = (path) =>
   /^(?:docs\/[^/]+\.md|docs\/images\/[^/]+\.(?:png|jpe?g|gif|webp)|examples\/[^/]+\.json|README\.md)$/.test(
     path,
   );
+// Git tree modes for an ordinary file. Links (120000) and submodules (160000) are not files.
+const FILE_MODES = ['100644', '100755'];
 
 export async function paginate(api, path, expected) {
   const all = [];
@@ -50,6 +52,7 @@ export async function evaluatePolicy({
   approved,
   readHead,
   readBase,
+  modeOf,
 }) {
   const errors = [];
   const reviewReasons = [];
@@ -62,6 +65,21 @@ export async function evaluatePolicy({
     );
   for (const file of files) {
     const oldPath = file.previous_filename ?? file.filename;
+    if (file.status !== 'removed') {
+      // The checkout follows links, but the API reads the link's own text; only plain files
+      // are what they seem.
+      const mode = await modeOf(file.filename);
+      if (mode === undefined)
+        throw new Error(`Could not find ${JSON.stringify(file.filename)} in the PR's commit.`);
+      if (file.filename.startsWith('places/') && mode !== '100644') {
+        errors.push(
+          `${JSON.stringify(file.filename)} must be a plain file. Links, folders and executable files can't live in places/.`,
+        );
+        continue;
+      }
+      if (!FILE_MODES.includes(mode) && !isMaintainer(authorPermission))
+        reviewReasons.push(`Link or submodule: ${JSON.stringify(file.filename)}`);
+    }
     if (!isHouse(file.filename) && !isHouse(oldPath)) {
       if (
         !isMaintainer(authorPermission) &&
@@ -128,4 +146,13 @@ export async function evaluatePolicy({
       `A different maintainer must approve this exact commit, then rerun the policy check: ${reviewReasons.join('; ')}. After approval, comment /check-contribution on the PR.`,
     );
   return { errors, reviewReasons, added: additions.length };
+}
+
+// Every path in the PR's head commit with its Git mode, from one API call. A truncated tree
+// could hide a link, so it fails closed.
+export async function headModes(api, root, head) {
+  const tree = await api(`${root}/git/trees/${head}?recursive=1`);
+  if (!Array.isArray(tree?.tree) || tree.truncated !== false)
+    throw new Error('GitHub returned an incomplete file tree. Please retry.');
+  return new Map(tree.tree.map((entry) => [entry.path, entry.mode]));
 }

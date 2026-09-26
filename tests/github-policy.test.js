@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { evaluatePolicy, paginate, approvedByMaintainer } from '../scripts/pr-policy.mjs';
+import {
+  evaluatePolicy,
+  paginate,
+  approvedByMaintainer,
+  headModes,
+} from '../scripts/pr-policy.mjs';
 
 const house = (filename = 'places/mine.json', status = 'added', extra = {}) => ({
   filename,
@@ -13,6 +18,7 @@ const defaults = {
   approved: false,
   readHead: async () => ({ creator: 'neighbor', resident: { name: 'Hello' } }),
   readBase: async () => ({ creator: 'neighbor' }),
+  modeOf: () => '100644',
 };
 const check = (overrides = {}) => evaluatePolicy({ ...defaults, ...overrides });
 describe('Trusted PR policy', () => {
@@ -131,6 +137,47 @@ describe('Trusted PR policy', () => {
   it('needs a maintainer when a rename moves code into a reader-only path', async () => {
     const moved = house('docs/app.md', 'renamed', { previous_filename: 'src/App.tsx' });
     expect((await check({ files: [moved] })).reviewReasons).toHaveLength(1);
+  });
+  it('rejects anything in places/ that is not a plain file, even with approval', async () => {
+    for (const [path, mode] of [
+      ['places/mine.json', '120000'],
+      ['places/mine.json', '100755'],
+      ['places/mine.json', '160000'],
+      ['places/{"creator":"neighbor","x":"/keep.md', '120000'],
+    ]) {
+      const readHead = vi.fn(async () => ({ creator: 'neighbor' }));
+      const result = await check({
+        approved: true,
+        authorPermission: 'admin',
+        files: [house(path)],
+        readHead,
+        modeOf: () => mode,
+      });
+      expect(result.errors.join(' '), `${path} ${mode}`).toContain('must be a plain file');
+      expect(readHead).not.toHaveBeenCalled();
+    }
+  });
+  it('needs a maintainer for links and submodules anywhere else', async () => {
+    for (const mode of ['120000', '160000']) {
+      const files = [house('docs/q.md', 'added')];
+      expect((await check({ files, modeOf: () => mode })).reviewReasons).toEqual([
+        'Link or submodule: "docs/q.md"',
+      ]);
+      expect(
+        (await check({ files, modeOf: () => mode, authorPermission: 'maintain' })).errors,
+      ).toEqual([]);
+    }
+  });
+  it('fails closed when a changed file is missing from the commit, but not for removals', async () => {
+    await expect(check({ modeOf: () => undefined })).rejects.toThrow('Could not find');
+    expect(
+      (
+        await check({
+          files: [house('docs/gone.md', 'removed')],
+          modeOf: () => undefined,
+        })
+      ).errors,
+    ).toEqual([]);
   });
   it('rejects unreadable JSON and invalid resident lists', async () => {
     await expect(
@@ -262,5 +309,25 @@ describe('Approval is tied to the author, current commit and current maintainer 
   it('invalidates a dismissed approval or subsequent changes request', async () => {
     for (const state of ['DISMISSED', 'CHANGES_REQUESTED'])
       expect(await approval([review, { ...review, state }])).toBe(false);
+  });
+});
+
+describe('The PR head commit, read like the checkout will read it', () => {
+  it('reads every mode from one recursive tree', async () => {
+    const api = vi.fn(async () => ({
+      truncated: false,
+      tree: [
+        { path: 'places/mine.json', mode: '100644' },
+        { path: 'docs/q', mode: '120000' },
+      ],
+    }));
+    const modes = await headModes(api, '/repos/o/r', 'abc');
+    expect(api).toHaveBeenCalledWith('/repos/o/r/git/trees/abc?recursive=1');
+    expect(modes.get('docs/q')).toBe('120000');
+    expect(modes.get('places/mine.json')).toBe('100644');
+  });
+  it('fails closed on a truncated or missing tree', async () => {
+    for (const reply of [{ truncated: true, tree: [] }, { tree: [] }, {}])
+      await expect(headModes(async () => reply, '/repos/o/r', 'abc')).rejects.toThrow('incomplete');
   });
 });

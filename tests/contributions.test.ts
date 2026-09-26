@@ -21,6 +21,11 @@ import { buildingHit, shade } from '../src/city/render';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { FOOTBALL_PLOTS } from '../src/lib/football';
 import { CINEMA_PLOTS } from '../src/lib/cinema';
+import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { readPlaceFiles } from '../scripts/place-files';
 
 const sample: Place = placeSchema.parse({
   id: 'tiny-library',
@@ -204,5 +209,75 @@ describe('The world stays predictable as people contribute', () => {
     const center = plotCenter(getPlot(sample.plot)!);
     expect(buildingHit({ x: center.x, y: center.y - 75 }, [sample])).toBe('A1');
     expect(buildingHit({ x: center.x + 200, y: center.y - 75 }, [sample])).toBeUndefined();
+  });
+});
+
+describe('Place files on disk', () => {
+  const folder = async () => {
+    const root = await mkdtemp(join(tmpdir(), 'forktown-place-files-'));
+    await mkdir(join(root, 'places'));
+    await mkdir(join(root, 'docs'));
+    await writeFile(join(root, 'places', 'tiny-library.json'), JSON.stringify(sample));
+    await writeFile(join(root, 'docs', 'real.json'), JSON.stringify({ ...sample, plot: 'A3' }));
+    return root;
+  };
+  const read = (root: string, name = 'places') =>
+    readPlaceFiles(pathToFileURL(join(root, name) + '/'));
+
+  it('reads plain JSON files and skips other plain files', async () => {
+    const root = await folder();
+    try {
+      await writeFile(join(root, 'places', '.DS_Store'), '');
+      expect(await read(root)).toEqual({
+        files: 1,
+        entries: [{ file: 'tiny-library.json', data: sample }],
+        errors: [],
+      });
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects links and folders, which the build would follow somewhere else', async () => {
+    const root = await folder();
+    try {
+      await mkdir(join(root, 'places', 'folder.json'));
+      // A folder link works without extra rights on Windows; a file link may not.
+      await symlink(
+        join(root, 'docs'),
+        join(root, 'places', 'linked-folder'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      let fileLink = true;
+      try {
+        await symlink(join(root, 'docs', 'real.json'), join(root, 'places', 'linked.json'));
+      } catch {
+        fileLink = false;
+      }
+      const result = await read(root);
+      expect(result.entries.map((entry) => entry.file)).toEqual(['tiny-library.json']);
+      expect(result.errors.map((error) => error.split(':')[0])).toEqual(
+        ['folder.json', 'linked-folder', ...(fileLink ? ['linked.json'] : [])].sort(),
+      );
+      expect(result.errors[0]).toContain('Keep only plain files in places/');
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a places folder that is itself a link', async () => {
+    const root = await folder();
+    try {
+      await symlink(
+        join(root, 'places'),
+        join(root, 'linked-places'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      expect((await read(root, 'linked-places')).errors).toEqual([
+        'places/ must be a plain folder, not a link.',
+      ]);
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
