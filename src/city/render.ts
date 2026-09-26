@@ -31,6 +31,16 @@ import {
 import { drawTownCat } from './cat';
 import { drawDuck } from './ducks';
 import { drawCinema, cinemaScreenHit } from './cinema';
+import {
+  drawTubeGround,
+  drawTubeTraffic,
+  drawTubes,
+  inTubeGlass,
+  tubeHit,
+  tubeCrowdOffsets,
+} from './tubes';
+import { isTubePlot } from '../lib/tubes';
+import { tubeParcelsAt, type TubeParcelState } from '../lib/tube-traffic';
 import { insideCinema, isCinemaPlot, CINEMA_VENUE } from '../lib/cinema';
 import { ducksAt } from '../lib/ducks';
 import { townCatAt, TOWN_CAT_ID } from '../lib/town-cat';
@@ -314,6 +324,26 @@ export function renderCity({
     // Seasonal ground art reads the whole day of the year, so the layer repaints once a town day.
     season.groundDay,
   ].join(':');
+  // The Treeline: both station plots light up together, and its parcels are read at most once a
+  // frame, only if some of the line is in view.
+  const emphasis = isTubePlot(selectedPlot ?? '')
+    ? 'selected'
+    : isTubePlot(hoveredPlot ?? '')
+      ? 'hover'
+      : 'none';
+  let parcels: TubeParcelState[] | undefined;
+  const tube = {
+    minutes,
+    day,
+    night,
+    season,
+    zoom: camera.zoom,
+    emphasis,
+    visible,
+    residents,
+    followed,
+    parcels: () => (parcels ??= tubeParcelsAt(places, minutes, day)),
+  } as const;
   paintGroundLayer(ctx, groundKey, (ctx) => {
     drawFarFields(ctx, night, season);
     const terrainPoint = (x: number, y: number) => project(x, y);
@@ -387,8 +417,10 @@ export function renderCity({
       const pt = plotCenter(plot);
       if (!visible(pt, 110, 60, 60)) continue;
       const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
-      const active = selectedPlot === plot.id;
-      const hover = hoveredPlot === plot.id;
+      // A tube station keeps its meadow and loses only the stake, label and outline.
+      const tubePlot = isTubePlot(plot.id);
+      const active = tubePlot ? isTubePlot(selectedPlot ?? '') : selectedPlot === plot.id;
+      const hover = tubePlot ? isTubePlot(hoveredPlot ?? '') : hoveredPlot === plot.id;
       if (occupied) {
         diamond(ctx, pt.x, pt.y, 105, 52.5, night ? '#577468' : '#BFD5A4');
         if (plot.id === FORK_PLOT) drawForkPlaza(ctx, pt.x, pt.y, night);
@@ -400,7 +432,7 @@ export function renderCity({
       }
       if (!occupied) drawMeadow(ctx, plot, night, season);
       if (active || hover) diamond(ctx, pt.x, pt.y, 108, 54, night ? '#B5C59B40' : '#F4EDCD80');
-      if (!occupied && (showPlots || hover || active)) {
+      if (!occupied && !tubePlot && (showPlots || hover || active)) {
         const corners = [
           [pt.x, pt.y - 49],
           [pt.x + 98, pt.y],
@@ -422,11 +454,14 @@ export function renderCity({
         ctx.fillText(plot.id, pt.x, pt.y + 4);
       }
       // An empty plot waits for its lantern: the stake stands where the post will go.
-      if (!occupied) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
+      if (!occupied && !tubePlot) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
     }
     drawFarmGround(ctx, night, season);
     drawMillpondGround(ctx, night, season, p.water, p.waterLight);
+    drawTubeGround(ctx, tube);
   });
+  // Riders in the glass behind the tree line: every edge tree stands in front of them.
+  drawTubeTraffic(ctx, tube);
   const objects = drawFootball(
     ctx,
     football,
@@ -560,9 +595,16 @@ export function renderCity({
       },
     });
   });
+  // The line's glass, stacks and sign, pushed before the residents so walkers win ties.
+  objects.push(...drawTubes(ctx, tube));
+  // Neighbors walking in lockstep to or from a stack stand side by side.
+  const offsets = tubeCrowdOffsets(residents);
   for (const resident of residents) {
     if (resident.activity !== 'stroll') continue;
-    const pt = project(resident.position.x, resident.position.y);
+    // Riders in the glass and figures in a stack are the tube's to draw.
+    if (inTubeGlass(resident.transit)) continue;
+    const ground = project(resident.position.x, resident.position.y);
+    const pt = { x: ground.x + (offsets.get(resident.id) ?? 0), y: ground.y };
     objects.push({
       depth: residentDepth(resident),
       paint: () => {
@@ -683,9 +725,22 @@ export function cityHit(
       target = { kind: 'place', id: CINEMA_VENUE.plot };
     }
   }
-  // the last resident in the input wins ties (the drawing sort is stable).
+  // The Treeline's stacks, sign and glass select the line; its glass behind the tree line is at
+  // depth -1, under everything else.
+  const tube = tubeHit(point);
+  if (tube && tube.depth >= depth) {
+    depth = tube.depth;
+    target = { kind: 'place', id: tube.id };
+  }
+  // the last resident in the input wins ties (the drawing sort is stable). Riders in the glass
+  // and figures in a stack are never hit: clicking them selects the line.
   for (const resident of residents) {
-    if (resident.activity !== 'stroll' || residentDepth(resident) < depth) continue;
+    if (
+      resident.activity !== 'stroll' ||
+      residentDepth(resident) < depth ||
+      inTubeGlass(resident.transit)
+    )
+      continue;
     const p = project(resident.position.x, resident.position.y);
     if (Math.abs(point.x - p.x) < 9 && point.y > p.y - 28 && point.y < p.y + 5) {
       target = { kind: 'resident', id: resident.id };

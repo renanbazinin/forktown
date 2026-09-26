@@ -3,9 +3,11 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
-import { getPlot, isRoad, plotEntrance, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
+import { getPlot, plotEntrance, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
 import { eventsForDay, HOUSE_PLOTS, insideVenue } from '../src/lib/events';
 import { insideFootball } from '../src/lib/football';
+import { TUBE_TRUNK_X } from '../src/lib/tubes';
+import { onRoadOrTube, riding } from './tube-riders';
 
 const places = readdirSync('places')
   .filter((file) => file.endsWith('.json'))
@@ -102,11 +104,12 @@ describe('A small predictable daily life', () => {
       for (const state of simulateResidents(wanderers, minute)) {
         const event = eventsForDay(0).find((event) => event.id === state.event?.id);
         expect(
-          isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
+          onRoadOrTube(state) ||
             (state.event?.id === 'football' && insideFootball(state.position)) ||
             (event && insideVenue(event.venue, state.position)),
         ).toBe(true);
-        expect(state.position.x).toBeGreaterThanOrEqual(1.5);
+        // Only the tube runs west of the lane, behind the trees.
+        expect(state.position.x).toBeGreaterThanOrEqual(riding(state) ? TUBE_TRUNK_X : 1.5);
         expect(state.position.y).toBeLessThanOrEqual(ROAD_MAX_Y + 0.5);
       }
   });

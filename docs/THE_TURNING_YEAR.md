@@ -104,7 +104,7 @@ The largest change to one frame, measured with the recording context in the open
 | Falling snow                      | 0      | 0      | 0      | +62    |
 | Far-ridge snow in the sky         | 0      | 0      | 0      | +57    |
 
-The season light is one `fillRect`, drawn only in autumn and winter. Across the year, at several times of day, a whole opening-view frame now stays between about 31,000 and 33,000 calls (30,967–32,932 with the Millpond and today's football), well inside the 40,000 budget of `tests/render-smoke.test.ts`. When the turning year arrived, a frame on the same day and minute differed from the town before it by −752 to +214 calls. Spring and winter frames are often lighter than before, because the young farm and the snowy meadows draw less.
+The season light is one `fillRect`, drawn only in autumn and winter. Across the year, at several times of day, a whole opening-view frame now stays between about 31,000 and 33,500 calls (31,497–33,461 with the Millpond, the Treeline and today's football), well inside the 40,000 budget of `tests/render-smoke.test.ts`. When the turning year arrived, a frame on the same day and minute differed from the town before it by −752 to +214 calls. Spring and winter frames are often lighter than before, because the young farm and the snowy meadows draw less.
 
 ## Determinism
 

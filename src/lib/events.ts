@@ -2,6 +2,7 @@ import { getPlot, hash, PLOTS } from './world.ts';
 import { isFootballPlot } from './football.ts';
 import { isFarmPlot } from './farm.ts';
 import { isMillpondPlot } from './millpond.ts';
+import { isTubePlot } from './tubes.ts';
 import { ZOO_VENUE, ZOO_SPOTS, isZooPlot, insideZoo } from './zoo.ts';
 import { CINEMA_VENUE, CINEMA_SEATS, isCinemaPlot, insideCinema, cinemaProgram } from './cinema.ts';
 import { FORK_ID, FORK_NAME, FORK_PLOT } from './lanterns.ts';
@@ -72,7 +73,8 @@ export const HOUSE_PLOTS = PLOTS.filter(
     !venueAt(plot.id) &&
     !isFootballPlot(plot.id) &&
     !isFarmPlot(plot.id) &&
-    !isMillpondPlot(plot.id),
+    !isMillpondPlot(plot.id) &&
+    !isTubePlot(plot.id),
 );
 
 export const EVENT_CHOICES = {
@@ -170,7 +172,7 @@ export function eventsForDay(day: number, minutes = 720): TownEvent[] {
       id: 'zoo',
       name: 'An afternoon with the animals',
       description:
-        'A long walk to giraffes, elephants, zebras and penguins. Two more habitats are growing for the future.',
+        'A trip out to giraffes, elephants, zebras and penguins. Two more habitats are growing for the future.',
       venue: ZOO_VENUE,
       period: 'afternoon',
       depart: 720,

@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { renderCity, type Camera } from '../city/render';
 import { eventsForDay } from '../lib/events';
 import { footballAt, footballListening } from '../lib/football';
-import { easeLiveCamera, liveCamera, liveProgram, liveShotAt } from '../lib/live-director';
+import {
+  easeLiveCamera,
+  liveCamera,
+  liveEaseSeconds,
+  liveLabelLift,
+  liveProgram,
+  liveShotAt,
+} from '../lib/live-director';
 import { latestArrival, places } from '../lib/places';
 import { project } from '../lib/world';
 import { townCatAt, TOWN_CAT_NAME } from '../lib/town-cat';
@@ -80,7 +87,7 @@ export default function LiveStream() {
     camera.current =
       camera.current === null || elapsed > 2 || distantCut
         ? target
-        : easeLiveCamera(camera.current, target, elapsed);
+        : easeLiveCamera(camera.current, target, elapsed, liveEaseSeconds(followedResident));
     lastShot.current = shot.id;
     lastPaint.current = now;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
@@ -104,8 +111,11 @@ export default function LiveStream() {
     if (followLabel.current && followPosition) {
       const point = project(followPosition.x, followPosition.y);
       const x = point.x * camera.current.zoom + camera.current.x;
+      // A neighbor on the tube carries the label up the stack and along the glass.
       const y =
-        (point.y - (shot.kind === 'cat' ? 24 : 43)) * camera.current.zoom + camera.current.y;
+        (point.y - (shot.kind === 'cat' ? 24 : liveLabelLift(followedResident))) *
+          camera.current.zoom +
+        camera.current.y;
       const halfLabel = followLabel.current.offsetWidth / 2 + 12;
       followLabel.current.style.left = `${Math.max(halfLabel, Math.min(size.width - halfLabel, x))}px`;
       followLabel.current.style.top = `${Math.max(90, Math.min(size.height - 30, y))}px`;
@@ -138,6 +148,8 @@ export default function LiveStream() {
     shot.height,
     shot.residentId,
     followedResident,
+    followedResident?.transit?.altitude,
+    followedResident?.transit?.stage,
     followPosition?.x,
     followPosition?.y,
     shot.id,

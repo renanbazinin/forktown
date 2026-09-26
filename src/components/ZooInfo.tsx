@@ -17,8 +17,8 @@ export default function ZooInfo({ minutes, watching }: { minutes: number; watchi
         </p>
         <p className="muted-copy">
           Little surprises happen roughly every two minutes in each habitat, with quiet wandering in
-          between. {watching} neighbors watching. Visitors plan their walk from home; those further
-          away set out earlier when their routine allows.
+          between. {watching} neighbors watching. Visitors plan their trip from home; those further
+          away set out earlier when their routine allows, or take the tube when it saves time.
         </p>
       </div>
       {ZOO_HABITATS.map((habitat, index) => (

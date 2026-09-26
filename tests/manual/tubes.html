@@ -1,0 +1,524 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forktown · The Treeline</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #eaf0df;
+        color: #304d40;
+        font: 15px system-ui;
+      }
+      h1 {
+        font: 32px Georgia;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font:
+          13px 'Space Mono',
+          monospace;
+        letter-spacing: 0.06em;
+        margin: 14px 0 4px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+        cursor: pointer;
+      }
+      button[aria-pressed='true'] {
+        background: #d9e6c8;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      select {
+        padding: 6px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+      }
+      .sliders {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 12px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      input[type='range'] {
+        width: 100%;
+      }
+      .stage {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 16px;
+        align-items: start;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        background: #dae4cd;
+      }
+      a {
+        color: inherit;
+      }
+      #status {
+        font:
+          13px/1.5 'Space Mono',
+          monospace;
+        min-height: 3em;
+        margin: 8px 0;
+      }
+      .problem {
+        color: #8a3b2b;
+        background: #fbe9e2;
+        border: 1px solid #d9a898;
+        border-radius: 6px;
+        padding: 8px 12px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      #panel {
+        display: grid;
+        gap: 12px;
+      }
+      #panel article {
+        background: #fffbed;
+        border: 1px solid #c9d6bf;
+        border-radius: 10px;
+        padding: 10px 14px;
+      }
+      #panel small {
+        font:
+          11px 'Space Mono',
+          monospace;
+        letter-spacing: 0.06em;
+      }
+      #panel h3 {
+        font: 18px Georgia;
+        margin: 4px 0;
+      }
+      #panel p {
+        margin: 4px 0;
+      }
+      #panel .muted {
+        opacity: 0.72;
+      }
+      #panel .sign {
+        padding: 8px 12px;
+        border: 1px solid #6f8b66;
+        border-radius: 3px;
+        background: #cfddb9;
+        color: #2f4a3b;
+        font:
+          700 13px/1.4 'Space Mono',
+          monospace;
+        text-align: center;
+      }
+      @media (max-width: 900px) {
+        .stage {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+    <script>
+      // A module caught mid-edit should say so instead of leaving a blank canvas.
+      window.tubesProblem = (message) => {
+        const box = document.querySelector('#problem');
+        if (!box) return;
+        box.textContent = String(message ?? 'Something failed.').split('\n')[0];
+        box.hidden = false;
+      };
+      addEventListener('error', (event) =>
+        window.tubesProblem(event.message || 'A script failed to load.'),
+      );
+      addEventListener('unhandledrejection', (event) =>
+        window.tubesProblem(event.reason?.message ?? event.reason),
+      );
+    </script>
+  </head>
+  <body>
+    <h1>The Treeline</h1>
+    <p>
+      A development fixture for the Treeline. It never saves houses or changes the live town clock.
+      The real renderer and residents at a pinned town day and minute (Year 3). Deep links:
+      <code>?day=42&amp;time=720&amp;view=c1&amp;emphasis=none</code> (day is the year day 0–111;
+      <b>Play</b> and <b>Next ride</b> go round from day 111 to day 0).
+    </p>
+    <p class="problem" id="problem" role="alert" hidden></p>
+    <h2>SCENES</h2>
+    <nav id="scenes" aria-label="Scenes"></nav>
+    <nav aria-label="View">
+      <label
+        >View
+        <select id="view">
+          <option value="c1">Hedgerow Halt (C1, zoom 3)</option>
+          <option value="n1">Willow Halt (N1, zoom 2.5)</option>
+          <option value="trunk">Trunk (zoom 3)</option>
+          <option value="opening">Opening view</option>
+          <option value="whole">Whole town</option>
+        </select></label
+      >
+      <label
+        >Emphasis
+        <select id="emphasis">
+          <option value="none">None</option>
+          <option value="hover">Hovered</option>
+          <option value="selected">Selected</option>
+        </select></label
+      >
+      <button id="play" aria-pressed="false">Play</button>
+      <button id="next">Next ride</button>
+      <a href="/#venue=tube">Open the Treeline in town</a>
+    </nav>
+    <div class="sliders">
+      <label for="day">Year day</label>
+      <input id="day" type="range" min="0" max="111" step="1" value="42" />
+      <label for="time">Minute</label>
+      <input id="time" type="range" min="0" max="1439.9" step="0.1" value="720" />
+    </div>
+    <p id="status" role="status"></p>
+    <div class="stage">
+      <canvas id="map" width="1440" height="900" aria-label="The Treeline preview"></canvas>
+      <section id="panel" aria-label="What the panel says"></section>
+    </div>
+    <script type="module">
+      // Every module loads with import() so a half-written file shows up in the problem box
+      // instead of a blank page.
+      const report = (error) => window.tubesProblem?.(error?.message ?? error);
+      const load = (path) => import(/* @vite-ignore */ path);
+
+      const [
+        { renderCity },
+        { places },
+        { eventsForDay, VENUES },
+        { simulateResidents, timeLabel },
+        { WORLD_BOUNDS, getPlot, plotCenter, project },
+        { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt },
+        { tubeRides, tubeStatus, tubeParcelsAt },
+        { tubeCopy },
+        { TUBE_STATIONS },
+      ] = await Promise.all(
+        [
+          '/src/city/render.ts',
+          '/src/lib/places.ts',
+          '/src/lib/events.ts',
+          '/src/lib/simulation.ts',
+          '/src/lib/world.ts',
+          '/src/lib/town-calendar.ts',
+          '/src/lib/tube-traffic.ts',
+          '/src/lib/tube-copy.ts',
+          '/src/lib/tubes.ts',
+        ].map(load),
+      ).catch((error) => {
+        report(`The renderer did not load: ${error?.message ?? error}`);
+        throw error;
+      });
+
+      const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like scene.html
+      const W = 1440,
+        H = 900;
+      const [FIRST, LAST] = [TUBE_STATIONS[0].id, TUBE_STATIONS.at(-1).id];
+      const VIEWS = ['c1', 'n1', 'trunk', 'opening', 'whole'];
+      const EMPHASES = ['none', 'hover', 'selected'];
+
+      // The page stays in Year 3: past day 111 it wraps to day 0, so the slider, the status line
+      // and the URL always name the same moment.
+      const inYear = (day) =>
+        YEAR + ((((day - YEAR) % DAYS_PER_YEAR) + DAYS_PER_YEAR) % DAYS_PER_YEAR);
+      const query = new URLSearchParams(location.search);
+      const state = { day: YEAR + 42, minutes: 720, view: 'c1', emphasis: 'none', playing: false };
+      const asked = (name) => (query.has(name) ? Number(query.get(name)) : NaN);
+      if (Number.isFinite(asked('day')))
+        state.day = YEAR + Math.max(0, Math.min(DAYS_PER_YEAR - 1, Math.floor(asked('day'))));
+      if (Number.isFinite(asked('time')))
+        state.minutes = Math.max(0, Math.min(1439.9, asked('time')));
+      if (VIEWS.includes(query.get('view'))) state.view = query.get('view');
+      if (EMPHASES.includes(query.get('emphasis'))) state.emphasis = query.get('emphasis');
+
+      const writeUrl = () => {
+        const params = new URLSearchParams({
+          day: String(state.day - YEAR),
+          time: String(Math.min(1439.9, Math.round(state.minutes * 10) / 10)),
+          view: state.view,
+          emphasis: state.emphasis,
+        });
+        history.replaceState(null, '', `${location.pathname}?${params}`);
+      };
+      function set(change) {
+        Object.assign(state, { playing: false }, change);
+        // A ride that boards after midnight sits on the next town day.
+        while (state.minutes >= 1440) {
+          state.minutes -= 1440;
+          state.day++;
+        }
+        state.day = inYear(state.day);
+        writeUrl();
+        syncControls();
+      }
+      // Scripted access for screenshots: tubesPreview.go(42, 720, 'c1', 'selected').
+      window.tubesPreview = Object.assign(state, {
+        go: (yearDay, minutes, view = state.view, emphasis = state.emphasis) =>
+          set({ day: YEAR + yearDay, minutes, view, emphasis }),
+      });
+
+      // Moments that depend on the day's plans: the first daytime ride that fits, searched
+      // forward through the year (round to day 0 after day 111) when today has none.
+      function firstRide(test = () => true) {
+        for (let ahead = 0; ahead < DAYS_PER_YEAR; ahead++) {
+          const day = inYear(state.day + ahead);
+          const ride = tubeRides(places, day).find(
+            (ride) => ride.board >= 360 && ride.off < 1440 && test(ride),
+          );
+          if (ride) return { day, ride };
+        }
+        return null;
+      }
+      const at = (test, time, view) => () => {
+        const found = firstRide(test);
+        if (found) set({ day: found.day, minutes: time(found.ride), view });
+        else report('No ride in the year to show.');
+      };
+      const fromFirst = (ride) => ride.from === FIRST;
+      const toLast = (ride) => ride.to === LAST;
+      // Half a minute before the next boarding on Year 3's clock, round to the year's first after
+      // day 111. Rides after midnight belong to the plan of the day before, so the search starts
+      // with yesterday's plan, and a moment outside Year 3's 112 days is never offered. A boarding
+      // within a tenth of a minute of now is the one already shown (the URL keeps tenths).
+      function nextRide() {
+        const span = DAYS_PER_YEAR * 1440;
+        const now = (state.day - YEAR) * 1440 + state.minutes;
+        const first = (from, to, after) => {
+          for (let plan = from; plan <= to; plan++)
+            for (const ride of tubeRides(places, plan)) {
+              const at = (plan - YEAR) * 1440 + ride.board - 0.5;
+              if (at >= 0 && at < span && at > after) return at;
+            }
+        };
+        const at =
+          first(state.day - 1, YEAR + DAYS_PER_YEAR - 1, now + 0.1) ??
+          first(YEAR - 1, state.day - 1, -1);
+        if (at === undefined) return report('No rides this year.');
+        set({ day: YEAR + Math.floor(at / 1440), minutes: at % 1440 });
+      }
+
+      const SCENES = [
+        ['Hedgerow Halt at noon', () => set({ day: YEAR + 42, minutes: 720, view: 'c1' })],
+        ['Boarding at C1 · walk in (+0.8)', at(fromFirst, (r) => r.board + 0.8, 'c1')],
+        ['Boarding at C1 · crouch (+1.7)', at(fromFirst, (r) => r.board + 1.7, 'c1')],
+        ['Boarding at C1 · fwoomp (+1.95)', at(fromFirst, (r) => r.board + 1.95, 'c1')],
+        [
+          'Riding the trunk',
+          at(
+            () => true,
+            (r) => r.depart + 2.5,
+            'trunk',
+          ),
+        ],
+        ['Stepping off at Willow Halt (+0.05)', at(toLast, (r) => r.arrive + 0.05, 'n1')],
+        ['Walking out of Willow Halt (+1.0)', at(toLast, (r) => r.arrive + 1, 'n1')],
+        ['Hedgerow Halt at night', () => set({ minutes: 1290, view: 'c1' })],
+        ['Snow', () => set({ day: YEAR + 98, minutes: 720, view: 'c1' })],
+        ['Opening view', () => set({ view: 'opening', emphasis: 'none' })],
+        ['Whole town', () => set({ view: 'whole', emphasis: 'none' })],
+        ['Selected', () => set({ emphasis: 'selected' })],
+        ['Hovered', () => set({ emphasis: 'hover' })],
+      ];
+      const $ = (selector) => document.querySelector(selector);
+      for (const [label, go] of SCENES) {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.onclick = go;
+        $('#scenes').append(b);
+      }
+      function syncControls() {
+        $('#view').value = state.view;
+        $('#emphasis').value = state.emphasis;
+        $('#play').setAttribute('aria-pressed', String(state.playing));
+      }
+      $('#view').onchange = (event) => set({ view: event.target.value });
+      $('#emphasis').onchange = (event) => set({ emphasis: event.target.value });
+      $('#day').oninput = (event) => set({ day: YEAR + Number(event.target.value) });
+      $('#time').oninput = (event) => set({ minutes: Number(event.target.value) });
+      $('#next').onclick = nextRide;
+      $('#play').onclick = () => {
+        state.playing = !state.playing;
+        // Playing leaves the URL alone; pausing writes the moment it stopped on.
+        if (!state.playing) writeUrl();
+        syncControls();
+      };
+      syncControls();
+
+      // Cameras: the app's whole-town and opening framings (City.tsx), and scene.html's close-ups.
+      function wholeTown(width, height) {
+        const zoom = Math.max(
+          0.01,
+          Math.min(
+            (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
+            (height - 85) / (WORLD_BOUNDS.bottom + 98),
+          ),
+        );
+        return {
+          x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
+          y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
+          zoom,
+        };
+      }
+      function openingView(width, height) {
+        const all = [
+          ...places.map((place) => place.plot),
+          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
+            (venue) => venue.plot,
+          ),
+        ].flatMap((id) => {
+          const plot = getPlot(id);
+          return plot ? [plotCenter(plot)] : [];
+        });
+        const median = (values) => values.sort((a, b) => a - b)[values.length >> 1];
+        const mid = { x: median(all.map((p) => p.x)), y: median(all.map((p) => p.y)) };
+        const distance = (p) => Math.hypot(p.x - mid.x, p.y - mid.y);
+        const typical = median(all.map(distance));
+        const points = all.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
+        const left = Math.min(...points.map((point) => point.x)) - 110;
+        const right = Math.max(...points.map((point) => point.x)) + 110;
+        const top = Math.min(...points.map((point) => point.y)) - 145;
+        const bottom = Math.max(...points.map((point) => point.y)) + 80;
+        const zoom = Math.max(
+          wholeTown(width, height).zoom,
+          Math.min(0.85, (width - 150) / (right - left), (height - 160) / (bottom - top)),
+        );
+        return {
+          x: width / 2 - ((left + right) / 2) * zoom,
+          y: height * 0.5 - ((top + bottom) / 2) * zoom,
+          zoom,
+        };
+      }
+      const closeUp = (focus, zoom) => ({
+        x: W / 2 - focus.x * zoom,
+        y: H / 2 - (focus.y - 30) * zoom,
+        zoom,
+      });
+      function camera() {
+        if (state.view === 'whole') return wholeTown(W, H);
+        if (state.view === 'opening') return openingView(W, H);
+        if (state.view === 'trunk') return closeUp(project(-0.5, 33), 3);
+        if (state.view === 'n1') return closeUp(plotCenter(getPlot(LAST)), 2.5);
+        return closeUp(plotCenter(getPlot(FIRST)), 3);
+      }
+
+      const canvas = $('#map'),
+        ctx = canvas.getContext('2d');
+      let last = performance.now(),
+        lastPanel = '';
+      function describe(day, minutes, residents) {
+        // Rounded to tenths once, so 760.99 reads 12:41 rather than 12:40.10.
+        const tenths = Math.min(Math.round(minutes * 10), 14399);
+        const bits = [
+          townCalendarAt(day, minutes).label,
+          timeLabel(Math.floor(tenths / 10)) + (tenths % 10 ? `.${tenths % 10}` : ''),
+        ];
+        for (const resident of residents.filter((resident) => resident.transit)) {
+          const { stage, from, to, progress, altitude } = resident.transit;
+          bits.push(
+            `${resident.resident.name} ${stage} ${from}→${to} ${Math.round(progress * 100)}% h${altitude.toFixed(1)}`,
+          );
+        }
+        for (const parcel of tubeParcelsAt(places, minutes, day))
+          bits.push(`parcel ${parcel.stage} ${parcel.from}→${parcel.to}`);
+        const today = tubeRides(places, day);
+        bits.push(
+          today.length
+            ? `rides ${today.map((ride) => `${timeLabel(ride.board)} ${ride.from}→${ride.to}`).join(', ')}`
+            : 'no rides today',
+        );
+        return bits.join(' · ');
+      }
+      function renderPanel(day, minutes) {
+        const copy = tubeCopy(tubeStatus(places, minutes, day));
+        const key = JSON.stringify(copy);
+        if (key === lastPanel) return;
+        lastPanel = key;
+        const panel = $('#panel');
+        panel.replaceChildren();
+        const article = (eyebrow, heading, ...lines) => {
+          const a = document.createElement('article');
+          const small = document.createElement('small');
+          small.textContent = eyebrow;
+          const h = document.createElement('h3');
+          h.textContent = heading;
+          a.append(small, h);
+          for (const [line, className] of lines) {
+            if (!line) continue;
+            const p = document.createElement('p');
+            p.textContent = line;
+            if (className) p.className = className;
+            a.append(p);
+          }
+          panel.append(a);
+          return a;
+        };
+        article(copy.label, 'The Treeline');
+        for (const block of copy.blocks)
+          article(block.eyebrow, block.heading, [block.body], [block.note, 'muted']);
+        article(copy.sign.caption, 'The sign', [copy.sign.text, 'sign'], [copy.footer, 'muted']);
+      }
+      function tick(now) {
+        if (state.playing) {
+          // The town clock: one town minute a second.
+          state.minutes += Math.min(0.25, (now - last) / 1000);
+          if (state.minutes >= 1440) {
+            state.minutes %= 1440;
+            state.day = inYear(state.day + 1);
+          }
+        }
+        last = now;
+        const { day, minutes } = state;
+        try {
+          const residents = simulateResidents(places, minutes, day);
+          renderCity({
+            ctx,
+            width: W,
+            height: H,
+            camera: camera(),
+            places,
+            residents,
+            events: eventsForDay(day),
+            minutes,
+            day,
+            night: minutes < 360 || minutes >= 1200,
+            selectedPlot: state.emphasis === 'selected' ? FIRST : null,
+            hoveredPlot: state.emphasis === 'hover' ? FIRST : null,
+            showPlots: false,
+          });
+          $('#status').textContent = describe(day, minutes, residents);
+          renderPanel(day, minutes);
+        } catch (error) {
+          report(error);
+        }
+        $('#day').value = String((((day - YEAR) % DAYS_PER_YEAR) + DAYS_PER_YEAR) % DAYS_PER_YEAR);
+        $('#time').value = String(minutes);
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>
