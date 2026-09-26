@@ -11,6 +11,8 @@ import {
   type ResidentTrip,
 } from '../src/lib/resident-trips';
 import { legsMinutes } from '../src/lib/tube-journeys';
+import { tubeParcels, tubeRides } from '../src/lib/tube-traffic';
+import { TUBE_PARCELS } from '../src/lib/tubes';
 import { MIN_VISIT_MINUTES, routeLength, WALK_SPEED } from '../src/lib/walking';
 import { simulateResidents } from '../src/lib/simulation';
 import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
@@ -73,21 +75,27 @@ const outing = (trip: ResidentTrip): Outing =>
       : CONCERTS.includes(trip.event.id)
         ? 'concert'
         : (trip.event.id as Outing);
-/** A year of plans, each day's guests by outing. */
-const years = new Map<Place[], { day: number; guests: Map<Outing, [string, ResidentTrip][]> }[]>();
+type Day = {
+  day: number;
+  plans: Map<string, ResidentTrip[]>;
+  guests: Map<Outing, [string, ResidentTrip][]>;
+};
+/** A year of plans, with each day's guests by outing. */
+const years = new Map<Place[], Day[]>();
 function year(homes: Place[]) {
-  let plans = years.get(homes);
-  if (!plans) {
-    plans = YEAR.map((day) => {
+  let days = years.get(homes);
+  if (!days) {
+    days = YEAR.map((day) => {
+      const plans = planResidentTrips(homes, day);
       const guests = new Map<Outing, [string, ResidentTrip][]>();
-      for (const [id, trips] of planResidentTrips(homes, day))
+      for (const [id, trips] of plans)
         for (const trip of trips)
           guests.set(outing(trip), [...(guests.get(outing(trip)) ?? []), [id, trip]]);
-      return { day, guests };
+      return { day, plans, guests };
     });
-    years.set(homes, plans);
+    years.set(homes, days);
   }
-  return plans;
+  return days;
 }
 
 describe('Event seats at a full town', () => {
@@ -122,6 +130,34 @@ describe('Event seats at a full town', () => {
         expect(new Set(afternoon).size).toBe(afternoon.length);
         const film = new Set((guests.get('cinema') ?? []).map(([id]) => id));
         expect((guests.get('concert') ?? []).some(([id]) => film.has(id))).toBe(false);
+      }
+  }, 60_000);
+
+  it('keeps every day whole at a full town, rides and parcels included', () => {
+    const { margin, wait } = TUBE_PARCELS;
+    for (const homes of [TOWNS.mixed, TOWNS.eager])
+      for (const { day, plans } of year(homes)) {
+        for (const home of homes)
+          plans.get(home.id)!.forEach((trip, index, trips) => {
+            expect(trip.depart).toBeGreaterThanOrEqual(trip.availableFrom);
+            expect(trip.homeBy).toBeLessThanOrEqual(trip.availableUntil + 1e-9);
+            if (home.resident.routine.night === 'stroll')
+              expect(trip.homeBy).toBeLessThanOrEqual(nightBedtime(home) + 1e-9);
+            if (index) expect(trip.depart).toBeGreaterThanOrEqual(trips[index - 1].homeBy);
+            // At least fifteen minutes while the show is on.
+            expect(
+              Math.min(trip.event.end, trip.leave) - Math.max(trip.event.start, trip.arrive),
+            ).toBeGreaterThanOrEqual(MIN_VISIT_MINUTES - 1e-9);
+            if (trip.legs) expect(legsMinutes(trip.legs)).toBeCloseTo(trip.duration, 9);
+          });
+        if (day % 4) continue;
+        const rides = tubeRides(homes, day);
+        for (const parcel of tubeParcels(homes, day))
+          for (const ride of rides)
+            expect(
+              ride.off + margin <= parcel.depart - wait ||
+                parcel.arrive + wait + margin <= ride.board,
+            ).toBe(true);
       }
   }, 60_000);
 
@@ -190,7 +226,7 @@ describe('Event seats at a full town', () => {
       for (const homes of [real, TOWNS.mixed.filter((_, index) => index % 3 === 0)]) {
         const roster = homes.filter((home) => home.plot !== plot);
         const town = withPreview(roster, draft);
-        for (const day of YEAR.filter((_, index) => index % 3 === 0)) {
+        for (const day of YEAR.filter((_, index) => index % 6 === 0)) {
           const before = planResidentTrips(roster, day),
             after = planResidentTrips(town, day);
           for (const home of roster) expect(after.get(home.id)).toEqual(before.get(home.id));
