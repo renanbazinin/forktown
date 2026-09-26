@@ -1,4 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { SUBPROCESS_TEST } from './subprocess-timeout';
 import {
   evaluatePolicy,
   paginate,
@@ -444,5 +450,65 @@ describe('One commit status for every PR that shares a head commit', () => {
     const github = fakeGitHub({ pulls: [pull(1, 'alice')], creator: 'bob' });
     expect(await github.run({ number: '1' })).toBe('failure');
     expect(github.log.error.mock.calls[0][0]).toContain('different maintainer');
+  });
+  it('says so when a review matches no open PR, instead of passing quietly', async () => {
+    const movedOn = { ...pull(1, 'alice'), head: { sha: 'd'.repeat(40) } };
+    for (const pulls of [[], [movedOn]]) {
+      const github = fakeGitHub({ pulls });
+      expect(await github.run({ sha: HEAD })).toBe('unresolved');
+      expect(github.statuses).toEqual([]);
+      expect(github.log.error.mock.calls[0][0]).toContain('/check-contribution');
+    }
+    const elsewhere = fakeGitHub({ pulls: [pull(2, 'mallory', 'old-branch')] });
+    expect(await elsewhere.run({ sha: HEAD })).toBe('skipped');
+  });
+});
+
+describe('The workflow step', SUBPROCESS_TEST, () => {
+  const script = fileURLToPath(new URL('../scripts/check-github-pr.mjs', import.meta.url));
+  // Runs the real script after a preload swaps fetch for canned GitHub replies.
+  const runAfterReview = (replies) => {
+    const directory = mkdtempSync(join(tmpdir(), 'forktown-policy-'));
+    try {
+      const stub = join(directory, 'github.mjs');
+      writeFileSync(
+        stub,
+        `const replies = ${JSON.stringify(replies)};
+globalThis.fetch = async (url) => {
+  const body = replies[new URL(url).pathname];
+  return { ok: body !== undefined, status: body === undefined ? 404 : 200, json: async () => body };
+};`,
+      );
+      const event = join(directory, 'event.json');
+      writeFileSync(event, JSON.stringify({ workflow_run: { head_sha: HEAD } }));
+      return spawnSync(process.execPath, ['--import', pathToFileURL(stub).href, script], {
+        env: {
+          ...process.env,
+          GITHUB_REPOSITORY: 'o/r',
+          GH_TOKEN: 'token',
+          GITHUB_EVENT_NAME: 'workflow_run',
+          GITHUB_EVENT_PATH: event,
+          GITHUB_RUN_ID: '1',
+          PR_NUMBER: '',
+        },
+        encoding: 'utf8',
+      });
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  };
+  const lookup = `/repos/o/r/commits/${HEAD}/pulls`;
+
+  it('fails the run when a review matches no open PR', () => {
+    const result = runAfterReview({ '/repos/o/r': { default_branch: 'main' }, [lookup]: [] });
+    expect(result.status, result.stderr).toBe(1);
+    expect(result.stderr).toContain('/check-contribution');
+  });
+  it('stays green when the reviewed PR goes into another branch', () => {
+    const result = runAfterReview({
+      '/repos/o/r': { default_branch: 'main' },
+      [lookup]: [pull(2, 'mallory', 'old-branch')],
+    });
+    expect(result.status, result.stderr).toBe(0);
   });
 });

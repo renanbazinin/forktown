@@ -215,18 +215,24 @@ export async function runContributionPolicy({ api, repo, number, sha, runUrl, lo
     });
   try {
     const defaultBranch = (await api(root)).default_branch;
-    const numbers = new Set();
-    for (const item of [
+    const sharing = [
       ...(trigger ? [trigger] : []),
       ...(await paginate(api, `${root}/commits/${head}/pulls`)),
-    ])
-      if (
-        item.state === 'open' &&
-        item.head?.sha === head &&
-        item.base?.repo?.full_name === repo &&
-        item.base.ref === defaultBranch
-      )
-        numbers.add(item.number);
+    ].filter(
+      (item) =>
+        item.state === 'open' && item.head?.sha === head && item.base?.repo?.full_name === repo,
+    );
+    // A review names only its commit. GitHub's commit-to-PR lookup can come back empty, and
+    // the PR may have moved on to a newer commit, so say so rather than pass quietly.
+    if (!sharing.length && !trigger) {
+      log.error(
+        'No open PR has the reviewed commit as its head, so nothing was checked. Comment /check-contribution on the PR, or rerun this workflow with its number.',
+      );
+      return 'unresolved';
+    }
+    const numbers = new Set(
+      sharing.filter((item) => item.base.ref === defaultBranch).map((item) => item.number),
+    );
     if (!numbers.size) {
       log.log(`No open PR into ${defaultBranch} uses this commit; no status changed.`);
       return 'skipped';

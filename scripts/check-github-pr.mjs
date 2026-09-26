@@ -38,4 +38,5 @@ const result = await runContributionPolicy({
   sha,
   runUrl: `https://github.com/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
 });
-if (result === 'failure') process.exitCode = 1;
+// A review that matched no PR checked nothing, so the run must not look green.
+if (result === 'failure' || result === 'unresolved') process.exitCode = 1;
