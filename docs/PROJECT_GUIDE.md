@@ -84,15 +84,16 @@ docs/                     Architecture and publishing guides
 
 ## Useful commands
 
-| Command             | Purpose                                                  |
-| ------------------- | -------------------------------------------------------- |
-| `npm run dev`       | Start the local city                                     |
-| `npm run validate`  | Check every place with beginner-friendly errors          |
-| `npm test`          | Test contribution rules and map behavior                 |
-| `npm run typecheck` | Check the app’s TypeScript                               |
-| `npm run build`     | Validate and build the production site                   |
-| `npm run preview`   | Serve the production build locally                       |
-| `npm run check`     | Run tests, validation, type checks, and production build |
+| Command                   | Purpose                                                  |
+| ------------------------- | -------------------------------------------------------- |
+| `npm run dev`             | Start the local city                                     |
+| `npm run validate`        | Check every place with beginner-friendly errors          |
+| `npm test`                | Test contribution rules and map behavior                 |
+| `npm run typecheck`       | Check the app’s TypeScript                               |
+| `npm run build`           | Validate and build the production site                   |
+| `npm run preview`         | Serve the production build locally                       |
+| `npm run check`           | Run tests, validation, type checks, and production build |
+| `npm run check:full-town` | Validate and test a copy with every house plot taken     |
 
 ## Put your town online
 

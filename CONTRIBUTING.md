@@ -117,3 +117,5 @@ After committing, run `npm run check:pr -- origin/main HEAD` to check the house 
 Improve the guide, report a reproducible bug, test the site with a screen reader, add translations, draw a new building style in the renderer, or help plan the next neighborhood. For a new mechanism or a large change, open an issue first so we can agree on the shape of it.
 
 Implementation notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Please keep meaningful tests for contribution rules, geometry, and other behavior that newcomers depend on.
+
+`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy.
