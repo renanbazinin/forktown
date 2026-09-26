@@ -50,6 +50,14 @@ function drift(ctx: Ctx, points: number[][], fill: string) {
   ctx.fillStyle = fill;
   ctx.fill();
 }
+/** The walls fall 15px over their 29px width, a touch steeper than 2:1. */
+const SLOPE = 15 / 29;
+/** A point `out` px in front of the right wall, at wall position `x`, `z` px above the lawn. */
+const onRight = (x: number, out: number, z: number) => [x + out, 18 - SLOPE * (x - out) - z];
+/** The same for the left wall, whose front faces down and to the left. */
+const onLeft = (x: number, out: number, z: number) => [x - out, 18 + SLOPE * (x + out) - z];
+/** Garden beds line the lawn's front edges, leaving a gap where the path runs from the door. */
+const BEDS = [-39, -30, -9, 0, 9, 18, 27];
 const BASE_HEIGHT = {
   cottage: 32,
   cafe: 34,
@@ -70,7 +78,7 @@ function scheduleOf(id: string) {
       roof: seedFraction(`roof:${id}`),
       doorstep: seedFraction(`pumpkin:${id}`) < 0.45,
       squash: hash(`squash:${id}`),
-      beds: Array.from({ length: 7 }, (_, bed) => seedFraction(`squash:${id}:${bed}`)),
+      beds: Array.from(BEDS, (_, bed) => seedFraction(`squash:${id}:${bed}`)),
     };
     schedules.set(id, schedule);
   }
@@ -161,7 +169,7 @@ export function drawHouse(
   );
   // Garden beds stay within the plot; all artwork is drawn locally.
   const bed = (i: number) => {
-    const gx = -34 + i * 10,
+    const gx = BEDS[i],
       gy = 24 - Math.abs(gx) * 0.35;
     if (d.garden === 'vegetables') {
       box(ctx, gx, gy, 7, 4, '#957453');
@@ -175,11 +183,11 @@ export function drawHouse(
       box(ctx, gx - 1, gy - 4, 3, 2, ['#EDC88B', '#D18F87', '#B3A5CD'][i % 3]);
     }
   };
-  for (let i = 0; i < 7; i++) bed(i);
+  for (let i = 0; i < BEDS.length; i++) bed(i);
   // Stepping stones cross the lawn from the front door toward the street.
   for (let step = 0; step < 3; step++) {
-    const sx = -18 - step * 8.5,
-      sy = 9 + step * 4.25;
+    const sx = -13.5 - step * 8,
+      sy = 15.6 + step * 4;
     polygon(
       ctx,
       [
@@ -234,6 +242,8 @@ export function drawHouse(
       night ? '#456D67' : '#8AB4A8',
     );
   }
+  // A balcony serves the first floor up; a one-floor home's stands low as a deck.
+  const balconyFloor = d.feature === 'balcony' ? Math.max(0, d.floors - 2) : -1;
   for (let floor = 0; floor < d.floors; floor++) {
     const yy = -h + 12 + floor * 23;
     if (floor > 0) {
@@ -252,15 +262,52 @@ export function drawHouse(
     }
     for (const side of [-1, 1]) {
       ctx.save();
-      ctx.transform(1, side === -1 ? 0.5 : -0.5, 0, 1, side === -1 ? -25 : 8, yy + 5);
-      const silhouette = () => {
+      // Both walls hang their windows at the same height, a sill 8px above each floor.
+      ctx.transform(
+        1,
+        side === -1 ? 0.5 : -0.5,
+        0,
+        1,
+        side === -1 ? -25 : 8,
+        yy + (side === -1 ? 5 : 14),
+      );
+      const silhouette = (dx = 0, dy = 0) => {
         if (!windowsLit || !awakeInside || floor !== 0 || side !== (seed % 2 ? -1 : 1)) return;
         // One neighbor behind one pane, with the window frame painted in front.
-        box(ctx, 5, 3, 3, 3, '#83744D');
-        box(ctx, 4, 6, 5, 4, '#83744D');
-        box(ctx, 3, 9, 7, 1, '#83744D');
+        box(ctx, 5 + dx, 3 + dy, 3, 3, '#83744D');
+        box(ctx, 4 + dx, 6 + dy, 5, 4, '#83744D');
+        box(ctx, 3 + dx, 9 + dy, 7, 1, '#83744D');
       };
-      if (d.windows === 'round') {
+      const glass = windowsLit ? '#F1D68F' : night ? '#4E6461' : '#90B6BA';
+      if (side === 1 && floor === balconyFloor) {
+        // The balcony's glazed double door takes this window's place, its sill on the boards.
+        const bottom = d.floors === 1 ? 16 : 13,
+          top = bottom - 15;
+        if (d.windows === 'round') {
+          ctx.beginPath();
+          ctx.moveTo(1, bottom);
+          ctx.arc(6, top + 5, 5, Math.PI, 0);
+          ctx.lineTo(11, bottom);
+          ctx.closePath();
+          ctx.fillStyle = glass;
+          ctx.fill();
+          silhouette(-2, top + 3);
+          ctx.strokeStyle = trim;
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          box(ctx, 5.5, top + 1, 1, bottom - top - 1, trim);
+        } else {
+          box(ctx, 0, top, 12, 15, trim);
+          box(ctx, 1, top + 1, 10, 14, glass);
+          silhouette(-2, top + 3);
+          box(ctx, 5, top, 2, 15, trim);
+          if (d.windows === 'cross') box(ctx, 0, top + 5, 12, 1, trim);
+          else {
+            box(ctx, -4, top - 1, 3, 17, roof);
+            box(ctx, 13, top - 1, 3, 17, roof);
+          }
+        }
+      } else if (d.windows === 'round') {
         ctx.beginPath();
         ctx.arc(6, 6, 6, 0, Math.PI * 2);
         ctx.fillStyle = windowsLit ? '#F1D68F' : night ? '#4E6461' : '#8EBCBF';
@@ -271,7 +318,7 @@ export function drawHouse(
         ctx.stroke();
       } else {
         box(ctx, 0, 0, 12, 12, trim);
-        box(ctx, 1, 1, 10, 10, windowsLit ? '#F1D68F' : night ? '#4E6461' : '#90B6BA');
+        box(ctx, 1, 1, 10, 10, glass);
         silhouette();
         box(ctx, 5, 0, 2, 12, trim);
         if (d.windows === 'cross') box(ctx, 0, 5, 12, 2, trim);
@@ -289,13 +336,12 @@ export function drawHouse(
   box(ctx, 5, 3, 1, 2, '#EFD8A4');
   ctx.restore();
   if (onDoorstep) {
-    // A doorstep pumpkin right of the door, clear of the porch post. Pumpkins never glow.
-    box(ctx, -6, 14, 7, 4, pick(PUMPKIN.body, night));
-    box(ctx, -5, 13, 5, 6, pick(PUMPKIN.body, night));
-    box(ctx, -3, 14, 1, 4, pick(PUMPKIN.rib, night));
-    box(ctx, -3, 11, 2, 2, pick(PUMPKIN.stem, night));
-    // The fourth bed stands in front of it, so that bed is drawn again over the pumpkin.
-    bed(3);
+    // A doorstep pumpkin at the corner right of the door, clear of the porch post and the beds.
+    // Pumpkins never glow.
+    box(ctx, -3, 14, 7, 4, pick(PUMPKIN.body, night));
+    box(ctx, -2, 13, 5, 6, pick(PUMPKIN.body, night));
+    box(ctx, 0, 14, 1, 4, pick(PUMPKIN.rib, night));
+    box(ctx, 0, 11, 2, 2, pick(PUMPKIN.stem, night));
   }
   const flat =
     d.roof === 'flat' || (d.roof === 'classic' && ['studio', 'cafe'].includes(place.building));
@@ -484,54 +530,74 @@ export function drawHouse(
       drawChimneySmoke(ctx, chimneyX + 5, chimneyY - 17, life.minutes, seed, night);
   }
   if (d.feature === 'balcony') {
-    polygon(
-      ctx,
-      [
-        [1, -9],
-        [30, -24],
-        [40, -17],
-        [11, -2],
-      ],
-      trim,
-    );
-    for (let i = 0; i < 6; i++) box(ctx, 11 + i * 5, -12 - i * 2.5, 1, 10, roof);
-    polygon(
-      ctx,
-      [
-        [10, -14],
-        [40, -29],
-        [40, -27],
-        [10, -12],
-      ],
-      roof,
-    );
+    // A slab on the right wall's first floor line, railed on its three open sides, outside the
+    // door that takes that floor's window. A one-floor home's stands a step up, as a deck.
+    const deck = d.floors === 1,
+      floorZ = deck ? 4 : 30,
+      underZ = deck ? 0 : 28,
+      railZ = floorZ + (deck ? 6 : 7),
+      [from, to, out] = [3, 26, deck ? 5 : 8];
+    const at = (x: number, o: number, z = floorZ) => onRight(x, o, z),
+      boards = [at(from, 0), at(to, 0), at(to, out), at(from, out)],
+      edge = tint(trim, -18);
+    if (!deck)
+      // Two knee braces carry the slab from the wall.
+      for (const x of [from + 4, to - 4])
+        polygon(ctx, [at(x, 0, underZ), at(x, out - 3, underZ), at(x, 0, underZ - 7)], edge);
+    polygon(ctx, boards, tint(trim, 30));
+    polygon(ctx, [at(from, out), at(to, out), at(to, out, underZ), at(from, out, underZ)], trim);
+    polygon(ctx, [at(from, 0), at(from, out), at(from, out, underZ), at(from, 0, underZ)], edge);
+    frosted(() => drift(ctx, boards, snowTop));
+    // Balusters stand on the boards under a handrail: the far side, the front, then the near side.
+    const baluster = ([x, y]: number[]) =>
+      box(ctx, x - 0.5, y - railZ + floorZ, 1, railZ - floorZ, tint(trim, -8));
+    const handrail = (a: number[], b: number[]) =>
+      polygon(ctx, [a, b, [b[0], b[1] + 1.5], [a[0], a[1] + 1.5]], trim);
+    const side = (x: number) => {
+      for (let o = 3.5; o < out; o += 3.5) baluster(at(x, o));
+      handrail(at(x, 0, railZ), at(x, out, railZ));
+    };
+    side(to);
+    for (let i = 0; i <= 7; i++) baluster(at(from + ((to - from) * i) / 7, out));
+    handrail(at(from, out, railZ), at(to, out, railZ));
+    side(from);
+    frosted(() => {
+      const [a, b] = [at(from, out, railZ), at(to, out, railZ)];
+      drift(ctx, [a, b, [b[0], b[1] - 1], [a[0], a[1] - 1]], snowTop);
+    });
   }
   if (d.feature === 'porch' || place.building === 'cafe') {
+    // The porch roof leans out from above the front door, so the door stays in sight beneath it;
+    // a post stands under each front corner.
+    const [from, to, out, high, low] = [-31, 2, 6, 26, 22];
+    polygon(
+      ctx,
+      [onLeft(from, 0, high), onLeft(to, 0, high), onLeft(to, out, low), onLeft(from, out, low)],
+      roof,
+    );
     polygon(
       ctx,
       [
-        [-33, -13],
-        [-2, 3],
-        [-9, 12],
-        [-40, -4],
+        onLeft(from, out, low),
+        onLeft(to, out, low),
+        onLeft(to, out, low - 2),
+        onLeft(from, out, low - 2),
       ],
-      roof,
+      tint(roof, -24),
     );
     // Snow banks against the wall on the upper part of the porch roof.
-    frosted(() =>
+    frosted(() => {
+      const [a, b] = [onLeft(from, 0, high + 1), onLeft(to, 0, high + 1)];
       drift(
         ctx,
-        [
-          [-33, -14],
-          [-2, 2],
-          [-5.5, 7.5],
-          [-36.5, -8.5],
-        ],
+        [a, b, onLeft(to, out / 2, (high + low) / 2), onLeft(from, out / 2, (high + low) / 2)],
         snowTop,
-      ),
-    );
-    box(ctx, -38, -2, 2, 19, trim);
-    box(ctx, -9, 12, 2, 14, trim);
+      );
+    });
+    for (const x of [from, to]) {
+      const [px, py] = onLeft(x, out, 0);
+      box(ctx, px - 1, py - low + 2, 2, low - 2, trim);
+    }
   }
   if (place.decoration === 'bench') {
     const wood = tint(trim, 24),
