@@ -98,7 +98,10 @@ export default function Soundtrack({
     if (!enabled) {
       player.current.stop();
       setLoading(false);
-      return;
+      // Once the fade is over, let the audio device sleep. Turning sound on resumes it.
+      const quiet = player.current;
+      const sleep = setTimeout(() => void quiet.suspend().catch(() => {}), 250);
+      return () => clearTimeout(sleep);
     }
     if (hidden || !playing) {
       void player.current.suspend().catch(() => {});
