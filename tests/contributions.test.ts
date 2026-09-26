@@ -286,17 +286,18 @@ describe('Place files on disk', () => {
 
 describe('The examples a newcomer copies', () => {
   it.each(['examples/my-little-place.json', 'examples/living-place.json'])(
-    '%s is a valid house on a house plot, with an id no house uses',
+    '%s is a valid house on a house plot, with a placeholder id',
     (file) => {
       const example = placeSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
       expect(HOUSE_PLOTS.map((plot) => plot.id)).toContain(example.plot);
-      expect(places.map((place) => place.id)).not.toContain(example.id);
+      // It matches the documented copy target, places/your-unique-id.json.
+      expect(example.id).toBe('your-unique-id');
+      expect(
+        places.map((place) => place.id),
+        'A house still uses the example id "your-unique-id". Choose your own id and rename the file to match.',
+      ).not.toContain(example.id);
     },
   );
-  it('copies to places/your-unique-id.json without a rename error', () => {
-    const example = JSON.parse(readFileSync('examples/my-little-place.json', 'utf8'));
-    expect(example.id).toBe('your-unique-id');
-  });
 });
 
 describe('The buttons the guides tell newcomers to click', () => {

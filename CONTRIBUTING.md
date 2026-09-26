@@ -27,7 +27,7 @@ Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not cha
 
 ```json
 {
-  "id": "sam-moon-cafe",
+  "id": "your-unique-id",
   "name": "Sam’s Moon Café",
   "creator": "your-github-username",
   "plot": "T3",
