@@ -4,7 +4,7 @@ import { cityHit } from '../src/city/render';
 import { tubeHit } from '../src/city/tubes';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
-import { getPlot, plotCenter, project } from '../src/lib/world';
+import { getPlot, plotCenter, project, unproject } from '../src/lib/world';
 import { ZOO_SIGN, ZOO_SIGN_DEPTH } from '../src/city/zoo';
 import { FORK_PLOT } from '../src/lib/lanterns';
 import { tubeAt, tubeLength, tubeRoute, tubeStation, type ResidentTransit } from '../src/lib/tubes';
@@ -25,18 +25,23 @@ describe('Map selection follows visible depth', () => {
       });
     },
   );
-  it('keeps the raised zoo sign selectable in front of a resident', () => {
+  it('keeps the zoo gate’s plaque selectable in front of a resident behind it', () => {
     const sign = project(ZOO_SIGN.point.x, ZOO_SIGN.point.y);
+    const plaque = { x: sign.x, y: sign.y - ZOO_SIGN.rise + ZOO_SIGN.height / 2 };
+    // A walker on the north street, just behind the gate, whose figure the plaque covers.
+    const behind = unproject(plaque.x, plaque.y + 14);
     const resident = {
       ...simulateResidents(places, 402)[0],
       activity: 'stroll' as const,
-      position: ZOO_SIGN.point,
+      position: behind,
     };
+    expect(behind.y).toBeLessThan(ZOO_SIGN.point.y);
     expect(resident.position.x + resident.position.y).toBeLessThan(ZOO_SIGN_DEPTH);
-    expect(cityHit({ x: sign.x, y: sign.y - 24 }, [], [resident])).toEqual({
+    expect(cityHit(plaque, [], [{ ...resident, position: ZOO_SIGN.point }])).toEqual({
       kind: 'place',
       id: 'O6',
     });
+    expect(cityHit(plaque, [], [resident])).toEqual({ kind: 'place', id: 'O6' });
   });
   it('selects the studio wall covering Milo at 06:42 instead of the resident behind it', () => {
     // Captured overlap from the original 5-by-5 town; keep it independent of route changes.

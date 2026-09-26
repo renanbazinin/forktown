@@ -5,13 +5,17 @@ type TitleOptions = {
   height: number;
   title: string;
   subtitle?: string;
+  /** A larger or bolder subtitle than the default small print, and its colour. */
+  subtitleFont?: string;
+  subtitleColour?: string;
   fontSize: number;
   night: boolean;
 };
 
 /** Timber-framed venue lettering, shared by the stage and zoo signs. */
 export function drawVenueTitle(ctx: CanvasRenderingContext2D, options: TitleOptions) {
-  const { x, y, width, height, title, subtitle, fontSize, night } = options;
+  const { x, y, width, height, title, subtitle, subtitleFont, subtitleColour, fontSize, night } =
+    options;
   ctx.save();
   ctx.translate(x, y);
   const rect = (x: number, y: number, w: number, h: number, color: string) => {
@@ -44,8 +48,8 @@ export function drawVenueTitle(ctx: CanvasRenderingContext2D, options: TitleOpti
   ctx.fillStyle = night ? '#FFE9B9' : '#FFF0CF';
   ctx.fillText(title, 0, subtitle ? height * 0.4 : height / 2 + 1);
   if (subtitle) {
-    ctx.font = '8px "Space Mono", monospace';
-    ctx.fillStyle = night ? '#CBCEA3' : '#CBD3AC';
+    ctx.font = subtitleFont ?? '8px "Space Mono", monospace';
+    ctx.fillStyle = subtitleColour ?? (night ? '#CBCEA3' : '#CBD3AC');
     ctx.fillText(subtitle, 0, height * 0.73);
   }
   ctx.restore();
