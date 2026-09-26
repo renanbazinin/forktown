@@ -8,7 +8,7 @@ Each 24-minute UTC town day selects one lunch event and one evening show, follow
 | Little Stage | B5            | Rock, acoustic, jazz                 | 19:00–21:00 |
 | Little Stage | B5            | Midnight at the Little Stage         | 23:30–02:30 |
 
-Neighbors set to `stroll` during that period are eligible. The green has six spots around its blanket; the stage has eight spots across its audience lawn. Guests are chosen deterministically by day and house ID. When all spots are taken, other neighbors keep their regular stroll instead of waiting in a queue. The selection changes with each town day.
+Neighbors set to `stroll` during that period are eligible. The green has six spots around its blanket; the stage has eight spots across its audience lawn. Guests are chosen deterministically by day and house ID: each day draws a new line, and spots go down it in order. A neighbor who can't make it (too far to get there, stay fifteen minutes and be home before their next routine or bedtime, or already out at an earlier outing that runs late) passes the spot to the next in line, so a spot stays empty only when nobody else free that period can reach it. When all spots are taken, other neighbors keep their regular stroll instead of waiting in a queue.
 
 Guests leave home shortly after 12:00 or 18:00, follow roads (or ride the Treeline when it saves at least ten minutes), then walk onto the venue lawn. Departures are staggered slightly; everyone gets home before the next routine starts. Neighbors at work or home remain indoors.
 

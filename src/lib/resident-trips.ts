@@ -120,113 +120,120 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
   return result;
 }
 
+/** Football uses the same physical travel rules, with a morning or afternoon visit. */
+function footballVisit(period: 'morning' | 'afternoon'): VisitEvent {
+  const start = period === 'morning' ? 360 : 720;
+  return {
+    id: 'football',
+    name: 'The Meadow Ground',
+    description: 'Watching the football',
+    venue: FOOTBALL_VENUE,
+    period,
+    depart: start,
+    start: start + 70,
+    end: start + 285,
+    homeBy: start + 350,
+  };
+}
+
+const skatingVisit: VisitEvent = {
+  id: 'millpond',
+  name: 'Skating on the Millpond',
+  description: 'Skating on the frozen millpond',
+  venue: MILLPOND_VENUE,
+  period: 'afternoon',
+  ...SKATING,
+  // Whoever leaves last (stagger 5 × 1.3) is still off the ice by the posted 16:40.
+  end: SKATING.end - 6.5,
+};
+
 /**
- * The day's plan, uncached. With `tube: false` nobody rides: that is the walking-only planner. A
- * tube plan equals it for every trip before a resident's first ride, and never drops one of its
- * trips for a trip only the tube makes possible.
+ * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
+ * neighbor in line whenever someone ahead can't make it (too far to walk there and home in time,
+ * or an earlier outing runs late), so a seat is only given out when it will be filled.
+ *
+ * With `tube: false` the same guests are invited but nobody rides: that is the walking-only
+ * planner. A tube plan equals it for every trip before a resident's first ride, and never drops
+ * one of its trips for a trip only the tube makes possible.
  */
 export function planResidentTrips(
   places: Place[],
   day: number,
   options: { tube?: boolean } = {},
 ): Map<string, ResidentTrip[]> {
-  const candidates = new Map<string, Candidate[]>();
   const program = eventsForDay(day);
   const movieGuests = cinemaGuests(places, day);
-  const sorted = (period: Period, key: string, excluded: string[] = []) =>
-    places
-      .filter((home) => home.resident.routine[period] === 'stroll' && !excluded.includes(home.id))
-      .sort((a, b) => hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) || a.id.localeCompare(b.id));
-  const add = (event: VisitEvent, ids: string[], period: Period = event.period) => {
-    ids.forEach((id, seat) => {
-      const list = candidates.get(id) ?? [];
-      list.push({ event, seat, period });
-      candidates.set(id, list);
-    });
+  // Each home's invitations so far, and the day they make.
+  const days = new Map<string, { list: Candidate[]; trips: ResidentTrip[] }>();
+  const empty = { list: [], trips: [] };
+  const invite = (home: Place, candidate: Candidate) => {
+    const before = days.get(home.id) ?? empty;
+    const list = [...before.list, candidate].sort((a, b) => a.event.start - b.event.start);
+    const trips = planWithTube(home, list);
+    const kept = new Set(trips.map((trip) => trip.event));
+    // A visit that costs an outing already planned would leave that seat empty.
+    if (!kept.has(candidate.event) || before.trips.some((trip) => !kept.has(trip.event)))
+      return false;
+    days.set(home.id, { list, trips });
+    return true;
   };
-  const picnic = program[0],
-    concert = program[1],
-    party = program.find((e) => e.id === 'night-party')!;
-  const picnicIds = sorted('afternoon', `${day}:${picnic.id}`)
-    .slice(0, EVENT_SPOTS.green.length)
-    .map((h) => h.id);
-  add(picnic, picnicIds);
-  add(
-    concert,
-    sorted('evening', `${day}:${concert.id}`, movieGuests)
-      .slice(0, EVENT_SPOTS.stage.length)
-      .map((h) => h.id),
+  const sorted = (period: Period, key: string, excluded: readonly string[] = []) =>
+    places
+      .filter(
+        (home) =>
+          home.resident.routine[period] === 'stroll' &&
+          !excluded.includes(home.id) &&
+          getPlot(home.plot),
+      )
+      .sort((a, b) => hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) || a.id.localeCompare(b.id));
+  /** Seat guests in line order until the seats are full or nobody else can make it. */
+  const seat = (event: VisitEvent, line: readonly Place[], seats: number) => {
+    const guests: string[] = [];
+    for (const home of line) {
+      if (guests.length >= seats) break;
+      if (invite(home, { event, seat: guests.length, period: event.period })) guests.push(home.id);
+    }
+    return guests;
+  };
+  const half = (line: readonly Place[], seats: number) =>
+    Math.min(seats, Math.ceil(line.length / 2));
+  // Cinema guests keep their seats whatever happens; their evening is planned around the film.
+  const cinema = program.find((e) => e.id === 'cinema')!;
+  movieGuests.forEach((id, seat) => {
+    const home = places.find((place) => place.id === id);
+    if (home && getPlot(home.plot)) invite(home, { event: cinema, seat, period: 'evening' });
+  });
+  // The rest in time order, so an outing is planned around the ones earlier in the day.
+  const morningFans = sorted('morning', `fans:${day}:morning`);
+  seat(footballVisit('morning'), morningFans, half(morningFans, 6));
+  const picnic = program[0];
+  const picnicIds = seat(
+    picnic,
+    sorted('afternoon', `${day}:${picnic.id}`),
+    EVENT_SPOTS.green.length,
   );
-  add(
-    party,
-    sorted('night', `${day}:${party.id}`)
-      .slice(0, EVENT_SPOTS.stage.length)
-      .map((h) => h.id),
-  );
-  add(
-    program.find((e) => e.id === 'cinema')!,
-    movieGuests,
-    'evening',
-  );
-  const zooCandidates = sorted('afternoon', `zoo:${day}`, picnicIds);
-  const zooIds = zooCandidates
-    .slice(0, Math.min(EVENT_SPOTS.zoo.length, Math.ceil(zooCandidates.length / 2)))
-    .map((h) => h.id);
-  add(
+  const zooLine = sorted('afternoon', `zoo:${day}`, picnicIds);
+  const zooIds = seat(
     program.find((e) => e.id === 'zoo')!,
-    zooIds,
+    zooLine,
+    half(zooLine, EVENT_SPOTS.zoo.length),
   );
-  for (const period of ['morning', 'afternoon'] as const) {
-    const fans = sorted(
-      period,
-      `fans:${day}:${period}`,
-      period === 'afternoon' ? [...picnicIds, ...zooIds] : [],
-    );
-    const start = period === 'morning' ? 360 : 720;
-    // Football uses the same physical travel rules, with a morning or afternoon visit.
-    const football: VisitEvent = {
-      id: 'football',
-      name: 'The Meadow Ground',
-      description: 'Watching the football',
-      venue: FOOTBALL_VENUE,
-      period,
-      depart: start,
-      start: start + 70,
-      end: start + 285,
-      homeBy: start + 350,
-    };
-    add(
-      football,
-      fans.slice(0, Math.min(6, Math.ceil(fans.length / 2))).map((h) => h.id),
-      period,
-    );
-  }
+  const afternoonFans = sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]);
+  const fanIds = seat(footballVisit('afternoon'), afternoonFans, half(afternoonFans, 6));
   // Winter skating on the frozen Millpond, for afternoon strollers nobody else has claimed.
   if (millpondSkatingDay(day)) {
-    const afternoonFans = sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]);
-    const fanIds = afternoonFans
-      .slice(0, Math.min(6, Math.ceil(afternoonFans.length / 2)))
-      .map((h) => h.id);
     const skaters = sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]);
-    add(
-      {
-        id: 'millpond',
-        name: 'Skating on the Millpond',
-        description: 'Skating on the frozen millpond',
-        venue: MILLPOND_VENUE,
-        period: 'afternoon',
-        ...SKATING,
-        // Whoever leaves last (stagger 5 × 1.3) is still off the ice by the posted 16:40.
-        end: SKATING.end - 6.5,
-      },
-      skaters.slice(0, Math.min(6, Math.ceil(skaters.length / 2))).map((h) => h.id),
-    );
+    seat(skatingVisit, skaters, half(skaters, 6));
   }
+  const concert = program[1];
+  seat(concert, sorted('evening', `${day}:${concert.id}`, movieGuests), EVENT_SPOTS.stage.length);
+  const party = program.find((e) => e.id === 'night-party')!;
+  seat(party, sorted('night', `${day}:${party.id}`), EVENT_SPOTS.stage.length);
   const result = new Map<string, ResidentTrip[]>();
   for (const home of places) {
     if (!getPlot(home.plot)) continue;
-    const list = (candidates.get(home.id) ?? []).sort((a, b) => a.event.start - b.event.start);
-    result.set(home.id, options.tube === false ? planHome(home, list) : planWithTube(home, list));
+    const { list, trips } = days.get(home.id) ?? empty;
+    result.set(home.id, options.tube === false ? planHome(home, list) : trips);
   }
   return result;
 }
