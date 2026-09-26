@@ -6,6 +6,7 @@ import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
+import { withPreview } from './lib/resident-trips';
 import { isZooPlot, ZOO_VENUE } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -136,7 +137,7 @@ export default function App() {
   const displayPlaces = useMemo(
     () =>
       draft && !places.some((place) => place.id === draft.id || place.plot === draft.plot)
-        ? [...places, draft]
+        ? withPreview(places, draft)
         : places,
     [draft, places],
   );

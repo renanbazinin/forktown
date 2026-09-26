@@ -147,6 +147,19 @@ const skatingVisit: VisitEvent = {
   end: SKATING.end - 6.5,
 };
 
+const previews = new WeakMap<Place[], { roster: Place[]; newcomers: Place[] }>();
+
+/**
+ * The town with a builder's draft house in it, for "Preview in town". Everyone already in town is
+ * planned exactly as without the draft, and the draft's neighbor only takes a seat they leave
+ * free, so a preview never moves anyone else.
+ */
+export function withPreview(places: Place[], draft: Place): Place[] {
+  const town = [...places, draft];
+  previews.set(town, { roster: places, newcomers: [draft] });
+  return town;
+}
+
 /**
  * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
  * neighbor in line whenever someone ahead can't make it (too far to walk there and home in time,
@@ -162,7 +175,8 @@ export function planResidentTrips(
   options: { tube?: boolean } = {},
 ): Map<string, ResidentTrip[]> {
   const program = eventsForDay(day);
-  const movieGuests = cinemaGuests(places, day);
+  // A previewed draft joins every line behind the whole town.
+  const { roster, newcomers } = previews.get(places) ?? { roster: places, newcomers: [] };
   // Each home's invitations so far, and the day they make.
   const days = new Map<string, { list: Candidate[]; trips: ResidentTrip[] }>();
   const empty = { list: [], trips: [] };
@@ -178,62 +192,93 @@ export function planResidentTrips(
     return true;
   };
   const sorted = (period: Period, key: string, excluded: readonly string[] = []) =>
-    places
-      .filter(
-        (home) =>
-          home.resident.routine[period] === 'stroll' &&
-          !excluded.includes(home.id) &&
-          getPlot(home.plot),
-      )
-      // Ids break a tie by code unit, never by the browser's language.
-      .sort(
-        (a, b) =>
-          hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) ||
-          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      );
-  /** Seat guests in line order until the seats are full or nobody else can make it. */
-  const seat = (event: VisitEvent, line: readonly Place[], seats: number) => {
+    [roster, newcomers].map((homes) =>
+      homes
+        .filter(
+          (home) =>
+            home.resident.routine[period] === 'stroll' &&
+            !excluded.includes(home.id) &&
+            getPlot(home.plot),
+        )
+        // Ids break a tie by code unit, never by the browser's language.
+        .sort(
+          (a, b) =>
+            hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) ||
+            (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+        ),
+    );
+  /**
+   * Seat guests in line order until the seats are full or nobody else can make it. `seats` counts
+   * the spots for a line of that many; newcomers get only the spots the town's line leaves.
+   */
+  const seat = (
+    event: VisitEvent,
+    [line, late]: Place[][],
+    seats: (entrants: number) => number,
+  ) => {
     const guests: string[] = [];
-    for (const home of line) {
-      if (guests.length >= seats) break;
-      if (invite(home, { event, seat: guests.length, period: event.period })) guests.push(home.id);
-    }
+    for (const [homes, spots] of [
+      [line, seats(line.length)],
+      [late, seats(line.length + late.length)],
+    ] as const)
+      for (const home of homes) {
+        if (guests.length >= spots) break;
+        if (invite(home, { event, seat: guests.length, period: event.period }))
+          guests.push(home.id);
+      }
     return guests;
   };
-  const half = (line: readonly Place[], seats: number) =>
-    Math.min(seats, Math.ceil(line.length / 2));
+  const all = (spots: number) => () => spots;
+  const half = (spots: number) => (entrants: number) => Math.min(spots, Math.ceil(entrants / 2));
   // Cinema guests keep their seats whatever happens; their evening is planned around the film.
   const cinema = program.find((e) => e.id === 'cinema')!;
+  const movieGuests = cinemaGuests(roster, day);
+  // A newcomer sees the film only from a seat the town's own guests leave free.
+  const filmSeats = cinemaGuests(places, day).length;
+  for (const { id, resident } of newcomers)
+    if (
+      movieGuests.length < filmSeats &&
+      resident.routine.evening === 'stroll' &&
+      resident.routine.night === 'stroll'
+    )
+      movieGuests.push(id);
   movieGuests.forEach((id, seat) => {
     const home = places.find((place) => place.id === id);
     if (home && getPlot(home.plot)) invite(home, { event: cinema, seat, period: 'evening' });
   });
   // The rest in time order, so an outing is planned around the ones earlier in the day.
-  const morningFans = sorted('morning', `fans:${day}:morning`);
-  seat(footballVisit('morning'), morningFans, half(morningFans, 6));
+  seat(footballVisit('morning'), sorted('morning', `fans:${day}:morning`), half(6));
   const picnic = program[0];
   const picnicIds = seat(
     picnic,
     sorted('afternoon', `${day}:${picnic.id}`),
-    EVENT_SPOTS.green.length,
+    all(EVENT_SPOTS.green.length),
   );
-  const zooLine = sorted('afternoon', `zoo:${day}`, picnicIds);
   const zooIds = seat(
     program.find((e) => e.id === 'zoo')!,
-    zooLine,
-    half(zooLine, EVENT_SPOTS.zoo.length),
+    sorted('afternoon', `zoo:${day}`, picnicIds),
+    half(EVENT_SPOTS.zoo.length),
   );
-  const afternoonFans = sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]);
-  const fanIds = seat(footballVisit('afternoon'), afternoonFans, half(afternoonFans, 6));
+  const fanIds = seat(
+    footballVisit('afternoon'),
+    sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]),
+    half(6),
+  );
   // Winter skating on the frozen Millpond, for afternoon strollers nobody else has claimed.
-  if (millpondSkatingDay(day)) {
-    const skaters = sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]);
-    seat(skatingVisit, skaters, half(skaters, 6));
-  }
+  if (millpondSkatingDay(day))
+    seat(
+      skatingVisit,
+      sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]),
+      half(6),
+    );
   const concert = program[1];
-  seat(concert, sorted('evening', `${day}:${concert.id}`, movieGuests), EVENT_SPOTS.stage.length);
+  seat(
+    concert,
+    sorted('evening', `${day}:${concert.id}`, movieGuests),
+    all(EVENT_SPOTS.stage.length),
+  );
   const party = program.find((e) => e.id === 'night-party')!;
-  seat(party, sorted('night', `${day}:${party.id}`), EVENT_SPOTS.stage.length);
+  seat(party, sorted('night', `${day}:${party.id}`), all(EVENT_SPOTS.stage.length));
   const result = new Map<string, ResidentTrip[]>();
   for (const home of places) {
     if (!getPlot(home.plot)) continue;

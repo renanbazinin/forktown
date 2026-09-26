@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { placeSchema, validatePlaces, type Place } from '../src/lib/schema';
 import { EVENT_SPOTS, eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
 import { hash } from '../src/lib/world';
-import { planResidentTrips, type ResidentTrip } from '../src/lib/resident-trips';
+import { planResidentTrips, withPreview, type ResidentTrip } from '../src/lib/resident-trips';
+import { simulateResidents } from '../src/lib/simulation';
 import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
 import { millpondSkatingDay } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
@@ -163,6 +164,47 @@ describe('Event seats at a full town', () => {
     // Today's town: every owl but the one two hours away by tube, whose bedtime is 00:34.
     const owls = TOWNS.real.filter((home) => home.resident.routine.night === 'stroll');
     expect(dancers(TOWNS.real).size).toBeGreaterThanOrEqual(owls.length - 1);
+  }, 60_000);
+
+  it('previews a draft house without moving anyone already in town', () => {
+    const free = HOUSE_PLOTS.filter((plot) => !real.some((home) => home.plot === plot.id));
+    let outings = 0;
+    // A night owl out all day beside the stage, an evening stroller, and a far lunch-goer.
+    for (const [plot, k] of [
+      [free[0], 0],
+      [free[12], 35],
+      [free.at(-1)!, 46],
+    ] as const) {
+      const draft = placeSchema.parse({
+        ...sample,
+        id: 'my-draft',
+        plot: plot.id,
+        resident: { ...sample.resident, routine: routine(k) },
+      });
+      const town = withPreview(real, draft);
+      for (const day of YEAR.filter((_, i) => i % 3 === 0)) {
+        const before = planResidentTrips(real, day),
+          after = planResidentTrips(town, day);
+        for (const home of real) expect(after.get(home.id)).toEqual(before.get(home.id));
+        // The draft's neighbor sits only where nobody else does.
+        for (const trip of after.get(draft.id)!) {
+          outings++;
+          const others = [...before.values()].flat().filter((t) => outing(t) === outing(trip));
+          expect(others.map((t) => t.seat)).not.toContain(trip.seat);
+          expect(others.length).toBeLessThan(CAPACITY[outing(trip)]);
+        }
+      }
+      for (const minutes of [500, 790, 845, 1150, 1225, 1300, 1430]) {
+        const day = YEAR[5];
+        const alone = simulateResidents(real, minutes, day),
+          shown = simulateResidents(town, minutes, day);
+        alone.forEach((state, index) => {
+          expect(shown[index].position).toEqual(state.position);
+          expect(shown[index].event).toEqual(state.event);
+        });
+      }
+    }
+    expect(outings).toBeGreaterThan(20);
   }, 60_000);
 
   it('plans the same day for any roster order', () => {
