@@ -87,6 +87,51 @@ describe('Trusted PR policy', () => {
         .errors,
     ).toEqual([]);
   });
+  it.each(['README.md', 'docs/GUIDE.md', 'docs/images/town.png', 'examples/my-home.json'])(
+    'lets anyone improve pages people only read: %s',
+    async (path) => {
+      expect((await check({ files: [house(path, 'modified')] })).errors).toEqual([]);
+      expect((await check({ files: [house(path, 'added')] })).errors).toEqual([]);
+    },
+  );
+  it.each([
+    'CLAUDE.md',
+    'AGENTS.md',
+    '.claude/commands/release.md',
+    '.claude/agents/reviewer.md',
+    '.claude/skills/deploy/SKILL.md',
+    '.claude/settings.json',
+    '.github/copilot-instructions.md',
+    '.github/PULL_REQUEST_TEMPLATE.md',
+    '.github/ISSUE_TEMPLATE/config.yml',
+    '.github/workflows/check.yml',
+    'SECURITY.md',
+    'CONTRIBUTING.md',
+    'CODE_OF_CONDUCT.md',
+    'THIRD_PARTY_NOTICES.md',
+    'LICENSE',
+    'src/notes.md',
+    'scripts/notes.md',
+    'places/notes.md',
+    'docs/history/old.md',
+    'docs/images/mark.svg',
+    'examples/nested/home.json',
+  ])('needs a maintainer for instructions, automation and policy files: %s', async (path) => {
+    for (const status of ['added', 'modified', 'removed']) {
+      const result = await check({ files: [house(path, status)] });
+      expect(result.reviewReasons, status).toEqual([
+        `Shared app or automation change: ${JSON.stringify(path)}`,
+      ]);
+      expect(result.errors.join(' ')).toContain('different maintainer');
+    }
+    expect(
+      (await check({ authorPermission: 'write', files: [house(path, 'modified')] })).errors,
+    ).toEqual([]);
+  });
+  it('needs a maintainer when a rename moves code into a reader-only path', async () => {
+    const moved = house('docs/app.md', 'renamed', { previous_filename: 'src/App.tsx' });
+    expect((await check({ files: [moved] })).reviewReasons).toHaveLength(1);
+  });
   it('rejects unreadable JSON and invalid resident lists', async () => {
     await expect(
       check({

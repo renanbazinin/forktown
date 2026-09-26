@@ -1,5 +1,12 @@
 export const isHouse = (path) => /^places\/[^/]+\.json$/.test(path);
 export const isMaintainer = (permission) => ['admin', 'maintain', 'write'].includes(permission);
+// Pages people only read. Everything else outside a house, including agent instructions
+// (CLAUDE.md, AGENTS.md, .claude/), .github/, and the security, conduct, contributing,
+// license and notice files, can steer tools or people, so outside changes need review.
+export const isReaderOnly = (path) =>
+  /^(?:docs\/[^/]+\.md|docs\/images\/[^/]+\.(?:png|jpe?g|gif|webp)|examples\/[^/]+\.json|README\.md)$/.test(
+    path,
+  );
 
 export async function paginate(api, path, expected) {
   const all = [];
@@ -58,7 +65,7 @@ export async function evaluatePolicy({
     if (!isHouse(file.filename) && !isHouse(oldPath)) {
       if (
         !isMaintainer(authorPermission) &&
-        !/^(docs\/|examples\/|.*\.md$|LICENSE$)/.test(file.filename)
+        !(isReaderOnly(file.filename) && isReaderOnly(oldPath))
       )
         reviewReasons.push(`Shared app or automation change: ${JSON.stringify(file.filename)}`);
       continue;
