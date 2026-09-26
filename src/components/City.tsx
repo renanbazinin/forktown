@@ -14,6 +14,7 @@ import { PLOT_COPY } from '../lib/brand';
 import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
 import { project, WORLD_BOUNDS } from '../lib/world';
+import { clampZoom, resizeView, zoomAround, type Point, type Size } from '../lib/map-view';
 import {
   FOOTBALL_CENTER,
   FOOTBALL_VENUE,
@@ -80,6 +81,10 @@ const City = forwardRef<CityHandle, Props>(function City(
     cy: number;
     moved: boolean;
   } | null>(null);
+  // The view the map chose for itself: the opening view, a selection, or the whole town. Until
+  // the visitor moves the map, a resize frames the same thing again; after that, their view stays.
+  const framing = useRef<((width: number, height: number) => Camera) | null>(null);
+  const measured = useRef<Size | null>(null);
   const fit = useRef(0.57);
   const initialPlaces = useRef(places);
   const selectedRef = useRef(selectedPlot);
@@ -221,17 +226,36 @@ const City = forwardRef<CityHandle, Props>(function City(
       zoom,
     };
   }, []);
+  // Frames one plot: a venue's own view, or a house near the middle at a readable zoom.
+  const plotCamera = (id: string, width: number, height: number, zoomFloor = 0) => {
+    if (isFarmPlot(id)) return farmCamera(width, height);
+    if (isZooPlot(id)) return zooCamera(width, height);
+    if (isMillpondPlot(id)) return millpondCamera(width, height);
+    if (isTubePlot(id)) return tubeCamera(width, height, id);
+    if (isCinemaPlot(id)) return cinemaCamera(width, height);
+    if (isFootballPlot(id)) return footballCamera(width, height);
+    const plot = getPlot(id);
+    if (!plot) return null;
+    const point = plotCenter(plot);
+    const zoom = Math.max(fit.current, 0.85, zoomFloor);
+    return {
+      x: width / 2 - point.x * zoom,
+      y: height * (width < 600 ? 0.33 : 0.5) - (point.y - 35) * zoom,
+      zoom,
+    };
+  };
   useEffect(() => {
     if (followed) {
+      framing.current = null;
       setHover(null);
       canvas.current?.focus({ preventScroll: true });
       setCamera((old) => ({ ...old, zoom: Math.max(old.zoom, 0.6, fit.current * 1.8) }));
     }
   }, [followed]);
-  const reset = useCallback(
-    () => setCamera(defaultCamera(size.width, size.height)),
-    [defaultCamera, size],
-  );
+  const reset = useCallback(() => {
+    framing.current = defaultCamera;
+    setCamera(defaultCamera(size.width, size.height));
+  }, [defaultCamera, size]);
   const neighborhoodCamera = useCallback(
     (width: number, height: number): Camera => {
       const overview = defaultCamera(width, height);
@@ -272,6 +296,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     [defaultCamera],
   );
   const stopFollowing = useCallback(() => {
+    framing.current = null;
     setCamera(cameraRef.current);
     onStopFollowing();
   }, [onStopFollowing]);
@@ -281,39 +306,11 @@ const City = forwardRef<CityHandle, Props>(function City(
       reset,
       stopFollowing,
       focus: (id) => {
-        if (isFarmPlot(id)) {
-          setCamera(farmCamera(size.width, size.height));
-          return;
-        }
-        if (isZooPlot(id)) {
-          setCamera(zooCamera(size.width, size.height));
-          return;
-        }
-        if (isMillpondPlot(id)) {
-          setCamera(millpondCamera(size.width, size.height));
-          return;
-        }
-        if (isTubePlot(id)) {
-          setCamera(tubeCamera(size.width, size.height, id));
-          return;
-        }
-        if (isCinemaPlot(id)) {
-          setCamera(cinemaCamera(size.width, size.height));
-          return;
-        }
-        if (isFootballPlot(id)) {
-          setCamera(footballCamera(size.width, size.height));
-          return;
-        }
-        const plot = getPlot(id);
-        if (!plot) return;
-        const pt = plotCenter(plot);
-        const zoom = Math.max(fit.current, 0.85, cameraRef.current.zoom);
-        setCamera({
-          x: size.width / 2 - pt.x * zoom,
-          y: size.height * (size.width < 600 ? 0.33 : 0.5) - (pt.y - 35) * zoom,
-          zoom,
-        });
+        const zoomFloor = cameraRef.current.zoom;
+        const view = plotCamera(id, size.width, size.height, zoomFloor);
+        if (!view) return;
+        framing.current = (width, height) => plotCamera(id, width, height, zoomFloor) ?? view;
+        setCamera(view);
       },
     }),
     [reset, size, stopFollowing],
@@ -321,49 +318,37 @@ const City = forwardRef<CityHandle, Props>(function City(
   useEffect(() => {
     if (!wrapper.current) return;
     const observer = new ResizeObserver(([entry]) => {
-      const width = entry.contentRect.width,
-        height = entry.contentRect.height;
-      setSize({ width, height });
-      const initial = neighborhoodCamera(width, height);
-      const selected = getPlot(selectedRef.current ?? '');
-      if (selected && isFarmPlot(selected.id)) setCamera(farmCamera(width, height));
-      else if (selected && isZooPlot(selected.id)) setCamera(zooCamera(width, height));
-      else if (selected && isMillpondPlot(selected.id)) setCamera(millpondCamera(width, height));
-      else if (selected && isTubePlot(selected.id))
-        setCamera(tubeCamera(width, height, selected.id));
-      else if (selected && isCinemaPlot(selected.id)) setCamera(cinemaCamera(width, height));
-      else if (selected && isFootballPlot(selected.id)) setCamera(footballCamera(width, height));
-      else if (selected) {
-        const point = plotCenter(selected),
-          zoom = Math.max(initial.zoom, 0.85);
-        setCamera({
-          x: width / 2 - point.x * zoom,
-          y: height * (width < 600 ? 0.33 : 0.5) - (point.y - 35) * zoom,
-          zoom,
-        });
-      } else setCamera(initial);
+      const next = { width: entry.contentRect.width, height: entry.contentRect.height };
+      const last = measured.current;
+      measured.current = next;
+      setSize(next);
+      const fitZoom = defaultCamera(next.width, next.height).zoom;
+      if (last && !framing.current) {
+        setCamera((old) => resizeView(old, last, next, fitZoom));
+        return;
+      }
+      if (!framing.current) {
+        const selected = selectedRef.current;
+        framing.current = (width, height) =>
+          (selected ? plotCamera(selected, width, height) : null) ??
+          neighborhoodCamera(width, height);
+      }
+      setCamera(framing.current(next.width, next.height));
     });
     observer.observe(wrapper.current);
     return () => observer.disconnect();
-  }, [neighborhoodCamera]);
+  }, [defaultCamera, neighborhoodCamera]);
   const zoomBy = useCallback(
-    (factor: number, anchor?: { x: number; y: number }) => {
+    (factor: number, anchor?: Point) => {
+      framing.current = null;
       setCamera((old) => {
-        const zoom = Math.max(
-          fit.current * 0.65,
-          Math.min(Math.max(6, fit.current * 3.5), old.zoom * factor),
-        );
         const pitch = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y);
         const a =
           anchor ??
           (isFootballPlot(selectedRef.current ?? '')
             ? { x: pitch.x * old.zoom + old.x, y: pitch.y * old.zoom + old.y }
             : { x: size.width / 2, y: size.height / 2 });
-        return {
-          x: a.x - ((a.x - old.x) * zoom) / old.zoom,
-          y: a.y - ((a.y - old.y) * zoom) / old.zoom,
-          zoom,
-        };
+        return zoomAround(old, clampZoom(old.zoom * factor, fit.current), a);
       });
     },
     [size],
@@ -461,6 +446,7 @@ const City = forwardRef<CityHandle, Props>(function City(
           };
           if (moves[event.key]) {
             onStopFollowing();
+            framing.current = null;
             event.preventDefault();
             const [x, y] = moves[event.key];
             const actual = cameraRef.current;
@@ -503,6 +489,7 @@ const City = forwardRef<CityHandle, Props>(function City(
               dy = event.clientY - p.y;
             if (Math.abs(dx) + Math.abs(dy) > 5) p.moved = true;
             if (p.moved) {
+              framing.current = null;
               setDragging(true);
               setHover(null);
               setCamera((old) => ({ ...old, x: p.cx + dx, y: p.cy + dy }));

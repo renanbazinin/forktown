@@ -1,0 +1,38 @@
+// The visitor's view of the map as plain numbers, so pinch, resize and zoom rules run in node.
+// A view maps a world point p to the screen at p * zoom + (x, y).
+
+export type View = { x: number; y: number; zoom: number };
+export type Point = { x: number; y: number };
+export type Size = { width: number; height: number };
+
+/** How far the map zooms at a given whole-town fit: a little past the whole town, up to a sign. */
+export function zoomRange(fit: number) {
+  return { min: fit * 0.65, max: Math.max(6, fit * 3.5) };
+}
+
+export function clampZoom(zoom: number, fit: number) {
+  const { min, max } = zoomRange(fit);
+  return Math.max(min, Math.min(max, zoom));
+}
+
+/** Changes the zoom while the map point under `anchor` stays where it is on screen. */
+export function zoomAround(view: View, zoom: number, anchor: Point): View {
+  return {
+    x: anchor.x - ((anchor.x - view.x) * zoom) / view.zoom,
+    y: anchor.y - ((anchor.y - view.y) * zoom) / view.zoom,
+    zoom,
+  };
+}
+
+/**
+ * Keeps the visitor's view through a resize: the map point in the middle of the screen stays in
+ * the middle, and the zoom only moves if the new size puts it out of range.
+ */
+export function resizeView(view: View, from: Size, to: Size, fit: number): View {
+  const moved = {
+    ...view,
+    x: view.x + (to.width - from.width) / 2,
+    y: view.y + (to.height - from.height) / 2,
+  };
+  return zoomAround(moved, clampZoom(view.zoom, fit), { x: to.width / 2, y: to.height / 2 });
+}
