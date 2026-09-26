@@ -42,8 +42,7 @@ Publish the `dist` folder. Set `VITE_BASE_PATH=/` for a root-domain site, or `/y
 ## Before inviting contributors
 
 - Add branch protection or a ruleset: require the **Check town** workflow’s **check** job, a maintainer review, and an up-to-date branch (or a merge queue).
-- Turn on GitHub private vulnerability reporting if available. See [SECURITY.md](../SECURITY.md).
-- Add a contact channel for private code-of-conduct reports; until then, maintainers should publish one before growing the community.
+- Turn on private vulnerability reporting in **Settings → Code security**. [SECURITY.md](../SECURITY.md), [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) and `.github/ISSUE_TEMPLATE/config.yml` send private security and conduct reports to that form; in your own fork, point those links at your repository.
 - Test one contribution from a fork, check its build artifact, and confirm that merging updates the public town.
 - Add some `good first issue` and `help wanted` issues for documentation, accessibility, and future building designs.
 

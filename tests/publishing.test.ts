@@ -55,3 +55,13 @@ describe('Static publishing configuration', SUBPROCESS_TEST, () => {
     expect(configure('not-a-repository').status).toBe(1);
   });
 });
+
+describe('Private reports', () => {
+  const form = 'https://github.com/renanbazinin/forktown/security/advisories/new';
+  it('send security and conduct reports to the same private form', () => {
+    for (const file of ['SECURITY.md', 'CODE_OF_CONDUCT.md', '.github/ISSUE_TEMPLATE/config.yml'])
+      expect(readFileSync(file, 'utf8'), file).toContain(form);
+    for (const file of ['SECURITY.md', 'CODE_OF_CONDUCT.md'])
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(/when it is enabled|must be listed/);
+  });
+});
