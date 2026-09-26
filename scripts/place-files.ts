@@ -8,7 +8,7 @@ import type { PlaceEntry } from '../src/lib/schema';
  * read through a folder, so a house has to be exactly the file it looks like in the PR.
  */
 export async function readPlaceFiles(directory: URL) {
-  const folder = fileURLToPath(directory).replace(/[\/]+$/, '');
+  const folder = fileURLToPath(directory).replace(/[\\/]+$/, '');
   const entries: PlaceEntry[] = [];
   const errors: string[] = [];
   if (!(await lstat(folder)).isDirectory())
