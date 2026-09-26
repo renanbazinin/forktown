@@ -160,5 +160,5 @@ export const PLOT_COPY = {
   hint: 'Build a house here and your lantern joins the Fork.',
   row: 'Room for a lantern',
   tooltip: (plot: string) => `Plot ${plot} · Room for one more lantern`,
-  map: 'Interactive map of Forktown. The Lantern Fork stands at the heart of town, with a lantern for every neighbor. Drag to pan, scroll or use plus and minus to zoom. Arrow keys move the map; Home shows the whole town. Use Explore places to select a house with a keyboard.',
+  map: 'Interactive map of Forktown. The Lantern Fork stands at the heart of town, with a lantern for every neighbor. Drag to pan; pinch, scroll or use plus and minus to zoom. Arrow keys move the map; Home shows the whole town. Use Explore places to select a house with a keyboard.',
 };

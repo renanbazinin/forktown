@@ -36,3 +36,26 @@ export function resizeView(view: View, from: Size, to: Size, fit: number): View 
   };
   return zoomAround(moved, clampZoom(view.zoom, fit), { x: to.width / 2, y: to.height / 2 });
 }
+
+const middle = ([a, b]: readonly [Point, Point]) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+const spread = ([a, b]: readonly [Point, Point]) => Math.hypot(a.x - b.x, a.y - b.y);
+
+/**
+ * Two fingers on the map: it scales by how far apart they have moved, clamped like the wheel, and
+ * the map point that was between them follows the point between them now.
+ */
+export function pinchView(
+  start: View,
+  from: readonly [Point, Point],
+  to: readonly [Point, Point],
+  fit: number,
+): View {
+  const before = middle(from),
+    after = middle(to);
+  const zoom = clampZoom((start.zoom * spread(to)) / Math.max(1, spread(from)), fit);
+  return {
+    x: after.x - ((before.x - start.x) * zoom) / start.zoom,
+    y: after.y - ((before.y - start.y) * zoom) / start.zoom,
+    zoom,
+  };
+}

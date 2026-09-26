@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampZoom,
+  pinchView,
   resizeView,
   zoomAround,
   zoomRange,
@@ -63,5 +64,60 @@ describe('The map keeps the visitor’s view', () => {
     near(screen(after, under), anchor);
     expect(clampZoom(100, fit)).toBe(6);
     expect(clampZoom(0.01, fit)).toBeCloseTo(0.195, 6);
+  });
+});
+
+describe('Two fingers pinch the map', () => {
+  const fit = 0.3;
+  const start: View = { x: 100, y: 50, zoom: 1 };
+
+  it('scales by how far the fingers spread, around the point between them', () => {
+    const from = [
+      { x: 170, y: 400 },
+      { x: 230, y: 400 },
+    ] as const;
+    const to = [
+      { x: 80, y: 400 },
+      { x: 320, y: 400 },
+    ] as const;
+    const between = world(start, { x: 200, y: 400 });
+    const after = pinchView(start, from, to, fit);
+    expect(after.zoom).toBeCloseTo(4, 6);
+    near(screen(after, between), { x: 200, y: 400 });
+  });
+
+  it('pans with the fingers when they move together', () => {
+    const from = [
+      { x: 100, y: 100 },
+      { x: 200, y: 100 },
+    ] as const;
+    const to = [
+      { x: 140, y: 160 },
+      { x: 240, y: 160 },
+    ] as const;
+    const after = pinchView(start, from, to, fit);
+    expect(after).toEqual({ x: 140, y: 110, zoom: 1 });
+  });
+
+  it('stops at the same limits as the wheel', () => {
+    const from = [
+      { x: 190, y: 100 },
+      { x: 210, y: 100 },
+    ] as const;
+    const wide = [
+      { x: 0, y: 100 },
+      { x: 1000, y: 100 },
+    ] as const;
+    expect(pinchView(start, from, wide, fit).zoom).toBe(6);
+    expect(pinchView(start, wide, from, fit).zoom).toBeCloseTo(zoomRange(fit).min, 6);
+  });
+
+  it('never divides by fingers that start on the same spot', () => {
+    const same = [
+      { x: 50, y: 50 },
+      { x: 50, y: 50 },
+    ] as const;
+    const after = pinchView(start, same, same, fit);
+    expect(Number.isFinite(after.x) && Number.isFinite(after.y)).toBe(true);
   });
 });

@@ -14,7 +14,14 @@ import { PLOT_COPY } from '../lib/brand';
 import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
 import { project, WORLD_BOUNDS } from '../lib/world';
-import { clampZoom, resizeView, zoomAround, type Point, type Size } from '../lib/map-view';
+import {
+  clampZoom,
+  pinchView,
+  resizeView,
+  zoomAround,
+  type Point,
+  type Size,
+} from '../lib/map-view';
 import {
   FOOTBALL_CENTER,
   FOOTBALL_VENUE,
@@ -80,6 +87,14 @@ const City = forwardRef<CityHandle, Props>(function City(
     cx: number;
     cy: number;
     moved: boolean;
+  } | null>(null);
+  // Every pointer held on the map, in page coordinates. Two fingers pinch.
+  const down = useRef(new Map<number, Point>());
+  const pinch = useRef<{
+    ids: [number, number];
+    from: [Point, Point];
+    start: Camera;
+    view: Camera;
   } | null>(null);
   // The view the map chose for itself: the opening view, a selection, or the whole town. Until
   // the visitor moves the map, a resize frames the same thing again; after that, their view stays.
@@ -426,6 +441,21 @@ const City = forwardRef<CityHandle, Props>(function City(
       local,
     };
   };
+  const local = (point: Point) => {
+    const bounds = canvas.current!.getBoundingClientRect();
+    return { x: point.x - bounds.left, y: point.y - bounds.top };
+  };
+  /** A pointer leaves the map. If it was half of a pinch, the other finger carries on dragging. */
+  const lift = (id: number) => {
+    const p = pinch.current;
+    down.current.delete(id);
+    if (!p?.ids.includes(id)) return false;
+    const rest = p.ids[0] === id ? p.ids[1] : p.ids[0];
+    const at = down.current.get(rest)!;
+    pinch.current = null;
+    pointer.current = { id: rest, x: at.x, y: at.y, cx: p.view.x, cy: p.view.y, moved: true };
+    return true;
+  };
   const hoveredPlace = places.find((place) => place.plot === hover);
   return (
     <div
@@ -467,7 +497,28 @@ const City = forwardRef<CityHandle, Props>(function City(
           }
         }}
         onPointerDown={(event) => {
-          if (pointer.current || event.button !== 0) return;
+          if (event.button !== 0) return;
+          const at = { x: event.clientX, y: event.clientY };
+          const first = pointer.current;
+          if (first && !pinch.current) {
+            // A second finger turns the drag into a pinch around the point between the two.
+            const start = cameraRef.current;
+            down.current.set(event.pointerId, at);
+            pinch.current = {
+              ids: [first.id, event.pointerId],
+              from: [local(down.current.get(first.id) ?? first), local(at)],
+              start,
+              view: start,
+            };
+            first.moved = true;
+            framing.current = null;
+            setDragging(true);
+            setHover(null);
+            event.currentTarget.setPointerCapture(event.pointerId);
+            return;
+          }
+          if (first) return;
+          down.current.set(event.pointerId, at);
           const actual = cameraRef.current;
           if (followed) {
             stopFollowing();
@@ -483,7 +534,14 @@ const City = forwardRef<CityHandle, Props>(function City(
           event.currentTarget.setPointerCapture(event.pointerId);
         }}
         onPointerMove={(event) => {
-          if (pointer.current && pointer.current.id === event.pointerId) {
+          const two = pinch.current;
+          if (two?.ids.includes(event.pointerId)) {
+            down.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+            const [a, b] = two.ids.map((id) => local(down.current.get(id)!));
+            two.view = pinchView(two.start, two.from, [a, b], fit.current);
+            setCamera(two.view);
+          } else if (pointer.current && pointer.current.id === event.pointerId) {
+            down.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
             const p = pointer.current,
               dx = event.clientX - p.x,
               dy = event.clientY - p.y;
@@ -494,13 +552,14 @@ const City = forwardRef<CityHandle, Props>(function City(
               setHover(null);
               setCamera((old) => ({ ...old, x: p.cx + dx, y: p.cy + dy }));
             }
-          } else {
+          } else if (!two) {
             const { id, local } = hit(event.clientX, event.clientY);
             setHover(id);
             setTip(local);
           }
         }}
         onPointerUp={(event) => {
+          if (lift(event.pointerId)) return;
           const p = pointer.current;
           if (!p || p.id !== event.pointerId) return;
           if (!p.moved) {
@@ -512,7 +571,8 @@ const City = forwardRef<CityHandle, Props>(function City(
           setDragging(false);
           event.currentTarget.releasePointerCapture(event.pointerId);
         }}
-        onPointerCancel={() => {
+        onPointerCancel={(event) => {
+          if (lift(event.pointerId) || pointer.current?.id !== event.pointerId) return;
           pointer.current = null;
           setDragging(false);
         }}
