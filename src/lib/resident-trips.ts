@@ -322,11 +322,22 @@ function planHome(
         continue;
       }
     }
+    const walkTiles = tube ? walkedTiles(tube.legs) : routeLength(route);
+    const fixed = tube ? fixedMinutes(tube.legs) : 0;
+    // Night owls drift in through the party's first hour, but never so late that their bedtime
+    // leaves less than fifteen minutes to dance and an unhurried walk home.
+    const unhurried = walkTiles / WALK_SPEED + fixed;
+    const lateness = Math.floor(
+      window.availableUntil - unhurried - event.start - MIN_VISIT_MINUTES,
+    );
+    const arrival = partyVisit
+      ? hash(`party-arrival:${home.id}`) % (Math.min(60, Math.max(0, lateness)) + 1)
+      : 0;
     // Only the walking picks up the pace; boarding, riding and stepping off keep their minutes.
     const plan = planJourney(
-      tube ? walkedTiles(tube.legs) : routeLength(route),
-      tube ? fixedMinutes(tube.legs) : 0,
-      event.start + (partyVisit ? hash(`party-arrival:${home.id}`) % 61 : 0),
+      walkTiles,
+      fixed,
+      event.start + arrival,
       end,
       Math.max(window.availableFrom, previousReturn),
       window.availableUntil,

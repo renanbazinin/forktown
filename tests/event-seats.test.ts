@@ -6,6 +6,7 @@ import { planResidentTrips, type ResidentTrip } from '../src/lib/resident-trips'
 import { cinemaGuests } from '../src/lib/cinema';
 import { millpondSkatingDay } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
+import { nightBedtime } from '../src/lib/night-routine';
 
 const real = validatePlaces(
   readdirSync('places')
@@ -132,6 +133,35 @@ describe('Event seats at a full town', () => {
       expect(seen.get(kind)!.size, kind).toBeGreaterThan(homes.length * 0.8);
     // Eleven frozen afternoons of six loops go round as far as they can.
     expect(seen.get('millpond')!.size).toBeGreaterThan(50);
+  }, 60_000);
+
+  it('lets every night owl who can reach the stage before bedtime dance on some nights', () => {
+    const dancers = (homes: Place[]) =>
+      new Set(
+        year(homes).flatMap(({ guests }) => (guests.get('night-party') ?? []).map(([id]) => id)),
+      );
+    for (const homes of [TOWNS.eager, TOWNS.mixed, TOWNS.real]) {
+      const danced = dancers(homes);
+      // Alone in town, with the whole dance floor free: can this owl ever dance at all?
+      const able = homes.filter(
+        (owl) =>
+          owl.resident.routine.night === 'stroll' &&
+          YEAR.some((day) =>
+            planResidentTrips([owl], day)
+              .get(owl.id)!
+              .some((trip) => trip.event.id === 'night-party'),
+          ),
+      );
+      for (const owl of able) expect(danced.has(owl.id), owl.id).toBe(true);
+    }
+    // A bedtime between midnight and one leaves room to dance when the stage is near enough.
+    const early = [...dancers(TOWNS.eager)].filter(
+      (id) => nightBedtime(TOWNS.eager.find((home) => home.id === id)!) < 1500,
+    );
+    expect(early.length).toBeGreaterThan(3);
+    // Today's town: every owl but the one two hours away by tube, whose bedtime is 00:34.
+    const owls = TOWNS.real.filter((home) => home.resident.routine.night === 'stroll');
+    expect(dancers(TOWNS.real).size).toBeGreaterThanOrEqual(owls.length - 1);
   }, 60_000);
 
   it('plans the same day for any roster order', () => {
