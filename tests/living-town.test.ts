@@ -201,7 +201,7 @@ describe('A small predictable daily life', () => {
           states.some(
             (other) =>
               other.id !== resident.id &&
-              other.greeting &&
+              !other.greeting &&
               Math.hypot(
                 other.position.x - resident.position.x,
                 other.position.y - resident.position.y,

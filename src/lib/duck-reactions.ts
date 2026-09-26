@@ -7,7 +7,10 @@ export const DUCK_LOVE_SECONDS = 4; // One town minute is one real second.
 const RECOVERY_SECONDS = 12;
 const COOLDOWN_SECONDS = 30;
 type WalkMotion = Pick<ResidentState, 'position' | 'moving' | 'facing' | 'walkPhase' | 'duckLove'>;
+// One entry per stroll window. Past the cap (far beyond one per home, even in a much bigger
+// town) the least recently used goes first, so a busy morning never rebuilds them all.
 const encounters = new Map<string, number[]>();
+const ENCOUNTER_CACHE = 2048;
 
 function nearestDuck(position: Point, time: number) {
   return ducksAt(time)
@@ -29,7 +32,10 @@ export function duckAwareWalk(
 ): WalkMotion {
   if (time < DUCK_WALK_START || time >= DUCK_WALK_END + RECOVERY_SECONDS) return sample(time);
   let pauses = encounters.get(routeKey);
-  if (!pauses) {
+  if (pauses) {
+    encounters.delete(routeKey);
+    encounters.set(routeKey, pauses);
+  } else {
     pauses = [];
     // A fixed half-second scan makes encounters independent of frame rate, reloads and visit order.
     // Each pause has finished recovering before another can begin or the routine changes.
@@ -52,7 +58,7 @@ export function duckAwareWalk(
       }
     }
     // Local house previews can introduce new routes; keep this derived cache bounded.
-    if (encounters.size >= 256) encounters.clear();
+    if (encounters.size >= ENCOUNTER_CACHE) encounters.delete(encounters.keys().next().value!);
     encounters.set(routeKey, pauses);
   }
   const pause = pauses.find((at) => time >= at && time < at + DUCK_LOVE_SECONDS + RECOVERY_SECONDS);

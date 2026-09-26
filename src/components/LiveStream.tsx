@@ -14,6 +14,8 @@ import { latestArrival, places } from '../lib/places';
 import { project } from '../lib/world';
 import { townCatAt, TOWN_CAT_NAME } from '../lib/town-cat';
 import { simulateResidents } from '../lib/simulation';
+import { residentTrips } from '../lib/resident-trips';
+import { useTownDayPrefetch, whenIdle } from '../lib/idle-prefetch';
 import { useTownClock } from '../lib/use-town-clock';
 import { trackForTown } from '../music/score';
 import { cinemaAt, cinemaListening } from '../lib/cinema';
@@ -35,6 +37,13 @@ export default function LiveStream() {
   const [cinemaField, setCinemaField] = useState({ gain: 0, pan: 0 });
   const cinema = useMemo(() => cinemaAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const program = useMemo(() => liveProgram(places, clock.day), [clock.day]);
+  // Tomorrow's program while idle in the last town hour (its plan first), so midnight never waits.
+  useEffect(() => {
+    if (clock.minutes < 1380) return;
+    whenIdle(places, `trips:${clock.day + 1}`, () => residentTrips(places, clock.day + 1));
+    whenIdle(places, `live:${clock.day + 1}`, () => liveProgram(places, clock.day + 1));
+  }, [clock.minutes, clock.day]);
+  useTownDayPrefetch(places, clock.minutes, clock.day);
   const cinemaEvening = clock.minutes < 360;
   const events = useMemo(
     () => eventsForDay(clock.day, cinemaEvening ? 0 : 720),
