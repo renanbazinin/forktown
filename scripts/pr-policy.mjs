@@ -1,5 +1,20 @@
 export const isHouse = (path) => /^places\/[^/]+\.json$/.test(path);
 export const isMaintainer = (permission) => ['admin', 'maintain', 'write'].includes(permission);
+// Files coding agents load as instructions from whatever folder they sit in, docs/ included.
+export const isAgentFile = (path) =>
+  /(?:^|\/)(?:(?:claude|agents?|gemini|qwen|warp|crush)(?:\.local|\.override)?\.md|copilot-instructions\.md|[^/]*\.(?:instructions|prompt)\.md)$/i.test(
+    path,
+  );
+// Pages people only read. Everything else outside a house, including agent instructions
+// (CLAUDE.md, AGENTS.md, .claude/), .github/, and the security, conduct, contributing,
+// license and notice files, can steer tools or people, so outside changes need review.
+export const isReaderOnly = (path) =>
+  !isAgentFile(path) &&
+  /^(?:docs\/[^/]+\.md|docs\/images\/[^/]+\.(?:png|jpe?g|gif|webp)|examples\/[^/]+\.json|README\.md)$/.test(
+    path,
+  );
+// Git tree modes for an ordinary file. Links (120000) and submodules (160000) are not files.
+const FILE_MODES = ['100644', '100755'];
 
 export async function paginate(api, path, expected) {
   const all = [];
@@ -43,6 +58,7 @@ export async function evaluatePolicy({
   approved,
   readHead,
   readBase,
+  modeOf,
 }) {
   const errors = [];
   const reviewReasons = [];
@@ -55,10 +71,29 @@ export async function evaluatePolicy({
     );
   for (const file of files) {
     const oldPath = file.previous_filename ?? file.filename;
+    if (file.status !== 'removed') {
+      // The checkout follows links, but the API reads the link's own text; only plain files
+      // are what they seem.
+      const mode = await modeOf(file.filename);
+      if (mode === undefined)
+        throw new Error(`Could not find ${JSON.stringify(file.filename)} in the PR's commit.`);
+      // Folders too: house files sit directly in places/, where the validator looks.
+      if (
+        file.filename.startsWith('places/') &&
+        (mode !== '100644' || /^places\/[^/]+\//.test(file.filename))
+      ) {
+        errors.push(
+          `${JSON.stringify(file.filename)} must be a plain file. Links, folders and executable files can't live in places/.`,
+        );
+        continue;
+      }
+      if (!FILE_MODES.includes(mode) && !isMaintainer(authorPermission))
+        reviewReasons.push(`Link or submodule: ${JSON.stringify(file.filename)}`);
+    }
     if (!isHouse(file.filename) && !isHouse(oldPath)) {
       if (
         !isMaintainer(authorPermission) &&
-        !/^(docs\/|examples\/|.*\.md$|LICENSE$)/.test(file.filename)
+        !(isReaderOnly(file.filename) && isReaderOnly(oldPath))
       )
         reviewReasons.push(`Shared app or automation change: ${JSON.stringify(file.filename)}`);
       continue;
@@ -121,4 +156,149 @@ export async function evaluatePolicy({
       `A different maintainer must approve this exact commit, then rerun the policy check: ${reviewReasons.join('; ')}. After approval, comment /check-contribution on the PR.`,
     );
   return { errors, reviewReasons, added: additions.length };
+}
+
+// Every path in the PR's head commit with its Git mode, from one API call. A truncated tree
+// could hide a link, so it fails closed.
+export async function headModes(api, root, head) {
+  const tree = await api(`${root}/git/trees/${head}?recursive=1`);
+  if (!Array.isArray(tree?.tree) || tree.truncated !== false)
+    throw new Error('GitHub returned an incomplete file tree. Please retry.');
+  return new Map(tree.tree.map((entry) => [entry.path, entry.mode]));
+}
+
+async function evaluatePullRequest({ api, root, repo, pr, modes, permissionFor }) {
+  const files = await paginate(api, `${root}/pulls/${pr.number}/files`, pr.changed_files);
+  if (new Set(files.map((file) => file.filename)).size !== files.length)
+    throw new Error('Duplicate changed-file results; please retry.');
+  const reviews = await paginate(api, `${root}/pulls/${pr.number}/reviews`);
+  const decode = (blob) => {
+    if (blob.encoding !== 'base64' || blob.size > 16384 || !blob.content)
+      throw new Error('House JSON must be a readable file under 16 KB.');
+    return JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
+  };
+  return evaluatePolicy({
+    files,
+    author: pr.user.login,
+    authorPermission: await permissionFor(pr.user.login),
+    repositoryOwner: repo.split('/')[0],
+    approved: await approvedByMaintainer(reviews, pr.head.sha, pr.user.login, permissionFor),
+    readHead: async (file) => {
+      if (!/^[a-f0-9]{40,64}$/.test(file.sha)) throw new Error('Invalid file SHA.');
+      return decode(await api(`${root}/git/blobs/${file.sha}`));
+    },
+    readBase: async (path) =>
+      decode(
+        await api(
+          `${root}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${pr.base.sha}`,
+        ),
+      ),
+    modeOf: (path) => modes.get(path),
+  });
+}
+
+// The status lives on the head commit, which any number of PRs can share. Check every open PR
+// into the default branch that points at this commit and pass only when all of them pass, so a
+// second PR can neither borrow nor flip the first one's result. PRs into other branches are
+// not merge-gated and are skipped.
+export async function runContributionPolicy({ api, repo, number, sha, runUrl, log = console }) {
+  const root = `/repos/${repo}`;
+  const trigger = number ? await api(`${root}/pulls/${number}`) : undefined;
+  if (trigger && trigger.state !== 'open') {
+    log.log('PR is closed; no status changed.');
+    return 'skipped';
+  }
+  const head = trigger ? trigger.head.sha : sha;
+  if (!/^[a-f0-9]{40,64}$/.test(head ?? '')) throw new Error('Missing PR revision.');
+  const status = (state, description) =>
+    api(`${root}/statuses/${head}`, {
+      state,
+      context: 'Contribution policy',
+      description,
+      target_url: runUrl,
+    });
+  try {
+    const defaultBranch = (await api(root)).default_branch;
+    const sharing = [
+      ...(trigger ? [trigger] : []),
+      ...(await paginate(api, `${root}/commits/${head}/pulls`)),
+    ].filter(
+      (item) =>
+        item.state === 'open' && item.head?.sha === head && item.base?.repo?.full_name === repo,
+    );
+    // A review names only its commit. GitHub's commit-to-PR lookup can come back empty, and
+    // the PR may have moved on to a newer commit, so say so rather than pass quietly.
+    if (!sharing.length && !trigger) {
+      log.error(
+        'No open PR has the reviewed commit as its head, so nothing was checked. Comment /check-contribution on the PR, or rerun this workflow with its number.',
+      );
+      return 'unresolved';
+    }
+    const numbers = new Set(
+      sharing.filter((item) => item.base.ref === defaultBranch).map((item) => item.number),
+    );
+    if (!numbers.size) {
+      log.log(`No open PR into ${defaultBranch} uses this commit; no status changed.`);
+      return 'skipped';
+    }
+    if (numbers.size > 10)
+      throw new Error('Too many open PRs share this commit. Close the duplicates and retry.');
+    await status('pending', 'Checking house allowance, credit and ownership');
+    const permissions = new Map();
+    const permissionFor = async (login) => {
+      const key = login.toLowerCase();
+      if (!permissions.has(key)) {
+        try {
+          permissions.set(
+            key,
+            (await api(`${root}/collaborators/${encodeURIComponent(login)}/permission`)).permission,
+          );
+        } catch (error) {
+          if (error.status !== 404) throw error;
+          permissions.set(key, 'none');
+        }
+      }
+      return permissions.get(key);
+    };
+    const prs = [];
+    for (const n of [...numbers].sort((a, b) => a - b)) {
+      const pr = n === trigger?.number ? trigger : await api(`${root}/pulls/${n}`);
+      if (pr.state === 'open' && pr.head.sha === head && pr.base.ref === defaultBranch)
+        prs.push(pr);
+    }
+    const modes = await headModes(api, root, head);
+    const results = [];
+    for (const pr of prs)
+      results.push({
+        pr,
+        ...(await evaluatePullRequest({ api, root, repo, pr, modes, permissionFor })),
+      });
+    for (const { pr } of results) {
+      const latest = await api(`${root}/pulls/${pr.number}`);
+      if (latest.head.sha !== head || latest.base.sha !== pr.base.sha || latest.state !== 'open')
+        throw new Error(
+          'PR changed during inspection. Run the check again for the current revision.',
+        );
+    }
+    const errors = [];
+    for (const { pr, reviewReasons, errors: found } of results) {
+      const prefix = results.length > 1 ? `PR #${pr.number}: ` : '';
+      for (const reason of reviewReasons) log.log(`${prefix}Review: ${reason}`);
+      errors.push(...found.map((error) => prefix + error));
+    }
+    if (results.length > 1 && errors.length)
+      errors.push(
+        'Open PRs that share one commit must all pass. A maintainer can close the duplicate and rerun.',
+      );
+    if (!results.length) throw new Error('The PR changed before it could be checked.');
+    if (errors.length) throw new Error(errors.join('\n'));
+    const added = Math.max(...results.map((result) => result.added));
+    await status('success', `${added} new house; credit and ownership checks passed`);
+    log.log('Contribution policy passed.');
+    return 'success';
+  } catch (error) {
+    await status('failure', 'Contribution policy needs attention; see workflow log');
+    log.error(error instanceof Error ? error.message : String(error));
+    return 'failure';
+  }
 }

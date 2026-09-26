@@ -62,24 +62,31 @@ describe('Exterior artwork is data, not a webpage', () => {
 });
 
 describe('A small predictable daily life', () => {
+  // Roster-wide checks gather what they find and assert once: an expect per resident per minute
+  // costs more than the simulation itself once every house plot is taken. They still grow
+  // with the town, so each gets a roster-wide timeout.
+  // Two simulations of the whole town a sample: about 4 s alone with all 141 plots taken.
   it('faces in the direction of movement on all four isometric road directions', () => {
     const seen = new Set<string>();
+    const wrong: string[] = [];
     for (let time = 361; time < 1319; time += 2.37) {
       const now = simulateResidents(places, time),
         next = simulateResidents(places, time + 0.0001);
       now.forEach((state, index) => {
-        expect(state.walkPhase).toBeGreaterThanOrEqual(0);
-        expect(state.walkPhase).toBeLessThan(1);
+        if (!(state.walkPhase >= 0 && state.walkPhase < 1))
+          wrong.push(`${state.id} at ${time}: walk phase ${state.walkPhase}`);
         if (!state.moving || !next[index].moving || state.facing !== next[index].facing) return;
         const a = project(state.position.x, state.position.y),
           b = project(next[index].position.x, next[index].position.y);
         const direction = `${b.y > a.y ? 's' : 'n'}${b.x > a.x ? 'e' : 'w'}`;
-        expect(state.facing).toBe(direction);
+        if (state.facing !== direction)
+          wrong.push(`${state.id} at ${time}: faces ${state.facing}, walks ${direction}`);
         seen.add(direction);
       });
     }
+    expect(wrong.slice(0, 5)).toEqual([]);
     expect([...seen].sort()).toEqual(['ne', 'nw', 'se', 'sw']);
-  });
+  }, 30_000);
   it('derives the same state regardless of visit order and replay direction', () => {
     const before = simulateResidents(places, 810.25);
     simulateResidents(places, 1300);
@@ -87,6 +94,7 @@ describe('A small predictable daily life', () => {
     expect(simulateResidents([...places].reverse(), 810.25).reverse()).toEqual(before);
     expect(simulateResidents(places, 810.25 + 1440)).toEqual(before);
   });
+  // Everyone out walking all day: about 2.5 s alone with all 141 plots taken.
   it('keeps residents on roads except when entering their assigned public venue', () => {
     const wanderers = places.map((place) => ({
       ...place,
@@ -100,19 +108,26 @@ describe('A small predictable daily life', () => {
         },
       },
     }));
+    const events = eventsForDay(0);
+    const astray: string[] = [];
     for (let minute = 360; minute < 1320; minute += 2.75)
       for (const state of simulateResidents(wanderers, minute)) {
-        const event = eventsForDay(0).find((event) => event.id === state.event?.id);
-        expect(
-          onRoadOrTube(state) ||
-            (state.event?.id === 'football' && insideFootball(state.position)) ||
-            (event && insideVenue(event.venue, state.position)),
-        ).toBe(true);
+        const event = events.find((event) => event.id === state.event?.id);
+        const { x, y } = state.position;
+        const stray = (where: string) =>
+          astray.push(`${state.id} at ${minute}: ${where} ${x},${y}`);
+        if (
+          !onRoadOrTube(state) &&
+          !(state.event?.id === 'football' && insideFootball(state.position)) &&
+          !(event && insideVenue(event.venue, state.position))
+        )
+          stray('off the road at');
         // Only the tube runs west of the lane, behind the trees.
-        expect(state.position.x).toBeGreaterThanOrEqual(riding(state) ? TUBE_TRUNK_X : 1.5);
-        expect(state.position.y).toBeLessThanOrEqual(ROAD_MAX_Y + 0.5);
+        if (x < (riding(state) ? TUBE_TRUNK_X : 1.5)) stray('west of the lane at');
+        if (y > ROAD_MAX_Y + 0.5) stray('past the last road at');
       }
-  });
+    expect(astray.slice(0, 5)).toEqual([]);
+  }, 30_000);
   it('continues trips across free periods and returns home by bedtime', () => {
     const wanderer = {
       ...sample,
@@ -186,7 +201,7 @@ describe('A small predictable daily life', () => {
           states.some(
             (other) =>
               other.id !== resident.id &&
-              other.greeting &&
+              !other.greeting &&
               Math.hypot(
                 other.position.x - resident.position.x,
                 other.position.y - resident.position.y,

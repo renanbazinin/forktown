@@ -8,7 +8,10 @@ import {
   DUCK_WALK_START,
   DUCK_WALK_END,
   DUCK_DAWDLE_START,
+  DUCK_WALK_LENGTH,
+  duckTurnX,
 } from '../src/lib/ducks';
+import { createWorldLayout } from '../src/lib/world-layout';
 import { isRoad, WORLD_WIDTH } from '../src/lib/world';
 
 describe('Daily river-to-neighborhood duck walk', () => {
@@ -95,6 +98,21 @@ describe('Daily river-to-neighborhood duck walk', () => {
       ).toBeLessThan(0.0002);
     }
     expect(ducksAt(DUCK_DAWDLE_START + 7 + 1440)).toEqual(ducksAt(DUCK_DAWDLE_START + 7));
+  });
+
+  it('keeps the same walk, and so the same pace, however wide the town grows', () => {
+    // Today: from the river to the first homes and back, as always.
+    expect(DUCK_TURN_X).toBe(1.8);
+    expect(DUCK_RIVER_X - DUCK_TURN_X).toBeCloseTo(DUCK_WALK_LENGTH, 9);
+    const leader = (time: number) => ducksAt(time).find((duck) => duck.id === 0)!.position.x;
+    // A resident's walking pace, 0.32 tiles a minute, give or take.
+    expect((leader(500) - leader(560)) / 60).toBeCloseTo(0.3155, 3);
+    for (let columns = 10; columns <= 20; columns++) {
+      const { width } = createWorldLayout({ rows: 20, columns });
+      const turn = duckTurnX(width);
+      expect(width - 1.5 - turn).toBeCloseTo(DUCK_WALK_LENGTH, 9);
+      expect(turn).toBeGreaterThanOrEqual(1.8);
+    }
   });
 
   it('reproduces the same scene after reload, pause, and day wrapping', () => {

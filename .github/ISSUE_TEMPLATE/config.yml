@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem privately
+    url: https://github.com/renanbazinin/forktown/security/advisories/new
+    about: Only the maintainers can read it. Please keep exploit details out of public issues.
+  - name: Report a conduct concern privately
+    url: https://github.com/renanbazinin/forktown/security/advisories/new
+    about: The same private form. Start the title with “Conduct report”; only the maintainers can read it.

@@ -103,7 +103,11 @@ export function tubeRides(places: Place[], day: number): TubeRide[] {
         if (ride) list.push(ride);
       }
     }
-  list.sort((a, b) => a.board - b.board || a.residentId.localeCompare(b.residentId));
+  // Ties in code-unit order, never the viewer's language.
+  list.sort(
+    (a, b) =>
+      a.board - b.board || (a.residentId < b.residentId ? -1 : a.residentId > b.residentId ? 1 : 0),
+  );
   let byDay = rides.get(places);
   if (!byDay) rides.set(places, (byDay = new Map()));
   if (byDay.size >= 3) byDay.clear();

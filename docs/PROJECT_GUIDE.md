@@ -18,7 +18,7 @@ Starter places use `creator: "forktown"` as a project credit, not a real communi
 - Shared daily events: picnics, books, and lawn games at the Lunch Green; rock, acoustic, and jazz evenings at the Little Stage. Strolling neighbors can join a small audience and walk home afterward. Both venues are reserved public plots.
 - A nightly 23:30–02:30 disco at the Little Stage, with a DJ, dancing night owls, steady pastel lights, and an original dance track. Guests arrive and leave at different times, returning before their own bedtime; sleeping neighbors stay indoors.
 - The four-plot Starlight Cinema on D6, D7, E6, and E7: three original animated shorts every night from 20:30, with six-second Forktown intermissions, a twelve-seat picnic lawn, projector, string lights, and popcorn stand. Film lengths stay independent; each day selects three distinct titles from the library. Night owls can walk from the cinema to the disco afterward when travel time and bedtime allow. See [the cinema and film library guide](CINEMA.md).
-- The six-plot Meadow Ground: four-a-side football all day, a live scoreboard, passing, shots, saves, goal celebrations, spectators, and short breaks between halves. Zoom close with Town sound enabled for kicks, whistles, and cheers. See [Football at the Meadow Ground](FOOTBALL.md).
+- The six-plot Meadow Ground: five-a-side football all day, a live scoreboard, passing, shots, saves, goal celebrations, spectators, and short breaks between halves. Zoom close with Town sound enabled for kicks, whistles, and cheers. See [Football at the Meadow Ground](FOOTBALL.md).
 - The eight-plot Millpond on H3–I6: a watermill, a jetty, reeds, a grey heron and rising fish, rowboats through the summer, the moon and the town's lanterns in the water at night, and skating on the winter ice. It sits low, so the football stays in view. See [The Millpond](MILLPOND.md).
 - The Treeline: a thin glass tube behind the northwest trees, for people and parcels, with two small stations, Hedgerow Halt on C1 and Willow Halt on N1. Neighbors ride only when it saves at least ten minutes door to door; short trips stay on foot. Hedgerow Halt's tiny sign reads "People & parcels. Please remove umbrella." See [The Treeline](TUBES.md).
 - A shared UTC-based 24-minute town day, automatic day/night lighting, pause/resume-live, and reduced-motion support.
@@ -84,15 +84,16 @@ docs/                     Architecture and publishing guides
 
 ## Useful commands
 
-| Command             | Purpose                                                  |
-| ------------------- | -------------------------------------------------------- |
-| `npm run dev`       | Start the local city                                     |
-| `npm run validate`  | Check every place with beginner-friendly errors          |
-| `npm test`          | Test contribution rules and map behavior                 |
-| `npm run typecheck` | Check the app’s TypeScript                               |
-| `npm run build`     | Validate and build the production site                   |
-| `npm run preview`   | Serve the production build locally                       |
-| `npm run check`     | Run tests, validation, type checks, and production build |
+| Command                   | Purpose                                                  |
+| ------------------------- | -------------------------------------------------------- |
+| `npm run dev`             | Start the local city                                     |
+| `npm run validate`        | Check every place with beginner-friendly errors          |
+| `npm test`                | Test contribution rules and map behavior                 |
+| `npm run typecheck`       | Check the app’s TypeScript                               |
+| `npm run build`           | Validate and build the production site                   |
+| `npm run preview`         | Serve the production build locally                       |
+| `npm run check`           | Run tests, validation, type checks, and production build |
+| `npm run check:full-town` | Validate and test a copy with every house plot taken     |
 
 ## Put your town online
 

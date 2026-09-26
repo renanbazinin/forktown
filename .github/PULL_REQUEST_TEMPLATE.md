@@ -8,7 +8,7 @@ Tell us a little about your place or your improvement.
 - [ ] The creator is my GitHub username, without `@`.
 - [ ] My plot is open in the current city. I understand that a preview does not reserve it.
 - [ ] The name and story are welcoming and the work is mine to contribute.
-- [ ] I have read [CONTRIBUTING.md](../CONTRIBUTING.md).
+- [ ] I have read [CONTRIBUTING.md](https://github.com/renanbazinin/forktown/blob/main/CONTRIBUTING.md).
 
 The automatic checks will help you with the rest. If this is your first pull request, say hello!
 

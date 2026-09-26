@@ -6,37 +6,89 @@ export function facingAlong(from: Point, to: Point): ResidentState['facing'] {
   return to.y >= from.y ? 'sw' : 'ne';
 }
 export const roadNodes: Point[] = [];
+// Road tiles by integer index, so a search needs no string keys: tile (x, y) is x * ROWS + y.
+const ROWS = ROAD_MAX_Y + 1;
+const TILES = (ROAD_MAX_X + 1) * ROWS;
+const nodes: Point[] = [];
+const road = new Uint8Array(TILES);
 for (let x = ROAD_MIN; x <= ROAD_MAX_X; x++)
   for (let y = ROAD_MIN; y <= ROAD_MAX_Y; y++)
-    if (isRoad(x, y)) roadNodes.push({ x: x + 0.5, y: y + 0.5 });
+    if (isRoad(x, y)) {
+      const point = { x: x + 0.5, y: y + 0.5 };
+      roadNodes.push(point);
+      nodes[x * ROWS + y] = point;
+      road[x * ROWS + y] = 1;
+    }
+/** The road tile whose centre is exactly `(x, y)`, or -1. */
+function tileAt(x: number, y: number) {
+  const i = x - 0.5,
+    j = y - 0.5;
+  const inside = Number.isInteger(i) && Number.isInteger(j) && i >= 0 && j >= 0;
+  return inside && i <= ROAD_MAX_X && j <= ROAD_MAX_Y && road[i * ROWS + j] ? i * ROWS + j : -1;
+}
 const key = (point: Point) => `${point.x},${point.y}`;
-const graph = new Map(roadNodes.map((point) => [key(point), point]));
 const paths = new Map<string, Point[]>();
+// One search at a time: reused buffers, with `seen` stamped per search instead of cleared.
+const parent = new Int32Array(TILES);
+const queue = new Int32Array(TILES);
+const seen = new Uint32Array(TILES);
+let search = 0;
+/**
+ * The shortest road route, breadth first in a fixed order (east, west, south, north), so every
+ * visitor walks the same one. Starting off the road (a doorway, a seat) steps onto the road tiles
+ * beside it; an unreachable goal gives `[from]`.
+ */
 export function roadPath(from: Point, to: Point): Point[] {
   const cacheKey = `${key(from)}:${key(to)}`;
-  if (paths.has(cacheKey)) return paths.get(cacheKey)!;
-  const queue = [from],
-    previous = new Map<string, Point | null>([[key(from), null]]);
-  for (let index = 0; index < queue.length; index++) {
-    const current = queue[index];
-    if (key(current) === key(to)) break;
-    for (const [dx, dy] of [
-      [1, 0],
-      [-1, 0],
-      [0, 1],
-      [0, -1],
-    ]) {
-      const next = graph.get(key({ x: current.x + dx, y: current.y + dy }));
-      if (next && !previous.has(key(next))) {
-        previous.set(key(next), current);
-        queue.push(next);
-      }
+  const cached = paths.get(cacheKey);
+  if (cached) return cached;
+  let path: Point[];
+  if (key(from) === key(to)) path = [to];
+  else {
+    const goal = tileAt(to.x, to.y);
+    if (goal < 0) return [from];
+    if (++search > 0xffffffff) {
+      seen.fill(0);
+      search = 1;
     }
+    let head = 0,
+      tail = 0;
+    const visit = (tile: number, previous: number) => {
+      if (seen[tile] === search) return;
+      seen[tile] = search;
+      parent[tile] = previous;
+      queue[tail++] = tile;
+    };
+    const start = tileAt(from.x, from.y);
+    if (start >= 0) visit(start, -1);
+    else
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const tile = tileAt(from.x + dx, from.y + dy);
+        if (tile >= 0) visit(tile, -1);
+      }
+    while (head < tail) {
+      const tile = queue[head++];
+      if (tile === goal) break;
+      const x = (tile / ROWS) | 0,
+        y = tile - x * ROWS;
+      if (x < ROAD_MAX_X && road[tile + ROWS]) visit(tile + ROWS, tile);
+      if (x > 0 && road[tile - ROWS]) visit(tile - ROWS, tile);
+      if (y < ROAD_MAX_Y && road[tile + 1]) visit(tile + 1, tile);
+      if (y > 0 && road[tile - 1]) visit(tile - 1, tile);
+    }
+    if (seen[goal] !== search) return [from];
+    // The ends are the caller's own points; the road tiles between are shared.
+    path = [to];
+    for (let tile = parent[goal]; tile >= 0 && tile !== start; tile = parent[tile])
+      path.push(nodes[tile]);
+    path.push(from);
+    path.reverse();
   }
-  if (!previous.has(key(to))) return [from];
-  const path: Point[] = [];
-  for (let current: Point | null = to; current; current = previous.get(key(current)) ?? null)
-    path.unshift(current);
   // Bound the cache even when many custom neighbors are previewed.
   if (paths.size > 4096) paths.clear();
   paths.set(cacheKey, path);

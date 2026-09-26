@@ -15,6 +15,7 @@ export type TownCat = {
 const NIGHT_START = 1200;
 const NIGHT_END = 360;
 const SPEED = 0.065; // Tiles per town minute: 30% faster than the old street stroll.
+const byId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** An outdoor town animal, not an extra resident or a change to anyone's routine. */
 export function townCatAt(places: Place[], minutes: number, day = 0): TownCat {
@@ -22,9 +23,8 @@ export function townCatAt(places: Place[], minutes: number, day = 0): TownCat {
   const time = ((minutes % 1440) + 1440) % 1440;
   // The evening owns the entire outing, including the hours after midnight.
   const evening = day + Math.floor(minutes / 1440) - (time < NIGHT_START ? 1 : 0);
-  const homes = places
-    .filter((place) => getPlot(place.plot))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  // Ids in code-unit order, never the viewer's language: every visitor sees the same cat.
+  const homes = places.filter((place) => getPlot(place.plot)).sort((a, b) => byId(a.id, b.id));
   const home = homes[hash(`miso:${evening}`) % homes.length];
   const plot = home ? getPlot(home.plot)! : stage;
   const doorstep = plotEntrance(plot);
@@ -34,7 +34,7 @@ export function townCatAt(places: Place[], minutes: number, day = 0): TownCat {
   };
   const neighbors = homes
     .filter((place) => place.id !== home?.id && distance(place) <= 8)
-    .sort((a, b) => distance(a) - distance(b) || a.id.localeCompare(b.id))
+    .sort((a, b) => distance(a) - distance(b) || byId(a.id, b.id))
     .slice(0, 3)
     .sort((a, b) => hash(`miso:${evening}:${a.id}`) - hash(`miso:${evening}:${b.id}`));
   const route = [doorstep];

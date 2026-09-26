@@ -3,6 +3,7 @@ import FarmInfo from './components/FarmInfo';
 import { FARM, isFarmPlot } from './lib/farm';
 import MillpondInfo from './components/MillpondInfo';
 import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
+import { withPreview } from './lib/resident-trips';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
@@ -71,6 +72,7 @@ import { FORK_PLOT } from './lib/lanterns';
 import { linkHash, MISSING_LINK_COPY, readDeepLink } from './lib/deep-link';
 import { OPEN_PLOTS_COPY } from './lib/open-plots';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
+import { useTownDayPrefetch } from './lib/idle-prefetch';
 
 type Panel = 'places' | 'neighbors' | 'events';
 // Keeps the welcome closed for this page load even when storage refuses the flag.
@@ -132,7 +134,7 @@ export default function App() {
   const displayPlaces = useMemo(
     () =>
       draft && !places.some((place) => place.id === draft.id || place.plot === draft.plot)
-        ? [...places, draft]
+        ? withPreview(places, draft)
         : places,
     [draft, places],
   );
@@ -140,6 +142,7 @@ export default function App() {
     () => simulateResidents(displayPlaces, clock.minutes, clock.day),
     [displayPlaces, clock.minutes, clock.day],
   );
+  useTownDayPrefetch(displayPlaces, clock.minutes, clock.day);
   const lanternTown = useLanternTown(places, clock.minutes, clock.day);
   const skaters = residents
     .filter((r) => r.event?.id === 'millpond' && r.event.phase === 'attending')

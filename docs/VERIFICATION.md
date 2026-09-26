@@ -1,6 +1,6 @@
 # Living edition verification
 
-Verified locally on September 20, 2026 with Node.js 24.19.0.
+This is a record of how the living edition was checked in September 2026, verified locally on September 20 with Node.js 24.19.0. It describes the town and the repository as they were then. For the town today, see the [project guide](PROJECT_GUIDE.md).
 
 ## Historical implementation checks (September 20)
 
@@ -24,9 +24,9 @@ Verified locally on September 20, 2026 with Node.js 24.19.0.
 
 ## GitHub and publishing
 
-The initial foundation was pushed to the private `renanbazinin/forktown` repository. Its first **Check town** workflow passed; **Publish town** was skipped because publishing is opt-in. The local-save follow-up and `renanbazinin`’s first contribution, **My Little Place** on plot A1, have passed the local checks above.
+The initial foundation was pushed to the `renanbazinin/forktown` repository, which was private then. Its first **Check town** workflow passed; **Publish town** was skipped because publishing is opt-in. The local-save follow-up and `renanbazinin`’s first contribution, **My Little Place** on plot A1, have passed the local checks above.
 
-The living edition was merged in PR #2 and deployed on September 20, 2026 at https://renanbazinin.github.io/forktown/. That release passed 94 tests, validated nine places, and passed type checking, formatting, and build checks. The map now has 50 plots. Hosted pages allow exploration and JSON browsing; building and saving require local development. The repository remains private. An external beginner trial is pending; see [External contributor trial](EXTERNAL_CONTRIBUTOR_TRIAL.md).
+The living edition was merged in PR #2 and deployed on September 20, 2026 at https://renanbazinin.github.io/forktown/. That release passed 94 tests, validated nine places, and passed type checking, formatting, and build checks. The map then had 50 plots. Hosted pages allow exploration and JSON browsing; building and saving require local development. The repository was still private, and an outside trial was still to come; see [External contributor trial](EXTERNAL_CONTRIBUTOR_TRIAL.md).
 
 ## Living edition checks
 
@@ -59,4 +59,4 @@ The initial local allowance work passed 103 tests but was not deployed. Review f
 
 The September 20 observation covered a fixed 24-minute town day using sampled screenshots. Walking, greetings, indoor hiding, day/night lighting and the map appeared intact; no new console errors were observed. Town hours 18 and 21 were missed, the final check arrived late, and exact transitions/continuous frame rate were not established.
 
-Earlier sections are historical checks, including the former 25-plot layout and old controls. They are not claims about the current hosted UI. External beginner testing and public launch remain pending.
+Earlier sections are historical checks, including the former 25-plot layout and old controls. They are not claims about the current hosted UI. Since then the repository has gone public, and an outside contributor completed the fork trial on September 24, 2026 (issue #6).

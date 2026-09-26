@@ -84,7 +84,7 @@ const allowed = (trip: ResidentTrip, state: ReturnType<typeof tripState>) => {
 };
 
 describe('Riding the Treeline over a whole year', () => {
-  it('plans every trip before a ride exactly as without the tube', () => {
+  it('plans every trip before a ride exactly as on foot', () => {
     // Synthetic full town for a week, then the real roster for a year.
     const crowd = HOUSE_PLOTS.map((plot, i) => ({
       ...sample,
@@ -111,7 +111,7 @@ describe('Riding the Treeline over a whole year', () => {
         for (const home of homes) {
           const trips = now.get(home.id)!,
             old = walking.get(home.id)!;
-          // Without the tube nobody has legs.
+          // On foot nobody has legs.
           for (const trip of old) expect('legs' in trip || 'returnLegs' in trip).toBe(false);
           const first = trips.findIndex(rides);
           if (first < 0) {
@@ -183,8 +183,11 @@ describe('Riding the Treeline over a whole year', () => {
     expect(walked).toBeGreaterThan(rode);
   }, 60_000);
 
+  // Every ride of half a year, sampled densely: it grows with the town, so the steps gather what
+  // they find and assert once.
   it('moves riders continuously, on the road or the line, never faster than the tube', () => {
     let checked = 0;
+    const wrong: string[] = [];
     for (const day of YEAR.filter((_, i) => i % 2 === 0))
       for (const ride of tubeRides(places, day)) {
         checked++;
@@ -196,31 +199,41 @@ describe('Riding the Treeline over a whole year', () => {
         const pace = walkingPace(legs);
         expect(pace).toBeGreaterThanOrEqual(WALK_SPEED - 1e-9);
         expect(pace).toBeLessThanOrEqual(WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER + 1e-9);
+        const say = (t: number, what: string) =>
+          wrong.push(`${home.id} on ${day} at ${t}: ${what}`);
         // Every other minute of the trip, then densely from a minute before boarding to a minute after.
         for (let t = trip.depart; t < trip.homeBy; t += 2)
-          expect(allowed(trip, tripState(home, trip, t, day))).toBe(true);
+          if (!allowed(trip, tripState(home, trip, t, day))) say(t, 'off the road and the line');
         let previous = tripState(home, trip, ride.board - 1, day);
         for (let t = ride.board - 1 + 0.05; t < ride.off + 1; t += 0.05) {
           const now = tripState(home, trip, t, day);
-          expect(allowed(trip, now)).toBe(true);
-          expect(distance(now.position!, previous.position!)).toBeLessThanOrEqual(
-            stepBound(now, previous, 0.05, WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER * 0.05 + 1e-9),
-          );
+          if (!allowed(trip, now)) say(t, 'off the road and the line');
+          const step = distance(now.position!, previous.position!);
+          if (
+            step >
+            stepBound(now, previous, 0.05, WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER * 0.05 + 1e-9)
+          )
+            say(t, `jumps ${step}`);
           if (now.transit) {
             // Moving only on the short walks between a station door and its stack.
-            if (now.transit.progress < 1) expect(now.moving).toBe(stationWalk(now));
-            expect(now.pose).toBeUndefined();
-            expect(now.transit.progress).toBeGreaterThanOrEqual(0);
-            expect(now.transit.progress).toBeLessThanOrEqual(1);
+            if (now.transit.progress < 1 && now.moving !== stationWalk(now))
+              say(t, now.moving ? 'moves in the tube' : 'stands still on the station walk');
+            if (now.pose !== undefined) say(t, `strikes a pose in transit: ${now.pose}`);
+            if (!(now.transit.progress >= 0 && now.transit.progress <= 1))
+              say(t, `transit progress ${now.transit.progress}`);
           }
           previous = now;
         }
       }
+    expect(wrong.slice(0, 5)).toEqual([]);
     expect(checked).toBeGreaterThan(300);
   }, 60_000);
 
+  // Every neighbor at every sampled minute of the year grows with the town, so the residents'
+  // side gathers what it finds and asserts once.
   it('shows riders only inside their ride windows, and parcels never share the tube', () => {
     const { margin, wait } = TUBE_PARCELS;
+    const wrong: string[] = [];
     for (const day of YEAR.filter((_, i) => i % 4 === 0)) {
       const today = tubeRides(places, day);
       for (let minutes = 360; minutes < 1440 + 360; minutes += 2.3) {
@@ -231,12 +244,17 @@ describe('Riding the Treeline over a whole year', () => {
           const ride = today.find(
             (r) => r.residentId === state.id && minutes >= r.board && minutes < r.off,
           );
-          expect(!!state.transit).toBe(!!ride);
-          if (state.transit && ride) {
-            expect([state.transit.from, state.transit.to]).toEqual([ride.from, ride.to]);
-            expect(state.transit.stage).toBe(
-              minutes < ride.depart ? 'boarding' : minutes < ride.arrive ? 'riding' : 'alighting',
-            );
+          const say = (what: string) => wrong.push(`${state.id} on ${day} at ${minutes}: ${what}`);
+          if (!!state.transit !== !!ride)
+            say(state.transit ? 'in the tube outside a ride' : 'missing from a ride');
+          else if (state.transit && ride) {
+            const stage =
+              minutes < ride.depart ? 'boarding' : minutes < ride.arrive ? 'riding' : 'alighting';
+            if (state.transit.from !== ride.from || state.transit.to !== ride.to)
+              say(
+                `rides ${state.transit.from} to ${state.transit.to}, not ${ride.from} to ${ride.to}`,
+              );
+            if (state.transit.stage !== stage) say(`${state.transit.stage}, not ${stage}`);
           }
         }
         if (minutes < 1440) {
@@ -258,7 +276,7 @@ describe('Riding the Treeline over a whole year', () => {
               expect(parcel.position).toEqual(
                 tubeStation(parcel.stage === 'sending' ? parcel.from : parcel.to).stack,
               );
-            for (const state of states) expect(state.transit).toBeUndefined();
+            expect(states.filter((state) => state.transit).map((state) => state.id)).toEqual([]);
           }
           const expected = tubeParcels(places, day).filter(
             (parcel) => time >= parcel.depart - wait && time < parcel.arrive + wait,
@@ -276,6 +294,7 @@ describe('Riding the Treeline over a whole year', () => {
           ).toBe(true);
       }
     }
+    expect(wrong.slice(0, 5)).toEqual([]);
   }, 60_000);
 
   it('gives the info card the same riders the town shows', () => {
@@ -366,7 +385,9 @@ describe('Riding the Treeline over a whole year', () => {
 
   it('is the same for any roster order, any reload and any question asked before', () => {
     const day = YEAR[3];
-    const minute = tubeRides(places, day).find((r) => r.depart < 1440)!.depart + 1;
+    // On a 1/64-minute grid, so minute + 1440 wraps back to exactly the same minute.
+    const depart = tubeRides(places, day).find((r) => r.depart < 1440)!.depart;
+    const minute = Math.round((depart + 1) * 64) / 64;
     const states = simulateResidents(places, minute, day);
     expect(states.some(riding)).toBe(true);
     simulateResidents(places, 1300, day + 1);

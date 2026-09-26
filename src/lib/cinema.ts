@@ -341,10 +341,10 @@ export type CinemaSlot = {
   nextFilm?: CinemaFilm;
 };
 
+/** Ids break a hash tie by code unit, so every browser language draws the same order. */
+const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 const shuffled = <T extends { id: string }>(items: readonly T[], seed: string) =>
-  [...items].sort(
-    (a, b) => hash(`${seed}:${a.id}`) - hash(`${seed}:${b.id}`) || a.id.localeCompare(b.id),
-  );
+  [...items].sort((a, b) => hash(`${seed}:${a.id}`) - hash(`${seed}:${b.id}`) || byId(a, b));
 const unique = (items: readonly { id: string }[]) =>
   items.every((item) => item.id) && new Set(items.map((item) => item.id)).size === items.length;
 const onStep = (seconds: number) =>
@@ -463,11 +463,8 @@ export function cinemaGuests<
       home.resident.routine.evening === 'stroll' && home.resident.routine.night === 'stroll',
   );
   return eligible
-    .sort(
-      (a, b) =>
-        hash(`cinema-guests:${day}:${a.id}`) - hash(`cinema-guests:${day}:${b.id}`) ||
-        a.id.localeCompare(b.id),
-    )
+    .map((home) => ({ id: home.id, draw: hash(`cinema-guests:${day}:${home.id}`) }))
+    .sort((a, b) => a.draw - b.draw || byId(a, b))
     .slice(0, Math.min(CINEMA_SEATS.length, Math.floor(eligible.length / 2)))
     .map((home) => home.id);
 }
