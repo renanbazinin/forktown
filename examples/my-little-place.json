@@ -1,8 +1,8 @@
 {
-  "id": "my-little-place",
-  "name": "My Little Place",
+  "id": "your-unique-id",
+  "name": "Your Place Name",
   "creator": "your-github-username",
-  "plot": "A1",
+  "plot": "T2",
   "building": "cottage",
   "color": "#789B76",
   "decoration": "flowers",

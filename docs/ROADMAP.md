@@ -8,10 +8,10 @@
 - [x] Local builder, preview, export, and contribution guide
 - [x] Day/night view, search, sharing, and mobile layout
 - [x] Contribution validation, meaningful tests, and opt-in publishing
-- [x] Connect the repository URL (currently private)
+- [x] Connect the repository URL
 - [x] Publish the founding town on GitHub Pages
-- [ ] Verify an external beginner contribution from a fork before public launch
-- [ ] Welcome the first real neighbors
+- [x] Verify an outside contribution from a fork (issue #6 and PR #41, September 24, 2026)
+- [x] Welcome the first real neighbors
 
 ## The living edition
 
@@ -22,7 +22,7 @@
 - [x] Exterior signs using text or restricted HTML/CSS artwork
 - [x] Builder, local saves, examples, validation, and security tests
 - [x] Owner review and deployment of the living edition (PR #2, September 20, 2026)
-- [ ] Open the repository to public contributors when the owner is ready
+- [x] Open the repository to public contributors
 
 ## Good early community contributions
 

@@ -4,6 +4,8 @@
 
 [Visit the town](https://renanbazinin.github.io/forktown/) · [Detailed contributor guide](CONTRIBUTING.md)
 
+<img src="public/og-image.png" alt="Forktown on an autumn evening: houses around the Lantern Fork, a football match at the Meadow Ground and a concert at the Little Stage." width="800">
+
 ## 1. Start in the live town
 
 Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find your way in**. You’ll see **Fork on GitHub**:
@@ -81,4 +83,4 @@ Want to help beyond building a house? Improve the guides, report a bug, or contr
 
 [JSON fields & contribution rules](CONTRIBUTING.md) · [Features, project map & commands](docs/PROJECT_GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Publishing](docs/PUBLISHING.md) · [Live view](docs/LIVE.md) · [Roadmap](docs/ROADMAP.md)
 
-[Code of conduct](CODE_OF_CONDUCT.md) · [MIT license](LICENSE)
+[Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [MIT license](LICENSE)
