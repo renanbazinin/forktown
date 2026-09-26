@@ -186,6 +186,8 @@ export function drawVenue(
     }
     if (live) {
       ctx.font = '18px serif';
+      // Set here, not left to whatever the last object drew with, which culling can change.
+      ctx.textAlign = 'start';
       ctx.fillStyle = night ? '#EED8A3' : '#6E7653';
       ctx.fillText('♪', -82, -24 - Math.sin(minutes) * 4);
       ctx.fillText('♫', 82, -13 - Math.cos(minutes) * 4);
