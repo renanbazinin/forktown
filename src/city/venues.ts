@@ -1,6 +1,6 @@
 import { isEventLive, type TownEvent, type Venue } from '../lib/events';
-import { project } from '../lib/world';
 import { FORK_BOUNDS } from '../lib/lanterns';
+import { drawDiscoFloor, drawDiscoStage, drawStageSpeakers } from './disco';
 import { drawVenueTitle } from './venue-title';
 
 export const venueBounds = (venue: Venue) =>
@@ -41,30 +41,20 @@ export function drawVenue(
     ctx.fill();
   };
   if (layer === 'ground' && venue.kind === 'stage') {
-    if (party) {
-      // Steady pastel tiles sit under the dancers and leave the stage approach open.
-      for (let row = 0; row < 3; row++)
-        for (let col = 0; col < 5; col++) {
-          const pt = project(-1 + col * 0.5, 0.5 + row * 0.4);
-          poly(
-            [
-              [pt.x, pt.y - 8],
-              [pt.x + 16, pt.y],
-              [pt.x, pt.y + 8],
-              [pt.x - 16, pt.y],
-            ],
-            ['#796E87', '#8D816C', '#638B80'][(row + col) % 3],
-          );
-        }
-    }
+    // The light-up floor sits under the dancers.
+    if (party) drawDiscoFloor(ctx, minutes);
     ctx.restore();
     return;
   }
   if (venue.kind === 'stage') {
     // Pull the platform to the rear of its plot, leaving a real audience lawn.
     // This matches the walkable spots in events.ts: platform local y ends at 0.2.
-    ctx.translate(20.9, -10.45);
-    ctx.scale(0.78, 0.78);
+    const onStage = () => {
+      ctx.translate(20.9, -10.45);
+      ctx.scale(0.78, 0.78);
+    };
+    ctx.save();
+    onStage();
     // Raised timber stage, shaded canopy, speakers and warm, steady festoon lights.
     poly(
       [
@@ -124,32 +114,13 @@ export function drawVenue(
         4,
         party ? ['#F2C18E', '#CEB7DF', '#ADDBC9'][i % 3] : live || night ? '#FFE0A0' : '#CFBE8E',
       );
-    for (const px of [-55, 41]) {
-      rect(px, -18, 15, 29, '#35453F');
-      rect(px + 3, -15, 9, 7, '#58645B');
-      rect(px + 3, -3, 9, 9, '#202F2E');
-    }
-    if (party) {
-      // A tiny DJ, two turntables, and a raised hand. Lights stay steady.
-      const lift = Math.sin(minutes * 2) > 0 ? 2 : 0;
-      rect(-5, -27, 11, 16, '#B18DB7');
-      rect(-4, -37, 9, 10, '#D6B18F');
-      rect(-5, -39, 11, 4, '#424A41');
-      rect(-7, -36, 3, 7, '#283E3A');
-      rect(5, -36, 3, 7, '#283E3A');
-      rect(6, -26, 8, 3, '#B18DB7');
-      rect(12, -33 - lift, 3, 10, '#D6B18F');
-      rect(-25, -12, 50, 20, '#304F48');
-      rect(-25, -14, 50, 4, '#8FAAA0');
-      for (const px of [-14, 14]) {
-        ctx.fillStyle = '#233D38';
-        ctx.beginPath();
-        ctx.ellipse(px, -12, 8, 3, 0, 0, Math.PI * 2);
-        ctx.fill();
-        rect(px - 1, -13, 2, 2, '#E5C989');
-      }
-      for (let i = 0; i < 3; i++) rect(-5 + i * 4, -7, 2, 5, '#D1B5D6');
-    } else {
+    ctx.restore();
+    drawStageSpeakers(ctx, minutes, night, live);
+    // The disco's DJ booth, mirror ball and moving lights. They glide and fade; nothing flashes.
+    if (party) drawDiscoStage(ctx, minutes);
+    ctx.save();
+    onStage();
+    if (!party) {
       // Instruments remain on the stage between shows; performers appear only during a set.
       rect(-9, -15, 19, 14, '#AE795B');
       rect(-8, -17, 17, 3, '#E1CF9F');
@@ -192,6 +163,7 @@ export function drawVenue(
       ctx.fillText('♪', -82, -24 - Math.sin(minutes) * 4);
       ctx.fillText('♫', 82, -13 - Math.cos(minutes) * 4);
     }
+    ctx.restore();
   } else {
     if (layer === 'ground') {
       // Patchwork picnic rugs and a lemonade/book table, kept clear of the front pavement.

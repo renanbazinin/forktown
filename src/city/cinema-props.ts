@@ -1,14 +1,11 @@
-// The Starlight Cinema's popcorn cart and film projector, drawn as small isometric objects.
-// Each face is painted flat in its own sheared frame (`face` for upright ones, `plane` for level
-// ones), so most details are single fillRects; the budget tests count every canvas call.
-import { project, TILE_W, type Point } from '../lib/world';
+// The Starlight Cinema's popcorn cart and film projector, drawn as small isometric objects with
+// the helpers in iso-paint.ts.
+import { type Point } from '../lib/world';
 import { drawGlow } from './glow';
+import { at, disc, face, frac, level, plane, PX, rect, TAU } from './iso-paint';
 import { mixHex, pick, SNOW, type Pair } from './season-palette';
 
 type Ctx = CanvasRenderingContext2D;
-/** Screen pixels per town unit along an upright face. */
-const PX = TILE_W / 2;
-const TAU = Math.PI * 2;
 
 export type CinemaPropsState = {
   minutes: number;
@@ -51,50 +48,6 @@ const C = {
   canShade: ['#99A096', '#5D6765'],
 } satisfies Record<string, Pair>;
 const LIT = { glass: '#F7DC94', popcorn: '#FFF1BF', bulb: '#FFE9A8', vent: '#FFD98A' };
-
-const lift = (p: Point, rise: number): Point => ({ x: p.x, y: p.y - rise });
-const at = (x: number, y: number, rise = 0) => lift(project(x, y), rise);
-function rect(ctx: Ctx, x: number, y: number, w: number, h: number, color: string) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x, y, w, h);
-}
-/** Paint a level surface `rise` pixels up, from its far corner: u runs along x, w along y. */
-function plane(ctx: Ctx, x: number, y: number, rise: number, paint: () => void) {
-  const origin = at(x, y, rise);
-  ctx.save();
-  ctx.transform(1, 0.5, -1, 0.5, origin.x, origin.y);
-  paint();
-  ctx.restore();
-}
-function level(
-  ctx: Ctx,
-  x0: number,
-  y0: number,
-  x1: number,
-  y1: number,
-  rise: number,
-  color: string,
-) {
-  plane(ctx, x0, y0, rise, () => rect(ctx, 0, 0, (x1 - x0) * PX, (y1 - y0) * PX, color));
-}
-/**
- * Paint an upright face flat: u runs along the face in screen pixels, v is height (negative up).
- * An 'x' face runs down-right with the town's x axis, from its left end; a 'y' face runs up-right
- * toward the screen, from its front corner.
- */
-function face(ctx: Ctx, origin: Point, along: 'x' | 'y', paint: () => void) {
-  ctx.save();
-  ctx.transform(1, along === 'x' ? 0.5 : -0.5, 0, 1, origin.x, origin.y);
-  paint();
-  ctx.restore();
-}
-function disc(ctx: Ctx, x: number, y: number, r: number, color: string) {
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, TAU);
-  ctx.fill();
-}
-const frac = (value: number) => value - Math.floor(value);
 
 // ---------------------------------------------------------------------------------------------
 // The popcorn cart: a striped wagon with a lit glass case, parked by the side lane.
@@ -163,6 +116,14 @@ function valance(ctx: Ctx, width: number, night: boolean, shade: boolean) {
 }
 
 const HEAP = [5, 6, 5.5, 7, 6, 5, 6.5, 5.5, 6, 7, 5.5];
+
+/** A marquee bulb: while the cart is open, a glow travels along the row. It brightens and fades
+ * smoothly, so the bulbs never blink (the town has no flashing lights). */
+export function marqueeBulb(minutes: number, index: number, open: boolean, night: boolean) {
+  if (!open) return pick(C.bulb, night);
+  const glow = 0.5 + 0.5 * Math.sin(minutes * 2.2 - index * 0.9);
+  return mixHex(pick(C.bulb, night), LIT.bulb, 0.35 + 0.65 * glow);
+}
 
 export function drawPopcornCart(ctx: Ctx, s: CinemaPropsState) {
   const { night, open, minutes } = s;
@@ -245,7 +206,7 @@ export function drawPopcornCart(ctx: Ctx, s: CinemaPropsState) {
   });
   face(ctx, at(r.x1, r.y1, ROOF + 6), 'y', () => valance(ctx, (r.y1 - r.y0) * PX, night, true));
   face(ctx, at(r.x0, r.y1, ROOF + 6), 'x', () => valance(ctx, roofLong, night, false));
-  // The marquee on the roof, with bulbs that chase at showtime.
+  // The marquee on the roof, with a glow that travels along its bulbs at showtime.
   const signMid = (r.x0 + r.x1) / 2;
   const signY = (r.y0 + r.y1) / 2;
   const sign = at(signMid - 15 / PX, signY, ROOF + 9);
@@ -261,11 +222,8 @@ export function drawPopcornCart(ctx: Ctx, s: CinemaPropsState) {
     ctx.textBaseline = 'alphabetic';
     ctx.fillStyle = pick(C.red, night);
     ctx.fillText('POPCORN', 15, -3.5);
-    const step = Math.floor(minutes * 3);
-    for (let i = 0; i < 8; i++) {
-      const on = open && (i + step) % 3 !== 0;
-      rect(ctx, 1 + i * 4, -11, 1.5, 1.5, on ? LIT.bulb : pick(C.bulb, night));
-    }
+    for (let i = 0; i < 8; i++)
+      rect(ctx, 1 + i * 4, -11, 1.5, 1.5, marqueeBulb(minutes, i, open, night));
   });
   if (open && night) {
     const glass = at((CASE.x0 + CASE_X1) / 2, (CASE_Y0 + CASE_Y1) / 2, BODY.top + 8);
