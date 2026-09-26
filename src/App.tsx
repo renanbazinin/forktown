@@ -41,6 +41,7 @@ import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
 import FullTownNote from './components/FullTownNote';
+import { NeighborRow, PlaceRow, PlotRow } from './components/BrowseRows';
 import BrandMark, { LanternDot } from './components/BrandMark';
 import WelcomeCard from './components/WelcomeCard';
 import TownEvents from './components/TownEvents';
@@ -237,12 +238,12 @@ export default function App() {
     setBuildPlot(plot);
     setModal('contribute');
   }
-  function follow(id: string) {
+  const follow = useCallback((id: string) => {
     setFollowed(id);
     setPanel(null);
     setSelectedPlot(null);
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-  }
+  }, []);
   async function share() {
     if (!selected) return;
     const url = new URL(window.location.href);
@@ -597,18 +598,13 @@ export default function App() {
             ) : panel === 'neighbors' ? (
               <div className="resident-directory">
                 {residents.map((resident) => (
-                  <button
-                    className="resident-link"
+                  <NeighborRow
                     key={resident.id}
-                    onClick={() => follow(resident.id)}
-                  >
-                    <ResidentPreview resident={resident.resident} size={42} />
-                    <span>
-                      <strong>{resident.resident.name}</strong>
-                      <small>{residentActivityLabel(resident)}</small>
-                    </span>
-                    <ArrowRight size={14} />
-                  </button>
+                    id={resident.id}
+                    resident={resident.resident}
+                    activity={residentActivityLabel(resident)}
+                    onFollow={follow}
+                  />
                 ))}
               </div>
             ) : (
@@ -655,37 +651,10 @@ export default function App() {
                 <div className="browse-list">
                   {filter === 'places'
                     ? filteredPlaces.map((place) => (
-                        <button
-                          className="browse-row"
-                          key={place.id}
-                          onClick={() => select(place.plot, true)}
-                        >
-                          <BuildingPreview place={place} size={48} />
-                          <span>
-                            <strong>{place.name}</strong>
-                            <small>
-                              {place.plot} ·{' '}
-                              {isFoundingPlace(place) ? place.resident.name : `@${place.creator}`}
-                            </small>
-                          </span>
-                          <ArrowRight size={14} />
-                        </button>
+                        <PlaceRow key={place.id} place={place} onSelect={select} />
                       ))
                     : filteredPlots.map((plot) => (
-                        <button
-                          className="browse-row"
-                          key={plot.id}
-                          onClick={() => select(plot.id, true)}
-                        >
-                          <span className="plot-symbol">
-                            <Plus size={19} />
-                          </span>
-                          <span>
-                            <strong>Plot {plot.id}</strong>
-                            <small>{PLOT_COPY.row}</small>
-                          </span>
-                          <ArrowRight size={14} />
-                        </button>
+                        <PlotRow key={plot.id} plot={plot.id} onSelect={select} />
                       ))}
                 </div>
                 {filter === 'empty' && !available.length ? (
