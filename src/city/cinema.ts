@@ -1,6 +1,14 @@
 import { cinemaAt, CINEMA_GROUND, CINEMA_SEATS } from '../lib/cinema';
 import { project } from '../lib/world';
+import { snowAt, type TownSeason } from '../lib/seasons';
 import { drawCinemaAd, drawCinemaCard, drawCinemaFilm, loadReel } from './cinema-films';
+import {
+  CART_DEPTH,
+  drawPopcornCart,
+  drawProjector,
+  paintBeam,
+  PROJECTOR_DEPTH,
+} from './cinema-props';
 
 type Ctx = CanvasRenderingContext2D;
 export const SCREEN_ORIGIN = project(22.3, 14.7);
@@ -25,6 +33,7 @@ export function drawCinema(
   day: number,
   night: boolean,
   selected = false,
+  season?: TownSeason,
 ) {
   const { left, right, top, bottom } = CINEMA_GROUND;
   polygon(
@@ -152,47 +161,28 @@ export function drawCinema(
       },
     });
   }
-  const booth = project(28.1, 20.3);
-  objects.push({
-    depth: 48.4,
-    paint: () => {
-      ctx.fillStyle = '#A78065';
-      ctx.fillRect(booth.x - 17, booth.y - 27, 34, 27);
-      ctx.fillStyle = '#E9D7AB';
-      ctx.fillRect(booth.x - 19, booth.y - 32, 38, 7);
-      for (let i = 0; i < 4; i++) {
-        ctx.fillStyle = i % 2 ? '#DBA879' : '#A75E59';
-        ctx.fillRect(booth.x - 20 + i * 10, booth.y - 43, 10, 12);
-      }
-      ctx.fillStyle = '#FAE6B0';
-      for (let i = 0; i < 3; i++) ctx.fillRect(booth.x - 10 + i * 8, booth.y - 37, 5, 6);
-      ctx.font = 'bold 6px "Space Mono", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#FFF0CA';
-      ctx.fillText('POPCORN', booth.x, booth.y - 12);
-    },
-  });
-  const projector = project(25.5, 20.5);
-  objects.push({
-    depth: 46,
-    paint: () => {
-      ctx.fillStyle = '#425657';
-      ctx.fillRect(projector.x - 9, projector.y - 21, 18, 12);
-      ctx.fillRect(projector.x - 5, projector.y - 9, 3, 10);
-      ctx.fillRect(projector.x + 4, projector.y - 9, 3, 10);
-      ctx.fillStyle = state.live ? '#F8EBC5' : '#A8B8A1';
-      ctx.fillRect(projector.x - 4, projector.y - 25, 8, 5);
-      if (state.live)
-        polygon(
-          ctx,
-          [
-            { x: projector.x, y: projector.y - 23 },
-            { x: SCREEN_ORIGIN.x + 40, y: SCREEN_ORIGIN.y - 85 },
-            { x: SCREEN_ORIGIN.x + 190, y: SCREEN_ORIGIN.y - 10 },
-          ],
-          '#F8EBC50A',
-        );
-    },
-  });
+  // Serving from when guests set out until the lawn has emptied; the reel runs with the bill.
+  const time = ((minutes % 1440) + 1440) % 1440;
+  const evening = time < 360 ? time + 1440 : time;
+  const { program } = state;
+  const props = {
+    minutes,
+    night,
+    open: evening >= program.depart && evening < program.homeBy,
+    live: state.live,
+    progress: Math.max(0, Math.min(1, (evening - program.start) / (program.end - program.start))),
+    snow: season ? snowAt(season.yearDay, 0.4) : 0,
+  };
+  objects.push({ depth: CART_DEPTH, paint: () => drawPopcornCart(ctx, props) });
+  objects.push({ depth: PROJECTOR_DEPTH, paint: () => drawProjector(ctx, props) });
+  if (state.live) {
+    // Sorted just in front of the cloth, so the audience sits in front of the light.
+    const corner = (u: number, v: number) => ({
+      x: SCREEN_ORIGIN.x + u * SCREEN_SCALE,
+      y: SCREEN_ORIGIN.y - 150 + (u * 0.5 + v) * SCREEN_SCALE,
+    });
+    const picture = [corner(0, 0), corner(320, 0), corner(320, 180), corner(0, 180)] as const;
+    objects.push({ depth: 40.25, paint: () => paintBeam(ctx, picture, minutes) });
+  }
   return objects;
 }

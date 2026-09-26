@@ -523,6 +523,7 @@ export function renderCity({
       day,
       night,
       isCinemaPlot(selectedPlot ?? '') || isCinemaPlot(hoveredPlot ?? ''),
+      season,
     ),
   );
   // The Millpond: flat water art now, under everyone on its banks; its uprights join the sort.
