@@ -473,6 +473,13 @@ body,
   line-height: 1.7;
   margin-bottom: 15px;
 }
+.venue-program .reel-missing {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: var(--lantern-pale);
+  color: var(--lantern-ink);
+  font-size: 13px;
+}
 .town-panel .town-events {
   display: flex;
   flex-direction: column;
