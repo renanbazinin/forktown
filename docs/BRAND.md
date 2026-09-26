@@ -133,7 +133,7 @@ The Treeline keeps to it too: its glass stays cool at night, and only the small 
 
 ## The welcome card
 
-A first visit (no saved flag and no `#place=` or `#venue=` link) shows a quiet card above the dock: the tiled mark, **Every house here started as a fork.**, the neighbor count and the newest arrival, and when nightfall comes. It is an `aside`, not a dialog, and never takes focus. It hides while a panel is open. Any of its actions, or its close button, stores `forktown-welcomed-v1` in local storage. When storage is blocked it greets once per page load. `/live` never shows it.
+A first visit (no saved flag, and no `#place=` or `#venue=` link to a house or venue the town has) shows a quiet card above the dock: the tiled mark, **Every house here started as a fork.**, the neighbor count and the newest arrival, and when nightfall comes. It is an `aside`, not a dialog, and never takes focus. It hides while a panel is open. Any of its actions, or its close button, stores `forktown-welcomed-v1` in local storage. When storage is blocked it greets once per page load. A link to a house or venue the town doesn't have still greets the newcomer, with a note saying so beside the card. `/live` never shows it.
 
 ## The dusk skin
 
