@@ -166,7 +166,8 @@
         const canvas = document.querySelector('canvas'),
           ctx = canvas.getContext('2d'),
           slider = document.querySelector('#time');
-        const day = 0,
+        // Any night's bill: ?day=12 previews a different mix of films and ads.
+        const day = Number(new URLSearchParams(location.search).get('day') ?? 0),
           bill = cinemaProgram(day);
         const previewHomes = HOUSE_PLOTS.slice(0, 32).map((plot, index) => ({
           ...places[index % places.length],
@@ -184,19 +185,24 @@
           soundEnabled = false;
         slider.min = CINEMA_SCREEN_RISE;
         slider.max = bill.end + CINEMA_SCREEN_ROLL_SECONDS;
-        for (const [index, slot] of bill.slots.filter((slot) => slot.film).entries()) {
+        for (const [index, slot] of bill.slots.filter((slot) => slot.film || slot.ad).entries()) {
+          const item = slot.film ?? slot.ad;
           const card = document.createElement('div');
           card.className = 'film';
           const duration = document.createElement('span');
-          duration.textContent = `FILM ${index + 1} · ${slot.film.duration} SECONDS`;
+          duration.textContent = slot.film
+            ? [slot.film.genre?.toUpperCase(), `${item.duration} SECONDS`, slot.film.rating]
+                .filter(Boolean)
+                .join(' · ')
+            : `AD · ${item.duration} SECONDS`;
           const name = document.createElement('strong');
-          name.textContent = slot.film.title;
+          name.textContent = slot.film?.title ?? slot.ad.sponsor;
           const description = document.createElement('span');
-          description.textContent = slot.film.description;
+          description.textContent = slot.film?.description ?? slot.ad.tagline;
           card.append(duration, name, description);
           document.querySelector('#bill').append(card);
           const button = document.createElement('button');
-          button.textContent = slot.film.title;
+          button.textContent = slot.film?.title ?? `Ad: ${slot.ad.sponsor}`;
           button.onclick = () => {
             time = slot.start;
             playing = true;
@@ -216,13 +222,13 @@
             : CINEMA_FRAME.center;
           const zoom = close ? 3.3 : 1.5;
           const camera = { x: 600 - center.x * zoom, y: 350 - center.y * zoom, zoom };
-          const film = state.slot?.film;
+          const film = state.slot?.film ?? state.slot?.ad;
           player?.cinemaSound(
             soundEnabled && playing && !document.hidden && film
               ? {
                   film,
                   elapsed: state.elapsed,
-                  key: `${day}:${film.id}`,
+                  key: `${day}:${state.slot.start}:${film.id}`,
                   ...cinemaListening(camera, 1200, 740),
                 }
               : undefined,
@@ -244,7 +250,7 @@
             showPlots: false,
           });
           document.querySelector('#status').textContent =
-            `${timeLabel(time)} · ${state.slot?.film?.title ?? (state.slot ? (state.slot.kind === 'closing' ? 'Goodnight, Forktown' : 'Starlight Cinema · a little breather') : 'The lawn is ready for tonight')} · ${Math.floor(state.elapsed)}s`;
+            `${timeLabel(time)} · ${state.slot?.film?.title ?? (state.slot?.ad ? `Ad · ${state.slot.ad.sponsor}` : state.slot ? (state.slot.kind === 'closing' ? 'Goodnight, Forktown' : 'Starlight Cinema · a little breather') : 'The lawn is ready for tonight')} · ${Math.floor(state.elapsed)}s`;
           document.querySelector('#play').textContent = playing ? 'Pause' : 'Play';
           slider.value = time;
         }
@@ -271,7 +277,11 @@
           paint();
         };
         document.querySelector('#interval').onclick = () => {
-          time = bill.slots.find((slot) => slot.kind === 'interval').start;
+          // One-film nights have no intermission; their break is the opening card.
+          time = (
+            bill.slots.find((slot) => slot.kind === 'interval') ??
+            bill.slots.find((slot) => slot.kind === 'opening')
+          ).start;
           playing = false;
           paint();
         };
