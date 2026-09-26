@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { readDeepLink } from '../src/lib/deep-link';
+import { linkHash, readDeepLink } from '../src/lib/deep-link';
 import {
   MILLPOND_LABEL,
   millpondCopy,
@@ -445,7 +445,10 @@ describe('Millpond skating card', () => {
   it('keeps the pond out of the empty-plot card and in the link', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(readDeepLink('#venue=millpond', [])).toEqual({ plot: MILLPOND_VENUE.plot });
-    expect(app).toContain("'#venue=millpond'");
+    expect(linkHash(MILLPOND_VENUE.plot, [])).toBe('#venue=millpond');
+    // The app reads and writes the address through those two.
+    expect(app).toContain('readDeepLink(window.location.hash, places)');
+    expect(app).toContain('linkHash(plotId, places)');
     // The pond's panel comes before the empty-plot fallback that offers "Build here".
     expect(app.indexOf('<MillpondInfo')).toBeGreaterThan(-1);
     expect(app.indexOf('<MillpondInfo')).toBeLessThan(app.indexOf("'Build here'"));

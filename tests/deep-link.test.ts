@@ -1,8 +1,15 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { MISSING_LINK_COPY, readDeepLink } from '../src/lib/deep-link';
-import { CINEMA_VENUE } from '../src/lib/cinema';
+import { linkHash, MISSING_LINK_COPY, readDeepLink } from '../src/lib/deep-link';
+import { CINEMA_PLOTS, CINEMA_VENUE } from '../src/lib/cinema';
+import { HOUSE_PLOTS } from '../src/lib/events';
+import { FARM, FARM_PLOTS } from '../src/lib/farm';
+import { FOOTBALL_VENUE } from '../src/lib/football';
 import { FORK_PLOT } from '../src/lib/lanterns';
+import { MILLPOND_VENUE } from '../src/lib/millpond';
 import { places } from '../src/lib/places';
+import { TUBE_VENUE } from '../src/lib/tubes';
+import { ZOO_PLOTS, ZOO_VENUE } from '../src/lib/zoo';
 
 describe('Shared links', () => {
   const home = places[0];
@@ -25,5 +32,36 @@ describe('Shared links', () => {
     expect(readDeepLink(`#venue=moon&place=${home.id}`, places)).toEqual({ plot: home.plot });
     expect(readDeepLink('', places)).toBeNull();
     expect(readDeepLink('#welcome=1', places)).toBeNull();
+  });
+
+  it('writes the link for every house and venue that reads back to the same plot', () => {
+    for (const place of places) expect(linkHash(place.plot, places)).toBe(`#place=${place.id}`);
+    for (const plot of [
+      FARM.plot,
+      MILLPOND_VENUE.plot,
+      TUBE_VENUE.plot,
+      FOOTBALL_VENUE.plot,
+      CINEMA_VENUE.plot,
+      ZOO_VENUE.plot,
+      FORK_PLOT,
+    ]) {
+      const hash = linkHash(plot, places);
+      expect(hash, plot).toMatch(/^#venue=/);
+      expect(readDeepLink(hash, places), plot).toEqual({ plot });
+    }
+    // Any plot of a venue links to the venue.
+    for (const plot of [...FARM_PLOTS, ...CINEMA_PLOTS, ...ZOO_PLOTS])
+      expect(readDeepLink(linkHash(plot, places), places)).not.toBeNull();
+    const empty = HOUSE_PLOTS.find(({ id }) => !places.some((place) => place.plot === id));
+    if (empty) expect(linkHash(empty.id, places)).toBe('');
+    expect(linkHash(null, places)).toBe('');
+  });
+
+  it('puts the address back to what the map shows when a link points at nothing', () => {
+    const app = readFileSync('src/App.tsx', 'utf8');
+    const missing = app.slice(app.indexOf("'missing' in link"));
+    expect(missing.slice(0, missing.indexOf('} else'))).toContain(
+      'linkHash(shownPlot.current, places)',
+    );
   });
 });

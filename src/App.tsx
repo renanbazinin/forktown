@@ -6,7 +6,6 @@ import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
-import { isZooPlot } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -51,7 +50,7 @@ import Soundtrack from './components/Soundtrack';
 import FootballMatch from './components/FootballMatch';
 import CalendarClock from './components/CalendarClock';
 import CinemaInfo from './components/CinemaInfo';
-import { isCinemaPlot, cinemaAt } from './lib/cinema';
+import { cinemaAt } from './lib/cinema';
 import { footballAt, isFootballPlot, FOOTBALL_VENUE } from './lib/football';
 import { trackForTown } from './music/score';
 import {
@@ -69,7 +68,7 @@ import { localSaveAvailable } from './lib/local-save';
 import { useTownClock } from './lib/use-town-clock';
 import { useLanternTown } from './lib/use-lantern-town';
 import { FORK_PLOT } from './lib/lanterns';
-import { MISSING_LINK_COPY, readDeepLink } from './lib/deep-link';
+import { linkHash, MISSING_LINK_COPY, readDeepLink } from './lib/deep-link';
 import { OPEN_PLOTS_COPY } from './lib/open-plots';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
 
@@ -97,6 +96,11 @@ export default function App() {
   const exploreButton = useRef<HTMLButtonElement>(null);
   const panelTitle = useRef<HTMLHeadingElement>(null);
   const [selectedPlot, setSelectedPlot] = useState<string | null>(initialSelection);
+  // The plot on show, for the address bar when a shared link turns out to point at nothing.
+  const shownPlot = useRef(selectedPlot);
+  useEffect(() => {
+    shownPlot.current = selectedPlot;
+  }, [selectedPlot]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(() => (initialSelection() ? 'places' : null));
   const [followed, setFollowed] = useState<string | null>(null);
@@ -178,11 +182,10 @@ export default function App() {
     setSelectedEventId(null);
     setShared(false);
     if (plotId) setPanel('places');
-    const place = places.find((place) => place.plot === plotId);
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isMillpondPlot(plotId ?? '') ? '#venue=millpond' : isTubePlot(plotId ?? '') ? '#venue=tube' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
+      `${window.location.pathname}${window.location.search}${linkHash(plotId, places)}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -197,9 +200,15 @@ export default function App() {
     // town doesn't have says so instead of doing nothing.
     const openLink = (fresh: boolean) => {
       const link = readDeepLink(window.location.hash, places);
-      if (link && 'missing' in link)
+      if (link && 'missing' in link) {
         setToast({ text: MISSING_LINK_COPY[link.missing], note: true });
-      else if (!fresh && link) select(link.plot, true);
+        // The map stays where it was, and so does the address: never a link to nothing.
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${window.location.search}${linkHash(shownPlot.current, places)}`,
+        );
+      } else if (!fresh && link) select(link.plot, true);
       else if (!fresh) setSelectedPlot(null);
     };
     openLink(true);
