@@ -29,6 +29,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run test && npm run build",
+    "check:full-town": "tsx scripts/full-town-check.ts",
     "check:pr": "node scripts/check-pr-places.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
