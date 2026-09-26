@@ -268,12 +268,14 @@ describe('A quiet first install and build', () => {
     for (const name of withScripts) expect(allowScripts, name).toHaveProperty([name!], true);
   });
 
-  it('keeps the chunk-size warning for chunks that really grew', () => {
+  it('keeps the chunk-size warning quiet for a full town, but not for any size', () => {
     expect(readFileSync('vite.config.ts', 'utf8')).toMatch(/plugins: \[[^\]]*chunkBudget\(\)/);
     const plugin = chunkBudget();
     expect((plugin.config as () => unknown)()).toEqual({
       build: { chunkSizeWarningLimit: CHUNK_WARNING_KB },
     });
-    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1000);
+    // A full town's main chunk measured 1,149–1,204 kB; see scripts/chunk-budget.ts.
+    expect(CHUNK_WARNING_KB).toBeGreaterThanOrEqual(1250);
+    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1300);
   });
 });
