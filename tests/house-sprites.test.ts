@@ -377,4 +377,23 @@ describe('House sprites', () => {
     frame(faded, homes);
     expect(frame(faded, homes)).toMatchObject({ direct: 3, painted: 0 });
   });
+
+  it('draws homes directly after something leaves the transform changed mid-frame', () => {
+    browser();
+    const view = map();
+    const homes = row(places.slice(0, 3));
+    frame(view, homes);
+    frame(view, homes);
+    const draws = vi.mocked(drawHouse);
+    draws.mockClear();
+    const paint = housePainter(view.ctx);
+    const [first, ...rest] = homes;
+    paint(first.place, first.x, first.y, false, 1.12, { minutes: 720 });
+    // A depth object that forgot its restore(): the rest of the frame is drawn where the canvas
+    // now puts it, not copied to where the frame began.
+    view.camera.e += 7;
+    for (const home of rest) paint(home.place, home.x, home.y, false, 1.12, { minutes: 720 });
+    expect(draws.mock.calls.filter(([target]) => target === view.ctx)).toHaveLength(2);
+    expect(draws.mock.calls.filter(([target]) => target !== view.ctx)).toHaveLength(0);
+  });
 });

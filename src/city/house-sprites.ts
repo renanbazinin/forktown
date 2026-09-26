@@ -96,13 +96,14 @@ function makeRoom(store: Store, need: number, budget: number, keep: HouseAppeara
 }
 
 /**
- * The house painter for one frame of `ctx`, made once the camera transform is set; every object
- * paints inside save() and restore(), so the transform holds for the whole frame. A house with a
- * sprite painted for this exact scale and sub-pixel position is copied, pixel for pixel, and a
- * few more houses a frame get one while the camera rests. A quick pan, moving everything several
- * pixels a frame, copies a sprite painted for another sub-pixel to the nearest whole pixel, as the
- * football pitch always is; the camera coming to rest repaints it exactly. A slow glide, where
- * half a pixel could show, a zoom, and anything unusual about the canvas draw houses directly.
+ * The house painter for one frame of `ctx`, made once the camera transform is set. No depth object
+ * may leave that transform changed; should one ever do so, each house after it is drawn directly
+ * where the canvas puts it, never copied to where the frame began. A house with a sprite painted
+ * for this exact scale and sub-pixel position is copied, pixel for pixel, and a few more houses a
+ * frame get one while the camera rests. A quick pan, moving everything several pixels a frame,
+ * copies a sprite painted for another sub-pixel to the nearest whole pixel, as the football pitch
+ * always is; the camera coming to rest repaints it exactly. A slow glide, where half a pixel could
+ * show, a zoom, and anything unusual about the canvas draw houses directly.
  */
 export function housePainter(ctx: Ctx): HousePainter {
   const direct: HousePainter = (place, x, y, night, scale, life) =>
@@ -127,10 +128,17 @@ export function housePainter(ctx: Ctx): HousePainter {
   let paints = still || quick ? PAINTS_PER_FRAME : 0;
   return (place, x, y, night, scale, life) => {
     const look = houseLook(place, night, life);
+    const now = ctx.getTransform();
     if (
       look === undefined ||
       ctx.globalAlpha !== 1 ||
-      ctx.globalCompositeOperation !== 'source-over'
+      ctx.globalCompositeOperation !== 'source-over' ||
+      now.a !== t.a ||
+      now.b !== t.b ||
+      now.c !== t.c ||
+      now.d !== t.d ||
+      now.e !== t.e ||
+      now.f !== t.f
     )
       return direct(place, x, y, night, scale, life);
     // Where the canvas puts the house origin: its translate(x, y), then scale(scale).
