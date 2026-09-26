@@ -67,11 +67,10 @@ export function HomeDetails({
           Floors
           <select
             value={draft.design.floors}
-            onChange={(e) => change('floors', Number(e.target.value) as 1 | 2 | 3)}
+            onChange={(e) => change('floors', Number(e.target.value) as 1 | 2)}
           >
             <option value={1}>One cozy floor</option>
             <option value={2}>Two floors</option>
-            <option value={3}>Three floors</option>
           </select>
         </label>
         <Choice

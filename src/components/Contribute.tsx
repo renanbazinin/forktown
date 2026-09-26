@@ -23,7 +23,7 @@ import { HOUSE_PLOTS as PLOTS } from '../lib/events';
 import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
 import { pickDraftNames } from '../lib/draft-names';
-import { restoreDraftPlot, storyPrompt } from '../lib/builder-nudges';
+import { restoreDraftDesign, restoreDraftPlot, storyPrompt } from '../lib/builder-nudges';
 import { BUILDER_DEFAULT_STORY } from '../lib/lanterns';
 import BuildingPreview from './BuildingPreview';
 import Modal from './Modal';
@@ -94,7 +94,11 @@ const Contribute = memo(function Contribute({
           if (restored.resident.name === 'New neighbor')
             restored.resident = { ...restored.resident, name: residentName };
         }
-        return { ...restored, plot: restoreDraftPlot(plot ?? restored.plot, available) };
+        return {
+          ...restored,
+          design: restoreDraftDesign(restored.design),
+          plot: restoreDraftPlot(plot ?? restored.plot, available),
+        };
       }
     } catch {
       /* A stale draft should never prevent a new contribution. */
