@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { readDeepLink } from '../src/lib/deep-link';
 import {
   MILLPOND_LABEL,
   millpondCopy,
@@ -27,6 +28,7 @@ import {
   millpondSkatingDay,
   millpondStatusAt,
   mistAt,
+  MILLPOND_VENUE,
   petalCountAt,
   sceneSkatersAt,
   SKATING,
@@ -442,7 +444,7 @@ describe('Millpond skating card', () => {
 
   it('keeps the pond out of the empty-plot card and in the link', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
-    expect(app).toContain("get('venue') === 'millpond'");
+    expect(readDeepLink('#venue=millpond', [])).toEqual({ plot: MILLPOND_VENUE.plot });
     expect(app).toContain("'#venue=millpond'");
     // The pond's panel comes before the empty-plot fallback that offers "Build here".
     expect(app.indexOf('<MillpondInfo')).toBeGreaterThan(-1);

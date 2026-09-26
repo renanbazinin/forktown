@@ -6,7 +6,7 @@ import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
-import { isZooPlot, ZOO_VENUE } from './lib/zoo';
+import { isZooPlot } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -50,7 +50,7 @@ import Soundtrack from './components/Soundtrack';
 import FootballMatch from './components/FootballMatch';
 import CalendarClock from './components/CalendarClock';
 import CinemaInfo from './components/CinemaInfo';
-import { CINEMA_VENUE, isCinemaPlot, cinemaAt } from './lib/cinema';
+import { isCinemaPlot, cinemaAt } from './lib/cinema';
 import { footballAt, isFootballPlot, FOOTBALL_VENUE } from './lib/football';
 import { trackForTown } from './music/score';
 import {
@@ -68,6 +68,7 @@ import { localSaveAvailable } from './lib/local-save';
 import { useTownClock } from './lib/use-town-clock';
 import { useLanternTown } from './lib/use-lantern-town';
 import { FORK_PLOT } from './lib/lanterns';
+import { MISSING_LINK_COPY, readDeepLink } from './lib/deep-link';
 import { OPEN_PLOTS_COPY } from './lib/open-plots';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
 
@@ -82,26 +83,12 @@ function initialWelcome() {
   } catch {
     // Blocked storage greets once per session.
   }
-  return shouldWelcome(window.location.hash, storage);
+  // A link to a house that isn't here greets a newcomer like a plain visit.
+  return shouldWelcome(initialSelection() ? window.location.hash : '', storage);
 }
 function initialSelection() {
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'fork') return FORK_PLOT;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'farm') return FARM.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'millpond')
-    return MILLPOND_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'tube')
-    return TUBE_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'zoo')
-    return ZOO_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'cinema')
-    return CINEMA_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'football')
-    return FOOTBALL_VENUE.plot;
-  return (
-    places.find(
-      (place) => place.id === new URLSearchParams(window.location.hash.slice(1)).get('place'),
-    )?.plot ?? null
-  );
+  const link = readDeepLink(window.location.hash, places);
+  return link && 'plot' in link ? link.plot : null;
 }
 
 export default function App() {
@@ -205,14 +192,20 @@ export default function App() {
     exploreButton.current?.focus();
   }, []);
   useEffect(() => {
-    const listener = () => {
-      const selection = initialSelection();
-      setSelectedPlot(selection);
-      if (selection) setPanel('places');
+    // A link opened in this tab moves the map there, like a fresh visit. A link to something the
+    // town doesn't have says so instead of doing nothing.
+    const openLink = (fresh: boolean) => {
+      const link = readDeepLink(window.location.hash, places);
+      if (link && 'missing' in link)
+        setToast({ text: MISSING_LINK_COPY[link.missing], note: true });
+      else if (!fresh && link) select(link.plot, true);
+      else if (!fresh) setSelectedPlot(null);
     };
+    openLink(true);
+    const listener = () => openLink(false);
     window.addEventListener('hashchange', listener);
     return () => window.removeEventListener('hashchange', listener);
-  }, []);
+  }, [select]);
   useEffect(() => {
     if (panel) panelTitle.current?.focus();
   }, [panel, selectedPlot]);
