@@ -122,7 +122,6 @@ describe('Live broadcast director', () => {
     }
   }, 20_000);
 
-  // Thirty days of programs, whose work grows with the town: a generous timeout.
   it('chooses three varied highlights each day, with no always-on ducks or disco', () => {
     const lineups = new Set<string>();
     for (let day = 0; day < 30; day++) {
@@ -150,7 +149,7 @@ describe('Live broadcast director', () => {
       expect(count).toBeGreaterThan(0);
       expect(count).toBeLessThan(30);
     }
-  }, 20_000);
+  });
 
   it('follows people between highlights and holds the full selected football match', () => {
     expect(shotAt(12, 420).kind).toBe('neighbor');
