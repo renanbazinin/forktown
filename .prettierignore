@@ -4,3 +4,6 @@ node_modules/
 package-lock.json
 .claude/
 .shots/
+# House files belong to their creators and are checked by the validator; a maintainer
+# can't reformat someone else's house without that creator's review.
+places/
