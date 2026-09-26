@@ -1,5 +1,6 @@
 /// <reference types="vitest/config" />
 import { defineConfig, loadEnv } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { localPlacesPlugin } from './scripts/local-places.ts';
 import { readArrivalOrder } from './scripts/town-arrivals.ts';
@@ -19,6 +20,8 @@ export default defineConfig(({ mode }) => {
       // busy desktop, and CI's shared runners are no faster, so Vitest's 5 s default would fail
       // them there. A hung test still stops within 15 s.
       testTimeout: 15_000,
+      // Worktrees under .claude/ and scratch copies under .shots/ carry tests of their own.
+      exclude: [...configDefaults.exclude, '.claude/**', '.shots/**'],
     },
   };
 });
