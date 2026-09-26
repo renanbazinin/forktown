@@ -20,6 +20,7 @@ For example, change this to `{ rows: 20, columns: 14 }` for 280 plots, or `{ row
 - Row letters and column numbers are independent of the current town size. Row Z is followed by AA, AB, and so on; A10 follows A9. Existing IDs are never renumbered.
 - Place links use the place ID, not an array index or map coordinate. Leave existing place IDs intact.
 - Walking destinations may change when roads grow, but resident data and simple routines remain compatible. Shoreline and border scenery move to the new edge.
+- The duck family walks a fixed 40.7 tiles each way from the river along the Lunch Green street, so in a wider town they turn back before its far end instead of hurrying to reach it.
 
 ## Before publishing an expansion
 
