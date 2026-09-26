@@ -79,6 +79,8 @@ describe('Residents admiring the duck family', () => {
 
   it('integrates with real residents, labels the reaction, and leaves event guests and indoor routines alone', () => {
     let seen = 0;
+    // One reversed roster, so its day plan is made once rather than for every reaction.
+    const reversed = [...places].reverse();
     for (let time = DUCK_WALK_START; time < DUCK_WALK_END; time += 0.5) {
       const states = simulateResidents(places, time, 0);
       for (const state of states) {
@@ -88,9 +90,7 @@ describe('Residents admiring the duck family', () => {
         expect(state.moving).toBe(false);
         expect(state.greeting).toBe(false);
         expect(residentActivityLabel(state)).toBe('Stopped to admire the ducklings');
-        const replay = simulateResidents([...places].reverse(), time, 0).find(
-          (r) => r.id === state.id,
-        );
+        const replay = simulateResidents(reversed, time, 0).find((r) => r.id === state.id);
         expect(replay).toEqual(state);
         expect(simulateResidents(places, time + 1440, 0).find((r) => r.id === state.id)).toEqual(
           state,

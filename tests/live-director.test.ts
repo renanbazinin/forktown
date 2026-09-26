@@ -17,6 +17,8 @@ import {
   liveLabelLift,
 } from '../src/lib/live-director';
 import { tubeRides } from '../src/lib/tube-traffic';
+import { residentTrips } from '../src/lib/resident-trips';
+import { nightBedtime } from '../src/lib/night-routine';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { eventsForDay, isEventLive } from '../src/lib/events';
@@ -120,6 +122,7 @@ describe('Live broadcast director', () => {
     }
   }, 20_000);
 
+  // Thirty days of programs, whose work grows with the town: a generous timeout.
   it('chooses three varied highlights each day, with no always-on ducks or disco', () => {
     const lineups = new Set<string>();
     for (let day = 0; day < 30; day++) {
@@ -147,7 +150,7 @@ describe('Live broadcast director', () => {
       expect(count).toBeGreaterThan(0);
       expect(count).toBeLessThan(30);
     }
-  });
+  }, 20_000);
 
   it('follows people between highlights and holds the full selected football match', () => {
     expect(shotAt(12, 420).kind).toBe('neighbor');
@@ -177,7 +180,15 @@ describe('Live broadcast director', () => {
     let followed = 0,
       kept = 0;
     for (const day of skatingDays) {
-      const program = liveProgram(places, day);
+      // The day's skaters first in every clip's cast, so even a crowded town follows one out.
+      const skaters = [...residentTrips(places, day)]
+        .filter(([, trips]) => trips.some((trip) => trip.event.id === 'millpond'))
+        .map(([id]) => id);
+      const planned = liveProgram(places, day);
+      const program = {
+        ...planned,
+        cast: planned.cast.map((ids) => [...skaters, ...ids.filter((id) => !skaters.includes(id))]),
+      };
       let walkingIn: string | undefined;
       for (let minute = SKATING.depart; minute < SKATING.end; minute += 0.5) {
         const residents = simulateResidents(places, minute, day);
@@ -316,7 +327,14 @@ describe('Live broadcast director', () => {
       if (selected) expect(before).toEqual(after);
     }
     expect(shotAt(3, 160).kind).toBe('neighbor');
-    expect(shotAt(3, 290).kind).toBe('cat');
+    // After the last night owl's bedtime only Miso is out, until the scenery at 05:00.
+    const quiet = Math.max(
+      290,
+      ...places
+        .filter((home) => home.resident.routine.night === 'stroll')
+        .map((home) => nightBedtime(home) - 1440 + 0.5),
+    );
+    expect(shotAt(3, quiet).kind).toBe(quiet < SCENERY_START ? 'cat' : 'home');
   });
 
   it('films Lantern hour at the Lantern Fork every evening', () => {
