@@ -65,6 +65,18 @@ describe('Residents admiring the duck family', () => {
     for (const time of [0, 360, 479.9, 780, 1200, 1439]) expect(reaction(time)).toEqual(walk(time));
   });
 
+  it('remembers every route’s encounters however many neighbors stroll at once', () => {
+    let samples = 0;
+    const counted = (time: number) => (samples++, walk(time));
+    // Far more stroll windows than today's town holds, all live in the same frames.
+    const routes = Array.from({ length: 600 }, (_, index) => `test:crowd:${index}`);
+    for (const route of routes) duckAwareWalk(route, 540, 360, 720, counted);
+    samples = 0;
+    for (const route of routes) duckAwareWalk(route, 540.1, 360, 720, counted);
+    // One sample per route for the next frame: no route's scan is done again.
+    expect(samples).toBe(routes.length);
+  });
+
   it('integrates with real residents, labels the reaction, and leaves event guests and indoor routines alone', () => {
     let seen = 0;
     for (let time = DUCK_WALK_START; time < DUCK_WALK_END; time += 0.5) {
