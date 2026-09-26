@@ -66,6 +66,7 @@ import { useTownClock } from './lib/use-town-clock';
 import { useLanternTown } from './lib/use-lantern-town';
 import { FORK_PLOT } from './lib/lanterns';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
+import { useTownDayPrefetch } from './lib/idle-prefetch';
 
 type Panel = 'places' | 'neighbors' | 'events';
 // Keeps the welcome closed for this page load even when storage refuses the flag.
@@ -144,6 +145,7 @@ export default function App() {
     () => simulateResidents(displayPlaces, clock.minutes, clock.day),
     [displayPlaces, clock.minutes, clock.day],
   );
+  useTownDayPrefetch(displayPlaces, clock.minutes, clock.day);
   const lanternTown = useLanternTown(places, clock.minutes, clock.day);
   const skaters = residents
     .filter((r) => r.event?.id === 'millpond' && r.event.phase === 'attending')

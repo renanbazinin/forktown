@@ -1,8 +1,10 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DUCK_WALK_END, DUCK_WALK_START } from '../src/lib/ducks';
 import { HOUSE_PLOTS } from '../src/lib/events';
+import { prefetchTownDay } from '../src/lib/idle-prefetch';
 import { liveProgram, liveShotAt } from '../src/lib/live-director';
+import { planResidentTrips, residentTrips } from '../src/lib/resident-trips';
 import { placeSchema, type Place } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { townCatAt } from '../src/lib/town-cat';
@@ -124,6 +126,10 @@ function inLocale<T>(locale: string, run: () => T): T {
     String.prototype.localeCompare = original;
   }
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('The town simulation at any size', () => {
   // Routes are part of the shared town: a faster search must not move anyone.
@@ -257,4 +263,33 @@ describe('The town simulation at any size', () => {
         expect(inLocale(locale, () => town(homes))).toEqual(english);
     }
   }, 30_000);
+
+  it('plans the next town day while idle before 06:00, exactly as the frame would', () => {
+    const homes = [...places];
+    const [day] = DAYS;
+    const idle: (() => void)[] = [];
+    // Outside a page, nothing is scheduled.
+    prefetchTownDay(homes, 330, day);
+    vi.stubGlobal('document', {});
+    vi.stubGlobal('requestIdleCallback', (work: () => void) => idle.push(work));
+    const today = residentTrips(homes, day - 1);
+    prefetchTownDay(homes, 299, day);
+    expect(idle).toHaveLength(0);
+    for (const minute of [300, 300.1, 330, 359.9]) prefetchTownDay(homes, minute, day);
+    expect(idle).toHaveLength(1);
+    idle[0]();
+    const prefetched = residentTrips(homes, day);
+    expect(prefetched).toEqual(planResidentTrips(homes, day));
+    // The first frame at 06:00 finds it, and the plan still in use before then stays cached.
+    expect(residentTrips(homes, day)).toBe(prefetched);
+    expect(residentTrips(homes, day - 1)).toBe(today);
+    expect(simulateResidents(homes, 360, day)).toEqual(simulateResidents([...places], 360, day));
+    // Days later, the prefetched plan never pushes out the one still in use.
+    for (let later = day + 1; later < day + 4; later++) {
+      const current = residentTrips(homes, later - 1);
+      prefetchTownDay(homes, 330, later);
+      idle.at(-1)!();
+      expect(residentTrips(homes, later - 1)).toBe(current);
+    }
+  });
 });

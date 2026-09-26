@@ -115,7 +115,8 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
     byDay = new Map();
     plans.set(places, byDay);
   }
-  if (byDay.size >= 3) byDay.clear();
+  // Drop the oldest day: tomorrow's plan, prefetched before 06:00, must not evict today's.
+  if (byDay.size >= 3) byDay.delete(byDay.keys().next().value!);
   byDay.set(day, result);
   return result;
 }
