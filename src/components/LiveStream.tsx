@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { renderCity, type Camera } from '../city/render';
 import { eventsForDay } from '../lib/events';
 import { footballAt, footballListening } from '../lib/football';
+import { steadyListening } from '../lib/map-view';
 import {
   easeLiveCamera,
   liveCamera,
@@ -133,16 +134,9 @@ export default function LiveStream() {
     }
     const field = footballListening(camera.current, size.width, size.height);
     const screen = cinemaListening(camera.current, size.width, size.height);
-    setCinemaField((old) =>
-      Math.abs(old.gain - screen.gain) < 0.002 && Math.abs(old.pan - screen.pan) < 0.002
-        ? old
-        : screen,
-    );
-    setListening((old) =>
-      Math.abs(old.gain - field.gain) < 0.002 && Math.abs(old.pan - field.pan) < 0.002
-        ? old
-        : field,
-    );
+    // The same steps the town's own view hears in, so both sound alike.
+    setCinemaField((old) => steadyListening(old, screen));
+    setListening((old) => steadyListening(old, field));
   }, [
     size,
     residents,

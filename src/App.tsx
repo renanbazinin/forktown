@@ -7,7 +7,6 @@ import { withPreview } from './lib/resident-trips';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
-import { isZooPlot, ZOO_VENUE } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
@@ -16,6 +15,7 @@ import {
   Code2,
   Compass,
   ExternalLink,
+  Info,
   Music2,
   Plus,
   Search,
@@ -39,6 +39,9 @@ import SignPreview from './components/SignPreview';
 import Contribute from './components/Contribute';
 import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
+import Toast from './components/Toast';
+import FullTownNote from './components/FullTownNote';
+import { NeighborRow, PlaceRow, PlotRow } from './components/BrowseRows';
 import BrandMark, { LanternDot } from './components/BrandMark';
 import WelcomeCard from './components/WelcomeCard';
 import TownEvents from './components/TownEvents';
@@ -48,7 +51,7 @@ import Soundtrack from './components/Soundtrack';
 import FootballMatch from './components/FootballMatch';
 import CalendarClock from './components/CalendarClock';
 import CinemaInfo from './components/CinemaInfo';
-import { CINEMA_VENUE, isCinemaPlot, cinemaAt } from './lib/cinema';
+import { cinemaAt } from './lib/cinema';
 import { footballAt, isFootballPlot, FOOTBALL_VENUE } from './lib/football';
 import { trackForTown } from './music/score';
 import {
@@ -66,6 +69,8 @@ import { localSaveAvailable } from './lib/local-save';
 import { useTownClock } from './lib/use-town-clock';
 import { useLanternTown } from './lib/use-lantern-town';
 import { FORK_PLOT } from './lib/lanterns';
+import { linkHash, MISSING_LINK_COPY, readDeepLink } from './lib/deep-link';
+import { OPEN_PLOTS_COPY } from './lib/open-plots';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
 import { useTownDayPrefetch } from './lib/idle-prefetch';
 
@@ -80,26 +85,12 @@ function initialWelcome() {
   } catch {
     // Blocked storage greets once per session.
   }
-  return shouldWelcome(window.location.hash, storage);
+  // A link to a house that isn't here greets a newcomer like a plain visit.
+  return shouldWelcome(initialSelection() ? window.location.hash : '', storage);
 }
 function initialSelection() {
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'fork') return FORK_PLOT;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'farm') return FARM.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'millpond')
-    return MILLPOND_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'tube')
-    return TUBE_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'zoo')
-    return ZOO_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'cinema')
-    return CINEMA_VENUE.plot;
-  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'football')
-    return FOOTBALL_VENUE.plot;
-  return (
-    places.find(
-      (place) => place.id === new URLSearchParams(window.location.hash.slice(1)).get('place'),
-    )?.plot ?? null
-  );
+  const link = readDeepLink(window.location.hash, places);
+  return link && 'plot' in link ? link.plot : null;
 }
 
 export default function App() {
@@ -107,6 +98,11 @@ export default function App() {
   const exploreButton = useRef<HTMLButtonElement>(null);
   const panelTitle = useRef<HTMLHeadingElement>(null);
   const [selectedPlot, setSelectedPlot] = useState<string | null>(initialSelection);
+  // The plot on show, for the address bar when a shared link turns out to point at nothing.
+  const shownPlot = useRef(selectedPlot);
+  useEffect(() => {
+    shownPlot.current = selectedPlot;
+  }, [selectedPlot]);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [panel, setPanel] = useState<Panel | null>(() => (initialSelection() ? 'places' : null));
   const [followed, setFollowed] = useState<string | null>(null);
@@ -117,7 +113,7 @@ export default function App() {
   const [sourceId, setSourceId] = useState<string>();
   const [buildPlot, setBuildPlot] = useState<string>();
   const [draft, setDraft] = useState<Place | null>(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ text: string; note?: boolean } | null>(null);
   const [shared, setShared] = useState(false);
   const [welcome, setWelcome] = useState(initialWelcome);
   const clock = useTownClock();
@@ -178,6 +174,8 @@ export default function App() {
   const filteredPlots = available.filter((plot) =>
     plot.id.toLowerCase().includes(search.toLowerCase()),
   );
+  // No house plot is free. An unsaved preview can still be saved: it holds its own plot.
+  const townFull = !available.length && !draft;
   const liveEvent = events.find((event) => isEventLive(event, clock.minutes));
 
   const select = useCallback((plotId: string | null, focus = false) => {
@@ -187,11 +185,10 @@ export default function App() {
     setSelectedEventId(null);
     setShared(false);
     if (plotId) setPanel('places');
-    const place = places.find((place) => place.plot === plotId);
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isMillpondPlot(plotId ?? '') ? '#venue=millpond' : isTubePlot(plotId ?? '') ? '#venue=tube' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
+      `${window.location.pathname}${window.location.search}${linkHash(plotId, places)}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -202,14 +199,26 @@ export default function App() {
     exploreButton.current?.focus();
   }, []);
   useEffect(() => {
-    const listener = () => {
-      const selection = initialSelection();
-      setSelectedPlot(selection);
-      if (selection) setPanel('places');
+    // A link opened in this tab moves the map there, like a fresh visit. A link to something the
+    // town doesn't have says so instead of doing nothing.
+    const openLink = (fresh: boolean) => {
+      const link = readDeepLink(window.location.hash, places);
+      if (link && 'missing' in link) {
+        setToast({ text: MISSING_LINK_COPY[link.missing], note: true });
+        // The map stays where it was, and so does the address: never a link to nothing.
+        window.history.replaceState(
+          null,
+          '',
+          `${window.location.pathname}${window.location.search}${linkHash(shownPlot.current, places)}`,
+        );
+      } else if (!fresh && link) select(link.plot, true);
+      else if (!fresh) setSelectedPlot(null);
     };
+    openLink(true);
+    const listener = () => openLink(false);
     window.addEventListener('hashchange', listener);
     return () => window.removeEventListener('hashchange', listener);
-  }, []);
+  }, [select]);
   useEffect(() => {
     if (panel) panelTitle.current?.focus();
   }, [panel, selectedPlot]);
@@ -226,7 +235,7 @@ export default function App() {
   }, [draft, places]);
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(''), 4000);
+    const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);
   }, [toast]);
   function startBuilding(plot?: string) {
@@ -234,19 +243,19 @@ export default function App() {
       setModal('guide');
       return;
     }
-    if (!available.length && !draft) {
-      setToast('All house plots are taken.');
+    if (townFull) {
+      setToast({ text: OPEN_PLOTS_COPY.full, note: true });
       return;
     }
     setBuildPlot(plot);
     setModal('contribute');
   }
-  function follow(id: string) {
+  const follow = useCallback((id: string) => {
     setFollowed(id);
     setPanel(null);
     setSelectedPlot(null);
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
-  }
+  }, []);
   async function share() {
     if (!selected) return;
     const url = new URL(window.location.href);
@@ -254,9 +263,9 @@ export default function App() {
     try {
       await navigator.clipboard.writeText(url.href);
       setShared(true);
-      setToast('Link copied.');
+      setToast({ text: 'Link copied.' });
     } catch {
-      setToast('Copy the browser address to share this home.');
+      setToast({ text: 'Copy the browser address to share this home.', note: true });
     }
   }
   const dismissWelcome = useCallback(() => {
@@ -601,18 +610,13 @@ export default function App() {
             ) : panel === 'neighbors' ? (
               <div className="resident-directory">
                 {residents.map((resident) => (
-                  <button
-                    className="resident-link"
+                  <NeighborRow
                     key={resident.id}
-                    onClick={() => follow(resident.id)}
-                  >
-                    <ResidentPreview resident={resident.resident} size={42} />
-                    <span>
-                      <strong>{resident.resident.name}</strong>
-                      <small>{residentActivityLabel(resident)}</small>
-                    </span>
-                    <ArrowRight size={14} />
-                  </button>
+                    id={resident.id}
+                    resident={resident.resident}
+                    activity={residentActivityLabel(resident)}
+                    onFollow={follow}
+                  />
                 ))}
               </div>
             ) : (
@@ -659,41 +663,18 @@ export default function App() {
                 <div className="browse-list">
                   {filter === 'places'
                     ? filteredPlaces.map((place) => (
-                        <button
-                          className="browse-row"
-                          key={place.id}
-                          onClick={() => select(place.plot, true)}
-                        >
-                          <BuildingPreview place={place} size={48} />
-                          <span>
-                            <strong>{place.name}</strong>
-                            <small>
-                              {place.plot} ·{' '}
-                              {isFoundingPlace(place) ? place.resident.name : `@${place.creator}`}
-                            </small>
-                          </span>
-                          <ArrowRight size={14} />
-                        </button>
+                        <PlaceRow key={place.id} place={place} onSelect={select} />
                       ))
                     : filteredPlots.map((plot) => (
-                        <button
-                          className="browse-row"
-                          key={plot.id}
-                          onClick={() => select(plot.id, true)}
-                        >
-                          <span className="plot-symbol">
-                            <Plus size={19} />
-                          </span>
-                          <span>
-                            <strong>Plot {plot.id}</strong>
-                            <small>{PLOT_COPY.row}</small>
-                          </span>
-                          <ArrowRight size={14} />
-                        </button>
+                        <PlotRow key={plot.id} plot={plot.id} onSelect={select} />
                       ))}
                 </div>
-                {(filter === 'places' ? filteredPlaces.length : filteredPlots.length) === 0 && (
-                  <p className="empty-search">No matches. Try another name.</p>
+                {filter === 'empty' && !available.length ? (
+                  <FullTownNote repositoryUrl={repositoryUrl} />
+                ) : (
+                  (filter === 'places' ? filteredPlaces.length : filteredPlots.length) === 0 && (
+                    <p className="empty-search">{OPEN_PLOTS_COPY.noMatch}</p>
+                  )
                 )}
                 <label className="map-label-setting">
                   <input
@@ -709,15 +690,6 @@ export default function App() {
         </section>
       )}
 
-      {toast && (
-        <div className="toast" role="status">
-          <Check size={15} />
-          {toast}
-          <button aria-label="Dismiss notification" onClick={() => setToast('')}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
       {modal === 'contribute' && localSaveAvailable && (
         <Contribute plot={buildPlot} places={places} onClose={closeBuilder} onPreview={preview} />
       )}
@@ -745,8 +717,14 @@ export default function App() {
                 </li>
               ))}
             </ol>
+            {townFull && <FullTownNote id="full-town-note" repositoryUrl={repositoryUrl} />}
             {localSaveAvailable ? (
-              <button className="button button-primary" onClick={() => startBuilding()}>
+              <button
+                className="button button-primary"
+                disabled={townFull}
+                aria-describedby={townFull ? 'full-town-note' : undefined}
+                onClick={() => startBuilding()}
+              >
                 Build a place <ArrowRight size={16} />
               </button>
             ) : repositoryUrl ? (
@@ -784,6 +762,14 @@ export default function App() {
             </div>
           </div>
         </Modal>
+      )}
+      {toast && (
+        <Toast
+          icon={toast.note ? <Info size={15} /> : <Check size={15} />}
+          onDismiss={() => setToast(null)}
+        >
+          {toast.text}
+        </Toast>
       )}
     </main>
   );

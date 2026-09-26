@@ -1,5 +1,6 @@
 import { cinemaAt, CINEMA_FILMS, CINEMA_PLOTS, type CinemaFilm } from '../lib/cinema';
 import { timeLabel } from '../lib/simulation';
+import { reelMissing } from '../city/cinema-films';
 
 const COUNT = ['No films', 'One film', 'Two films', 'Three films'];
 const running = (seconds: number) =>
@@ -34,6 +35,11 @@ export default function CinemaInfo({ minutes, day }: { minutes: number; day: num
                   ? 'A little cinema break'
                   : `${COUNT[program.films.length]}. One lovely night.`)}
         </h3>
+        {reelMissing() && (
+          <p className="reel-missing" role="status">
+            Tonight’s films didn’t reach this tab. Refresh the page to watch them.
+          </p>
+        )}
         <p>
           A seat on the lawn, a warm light, and original stories from one to three minutes long. The
           program starts at {timeLabel(program.start)} and ends at {timeLabel(program.end)}.

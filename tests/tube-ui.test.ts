@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import TubeInfo from '../src/components/TubeInfo';
+import { linkHash, readDeepLink } from '../src/lib/deep-link';
 import { places } from '../src/lib/places';
 import {
   onTheLine,
@@ -25,6 +26,7 @@ import {
   TUBE_SIGN,
   TUBE_SPEED,
   TUBE_STATIONS,
+  TUBE_VENUE,
   tubeLength,
   tubeParcelMinutes,
 } from '../src/lib/tubes';
@@ -358,8 +360,11 @@ describe('Treeline panel', () => {
 
   it('is wired into the app, the map and the live view', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
-    expect(app).toContain("get('venue') === 'tube'");
-    expect(app).toContain("'#venue=tube'");
+    expect(readDeepLink('#venue=tube', [])).toEqual({ plot: TUBE_VENUE.plot });
+    expect(linkHash(TUBE_VENUE.plot, [])).toBe('#venue=tube');
+    // The app reads and writes the address through those two.
+    expect(app).toContain('readDeepLink(window.location.hash, places)');
+    expect(app).toContain('linkHash(plotId, places)');
     // The heading names the line, never "Plot C1".
     expect(app).toContain('selectedTube ? TUBE_VENUE.name');
     expect(app.indexOf('selectedTube ? TUBE_VENUE.name')).toBeLessThan(

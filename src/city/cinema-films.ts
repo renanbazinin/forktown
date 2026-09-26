@@ -31,27 +31,75 @@ function nightSky(ctx: Ctx, seconds: number) {
       1 + Math.round((Math.sin(seconds * 0.4 + i) + 1) / 2),
     );
 }
+type ReelModule = typeof import('../films');
 let reel: Record<FilmArtwork, FilmModule> | undefined;
 let ads: Record<AdArtwork, AdModule> | undefined;
 let reeling: Promise<Record<FilmArtwork, FilmModule>> | undefined;
+/** After a failed load: when it failed, how many tries so far, and where a retry can ask. */
+let trouble: { since: number; tries: number; retry?: string } | undefined;
+/** How long a failed reel waits before it asks again (real milliseconds). */
+export const REEL_RETRY_MS = 30_000;
+
+/**
+ * Browsers remember a failed module fetch for its address, so asking again for the same chunk
+ * fails straight away. A retry can only work under a fresh address: the chunk's own, as the
+ * browser names it in the error, with a query. Only a same-origin script address qualifies.
+ */
+export function reelRetryAddress(error: unknown, origin: string | undefined, tries: number) {
+  const named = /https?:\/\/[^\s'"<>]+?\.(?:js|ts)(?=$|[\s'"<>?#])/.exec(
+    error instanceof Error ? error.message : String(error),
+  )?.[0];
+  if (!named || !origin) return undefined;
+  const url = new URL(named);
+  if (url.origin !== origin) return undefined;
+  url.searchParams.set('retry', String(tries));
+  return url.href;
+}
+
+const openReel = (address?: string): Promise<ReelModule> =>
+  address ? import(/* @vite-ignore */ address) : import('../films');
+
 /**
  * The film library's pictures (and the ads') are their own chunk, fetched as the screen starts
  * to rise (or when a reel film is first asked for), so a daytime visit never downloads them.
+ * If the chunk fails (offline for a moment, or a new deploy renamed it under an open tab), the
+ * screen asks for a refresh, and a fresh try goes out every REEL_RETRY_MS where one can work.
  */
-export function loadReel() {
-  reeling ??= import('../films').then((module) => {
-    ads = module.ADS;
-    return (reel = module.REEL);
-  });
+export function loadReel(open = openReel) {
+  if (reeling && !(trouble?.retry && Date.now() - trouble.since >= REEL_RETRY_MS)) return reeling;
+  const tries = trouble?.tries ?? 0;
+  reeling = open(trouble?.retry).then(
+    (module) => {
+      ads = module.ADS;
+      trouble = undefined;
+      return (reel = module.REEL);
+    },
+    (error: unknown) => {
+      const retry = reelRetryAddress(error, globalThis.location?.origin, tries + 1);
+      trouble = { since: Date.now(), tries: tries + 1, retry: retry ?? trouble?.retry };
+      throw error;
+    },
+  );
+  // Every frame asks for the reel. The screen shows the trouble; the promise needn't shout it.
+  reeling.catch(() => {});
   return reeling;
 }
+
+/** True while the reel has failed to arrive, so the screen and the cinema panel can say so. */
+export const reelMissing = () => trouble !== undefined;
 
 /** Shown for the moment it takes the reel to arrive, if someone sits down mid-film. */
 function threading(ctx: Ctx, film: CinemaFilm, seconds: number) {
   nightSky(ctx, seconds);
   words(ctx, 'forktown.', 86, 21);
   words(ctx, film.title.toUpperCase(), 112, 9, '#DBBF89');
-  words(ctx, 'THREADING THE PROJECTOR...', 130, 7, '#ADBFBA');
+  words(
+    ctx,
+    reelMissing() ? 'REFRESH FOR TONIGHT’S FILMS' : 'THREADING THE PROJECTOR...',
+    130,
+    7,
+    '#ADBFBA',
+  );
 }
 
 /** Every film draws itself at any point in its own timeline, from its reel module. */

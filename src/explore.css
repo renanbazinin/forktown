@@ -320,6 +320,37 @@ body,
   font-size: 13px;
   color: var(--muted);
 }
+/* Said where a new house would start, once every house plot has one. */
+.full-town-note {
+  margin: 0 0 20px;
+  padding: 13px 16px;
+  border-radius: 9px;
+  background: var(--lantern-pale);
+  color: var(--lantern-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.full-town-note a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.full-town-note code {
+  font: 12px var(--mono);
+}
+.town-panel .full-town-note {
+  margin: 16px 20px;
+}
+.welcome-guide .button-primary:disabled {
+  opacity: 0.55;
+  transform: none;
+}
+.welcome-guide .button-primary:disabled:hover {
+  background: var(--green);
+}
 .resident-directory {
   padding: 8px;
 }
@@ -441,6 +472,13 @@ body,
   font-size: 14px;
   line-height: 1.7;
   margin-bottom: 15px;
+}
+.venue-program .reel-missing {
+  padding: 10px 13px;
+  border-radius: 8px;
+  background: var(--lantern-pale);
+  color: var(--lantern-ink);
+  font-size: 13px;
 }
 .town-panel .town-events {
   display: flex;
@@ -565,6 +603,29 @@ body,
 }
 .town-app .toast {
   bottom: 90px;
+}
+/* Inside an open dialog, at its foot. A dialog as tall as the screen has no room below it, so
+   there the note covers its last lines for the few seconds it shows. */
+.town-app .modal .toast {
+  bottom: 24px;
+}
+/* While a newcomer's welcome card shows (28 px from the left, 340 px wide), a note keeps to its
+   right, and on a phone, where the card fills the foot of the screen, under the clock. */
+.town-app:has(> .welcome-card) > .toast {
+  left: calc((368px + 100vw) / 2);
+  width: max-content;
+  min-width: 0;
+  max-width: calc(100vw - 392px);
+}
+@media (max-width: 600px) {
+  .town-app:has(> .welcome-card) > .toast {
+    top: 128px;
+    bottom: auto;
+    left: 50%;
+    width: auto;
+    min-width: 280px;
+    max-width: calc(100vw - 32px);
+  }
 }
 @media (max-width: 600px) {
   .map-header {
