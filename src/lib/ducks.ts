@@ -6,7 +6,12 @@ export const DUCK_COUNT = 6;
 // The street in front of the Lunch Green runs from the first homes to the river.
 export const DUCK_STREET_Y = getPlot('C5')!.y + 2.5;
 export const DUCK_RIVER_X = WORLD_WIDTH - 1.5;
-export const DUCK_TURN_X = 1.8;
+/** Tiles of street the family walks each way: the whole street of the ten-column town. */
+export const DUCK_WALK_LENGTH = 40.7;
+/** Where the family turns back: at the first homes today, and after the same walk in a wider
+ *  town, so their fixed walk time never turns into a faster pace. */
+export const duckTurnX = (worldWidth: number) => Math.max(1.8, worldWidth - 1.5 - DUCK_WALK_LENGTH);
+export const DUCK_TURN_X = duckTurnX(WORLD_WIDTH);
 const TURN_RADIUS = 0.2;
 const FOLLOW_DELAY = 2;
 export const DUCK_DAWDLE_START = DUCK_WALK_START + (DUCK_COUNT - 1) * FOLLOW_DELAY + 95;
