@@ -59,3 +59,16 @@ export function pinchView(
     zoom,
   };
 }
+
+export type Listening = { gain: number; pan: number };
+
+/**
+ * Keeps the last reading while the change is too small to hear (the players glide to each new
+ * level anyway), so a camera following a walker does not re-render the whole app on every frame.
+ * While it is silent the pan does not matter, and falling silent always gets through.
+ */
+export function steadyListening(old: Listening, next: Listening): Listening {
+  if (old.gain === 0 && next.gain === 0) return old;
+  if (old.gain === 0 || next.gain === 0) return next;
+  return Math.abs(old.gain - next.gain) < 0.01 && Math.abs(old.pan - next.pan) < 0.02 ? old : next;
+}

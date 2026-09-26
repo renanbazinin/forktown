@@ -18,6 +18,7 @@ import {
   clampZoom,
   pinchView,
   resizeView,
+  steadyListening,
   zoomAround,
   type Point,
   type Size,
@@ -120,9 +121,20 @@ const City = forwardRef<CityHandle, Props>(function City(
       }
     : camera;
   cameraRef.current = renderedCamera;
+  // What the camera hears. Changes too small to hear are held back, so following a neighbor
+  // doesn't re-render the whole app a second time on every frame.
+  const heard = useRef({ football: { gain: 0, pan: 0 }, cinema: { gain: 0, pan: 0 } });
   useEffect(() => {
-    onListening(footballListening(renderedCamera, size.width, size.height));
-    onCinemaListening(cinemaListening(renderedCamera, size.width, size.height));
+    const football = steadyListening(
+      heard.current.football,
+      footballListening(renderedCamera, size.width, size.height),
+    );
+    const cinema = steadyListening(
+      heard.current.cinema,
+      cinemaListening(renderedCamera, size.width, size.height),
+    );
+    if (football !== heard.current.football) onListening((heard.current.football = football));
+    if (cinema !== heard.current.cinema) onCinemaListening((heard.current.cinema = cinema));
   }, [
     renderedCamera.x,
     renderedCamera.y,

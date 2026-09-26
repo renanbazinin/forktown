@@ -3,6 +3,7 @@ import {
   clampZoom,
   pinchView,
   resizeView,
+  steadyListening,
   zoomAround,
   zoomRange,
   type Point,
@@ -119,5 +120,29 @@ describe('Two fingers pinch the map', () => {
     ] as const;
     const after = pinchView(start, same, same, fit);
     expect(Number.isFinite(after.x) && Number.isFinite(after.y)).toBe(true);
+  });
+});
+
+describe('What the camera hears', () => {
+  it('holds back changes too small to hear', () => {
+    const old = { gain: 0.4, pan: 0.2 };
+    expect(steadyListening(old, { gain: 0.405, pan: 0.21 })).toBe(old);
+    const louder = { gain: 0.42, pan: 0.2 };
+    expect(steadyListening(old, louder)).toBe(louder);
+    const across = { gain: 0.4, pan: 0.25 };
+    expect(steadyListening(old, across)).toBe(across);
+  });
+
+  it('always lets the sound fall silent, however quiet it was', () => {
+    const faint = { gain: 0.004, pan: 0.1 };
+    const silent = { gain: 0, pan: 0.1 };
+    expect(steadyListening(faint, silent)).toBe(silent);
+  });
+
+  it('ignores the pan while it is silent, so a followed walk far away re-renders nothing', () => {
+    const silent = { gain: 0, pan: -0.4 };
+    expect(steadyListening(silent, { gain: 0, pan: 0.9 })).toBe(silent);
+    const heard = { gain: 0.05, pan: 0.9 };
+    expect(steadyListening(silent, heard)).toBe(heard);
   });
 });
