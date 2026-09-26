@@ -21,7 +21,7 @@ import { drawFireflies, drawSeasonLight, drawSnowfall } from './weather';
 import { groundTuft, riverGlint } from './season-ground';
 import { SNOW, pick } from './season-palette';
 import { seedFraction, snowAt, townSeasonAt } from '../lib/seasons';
-import { paintGroundLayer } from './ground-cache';
+import { paintGroundLayer, type GroundArea } from './ground-cache';
 import {
   drawFootball,
   footballFurnitureHit,
@@ -314,22 +314,48 @@ export function renderCity({
     top: -camera.y / camera.zoom,
     bottom: (height - camera.y) / camera.zoom,
   };
-  const visible = (point: Point, rx: number, above: number, below: number) =>
-    point.x + rx >= view.left &&
-    point.x - rx <= view.right &&
-    point.y + below >= view.top &&
-    point.y - above <= view.bottom;
+  const within = (area: GroundArea) => (point: Point, rx: number, above: number, below: number) =>
+    point.x + rx >= area.left &&
+    point.x - rx <= area.right &&
+    point.y + below >= area.top &&
+    point.y - above <= area.bottom;
+  const visible = within(view);
   const groundKey = [
     night,
     showPlots,
-    selectedPlot,
-    hoveredPlot,
     width,
     height,
     [...byPlot.keys()].sort().join(','),
     // Seasonal ground art reads the whole day of the year, so the layer repaints once a town day.
     season.groundDay,
   ].join(':');
+  // The hover and selection marks stay out of the key: moving the pointer to another plot
+  // repaints just the plots it leaves and reaches. A station lights the whole Treeline, so it
+  // repaints the layer; the venues with their own art mark themselves outside it.
+  const mark = (id: string | null) => {
+    const plot = getPlot(id ?? '');
+    if (
+      !plot ||
+      isFootballPlot(plot.id) ||
+      isCinemaPlot(plot.id) ||
+      isZooPlot(plot.id) ||
+      isFarmPlot(plot.id) ||
+      isMillpondPlot(plot.id)
+    )
+      return '';
+    return isTubePlot(plot.id) ? 'tube' : plot.id;
+  };
+  const marks = {
+    key: `${mark(selectedPlot)} ${mark(hoveredPlot)}`,
+    areas: (key: string) => {
+      const ids = key.split(' ').filter(Boolean);
+      if (ids.includes('tube')) return null;
+      return ids.map((id) => {
+        const pt = plotCenter(getPlot(id)!);
+        return { left: pt.x - 112, right: pt.x + 112, top: pt.y - 58, bottom: pt.y + 58 };
+      });
+    },
+  };
   // The Treeline: both station plots light up together, and its parcels are read at most once a
   // frame, only if some of the line is in view.
   const emphasis = isTubePlot(selectedPlot ?? '')
@@ -350,7 +376,9 @@ export function renderCity({
     followed,
     parcels: () => (parcels ??= tubeParcelsAt(places, minutes, day)),
   } as const;
-  paintGroundLayer(ctx, groundKey, (ctx) => {
+  const paintGround = (ctx: Ctx, area?: GroundArea) => {
+    // A partial repaint culls tiles and plots to its own area; the canvas clips the rest.
+    const near = area ? within(area) : visible;
     drawFarFields(ctx, night, season);
     const terrainPoint = (x: number, y: number) => project(x, y);
     const b = terrainPoint(WORLD_WIDTH, 0),
@@ -387,7 +415,7 @@ export function renderCity({
       p.grass,
     );
     for (const { x, y, point: pt, seed, road } of terrain) {
-      if (!visible(pt, 60, 24, 24)) continue;
+      if (!near(pt, 60, 24, 24)) continue;
       if (insideMillpond({ x, y })) continue;
       if (seed % 4 === 0) diamond(ctx, pt.x, pt.y, 38, 19, p.grassAlt);
       if (x === WORLD_WIDTH - 2 || (x === WORLD_WIDTH - 1 && y < 8)) {
@@ -421,7 +449,7 @@ export function renderCity({
       )
         continue;
       const pt = plotCenter(plot);
-      if (!visible(pt, 110, 60, 60)) continue;
+      if (!near(pt, 110, 60, 60)) continue;
       const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
       // A tube station keeps its meadow and loses only the stake, label and outline.
       const tubePlot = isTubePlot(plot.id);
@@ -465,7 +493,8 @@ export function renderCity({
     drawFarmGround(ctx, night, season);
     drawMillpondGround(ctx, night, season, p.water, p.waterLight);
     drawTubeGround(ctx, tube);
-  });
+  };
+  paintGroundLayer(ctx, groundKey, paintGround, marks);
   // Riders in the glass behind the tree line: every edge tree stands in front of them.
   drawTubeTraffic(ctx, tube);
   const objects = drawFootball(
