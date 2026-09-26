@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { drawHouse, houseBounds, type HouseLife } from '../src/city/houses';
+import { drawHouse, houseBounds, houseLook, type HouseLife } from '../src/city/houses';
 import {
   housePainter,
   houseSpriteStats,
@@ -19,7 +19,7 @@ import {
   townSeasonAt,
   type TownSeason,
 } from '../src/lib/seasons';
-import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
+import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../src/lib/town-calendar';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
 import { everyShape, places } from './house-variety';
@@ -86,6 +86,31 @@ function frame({ ctx, calls }: Map, homes: Home[], life: Partial<HouseLife> = {}
   };
 }
 afterEach(() => vi.unstubAllGlobals());
+
+/** Every call, property and gradient stop of one still picture of a home, as text. */
+function picture(place: Place, night: boolean, life: HouseLife) {
+  const { ctx } = recordingContext();
+  const trace: unknown[] = [];
+  const traced = new Proxy(ctx, {
+    get(target, key) {
+      const value = Reflect.get(target, key);
+      if (typeof value !== 'function') return value;
+      return (...args: unknown[]) => {
+        trace.push(key, args);
+        const result = value(...args);
+        return typeof key === 'string' && key.endsWith('Gradient')
+          ? { addColorStop: (...stop: unknown[]) => trace.push('stop', stop) }
+          : result;
+      };
+    },
+    set(target, key, value) {
+      trace.push('set', key, typeof value === 'object' ? 'gradient' : value);
+      return Reflect.set(target, key, value);
+    },
+  });
+  drawHouse(traced, place, 0, 0, night, 1, life, false);
+  return JSON.stringify(trace);
+}
 
 describe('House sprites', () => {
   it('copies each home from its sprite once painted, instead of drawing it again', () => {
@@ -156,6 +181,71 @@ describe('House sprites', () => {
     const repainted = { ...garden, color: '#AA3344' };
     expect(frame(view, [{ ...homes[0], place: repainted }], winter).painted).toBe(1);
     expect(houseSpriteStats(view.ctx).sprites).toBe(2);
+  });
+
+  it('paints a new sprite when only the line joins or caps change', () => {
+    browser();
+    const view = map();
+    const homes = row([cottage]);
+    frame(view, homes);
+    expect(frame(view, homes).painted).toBe(1);
+    view.ctx.lineJoin = 'round';
+    expect(frame(view, homes)).toMatchObject({ painted: 1, direct: 0 });
+    expect(frame(view, homes)).toMatchObject({ painted: 0, direct: 0 });
+    view.ctx.lineCap = 'square';
+    expect(frame(view, homes)).toMatchObject({ painted: 1, direct: 0 });
+    expect(frame(view, homes)).toMatchObject({ painted: 0, direct: 0 });
+  });
+
+  // Everything that changes a home's still picture must be in its look, or a sprite would keep a
+  // stale roof, bed or lantern: two moments with the same look draw exactly the same, every call,
+  // colour and gradient stop, smoke aside. Each home and moment gets one of the night, lantern
+  // and activity combinations in turn, so every combination comes round in several seasons.
+  it('draws the same picture for the same look, all year', () => {
+    const homes = [...places.slice(0, 18), ...everyShape.filter((_, i) => i % 9 === 0)];
+    const lanterns = [
+      undefined,
+      { lit: false },
+      { lit: true },
+      { lit: true, tale: true },
+      { lit: false, newest: true },
+    ];
+    const activities = [undefined, 'home', 'stroll'] as const;
+    const combos = [false, true].flatMap((night) =>
+      lanterns.flatMap((lantern) => activities.map((activity) => ({ night, lantern, activity }))),
+    );
+    // Every noon, and every six hours through the pumpkins, the first snow and the thaw.
+    const moments: [number, number][] = [];
+    for (let day = 0; day < DAYS_PER_YEAR; day++) {
+      moments.push([day, 720]);
+      const busy =
+        (day >= AUTUMN && day < AUTUMN + 20) ||
+        (day >= WINTER && day < WINTER + 3) ||
+        day >= WINTER + 22;
+      if (busy) for (const minutes of [0, 360, 1080]) moments.push([day, minutes]);
+    }
+    const pictures = new Map<string, { picture: string; at: string }>();
+    const clashes: string[] = [];
+    let compared = 0;
+    homes.forEach((place, h) =>
+      moments.forEach(([day, minutes], m) => {
+        const { night, lantern, activity } = combos[(h * 7 + m) % combos.length];
+        const life: HouseLife = { minutes, lantern, activity, season: seasonOn(day, minutes) };
+        const look = houseLook(place, night, life);
+        if (look === undefined) return;
+        const key = `${h}:${look}`,
+          drawn = picture(place, night, life),
+          at = `day ${day} ${minutes} ${JSON.stringify({ night, lantern, activity })}`;
+        const before = pictures.get(key);
+        if (!before) return void pictures.set(key, { picture: drawn, at });
+        compared++;
+        if (before.picture !== drawn)
+          clashes.push(`${place.id} look ${look}: ${before.at} vs ${at}`);
+      }),
+    );
+    expect(clashes.slice(0, 5)).toEqual([]);
+    // Most moments meet an earlier one with the same look, so a missing bit would show.
+    expect(compared).toBeGreaterThan(pictures.size * 3);
   });
 
   it('draws a roof directly while its snow settles or thaws, as it fades every frame', () => {
