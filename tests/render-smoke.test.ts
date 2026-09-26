@@ -94,14 +94,27 @@ describe('Rendering a full town in node', () => {
     },
   );
 
-  it('fits a town of the heaviest house on every plot, so no house can outgrow the budget', () => {
+  it('fits a town of the heaviest house at every size, so no house can outgrow the budget', () => {
     const heavy = HOUSE_PLOTS.map((plot) => heaviest(plot.id));
-    for (const { day, minutes } of [
-      ...MOMENTS.map((minutes) => ({ day: 3, minutes })),
-      ...DEEP_WINTER,
-    ])
-      expect(openingView(heavy, minutes, day), `${day} ${minutes}`).toBeLessThan(
-        openingViewBudget(heavy.length),
-      );
-  });
+    for (const size of [10, 30, 60, 90, heavy.length])
+      for (const { day, minutes } of [
+        ...MOMENTS.map((minutes) => ({ day: 3, minutes })),
+        ...DEEP_WINTER,
+      ])
+        expect(
+          openingView(heavy.slice(0, size), minutes, day),
+          `${size} ${day} ${minutes}`,
+        ).toBeLessThan(openingViewBudget(size));
+  }, 30_000);
+
+  it('fails a frame that doubled its calls, even with most houses out of view', () => {
+    // The plots run north to south, so the reversed town fills the far side first.
+    for (const order of [town, [...town].reverse()])
+      for (const size of [0, 18, 60, 90, town.length])
+        for (const minutes of MOMENTS)
+          expect(
+            2 * openingView(order.slice(0, size), minutes),
+            `${size} ${minutes}`,
+          ).toBeGreaterThan(openingViewBudget(size));
+  }, 30_000);
 });

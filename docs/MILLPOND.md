@@ -78,7 +78,7 @@ Measured with the recording context in the opening view at 1440 × 900 (camera 7
 - Against the same date and minute in summer, the pond swings by −210 to +66 calls (budget −450 to +350). At night, counting the reed fireflies too, it never falls below −139 (budget −550).
 - The largest parts are the mill, wheel and sign at 198 (106, 60 and 32; the sign's lettering is painted once), the reeds at 154 and the boats with their rowers at 145. The scenery skaters take 79, the fisher 43, the heron 41, the jetty posts 12 and a leaping fish 7. Every part has its own cap in the tests.
 - The ground lives in the ground cache and reads only `night` and the season's whole day, so it repaints at most once per town day, like the farm. The terrain loop, the trees and the plot art skip the site.
-- A whole opening-view frame stays between about 31,000 and 33,500 calls at the season tests' moments (31,497–33,461 with the Treeline), well inside the budget of `tests/render-budget.ts`, 43,200 calls with today's 18 houses. Against the same date and minute in summer, the whole frame differs by −754 to +287 calls.
+- A whole opening-view frame stays between about 31,000 and 33,500 calls at the season tests' moments (31,497–33,461 with the Treeline), well inside the budget of `tests/render-budget.ts`, 41,400 calls with today's 18 houses. Against the same date and minute in summer, the whole frame differs by −754 to +287 calls.
 
 ## Code and verification
 
