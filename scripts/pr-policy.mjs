@@ -156,3 +156,133 @@ export async function headModes(api, root, head) {
     throw new Error('GitHub returned an incomplete file tree. Please retry.');
   return new Map(tree.tree.map((entry) => [entry.path, entry.mode]));
 }
+
+async function evaluatePullRequest({ api, root, repo, pr, modes, permissionFor }) {
+  const files = await paginate(api, `${root}/pulls/${pr.number}/files`, pr.changed_files);
+  if (new Set(files.map((file) => file.filename)).size !== files.length)
+    throw new Error('Duplicate changed-file results; please retry.');
+  const reviews = await paginate(api, `${root}/pulls/${pr.number}/reviews`);
+  const decode = (blob) => {
+    if (blob.encoding !== 'base64' || blob.size > 16384 || !blob.content)
+      throw new Error('House JSON must be a readable file under 16 KB.');
+    return JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
+  };
+  return evaluatePolicy({
+    files,
+    author: pr.user.login,
+    authorPermission: await permissionFor(pr.user.login),
+    repositoryOwner: repo.split('/')[0],
+    approved: await approvedByMaintainer(reviews, pr.head.sha, pr.user.login, permissionFor),
+    readHead: async (file) => {
+      if (!/^[a-f0-9]{40,64}$/.test(file.sha)) throw new Error('Invalid file SHA.');
+      return decode(await api(`${root}/git/blobs/${file.sha}`));
+    },
+    readBase: async (path) =>
+      decode(
+        await api(
+          `${root}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${pr.base.sha}`,
+        ),
+      ),
+    modeOf: (path) => modes.get(path),
+  });
+}
+
+// The status lives on the head commit, which any number of PRs can share. Check every open PR
+// into the default branch that points at this commit and pass only when all of them pass, so a
+// second PR can neither borrow nor flip the first one's result. PRs into other branches are
+// not merge-gated and are skipped.
+export async function runContributionPolicy({ api, repo, number, sha, runUrl, log = console }) {
+  const root = `/repos/${repo}`;
+  const trigger = number ? await api(`${root}/pulls/${number}`) : undefined;
+  if (trigger && trigger.state !== 'open') {
+    log.log('PR is closed; no status changed.');
+    return 'skipped';
+  }
+  const head = trigger ? trigger.head.sha : sha;
+  if (!/^[a-f0-9]{40,64}$/.test(head ?? '')) throw new Error('Missing PR revision.');
+  const defaultBranch = (await api(root)).default_branch;
+  const numbers = new Set();
+  for (const item of [
+    ...(trigger ? [trigger] : []),
+    ...(await paginate(api, `${root}/commits/${head}/pulls`)),
+  ])
+    if (
+      item.state === 'open' &&
+      item.head?.sha === head &&
+      item.base?.repo?.full_name === repo &&
+      item.base.ref === defaultBranch
+    )
+      numbers.add(item.number);
+  if (!numbers.size) {
+    log.log(`No open PR into ${defaultBranch} uses this commit; no status changed.`);
+    return 'skipped';
+  }
+  if (numbers.size > 10)
+    throw new Error('Too many open PRs share this commit. Close the duplicates and retry.');
+  const status = (state, description) =>
+    api(`${root}/statuses/${head}`, {
+      state,
+      context: 'Contribution policy',
+      description,
+      target_url: runUrl,
+    });
+  await status('pending', 'Checking house allowance, credit and ownership');
+  try {
+    const permissions = new Map();
+    const permissionFor = async (login) => {
+      const key = login.toLowerCase();
+      if (!permissions.has(key)) {
+        try {
+          permissions.set(
+            key,
+            (await api(`${root}/collaborators/${encodeURIComponent(login)}/permission`)).permission,
+          );
+        } catch (error) {
+          if (error.status !== 404) throw error;
+          permissions.set(key, 'none');
+        }
+      }
+      return permissions.get(key);
+    };
+    const prs = [];
+    for (const n of [...numbers].sort((a, b) => a - b)) {
+      const pr = n === trigger?.number ? trigger : await api(`${root}/pulls/${n}`);
+      if (pr.state === 'open' && pr.head.sha === head && pr.base.ref === defaultBranch)
+        prs.push(pr);
+    }
+    const modes = await headModes(api, root, head);
+    const results = [];
+    for (const pr of prs)
+      results.push({
+        pr,
+        ...(await evaluatePullRequest({ api, root, repo, pr, modes, permissionFor })),
+      });
+    for (const { pr } of results) {
+      const latest = await api(`${root}/pulls/${pr.number}`);
+      if (latest.head.sha !== head || latest.base.sha !== pr.base.sha || latest.state !== 'open')
+        throw new Error(
+          'PR changed during inspection. Run the check again for the current revision.',
+        );
+    }
+    const errors = [];
+    for (const { pr, reviewReasons, errors: found } of results) {
+      const prefix = results.length > 1 ? `PR #${pr.number}: ` : '';
+      for (const reason of reviewReasons) log.log(`${prefix}Review: ${reason}`);
+      errors.push(...found.map((error) => prefix + error));
+    }
+    if (results.length > 1 && errors.length)
+      errors.push(
+        'Open PRs that share one commit must all pass. A maintainer can close the duplicate and rerun.',
+      );
+    if (!results.length) throw new Error('The PR changed before it could be checked.');
+    if (errors.length) throw new Error(errors.join('\n'));
+    const added = Math.max(...results.map((result) => result.added));
+    await status('success', `${added} new house; credit and ownership checks passed`);
+    log.log('Contribution policy passed.');
+    return 'success';
+  } catch (error) {
+    await status('failure', 'Contribution policy needs attention; see workflow log');
+    log.error(error instanceof Error ? error.message : String(error));
+    return 'failure';
+  }
+}

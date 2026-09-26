@@ -4,6 +4,7 @@ import {
   paginate,
   approvedByMaintainer,
   headModes,
+  runContributionPolicy,
 } from '../scripts/pr-policy.mjs';
 
 const house = (filename = 'places/mine.json', status = 'added', extra = {}) => ({
@@ -329,5 +330,100 @@ describe('The PR head commit, read like the checkout will read it', () => {
   it('fails closed on a truncated or missing tree', async () => {
     for (const reply of [{ truncated: true, tree: [] }, { tree: [] }, {}])
       await expect(headModes(async () => reply, '/repos/o/r', 'abc')).rejects.toThrow('incomplete');
+  });
+});
+
+const HEAD = 'a'.repeat(40);
+const BASE = 'b'.repeat(40);
+const BLOB = 'c'.repeat(40);
+const pull = (number, login, ref = 'main') => ({
+  number,
+  state: 'open',
+  user: { login },
+  changed_files: 1,
+  head: { sha: HEAD },
+  base: { ref, sha: BASE, repo: { full_name: 'o/r' } },
+});
+// A small stand-in for the GitHub REST API: enough routes for one policy run.
+function fakeGitHub({ pulls, mode = '100644', creator = 'alice', permissions = {} }) {
+  const statuses = [];
+  const reads = [];
+  const blob = (value) => ({
+    encoding: 'base64',
+    size: 64,
+    content: Buffer.from(JSON.stringify(value)).toString('base64'),
+  });
+  const api = async (path, body) => {
+    if (body) {
+      statuses.push({ path, ...body });
+      return {};
+    }
+    reads.push(path);
+    const route = path.split('?')[0].replace('/repos/o/r', '');
+    const page = Number(new URLSearchParams(path.split('?')[1]).get('page') ?? '1');
+    const list = (items) => (page === 1 ? items : []);
+    let match;
+    if (route === '') return { default_branch: 'main' };
+    if ((match = route.match(/^\/pulls\/(\d+)$/)))
+      return pulls.find((pr) => pr.number === Number(match[1]));
+    if (route === `/commits/${HEAD}/pulls`) return list(pulls);
+    if (/^\/pulls\/\d+\/files$/.test(route))
+      return list([{ filename: 'places/alice.json', status: 'added', sha: BLOB }]);
+    if (/^\/pulls\/\d+\/reviews$/.test(route)) return list([]);
+    if ((match = route.match(/^\/collaborators\/([^/]+)\/permission$/))) {
+      if (permissions[match[1]]) return { permission: permissions[match[1]] };
+      throw Object.assign(new Error('not found'), { status: 404 });
+    }
+    if (route === `/git/trees/${HEAD}`)
+      return { truncated: false, tree: [{ path: 'places/alice.json', mode }] };
+    if (route === `/git/blobs/${BLOB}`) return blob({ creator, resident: { name: 'Al' } });
+    throw new Error(`Unexpected API call ${path}`);
+  };
+  const log = { log: vi.fn(), error: vi.fn() };
+  const run = (options) =>
+    runContributionPolicy({ api, repo: 'o/r', runUrl: 'https://run', log, ...options });
+  return { run, statuses, reads, log };
+}
+
+describe('One commit status for every PR that shares a head commit', () => {
+  it('passes a single house PR and reports on its head commit', async () => {
+    const github = fakeGitHub({ pulls: [pull(1, 'alice')] });
+    expect(await github.run({ number: '1' })).toBe('success');
+    expect(github.statuses.map((status) => status.state)).toEqual(['pending', 'success']);
+    expect(github.statuses[1]).toMatchObject({
+      path: `/repos/o/r/statuses/${HEAD}`,
+      context: 'Contribution policy',
+    });
+  });
+  it('gives the same answer whichever duplicate PR asks, and never borrows a pass', async () => {
+    const pulls = [pull(1, 'alice'), pull(2, 'mallory')];
+    for (const options of [{ number: '1' }, { number: '2' }, { sha: HEAD }]) {
+      const github = fakeGitHub({ pulls });
+      expect(await github.run(options)).toBe('failure');
+      expect(github.statuses.at(-1).state).toBe('failure');
+      expect(github.log.error.mock.calls[0][0]).toContain('PR #2:');
+      expect(github.log.error.mock.calls[0][0]).toContain('close the duplicate');
+    }
+  });
+  it('ignores PRs into other branches, which do not gate a merge', async () => {
+    const pulls = [pull(1, 'alice'), pull(2, 'mallory', 'old-branch')];
+    for (const options of [{ number: '1' }, { number: '2' }]) {
+      const github = fakeGitHub({ pulls });
+      expect(await github.run(options)).toBe('success');
+    }
+    const alone = fakeGitHub({ pulls: [pull(2, 'mallory', 'old-branch')] });
+    expect(await alone.run({ number: '2' })).toBe('skipped');
+    expect(alone.statuses).toEqual([]);
+  });
+  it('rejects a house that is a link without reading the link text', async () => {
+    const github = fakeGitHub({ pulls: [pull(1, 'alice')], mode: '120000' });
+    expect(await github.run({ number: '1' })).toBe('failure');
+    expect(github.log.error.mock.calls[0][0]).toContain('must be a plain file');
+    expect(github.reads.some((path) => path.includes('/git/blobs/'))).toBe(false);
+  });
+  it('still needs a maintainer for credit that differs from the author', async () => {
+    const github = fakeGitHub({ pulls: [pull(1, 'alice')], creator: 'bob' });
+    expect(await github.run({ number: '1' })).toBe('failure');
+    expect(github.log.error.mock.calls[0][0]).toContain('different maintainer');
   });
 });
