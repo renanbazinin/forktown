@@ -46,6 +46,49 @@ export const FALLEN_LEAVES: readonly Pair[] = [
 
 export const FIREFLY = { core: '#EEF6B2', halo: '#C4DE7C' };
 
+// The Millpond's own colours. None of them is a light and none repeats a signature swatch
+// above, so the season tests can tell the pond's water, ice and reeds apart from snow, blossom,
+// foliage and fallen leaves. The ice is winter's alone and joins the snow signature in the tests.
+export const POND = {
+  /** The middle of the pond; the shallows and open water use the town's own water colours. */
+  deep: ['#8FBBBC', '#3E6371'] as Pair,
+  /** The damp line where the water meets the bank. */
+  shore: ['#93A07A', '#3C5448'] as Pair,
+  /** The worn shore path and its stepping stones. */
+  path: ['#D9CCA2', '#7B8672'] as Pair,
+  stone: ['#C3BCA4', '#76807A'] as Pair,
+  /** Light on open water: small streaks that come and go. */
+  glint: ['#DCEDEA', '#86A8B0'] as Pair,
+  /** A fish rising: one flat ring spreading on still water. */
+  ring: ['#D4E6E4', '#8FB3B6'] as Pair,
+  /** A leaping fish, silver rather than gold. */
+  fish: ['#C6D3D2', '#9FB0B2'] as Pair,
+  /** The fish's darker back, so it reads against the water it leaps from. */
+  fishBack: ['#62777A', '#7C8F92'] as Pair,
+  /** Dawn mist, lying in 2-px bands on the water. */
+  mist: ['#E4ECE6', '#8FA4A3'] as Pair,
+  lily: ['#7FA36A', '#3F6152'] as Pair,
+  lilyLight: ['#96B77C', '#4D7060'] as Pair,
+  lilyFlower: ['#F2A7C0', '#9E7F8C'] as Pair,
+};
+
+/** The pond's ice, from the first skim at the shore to the last floes of the thaw. */
+export const ICE = {
+  sheet: ['#D3E4E3', '#7FA3AA'] as Pair,
+  /** Dark water showing through a crack, 2 px wide. */
+  crack: ['#6F98A0', '#3E6270'] as Pair,
+  /** The 1-px highlight on a crack's upper side. */
+  crackLight: ['#F4F8F6', '#B7CDD0'] as Pair,
+};
+
+/** Reeds: green through spring and summer, straw through autumn, pale straw in winter. */
+export const REED = {
+  green: ['#6F9656', '#3E5F4C'] as Pair,
+  greenLight: ['#89A964', '#4E6E55'] as Pair,
+  straw: ['#BDA86A', '#6B684F'] as Pair,
+  pale: ['#D6CDA2', '#7B7A63'] as Pair,
+};
+
 /** The farm's pumpkin colours, with a darker night stem, reused on doorsteps and in gardens. */
 export const PUMPKIN = {
   body: ['#E2A15A', '#B17D4D'] as Pair,

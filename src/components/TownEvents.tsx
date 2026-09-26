@@ -4,6 +4,8 @@ import { timeLabel } from '../lib/simulation';
 import { FOOTBALL_VENUE, type FootballState } from '../lib/football';
 import { FootballIcon } from './FootballMatch';
 import EveningNote, { type Evening } from './EveningNote';
+import MillpondEventCard from './MillpondEventCard';
+import { skatingCard } from '../lib/millpond-copy';
 
 export default function TownEvents({
   events,
@@ -11,12 +13,16 @@ export default function TownEvents({
   onVisit,
   football,
   evening,
+  day,
+  skaters,
 }: {
   events: TownEvent[];
   minutes: number;
   onVisit: (plot: string, eventId: string) => void;
   football: FootballState;
   evening?: Evening;
+  day?: number;
+  skaters?: number;
 }) {
   const minute = Math.min(10, Number(football.clock.slice(0, 2)) + 1);
   const phase =
@@ -32,6 +38,12 @@ export default function TownEvents({
   const spoken = football.live
     ? `${phase.startsWith('LIVE') ? `live, minute ${minute}` : phase.toLowerCase()}: Meadow FC ${football.score[0]}, Sunset United ${football.score[1]}`
     : 'back at sunrise';
+  // Skating waits at the end of the list, and joins the live cards while it is on.
+  const firstLater = events.findIndex((event) => eventStatus(event, minutes) !== 'Happening now');
+  const skatingAt =
+    day !== undefined && skatingCard(minutes, day)?.live && firstLater >= 0
+      ? firstLater
+      : events.length;
   return (
     <section className="town-events" aria-label="Today’s town events">
       <div className="events-intro">
@@ -73,7 +85,17 @@ export default function TownEvents({
           </span>
         </span>
       </button>
-      {events.map((event) => {
+      {[...events.slice(0, skatingAt), null, ...events.slice(skatingAt)].map((event) => {
+        if (!event)
+          return day === undefined ? null : (
+            <MillpondEventCard
+              key="millpond"
+              minutes={minutes}
+              day={day}
+              skaters={skaters}
+              onVisit={onVisit}
+            />
+          );
         const live = eventStatus(event, minutes) === 'Happening now';
         const Icon =
           event.venue.kind === 'zoo'

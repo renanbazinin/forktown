@@ -64,6 +64,9 @@ function followable(program: LiveProgram, residents: ResidentState[], time: numb
   return residents.filter((resident) => {
     if (resident.activity !== 'stroll') return false;
     if (resident.event?.phase !== 'attending') return true;
+    // A skater on the Millpond is no show the lineup could skip (the pond has no event shot, and a
+    // selected afternoon is filmed at its own venues), so they stay followable out on the ice.
+    if (resident.event.id === 'millpond') return true;
     const highlight =
       resident.event.id === 'football' || resident.event.id === 'cinema'
         ? resident.event.id

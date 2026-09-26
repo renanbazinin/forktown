@@ -3,8 +3,8 @@ import {
   DAYS_PER_SEASON,
   DAYS_PER_YEAR,
   townCalendarAt,
-} from './town-calendar';
-import { hash } from './world';
+} from './town-calendar.ts';
+import { hash } from './world.ts';
 
 // The turning year: what the calendar's seasons do to the scenery. Everything here is a pure
 // function of the town day and minute, like the sky and the moon, so every visitor sees the same

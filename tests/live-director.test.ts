@@ -19,6 +19,8 @@ import { townCatAt } from '../src/lib/town-cat';
 import { ducksAt } from '../src/lib/ducks';
 import { getPlot, isRoad, plotCenter, project } from '../src/lib/world';
 import { FORK_BOUNDS, FORK_PLOT } from '../src/lib/lanterns';
+import { SKATING, millpondSkatingDay } from '../src/lib/millpond';
+import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 
 const places = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
@@ -60,7 +62,8 @@ describe('Live broadcast director', () => {
           } else if (shot.kind === 'neighbor') {
             const subject = residents.find((r) => r.id === shot.residentId)!;
             expect(subject.activity).toBe('stroll');
-            if (subject.event?.phase === 'attending') {
+            // Skaters on the Millpond are followable whatever the lineup (no show to skip).
+            if (subject.event?.phase === 'attending' && subject.event.id !== 'millpond') {
               const highlight =
                 subject.event.id === 'football' || subject.event.id === 'cinema'
                   ? subject.event.id
@@ -158,6 +161,40 @@ describe('Live broadcast director', () => {
     expect(shotAt(12, 359.99).kind).toBe('home');
     expect(shotAt(12, 360).kind).not.toBe('home');
   });
+
+  it('stays with a winter skater once they are out on the Millpond ice', () => {
+    // Every frozen day of two years with the published roster.
+    const skatingDays = Array.from({ length: 224 }, (_, i) => CALENDAR_EPOCH_DAY + i).filter(
+      millpondSkatingDay,
+    );
+    expect(skatingDays.length).toBe(22);
+    let followed = 0,
+      kept = 0;
+    for (const day of skatingDays) {
+      const program = liveProgram(places, day);
+      let walkingIn: string | undefined;
+      for (let minute = SKATING.depart; minute < SKATING.end; minute += 0.5) {
+        const residents = simulateResidents(places, minute, day);
+        const shot = liveShotAt(program, minute, residents);
+        const subject = residents.find((r) => r.id === shot.residentId);
+        // A follow that walked someone to the pond is not dropped as they step onto the ice.
+        const arrived = residents.find((r) => r.id === walkingIn);
+        if (arrived?.event?.phase === 'attending' && minute % FOLLOW_SECONDS !== 0) {
+          expect(shot.residentId).toBe(arrived.id);
+          kept++;
+        }
+        walkingIn = undefined;
+        if (shot.kind !== 'neighbor' || subject?.event?.id !== 'millpond') continue;
+        if (subject.event.phase === 'going') walkingIn = subject.id;
+        if (subject.event.phase === 'attending') {
+          expect(subject.pose).toBe('skate');
+          followed++;
+        }
+      }
+    }
+    expect(followed).toBeGreaterThan(0);
+    expect(kept).toBeGreaterThan(0);
+  }, 20_000);
 
   it('keeps casting deterministic and switches away from a resident who goes indoors', () => {
     const program = liveProgram(places, 12);

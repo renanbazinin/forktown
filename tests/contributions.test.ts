@@ -1,5 +1,6 @@
 import { ZOO_PLOTS } from '../src/lib/zoo';
 import { FARM_PLOTS } from '../src/lib/farm';
+import { MILLPOND_PLOTS } from '../src/lib/millpond';
 import { describe, expect, it } from 'vitest';
 import { draftSchema, placeSchema, validatePlaces, type Place } from '../src/lib/schema';
 import {
@@ -143,7 +144,7 @@ describe('The world stays predictable as people contribute', () => {
     expect(shade('#FFFFFF', 30)).toBe('#ffffff');
     expect(shade('#000000', -30)).toBe('#000000');
   });
-  it('has 200 unique plots with public venues, football ground, cinema, zoo, and farm reserved', () => {
+  it('has 200 unique plots with public venues, football ground, cinema, zoo, farm, and millpond reserved', () => {
     expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(200);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
@@ -155,6 +156,7 @@ describe('The world stays predictable as people contribute', () => {
           ...CINEMA_PLOTS,
           ...ZOO_PLOTS,
           ...FARM_PLOTS,
+          ...MILLPOND_PLOTS,
         ].includes(plot.id),
       );
   });

@@ -1,4 +1,4 @@
-import { townDayAt } from './town-time';
+import { townDayAt } from './town-time.ts';
 
 // A permanent epoch, shared by every build and visitor. This is a fictional
 // calendar running at town speed, not the observer's local date or real astronomy.

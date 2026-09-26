@@ -19,6 +19,7 @@ Starter places use `creator: "forktown"` as a project credit, not a real communi
 - A nightly 23:30–02:30 disco at the Little Stage, with a DJ, dancing night owls, steady pastel lights, and an original dance track. Guests arrive and leave at different times, returning before their own bedtime; sleeping neighbors stay indoors.
 - The four-plot Starlight Cinema on D6, D7, E6, and E7: three original animated shorts every night from 20:30, with six-second Forktown intermissions, a twelve-seat picnic lawn, projector, string lights, and popcorn stand. Film lengths stay independent; each day selects three distinct titles from the library. Night owls can walk from the cinema to the disco afterward when travel time and bedtime allow. See [the cinema and film library guide](CINEMA.md).
 - The six-plot Meadow Ground: four-a-side football all day, a live scoreboard, passing, shots, saves, goal celebrations, spectators, and short breaks between halves. Zoom close with Town sound enabled for kicks, whistles, and cheers. See [Football at the Meadow Ground](FOOTBALL.md).
+- The eight-plot Millpond on H3–I6: a watermill, a jetty, reeds, a grey heron and rising fish, rowboats through the summer, the moon and the town's lanterns in the water at night, and skating on the winter ice. It sits low, so the football stays in view. See [The Millpond](MILLPOND.md).
 - A shared UTC-based 24-minute town day, automatic day/night lighting, pause/resume-live, and reduced-motion support.
 - A quiet sun, moon, and starry background, with continuous lunar phases and a shared town almanac. Four 28-day seasons count forward from a permanent UTC epoch. Open the date beside the clock. See [Sky and calendar](SKY_AND_CALENDAR.md).
 - The Lantern Fork identity: a leaf-and-lantern fork mark shared by the header, favicon and /live, a warm lantern accent, a dusk skin for the controls after 20:00, and a first-visit welcome card. See [Brand](BRAND.md).
@@ -59,6 +60,9 @@ src/city/trees.ts          The town's trees through the year
 src/city/weather.ts        Fireflies, falling snow, and the season's light
 src/city/season-ground.ts  Seasonal grass tufts and river ice
 src/city/season-palette.ts The turning year's colors
+src/lib/millpond.ts        The Millpond: its site, ice, heron, fish, boats, and skaters
+src/lib/millpond-copy.ts   The Millpond's panel copy and skating card
+src/city/millpond.ts       The Millpond's water, mill, and wildlife
 src/components/City.tsx    Map interaction and accessible controls
 src/components/Contribute.tsx  Building editor and JSON export
 src/components/BrandMark.tsx   The leaf-and-lantern mark and the wordmark's lantern
