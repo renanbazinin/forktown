@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 export default function Modal({
@@ -15,15 +15,19 @@ export default function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
+  // A layout effect cleans up while the dialog is still in the page, before React removes it.
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (!dialog) return;
+    // Whatever opened the dialog gets focus back when it closes, however it closes.
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     dialog.showModal();
     const previous = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       dialog.close();
       document.body.style.overflow = previous;
+      if (opener?.isConnected) opener.focus({ preventScroll: true });
     };
   }, []);
   useEffect(() => {
