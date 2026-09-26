@@ -3,6 +3,7 @@ import FarmInfo from './components/FarmInfo';
 import { FARM, isFarmPlot } from './lib/farm';
 import MillpondInfo from './components/MillpondInfo';
 import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
+import { withPreview } from './lib/resident-trips';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
@@ -136,7 +137,7 @@ export default function App() {
   const displayPlaces = useMemo(
     () =>
       draft && !places.some((place) => place.id === draft.id || place.plot === draft.plot)
-        ? [...places, draft]
+        ? withPreview(places, draft)
         : places,
     [draft, places],
   );
