@@ -11,7 +11,8 @@ import {
   millpondSignHit,
   MILLPOND_SIGN_DEPTH,
 } from './millpond';
-import { drawHouse, houseBounds, houseReach } from './houses';
+import { houseBounds, houseReach } from './houses';
+import { housePainter } from './house-sprites';
 import { drawResident, residentReach } from './residents';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
@@ -306,6 +307,7 @@ export function renderCity({
   ctx.scale(camera.zoom, camera.zoom);
   const byPlot = new Map(places.map((place) => [place.plot, place]));
   const residentsByHome = new Map(residents.map((resident) => [resident.id, resident]));
+  const paintHouse = housePainter(ctx);
   const view = {
     left: -camera.x / camera.zoom,
     right: (width - camera.x) / camera.zoom,
@@ -575,7 +577,7 @@ export function renderCity({
     objects.push({
       depth: houseDepth(plot),
       paint: () =>
-        drawHouse(ctx, place, pt.x, pt.y, night, HOUSE_SCALE, {
+        paintHouse(place, pt.x, pt.y, night, HOUSE_SCALE, {
           minutes,
           activity: residentsByHome.get(place.id)?.activity,
           lantern,
