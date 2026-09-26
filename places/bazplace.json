@@ -1,0 +1,41 @@
+{
+  "id": "bazplace",
+  "name": "BazPlace",
+  "creator": "Sharpen6",
+  "plot": "E4",
+  "building": "studio",
+  "color": "#789B76",
+  "decoration": "bench",
+  "story": "Metal symphonic music",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "round",
+    "garden": "vegetables",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Hazel",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "<div style=\"background-color: #203B35; text-align: center\">\n  <strong style=\"color: #FFE7A3; font-size: 24px\">SHARPEN'S</strong>\n  <p style=\"color: #BFE2C2; font-size: 12px\">WELCOME HOME</p>\n</div>"
+  }
+}
