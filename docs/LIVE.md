@@ -23,6 +23,8 @@ One town day lasts 24 real minutes. The broadcast uses the same UTC town clock, 
 
 Lunch features can be a picnic, books and lemonade, or lawn games. Concerts can be rock, acoustic, or jazz. The director films the actual town simulation: it does not invent interactions or force residents into new routines.
 
+The director plans a day's clips once, from the same day plans the town uses, and prepares the next day's in idle moments during the last town hour, so the picture doesn't stall at midnight. Casting and Miso's home follow the homes' ids in a fixed order, never the viewer's browser language, so every viewer sees the same neighbors.
+
 The Starlight Cinema is also in the pool of daily broadcast highlights. When selected, its complete three-film program takes priority from 20:30 through the closing card, with the camera framing both screen and audience. Its initial program finishes at 23:30; later film libraries may produce different end times. Cinema guests are not used as audience close-ups on days when cinema is skipped. See [the cinema guide](CINEMA.md).
 
 ## Sound for recording

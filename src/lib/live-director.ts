@@ -89,7 +89,21 @@ function followable(program: LiveProgram, residents: ResidentState[], time: numb
   });
 }
 
+const programs = new WeakMap<Place[], Map<number, LiveProgram>>();
+/** The day's program, planned once per roster and day (LiveStream prefetches tomorrow's). */
 export function liveProgram(places: Place[], day: number): LiveProgram {
+  const cached = programs.get(places)?.get(day);
+  if (cached) return cached;
+  const program = planLiveProgram(places, day);
+  let byDay = programs.get(places);
+  if (!byDay) programs.set(places, (byDay = new Map()));
+  // Today's and tomorrow's: drop the oldest.
+  if (byDay.size >= 2) byDay.delete(byDay.keys().next().value!);
+  byDay.set(day, program);
+  return program;
+}
+
+function planLiveProgram(places: Place[], day: number): LiveProgram {
   // Code-unit order, never the viewer's language: every visitor casts the same neighbors.
   const homes = [...places].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const program: LiveProgram = {
@@ -106,7 +120,8 @@ export function liveProgram(places: Place[], day: number): LiveProgram {
   // Keep replacements ranked too, so an indoor subject never means falling back to one home.
   for (let chapter = 0; chapter < 1440 / FOLLOW_SECONDS; chapter++) {
     const time = chapter * FOLLOW_SECONDS;
-    const residents = simulateResidents(homes, time, day);
+    // The caller's own roster, so the day's plan comes from the town's cache.
+    const residents = simulateResidents(places, time, day);
     const ranked = shuffled(
       homes.map((home) => home.id),
       `live-cast:${day}:${chapter}`,
