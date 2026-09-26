@@ -649,7 +649,7 @@ export function renderCity({
     const pt = { x: ground.x + (offsets.get(resident.id) ?? 0), y: ground.y };
     // Walkers off screen are skipped too. The ring round a followed one, 10px either way and 7px
     // below the feet, gets the same 2px to spare.
-    const reach = residentReach(resident.resident, resident);
+    const reach = residentReach(ctx, resident.resident, resident);
     if (
       !visible(
         pt,

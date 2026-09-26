@@ -2,17 +2,37 @@ import type { Resident } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { tint } from './houses';
 
+const GREETING_FONT = '10px "Space Mono", monospace';
+
 /**
  * How far a figure, its props and its speech reach from its feet, in its own px before scaling,
- * with 2px to spare: sideways either way, above and below. A greeting bubble is budgeted 12px a
- * character, wider than any 10px glyph, since the map culls before any text is measured.
+ * with 2px to spare: sideways either way, above and below. A greeting may be any 40 characters,
+ * some many times wider or taller than a letter, so it is measured on `ctx` as drawResident will
+ * draw it: the bubble round its words, and the ink, which may reach past the bubble.
  */
 export function residentReach(
+  ctx: CanvasRenderingContext2D,
   resident: Resident,
   state?: Pick<ResidentState, 'greeting' | 'duckLove'>,
 ) {
-  const bubble = state?.greeting && !state.duckLove ? 6 * resident.greeting.length + 14 : 0;
-  return { x: Math.max(18, bubble), above: 48, below: 5 };
+  const figure = { x: 18, above: 48, below: 5 };
+  if (!state?.greeting || state.duckLove) return figure;
+  ctx.save();
+  ctx.font = GREETING_FONT;
+  ctx.textAlign = 'center';
+  const words = ctx.measureText(resident.greeting);
+  ctx.restore();
+  // The bubble is 6px wider than the words on each side; they sit on a line 35px above the feet.
+  const half = Math.max(
+    words.width / 2 + 6,
+    words.actualBoundingBoxLeft ?? 0,
+    words.actualBoundingBoxRight ?? 0,
+  );
+  return {
+    x: Math.max(figure.x, Math.ceil(half) + 2),
+    above: Math.max(figure.above, Math.ceil(35 + (words.actualBoundingBoxAscent ?? 0)) + 2),
+    below: Math.max(figure.below, Math.ceil((words.actualBoundingBoxDescent ?? 0) - 35) + 2),
+  };
 }
 
 export function drawResident(
@@ -265,7 +285,7 @@ export function drawResident(
     ctx.fillRect(-3, -35, 6, 2);
     ctx.fillRect(-1, -33, 2, 1);
   } else if (state?.greeting) {
-    ctx.font = '10px "Space Mono", monospace';
+    ctx.font = GREETING_FONT;
     const width = ctx.measureText(resident.greeting).width + 12;
     ctx.fillStyle = '#FCFAEF';
     ctx.fillRect(-width / 2, -46, width, 16);
