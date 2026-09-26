@@ -3,8 +3,11 @@ import { nightBedtime } from '../src/lib/night-routine';
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
+  CINEMA_ADS,
   CINEMA_FILMS,
   CINEMA_PLOTS,
+  CINEMA_SCREEN_TIME,
+  FILM_LENGTH,
   CINEMA_SEATS,
   cinemaProgram,
   cinemaAt,
@@ -62,10 +65,10 @@ describe('Starlight Cinema', () => {
     expect(cinemaScreenHit(screenPoint(160, 190), 0)).toBe(true);
     expect(cityHit(screenPoint(160, 30), [], [], 0)).toBeUndefined();
   });
-  it('selects exactly three different films with a shared, varying, order-independent nightly bill', () => {
+  it('fills the same three minutes every night with films, then ads, on a shared, order-independent bill', () => {
     const library = [
       ...CINEMA_FILMS,
-      ...[18, 27, 71, 83].map((duration, index) => ({
+      ...[70, 110, 130, 170].map((duration, index) => ({
         ...CINEMA_FILMS[0],
         id: `future-${index}`,
         duration,
@@ -73,38 +76,106 @@ describe('Starlight Cinema', () => {
     ];
     const seen = new Set<string>(),
       bills = new Set<string>();
-    for (let day = 0; day < 80; day++) {
+    const seconds = (items: readonly { duration: number }[]) =>
+      items.reduce((sum, item) => sum + item.duration, 0);
+    for (let day = 0; day < 120; day++) {
       const bill = cinemaProgram(day, library);
-      expect(bill.films).toHaveLength(3);
-      expect(new Set(bill.films.map((f) => f.id)).size).toBe(3);
-      expect(cinemaProgram(day, [...library].reverse())).toEqual(bill);
+      expect(bill.films.length).toBeGreaterThanOrEqual(1);
+      expect(bill.films.length).toBeLessThanOrEqual(3);
+      expect(new Set(bill.films.map((f) => f.id)).size).toBe(bill.films.length);
+      expect(cinemaProgram(day, [...library].reverse(), [...CINEMA_ADS].reverse())).toEqual(bill);
       bill.films.forEach((f) => seen.add(f.id));
       bills.add(bill.films.map((f) => f.id).join(','));
-      expect(bill.end - bill.start).toBe(
-        bill.films.reduce((sum, film) => sum + film.duration, 0) + 24,
-      );
+      // Ads only ever fill what no film could: a gap shorter than the shortest film.
+      expect(seconds(bill.films) + seconds(bill.ads)).toBe(CINEMA_SCREEN_TIME);
+      expect(seconds(bill.ads)).toBeLessThan(FILM_LENGTH.min);
+      expect(bill.end - bill.start).toBe(CINEMA_SCREEN_TIME + 6 * (bill.films.length + 1));
       bill.slots.forEach((slot, index) => {
         if (index) expect(slot.start).toBe(bill.slots[index - 1].end);
-        if (slot.kind !== 'film') expect(slot.end - slot.start).toBe(6);
+        const item = slot.film ?? slot.ad;
+        expect(slot.end - slot.start).toBe(item ? item.duration : 6);
+        // Ads sit in a break before a film's card, or before a lone film; never after the last.
+        if (slot.ad)
+          expect(
+            bill.slots.slice(index).find((next) => !next.ad)!.kind === 'interval' ||
+              bill.films.length === 1,
+          ).toBe(true);
       });
+      expect(bill.slots.map((slot) => slot.ad).filter(Boolean)).toEqual(bill.ads);
+      expect(bill.slots.at(-1)!.kind).toBe('closing');
+      expect(bill.slots.at(-2)!.kind).toBe('film');
     }
     expect(seen.size).toBe(library.length);
-    expect(bills.size).toBeGreaterThan(8);
+    expect(bills.size).toBeGreaterThan(40);
     expect(cinemaProgram(0).end).toBe(
-      1230 + 24 + cinemaProgram(0).films.reduce((sum, film) => sum + film.duration, 0),
+      1230 + CINEMA_SCREEN_TIME + 6 * (cinemaProgram(0).films.length + 1),
     );
   });
-  it('rotates the classics and the Starlight Reel together, three at a time', () => {
-    expect(CINEMA_FILMS).toHaveLength(16);
+  it('shapes one-film nights and ad breaks exactly', () => {
+    const lengths = (durations: number[]) =>
+      durations.map((duration, index) => ({ ...CINEMA_FILMS[0], id: `film-${index}`, duration }));
+    // A three-minute film fills the night alone.
+    expect(cinemaProgram(0, lengths([180, 180, 180])).slots.map((s) => s.kind)).toEqual([
+      'opening',
+      'film',
+      'closing',
+    ]);
+    // A lone film that leaves a gap plays after a pre-show of ads.
+    const lone = cinemaProgram(3, lengths([150, 150, 150]));
+    expect(lone.films).toHaveLength(1);
+    expect(lone.ads.reduce((sum, ad) => sum + ad.duration, 0)).toBe(30);
+    expect(lone.slots.map((s) => s.kind)).toEqual([
+      'opening',
+      ...lone.ads.map(() => 'ad'),
+      'film',
+      'closing',
+    ]);
+    // Two films: the ads run after the first, then the card announces the second.
+    for (let day = 0; day < 20; day++) {
+      const pair = cinemaProgram(day, lengths([100, 60, 100]));
+      expect(pair.films.map((f) => f.duration).sort()).toEqual([100, 60]);
+      expect(pair.slots.map((s) => s.kind)).toEqual([
+        'opening',
+        'film',
+        ...pair.ads.map(() => 'ad'),
+        'interval',
+        'film',
+        'closing',
+      ]);
+      expect(pair.slots.find((s) => s.kind === 'interval')!.nextFilm).toBe(pair.films[1]);
+    }
+    // Every spot plays once before any repeats, even in a long break.
+    const long = cinemaProgram(1, lengths([100, 100, 100]));
+    expect(long.ads.reduce((sum, ad) => sum + ad.duration, 0)).toBe(80);
+    expect(new Set(long.ads.map((ad) => ad.id)).size).toBe(long.ads.length);
+  });
+  it('rotates the classics, the Starlight Reel, and the 14+ films together', () => {
+    expect(CINEMA_FILMS).toHaveLength(22);
     expect(CINEMA_FILMS.map((film) => film.artwork)).toEqual(
       expect.arrayContaining(['race', 'duel', 'ufo', 'orchestra', 'lanterns', 'mitten']),
     );
+    const grownUp = CINEMA_FILMS.filter((film) => film.rating === '14+');
+    expect(grownUp.map((film) => film.genre).sort()).toEqual([
+      'action',
+      'action',
+      'comedy',
+      'comedy',
+      'drama',
+      'drama',
+    ]);
+    for (const film of CINEMA_FILMS) {
+      expect(film.duration % FILM_LENGTH.step).toBe(0);
+      expect(film.duration).toBeGreaterThanOrEqual(FILM_LENGTH.min);
+      expect(film.duration).toBeLessThanOrEqual(FILM_LENGTH.max);
+    }
     const firstDay = townDayAt(Date.parse('2026-09-23T00:00:00Z'));
     const seen = new Set<string>(),
       selections = new Set<string>();
     for (let day = firstDay; day < firstDay + 90; day++) {
-      const films = cinemaProgram(day).films;
-      expect(new Set(films.map((film) => film.id)).size).toBe(3);
+      const { films, ads } = cinemaProgram(day);
+      expect(new Set(films.map((film) => film.id)).size).toBe(films.length);
+      // With tonight's library, no break runs longer than half a minute.
+      expect(ads.reduce((sum, ad) => sum + ad.duration, 0)).toBeLessThanOrEqual(30);
       films.forEach((film) => seen.add(film.id));
       selections.add(
         films
@@ -113,15 +184,18 @@ describe('Starlight Cinema', () => {
           .join(','),
       );
     }
-    expect(seen.size).toBe(16);
+    expect(seen.size).toBe(22);
     expect(selections.size).toBeGreaterThan(40);
   });
-  it('fits any three films into the evening, so the screen is stowed before midnight', () => {
+  it('fits every possible bill into the evening, so the screen is stowed before midnight', () => {
     // The disco, bedtimes, and the live director all assume the bill ends before 00:00.
-    const longest = [...CINEMA_FILMS].sort((a, b) => b.duration - a.duration).slice(0, 3);
-    const latest = cinemaProgram(0, longest);
+    // The latest bill is three one-minute films: the most cards around a fixed screen time.
+    const shortest = [...CINEMA_FILMS].sort((a, b) => a.duration - b.duration).slice(0, 3);
+    const latest = cinemaProgram(0, shortest);
+    expect(latest.films).toHaveLength(3);
     expect(latest.end + CINEMA_SCREEN_ROLL_SECONDS).toBeLessThanOrEqual(1440);
-    for (const film of CINEMA_FILMS) expect(film.duration).toBeLessThanOrEqual(60);
+    for (let day = 0; day < 365; day++)
+      expect(cinemaProgram(day).end + CINEMA_SCREEN_ROLL_SECONDS).toBeLessThanOrEqual(1440);
   });
   it('shares the program and playback position across fresh instances, refreshes, and time zones', async () => {
     const utc = Date.parse('2026-09-23T00:20:37Z');
@@ -163,12 +237,26 @@ describe('Starlight Cinema', () => {
   it('rejects invalid libraries and programs that cannot finish before morning', () => {
     expect(() => cinemaProgram(0, CINEMA_FILMS.slice(0, 2))).toThrow();
     expect(() => cinemaProgram(0, [...CINEMA_FILMS, CINEMA_FILMS[0]])).toThrow();
-    for (const duration of [0, -1, NaN, Infinity, 600])
+    for (const duration of [0, -1, NaN, Infinity, 50, 65, 190, 600])
       expect(() =>
         cinemaProgram(
           0,
           CINEMA_FILMS.map((f) => ({ ...f, duration })),
         ),
+      ).toThrow();
+    // Ads must be shorter than any film, on the same step, unique, and able to fill one step.
+    const ads = CINEMA_ADS;
+    expect(() => cinemaProgram(0, CINEMA_FILMS, [...ads, ads[0]])).toThrow();
+    expect(() =>
+      cinemaProgram(
+        0,
+        CINEMA_FILMS,
+        ads.filter((ad) => ad.duration !== 10),
+      ),
+    ).toThrow();
+    for (const duration of [0, 15, 60, NaN])
+      expect(() =>
+        cinemaProgram(0, CINEMA_FILMS, [...ads, { ...ads[0], id: 'x', duration }]),
       ).toThrow();
   });
   it('reserves all four empty plots, removes interior roads, and has twelve distinct lawn seats', () => {

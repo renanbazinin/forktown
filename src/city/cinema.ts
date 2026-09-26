@@ -1,6 +1,6 @@
 import { cinemaAt, CINEMA_GROUND, CINEMA_SEATS } from '../lib/cinema';
 import { project } from '../lib/world';
-import { drawCinemaCard, drawCinemaFilm, loadReel } from './cinema-films';
+import { drawCinemaAd, drawCinemaCard, drawCinemaFilm, loadReel } from './cinema-films';
 
 type Ctx = CanvasRenderingContext2D;
 export const SCREEN_ORIGIN = project(22.3, 14.7);
@@ -104,8 +104,8 @@ export function drawCinema(
         ctx.fillRect(-7, -7, 334, 194);
         ctx.fillStyle = '#C7BA93';
         ctx.fillRect(-3, -3, 326, 186);
-        if (state.slot?.kind === 'film' && state.slot.film)
-          drawCinemaFilm(ctx, state.slot.film, state.elapsed);
+        if (state.slot?.film) drawCinemaFilm(ctx, state.slot.film, state.elapsed);
+        else if (state.slot?.ad) drawCinemaAd(ctx, state.slot.ad, state.elapsed);
         else drawCinemaCard(ctx, state.slot, state.live ? state.elapsed : 0);
         ctx.restore();
         // The lifting bar follows the cloth; artwork is revealed without stretching.

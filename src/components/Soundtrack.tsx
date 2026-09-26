@@ -34,16 +34,18 @@ export default function Soundtrack({
   const [hidden, setHidden] = useState(document.hidden);
   const request = useRef(0);
   const previousMatch = useRef<FootballState | null>(null);
-  const audibleFilm =
-    enabled && playing && !hidden && cinemaListening.gain >= 0.005 ? cinema.slot?.film : undefined;
+  const audible = enabled && playing && !hidden && cinemaListening.gain >= 0.005;
+  const audibleFilm = audible ? (cinema.slot?.film ?? cinema.slot?.ad) : undefined;
+  const audibleTitle = cinema.slot?.film?.title ?? cinema.slot?.ad?.sponsor;
   useEffect(() => {
-    const film = cinema.slot?.film;
+    const film = cinema.slot?.film ?? cinema.slot?.ad;
     player.current?.cinemaSound(
       enabled && playing && !hidden && film
         ? {
             film,
             elapsed: cinema.elapsed,
-            key: `${cinema.program.day}:${film.id}`,
+            // An ad can play twice in one night, so the key includes where it starts.
+            key: `${cinema.program.day}:${cinema.slot!.start}:${film.id}`,
             ...cinemaListening,
           }
         : undefined,
@@ -147,7 +149,7 @@ export default function Soundtrack({
       <button
         aria-label="Town sound"
         aria-expanded={open}
-        title={enabled ? (audibleFilm?.title ?? TRACKS[track].title) : 'Turn on town sound'}
+        title={enabled ? (audible && audibleTitle) || TRACKS[track].title : 'Turn on town sound'}
         onClick={() => setOpen(!open)}
       >
         {enabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -169,8 +171,14 @@ export default function Soundtrack({
               <X size={14} />
             </button>
           </div>
-          <strong>{audibleFilm?.title ?? TRACKS[track].title}</strong>
-          <p>{audibleFilm ? 'Original movie score and sound effects' : TRACKS[track].subtitle}</p>
+          <strong>{(audibleFilm && audibleTitle) || TRACKS[track].title}</strong>
+          <p>
+            {audibleFilm
+              ? cinema.slot?.ad
+                ? 'A word from around town'
+                : 'Original movie score and sound effects'
+              : TRACKS[track].subtitle}
+          </p>
           <p className="sound-field-note">
             Zoom into the cinema for movie music and sound effects, or the football for kicks,
             whistles, and cheers.

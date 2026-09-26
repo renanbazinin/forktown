@@ -1,5 +1,5 @@
-import type { CinemaFilm } from '../lib/cinema';
-import { REEL_SCORES } from '../films/scores';
+import type { Screening } from '../lib/cinema';
+import { AD_SCORES, REEL_SCORES } from '../films/scores';
 import type { Voice } from './score';
 
 export type FilmEffect =
@@ -62,7 +62,10 @@ export type FilmCue = { at: number; duration: number; gain: number; pan: number 
   { kind: 'note'; voice: Voice; pitch: number } | { kind: FilmEffect }
 );
 
-/** A film's complete cue list, composed by its own module in `src/films/`. */
-export function cinemaScore(film: CinemaFilm): FilmCue[] {
-  return REEL_SCORES[film.artwork](film);
+/** A film's or ad's complete cue list, composed by its own module in `src/films/`. */
+export function cinemaScore(screening: Screening): FilmCue[] {
+  // A type-only import keeps the town's world code out of the audio worker's bundle.
+  return 'sponsor' in screening
+    ? AD_SCORES[screening.artwork](screening)
+    : REEL_SCORES[screening.artwork](screening);
 }

@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { CINEMA_FILMS, CINEMA_FRAME, cinemaListening } from '../src/lib/cinema';
+import { CINEMA_ADS, CINEMA_FILMS, CINEMA_FRAME, cinemaListening } from '../src/lib/cinema';
 import { cinemaScore } from '../src/music/cinema-score';
 import { renderCinemaPCM } from '../src/music/cinema-render';
 
+const SCREENINGS = [
+  ...CINEMA_FILMS.map((film) => ({ name: film.title, film })),
+  ...CINEMA_ADS.map((ad) => ({ name: `${ad.sponsor} ad`, film: ad })),
+];
+
 describe('Film soundtracks', () => {
-  it.each(CINEMA_FILMS)(
-    '$title has a full, finite stereo mix without clipping or cut-off edges',
-    (film) => {
+  it.each(SCREENINGS)(
+    '$name has a full, finite stereo mix without clipping or cut-off edges',
+    ({ film }) => {
       const mix = renderCinemaPCM(film);
       expect(mix.left.length).toBe(film.duration * mix.sampleRate);
       expect(mix.right.length).toBe(mix.left.length);
@@ -38,7 +43,7 @@ describe('Film soundtracks', () => {
   );
 
   it('composes deterministically and keeps every cue inside its film', () => {
-    for (const film of CINEMA_FILMS) {
+    for (const { film } of SCREENINGS) {
       const score = cinemaScore(film);
       expect(cinemaScore({ ...film })).toEqual(score);
       expect(score.some((cue) => cue.kind !== 'note')).toBe(true);

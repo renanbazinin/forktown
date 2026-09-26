@@ -1,8 +1,8 @@
-import type { CinemaFilm } from '../lib/cinema';
+import type { Screening } from '../lib/cinema';
 import { renderCinemaTrack } from './synth';
 
 export type CinemaPlayback = {
-  film: CinemaFilm;
+  film: Screening;
   elapsed: number;
   key: string;
   gain: number;

@@ -1,4 +1,4 @@
-import type { CinemaFilm } from '../lib/cinema';
+import type { CinemaAd, CinemaFilm } from '../lib/cinema';
 
 /**
  * The Starlight Reel drawing kit. Every film renders a pure function of its own story
@@ -355,8 +355,10 @@ export function captions(
   p: number,
   lines: readonly (readonly [number, number, string])[],
   style: Parameters<typeof caption>[3] = {},
+  /** Fade width in story units; longer films want a smaller one (about 0.3 s of story). */
+  edge?: number,
 ) {
-  for (const [from, to, text] of lines) caption(ctx, text, presence(p, from, to), style);
+  for (const [from, to, text] of lines) caption(ctx, text, presence(p, from, to, edge), style);
 }
 /** A silent-film intertitle card: centred lines on a bordered panel. */
 export function intertitle(
@@ -564,6 +566,16 @@ export type Look = {
   dedication: string;
 };
 
+const BILLING = { drama: 'drama', comedy: 'comedy', action: 'action picture' } as const;
+/** The age badge in the corner of a grown-up film's title card. */
+function rating(ctx: Ctx, label: string, x: number, y: number, look: Look) {
+  box(ctx, x, y, 24, 13, alpha('#07090C', 0.55));
+  ctx.strokeStyle = look.accent;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, 23, 12);
+  write(ctx, label, x + 12, y + 9.5, { size: 7, color: look.ink });
+}
+
 /** Opening titles over the first frame, and an end card over the last. */
 export function titles(ctx: Ctx, film: CinemaFilm, elapsed: number, look: Look) {
   const endAt = film.duration - 3;
@@ -599,11 +611,18 @@ export function titles(ctx: Ctx, film: CinemaFilm, elapsed: number, look: Look) 
       shadow: alpha('#000000', 0.35),
     });
     rule(106, 38);
-    write(ctx, 'a forktown original', W / 2, 124, {
-      size: 9,
-      type: 'italic',
-      color: alpha(look.ink, 0.8),
-    });
+    write(
+      ctx,
+      film.genre ? `a forktown ${BILLING[film.genre]}` : 'a forktown original',
+      W / 2,
+      124,
+      {
+        size: 9,
+        type: 'italic',
+        color: alpha(look.ink, 0.8),
+      },
+    );
+    if (film.rating) rating(ctx, film.rating, W - 38, 26, look);
   } else {
     write(ctx, 'The End', W / 2, 88, {
       size: 24,
@@ -619,5 +638,34 @@ export function titles(ctx: Ctx, film: CinemaFilm, elapsed: number, look: Look) 
     });
     write(ctx, 'FORKTOWN PICTURE HOUSE', W / 2, 150, { size: 5, color: look.accent });
   }
+  ctx.restore();
+}
+
+/** How long an ad holds its sponsor slate at the end: three seconds, or four for longer spots. */
+export const slateSeconds = (ad: CinemaAd) => (ad.duration > 10 ? 4 : 3);
+/** Look of an ad's closing slate. */
+export type AdLook = { shade: string; ink: string; accent: string };
+/** Every ad ends on the same kind of card: who it is from, and one line to remember. */
+export function slate(ctx: Ctx, ad: CinemaAd, elapsed: number, look: AdLook) {
+  const from = ad.duration - slateSeconds(ad);
+  const amount = ease((elapsed - from) / 0.6) * (1 - ease((elapsed - ad.duration + 0.5) / 0.5));
+  if (amount <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = amount * 0.88;
+  box(ctx, 0, 0, W, H, look.shade);
+  ctx.globalAlpha = amount;
+  const rise = (1 - easeOut((elapsed - from) / 0.9)) * 5;
+  let size = 20;
+  ctx.font = font('serif', size);
+  while (size > 12 && ctx.measureText(ad.sponsor).width > W - 40) ctx.font = font('serif', --size);
+  write(ctx, ad.sponsor, W / 2, 84 + rise, {
+    size,
+    type: 'serif',
+    color: look.ink,
+    shadow: alpha('#000000', 0.35),
+  });
+  box(ctx, W / 2 - 24, 96, 48, 1, alpha(look.accent, 0.9));
+  write(ctx, ad.tagline, W / 2, 114, { size: 9, type: 'italic', color: alpha(look.ink, 0.9) });
+  write(ctx, 'HERE IN FORKTOWN', W / 2, 150, { size: 5, color: look.accent });
   ctx.restore();
 }

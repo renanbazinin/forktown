@@ -114,8 +114,8 @@
       import '@fontsource/fraunces/500.css';
       import '@fontsource/fraunces/500-italic.css';
       import '@fontsource/space-mono/700.css';
-      import { CINEMA_FILMS, cinemaAt } from '/src/lib/cinema.ts';
-      import { drawCinemaFilm, loadReel } from '/src/city/cinema-films.ts';
+      import { CINEMA_ADS, CINEMA_FILMS, cinemaAt, isAd } from '/src/lib/cinema.ts';
+      import { drawCinemaAd, drawCinemaFilm, loadReel } from '/src/city/cinema-films.ts';
       import { townDayAt, townMinutesAt } from '/src/lib/town-time.ts';
       import { TownPlayer } from '/src/music/player.ts';
       const slider = document.querySelector('#progress');
@@ -145,20 +145,28 @@
       }
       await loadReel();
       document.querySelector('#library').textContent =
-        `${CINEMA_FILMS.length} original shorts with original music and sound effects. Choose a film to hear its soundtrack.`;
-      const screens = CINEMA_FILMS.map((film) => {
+        `${CINEMA_FILMS.length} original shorts and ${CINEMA_ADS.length} ads from around town, with original music and sound effects. Choose one to hear its soundtrack.`;
+      const name = (item) => (isAd(item) ? `${item.sponsor} (ad)` : item.title);
+      const screens = [...CINEMA_FILMS, ...CINEMA_ADS].map((film) => {
         const article = document.createElement('article');
         const canvas = document.createElement('canvas');
         canvas.width = 320;
         canvas.height = 180;
-        canvas.setAttribute('aria-label', film.title);
+        canvas.setAttribute('aria-label', name(film));
         const title = document.createElement('h2');
-        title.textContent = film.title;
+        title.textContent = name(film);
         const description = document.createElement('p');
-        description.textContent = `${film.duration}s · ${film.description}`;
+        description.textContent = [
+          `${film.duration}s`,
+          film.genre,
+          film.rating,
+          isAd(film) ? film.tagline : film.description,
+        ]
+          .filter(Boolean)
+          .join(' · ');
         const watch = document.createElement('button');
         watch.textContent = 'Watch with sound';
-        watch.setAttribute('aria-label', `Watch ${film.title} with sound`);
+        watch.setAttribute('aria-label', `Watch ${name(film)} with sound`);
         watch.onclick = () => {
           player?.cinemaSound();
           selected = film;
@@ -172,7 +180,8 @@
       });
       function paint() {
         for (const { film, ctx, article } of screens) {
-          drawCinemaFilm(ctx, film, progress * film.duration);
+          if (isAd(film)) drawCinemaAd(ctx, film, progress * film.duration);
+          else drawCinemaFilm(ctx, film, progress * film.duration);
           article.dataset.listening = String(enabled && selected.id === film.id);
         }
         player?.cinemaSound(
@@ -191,7 +200,7 @@
         document.querySelector('#audio-status').textContent =
           audioError ||
           (enabled
-            ? `${selected.title} · ${!playing ? 'Paused' : player?.cinemaStatus === 'preparing' ? 'Preparing soundtrack…' : player?.cinemaStatus === 'error' ? 'Sound could not load. Toggle sound to retry.' : 'Music + sound effects'}`
+            ? `${name(selected)} · ${!playing ? 'Paused' : player?.cinemaStatus === 'preparing' ? 'Preparing soundtrack…' : player?.cinemaStatus === 'error' ? 'Sound could not load. Toggle sound to retry.' : 'Music + sound effects'}`
             : 'Choose “Watch with sound” on any film below.');
         slider.value = progress * 100;
         document.querySelector('#position').value = `${Math.round(progress * 100)}%`;

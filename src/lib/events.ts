@@ -127,7 +127,7 @@ export function cinemaEventForDay(day: number): TownEvent {
   const bill = cinemaProgram(day);
   return {
     id: 'cinema',
-    name: 'Three little films under the stars',
+    name: 'Films under the stars',
     description: 'Tonight: ' + bill.films.map((film) => film.title).join(' · '),
     venue: CINEMA_VENUE,
     period: 'night',

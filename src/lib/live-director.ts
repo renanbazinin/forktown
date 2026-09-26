@@ -147,7 +147,9 @@ export function liveShotAt(
     return {
       id: `event:${cinema.program.day}:cinema`,
       kind: 'event',
-      label: cinema.slot?.film?.title ?? 'Intermission at the Starlight Cinema',
+      label:
+        cinema.slot?.film?.title ??
+        (cinema.slot?.ad ? 'Ads at the Starlight Cinema' : 'Intermission at the Starlight Cinema'),
       ...CINEMA_FRAME,
     };
   const event = program.events.find(
