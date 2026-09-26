@@ -28,7 +28,13 @@ The included deployment workflow is deliberately opt-in. Pull request checks run
 
 Future pushes to `main` run the publishing workflow. It derives the repository path and GitHub link settings automatically. For a repository named `USERNAME.github.io`, it uses `/`; ordinary project repositories use `/REPOSITORY/`.
 
-For a custom domain, create an Actions variable named `PAGES_BASE_PATH` with value `/`, and follow GitHub’s custom-domain setup. The workflow respects this override. Confirm DNS and the Pages settings before expecting the domain to work.
+For a custom domain, create an Actions variable named `PAGES_BASE_PATH` with value `/`, and follow GitHub’s custom-domain setup. The workflow respects this override. Confirm DNS and the Pages settings before expecting the domain to work. Also create `PAGES_SITE_URL` with the domain’s full address, such as `https://town.example/`, so link previews point straight at it.
+
+## Link previews
+
+Shared links show a card with a picture of the town. Link previews need absolute addresses, so the page heads use `VITE_SITE_URL`. The Pages workflow sets it to your site’s address (`PAGES_SITE_URL`, or `https://OWNER.github.io/REPOSITORY/`); other builds fall back to the main town, https://renanbazinin.github.io/forktown/. On another host, set `VITE_SITE_URL` to the address ending in `/`.
+
+The picture is `public/og-image.png`, 1200 × 630 and under 300 kB: the real town at Autumn 11, 19:25 in Year 3 (2026-09-24 20:19:25 UTC), captured from a production build in headless Chrome with the clock pinned, zoomed in three steps, the interface hidden, and colors trimmed to six bits to keep it small. The home-screen icon, `public/apple-touch-icon.png`, is drawn from the mark by `npx tsx scripts/touch-icon.ts`.
 
 ## Other static hosts
 
@@ -37,7 +43,7 @@ npm ci
 npm run build
 ```
 
-Publish the `dist` folder. Set `VITE_BASE_PATH=/` for a root-domain site, or `/your-subpath/` for a subpath deployment. Set `VITE_GITHUB_REPOSITORY` in the host’s build environment. Use `npm run preview` to inspect the result at `http://localhost:4173` before publishing.
+Publish the `dist` folder. Set `VITE_BASE_PATH=/` for a root-domain site, or `/your-subpath/` for a subpath deployment. Set `VITE_GITHUB_REPOSITORY` and `VITE_SITE_URL` in the host’s build environment. Use `npm run preview` to inspect the result at `http://localhost:4173` before publishing.
 
 ## Before inviting contributors
 

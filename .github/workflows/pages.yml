@@ -30,6 +30,7 @@ jobs:
         run: node scripts/configure-pages.mjs
         env:
           PAGES_BASE_PATH: ${{ vars.PAGES_BASE_PATH }}
+          PAGES_SITE_URL: ${{ vars.PAGES_SITE_URL }}
       - run: npm ci
       - run: npm run check
       - uses: actions/upload-pages-artifact@v3
