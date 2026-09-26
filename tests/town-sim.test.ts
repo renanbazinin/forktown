@@ -6,7 +6,15 @@ import { placeSchema, type Place } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { roadNodes, roadPath, WALK_SPEED } from '../src/lib/walking';
-import { getPlot, PLOTS, plotEntrance, ROAD_MAX_X, ROAD_MAX_Y, type Point } from '../src/lib/world';
+import {
+  getPlot,
+  PLOTS,
+  plotEntrance,
+  project,
+  ROAD_MAX_X,
+  ROAD_MAX_Y,
+  type Point,
+} from '../src/lib/world';
 
 const places = readdirSync('places')
   .filter((name) => name.endsWith('.json'))
@@ -170,5 +178,40 @@ describe('The town simulation at any size', () => {
               distance(state.position, plotEntrance(getPlot(state.home.plot)!)),
             ).toBeLessThanOrEqual(0.001);
     }
+  }, 20_000);
+
+  it('lets one of each greeting pair speak, with no bubble over another', () => {
+    // Bubbles as drawResident draws them at scale 1.25: 10px Space Mono, padded, 20 px tall.
+    const bubble = (state: ResidentState) => {
+      const at = project(state.position.x, state.position.y);
+      const half = ((state.resident.greeting.length * 6.12 + 12) * 1.25) / 2;
+      return { left: at.x - half, right: at.x + half, top: at.y - 57.5 };
+    };
+    let greetings = 0;
+    for (const { now } of daytime(fullTown, DAYS[0])) {
+      const talking = now.filter((state) => state.greeting);
+      greetings += talking.length;
+      for (const speaker of talking) {
+        expect(strolling(speaker)).toBe(true);
+        // The one greeted listens: a pair never shows two bubbles.
+        expect(
+          now.some(
+            (other) =>
+              other !== speaker &&
+              strolling(other) &&
+              !other.greeting &&
+              distance(other.position, speaker.position) < 1.4,
+          ),
+        ).toBe(true);
+      }
+      for (let i = 0; i < talking.length; i++)
+        for (let j = i + 1; j < talking.length; j++) {
+          const a = bubble(talking[i]),
+            b = bubble(talking[j]);
+          const overlap = a.left < b.right && b.left < a.right && Math.abs(a.top - b.top) < 20;
+          expect(overlap).toBe(false);
+        }
+    }
+    expect(greetings).toBeGreaterThan(100);
   }, 20_000);
 });

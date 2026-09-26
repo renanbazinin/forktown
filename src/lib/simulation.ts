@@ -1,7 +1,7 @@
 import type { Place } from './schema';
 import { duckAwareWalk, DUCK_NOTICE_RADIUS } from './duck-reactions';
 import { DUCK_STREET_Y } from './ducks';
-import { getPlot, hash, plotEntrance, type Point } from './world';
+import { getPlot, hash, plotEntrance, project, type Point } from './world';
 import type { EventPose } from './events';
 import { roadNodes, roadPath, facingAlong, WALK_SPEED } from './walking';
 import { residentTrips, tripState } from './resident-trips';
@@ -193,25 +193,7 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
       },
     ];
   });
-  for (let i = 0; i < states.length; i++)
-    for (let j = i + 1; j < states.length; j++) {
-      const a = states[i],
-        b = states[j];
-      if (
-        a.activity === 'stroll' &&
-        b.activity === 'stroll' &&
-        !a.event &&
-        !b.event &&
-        !a.duckLove &&
-        !b.duckLove &&
-        Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) < 1.4
-      ) {
-        // Occasional greetings, with no named meetings or shared mutable state.
-        const beat = Math.floor(time / 5);
-        if (hash(`${[a.id, b.id].sort().join(':')}:${beat}`) % 3 === 0)
-          a.greeting = b.greeting = true;
-      }
-    }
+  greet(states, time);
   return states;
 }
 
@@ -320,4 +302,71 @@ function strollAt(
     facing: facingAlong(a, b),
     walkPhase: (step * 3) % 1,
   };
+}
+
+// Greeting bubbles as drawResident draws them at the town's figure scale (1.25), in world pixels:
+// 10px Space Mono plus padding, 20 px tall. Wider glyphs (emoji, CJK) come from fallback fonts.
+const BUBBLE_HEIGHT = 20;
+function bubbleWidth(text: string) {
+  let width = 12;
+  for (const char of text) width += char.codePointAt(0)! < 0x2000 ? 6.12 : 12;
+  return width * 1.25;
+}
+const HEART_WIDTH = 30;
+
+/**
+ * Occasional greetings between free strollers who pass close by, with no named meetings or
+ * shared mutable state. One of each pair speaks, taking turns every five-minute beat, and a
+ * bubble that would cover another bubble (or a heart for the ducklings) is left unsaid.
+ */
+function greet(states: ResidentState[], time: number) {
+  const beat = Math.floor(time / 5);
+  const walkers = states.filter(
+    (state) => state.activity === 'stroll' && !state.event && !state.duckLove,
+  );
+  const pairs: { key: string; first: ResidentState; second: ResidentState }[] = [];
+  for (let i = 0; i < walkers.length; i++)
+    for (let j = i + 1; j < walkers.length; j++) {
+      const a = walkers[i],
+        b = walkers[j];
+      // Within 1.4 tiles, squared: this runs for every pair of walkers, every frame.
+      const dx = a.position.x - b.position.x,
+        dy = a.position.y - b.position.y;
+      if (dx * dx + dy * dy >= 1.96) continue;
+      const [first, second] = a.id < b.id ? [a, b] : [b, a];
+      const key = `${first.id}:${second.id}`;
+      if (hash(`${key}:${beat}`) % 3 === 0) pairs.push({ key, first, second });
+    }
+  if (!pairs.length) return;
+  const shown = states
+    .filter((state) => state.duckLove)
+    .map((state) => ({ at: project(state.position.x, state.position.y), width: HEART_WIDTH }));
+  const partners = new Map<ResidentState, ResidentState[]>();
+  for (const { first, second } of pairs) {
+    partners.set(first, [...(partners.get(first) ?? []), second]);
+    partners.set(second, [...(partners.get(second) ?? []), first]);
+  }
+  // Whoever is greeted listens, so a pair never shows two bubbles.
+  const listening = new Set<ResidentState>();
+  pairs.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  for (const { first, second } of pairs) {
+    if (first.greeting || second.greeting) continue;
+    for (const speaker of beat % 2 ? [second, first] : [first, second]) {
+      if (listening.has(speaker)) continue;
+      const bubble = {
+        at: project(speaker.position.x, speaker.position.y),
+        width: bubbleWidth(speaker.resident.greeting),
+      };
+      const covers = shown.some(
+        (other) =>
+          Math.abs(other.at.x - bubble.at.x) < (other.width + bubble.width) / 2 &&
+          Math.abs(other.at.y - bubble.at.y) < BUBBLE_HEIGHT,
+      );
+      if (covers) continue;
+      speaker.greeting = true;
+      for (const partner of partners.get(speaker)!) listening.add(partner);
+      shown.push(bubble);
+      break;
+    }
+  }
 }
