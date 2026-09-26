@@ -4,6 +4,8 @@
 
 [Visit the town](https://renanbazinin.github.io/forktown/) · [Detailed contributor guide](CONTRIBUTING.md)
 
+<img src="public/og-image.png" alt="Forktown on an autumn evening: houses around the Lantern Fork, a football match at the Meadow Ground and a concert at the Little Stage." width="800">
+
 ## 1. Start in the live town
 
 Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find your way in**. You’ll see **Fork on GitHub**:

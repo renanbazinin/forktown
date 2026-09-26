@@ -5,6 +5,14 @@
   "type": "module",
   "description": "A tiny pixel city built one pull request at a time.",
   "license": "MIT",
+  "homepage": "https://renanbazinin.github.io/forktown/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/renanbazinin/forktown.git"
+  },
+  "bugs": {
+    "url": "https://github.com/renanbazinin/forktown/issues"
+  },
   "engines": {
     "node": ">=22.12.0"
   },
