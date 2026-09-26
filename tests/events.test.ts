@@ -1,6 +1,6 @@
 import { residentTrips } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import {
   EVENT_SPOTS,
   eventSpot,
@@ -11,7 +11,7 @@ import {
   VENUES,
 } from '../src/lib/events';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
-import { simulateResidents } from '../src/lib/simulation';
+import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { getPlot, isRoad, plotEntrance } from '../src/lib/world';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
 import { onRoadOrTube, stepBound } from './tube-riders';
@@ -121,6 +121,43 @@ describe('Shared town events', () => {
       expect(stateAt(trip.homeBy).event?.id).not.toBe(event.id);
     }
   });
+  it('seats early guests facing the show, waiting for it to start', () => {
+    const town = readdirSync('places')
+      .filter((file) => file.endsWith('.json'))
+      .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+    const seen = new Set<string>();
+    for (let day = 0; day < 7; day++)
+      for (const [id, trips] of residentTrips(town, day))
+        for (const trip of trips) {
+          const { event } = trip;
+          if (event.start - trip.arrive < 1) continue;
+          const at = (t: number) => {
+            const minutes = t % 1440;
+            return simulateResidents(town, minutes, day + (t - minutes) / 1440).find(
+              (state) => state.id === id,
+            )!;
+          };
+          const early = at((trip.arrive + event.start) / 2);
+          expect(early).toMatchObject({ moving: false, facing: trip.facing });
+          expect(early.position).toEqual(at(event.start + 1).position);
+          seen.add(event.venue.kind);
+          // The animals and the match are on all day: those guests join in straight away.
+          if (event.venue.kind === 'zoo' || event.venue.kind === 'football') {
+            expect(early.event?.phase).toBe('attending');
+            expect(residentActivityLabel(early)).toMatch(/^Watching /);
+            continue;
+          }
+          expect(early.event?.phase).toBe('waiting');
+          expect(residentActivityLabel(early)).toBe(
+            event.id === 'cinema' ? 'Waiting for the film to start' : `Waiting for ${event.name}`,
+          );
+          expect(early.pose).toBe(
+            event.venue.kind === 'green' || event.venue.kind === 'cinema' ? 'sit' : undefined,
+          );
+          expect(at(event.start).event?.phase).toBe('attending');
+        }
+    expect([...seen].sort()).toEqual(['cinema', 'football', 'green', 'stage', 'zoo']);
+  }, 20_000);
   it('caps the audience, assigns distinct spots, and does not depend on JSON ordering', () => {
     const crowd = HOUSE_PLOTS.slice(0, 20).map((plot, i) => ({
       ...walker,

@@ -400,14 +400,19 @@ export function tripState(
     legs,
     returnLegs,
   } = trip;
-  // Skaters step onto the ice at their loop's south point and glide from that moment on.
+  // Skaters step onto the ice at their loop's south point and glide from that moment on. Zoo
+  // visitors and football fans likewise join in on arrival: the animals and the match are already
+  // there. Anyone early for a show waits at their spot until it starts.
   const skating = event.venue.kind === 'millpond';
+  const underway = skating || event.venue.kind === 'zoo' || event.venue.kind === 'football';
   const phase =
-    time < (skating ? arrive : Math.max(arrive, event.start))
+    time < arrive
       ? 'going'
-      : time < leave
-        ? 'attending'
-        : 'returning';
+      : time < (underway ? arrive : event.start)
+        ? 'waiting'
+        : time < leave
+          ? 'attending'
+          : 'returning';
   if (skating && phase === 'attending')
     return {
       ...skateGlide(seat, arrive, leave, time),
@@ -454,5 +459,9 @@ export function tripState(
     activity: 'stroll',
     event: { id: event.id, name: event.name, phase },
     ...(phase === 'attending' ? { pose, walkPhase: (time / 5 + seat / 10) % 1 } : {}),
+    // A blanket or a cinema seat is for sitting on while the show gets ready; the lawn stands.
+    ...(phase === 'waiting' && (event.venue.kind === 'green' || event.venue.kind === 'cinema')
+      ? { pose: 'sit' as const }
+      : {}),
   };
 }
