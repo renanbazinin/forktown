@@ -40,6 +40,7 @@ import Contribute from './components/Contribute';
 import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
+import FullTownNote from './components/FullTownNote';
 import BrandMark, { LanternDot } from './components/BrandMark';
 import WelcomeCard from './components/WelcomeCard';
 import TownEvents from './components/TownEvents';
@@ -67,6 +68,7 @@ import { localSaveAvailable } from './lib/local-save';
 import { useTownClock } from './lib/use-town-clock';
 import { useLanternTown } from './lib/use-lantern-town';
 import { FORK_PLOT } from './lib/lanterns';
+import { OPEN_PLOTS_COPY } from './lib/open-plots';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
 
 type Panel = 'places' | 'neighbors' | 'events';
@@ -177,6 +179,8 @@ export default function App() {
   const filteredPlots = available.filter((plot) =>
     plot.id.toLowerCase().includes(search.toLowerCase()),
   );
+  // No house plot is free. An unsaved preview can still be saved: it holds its own plot.
+  const townFull = !available.length && !draft;
   const liveEvent = events.find((event) => isEventLive(event, clock.minutes));
 
   const select = useCallback((plotId: string | null, focus = false) => {
@@ -233,8 +237,8 @@ export default function App() {
       setModal('guide');
       return;
     }
-    if (!available.length && !draft) {
-      setToast({ text: 'All house plots are taken.', note: true });
+    if (townFull) {
+      setToast({ text: OPEN_PLOTS_COPY.full, note: true });
       return;
     }
     setBuildPlot(plot);
@@ -691,8 +695,12 @@ export default function App() {
                         </button>
                       ))}
                 </div>
-                {(filter === 'places' ? filteredPlaces.length : filteredPlots.length) === 0 && (
-                  <p className="empty-search">No matches. Try another name.</p>
+                {filter === 'empty' && !available.length ? (
+                  <FullTownNote repositoryUrl={repositoryUrl} />
+                ) : (
+                  (filter === 'places' ? filteredPlaces.length : filteredPlots.length) === 0 && (
+                    <p className="empty-search">{OPEN_PLOTS_COPY.noMatch}</p>
+                  )
                 )}
                 <label className="map-label-setting">
                   <input
@@ -735,8 +743,14 @@ export default function App() {
                 </li>
               ))}
             </ol>
+            {townFull && <FullTownNote id="full-town-note" repositoryUrl={repositoryUrl} />}
             {localSaveAvailable ? (
-              <button className="button button-primary" onClick={() => startBuilding()}>
+              <button
+                className="button button-primary"
+                disabled={townFull}
+                aria-describedby={townFull ? 'full-town-note' : undefined}
+                onClick={() => startBuilding()}
+              >
                 Build a place <ArrowRight size={16} />
               </button>
             ) : repositoryUrl ? (

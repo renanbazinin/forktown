@@ -320,6 +320,37 @@ body,
   font-size: 13px;
   color: var(--muted);
 }
+/* Said where a new house would start, once every house plot has one. */
+.full-town-note {
+  margin: 0 0 20px;
+  padding: 13px 16px;
+  border-radius: 9px;
+  background: var(--lantern-pale);
+  color: var(--lantern-ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.full-town-note a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.full-town-note code {
+  font: 12px var(--mono);
+}
+.town-panel .full-town-note {
+  margin: 16px 20px;
+}
+.welcome-guide .button-primary:disabled {
+  opacity: 0.55;
+  transform: none;
+}
+.welcome-guide .button-primary:disabled:hover {
+  background: var(--green);
+}
 .resident-directory {
   padding: 8px;
 }
