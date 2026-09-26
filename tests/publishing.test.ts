@@ -13,6 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import type { Plugin, UserConfig } from 'vite';
 import { SUBPROCESS_TEST } from './subprocess-timeout';
 import { thirdPartyLicenses, thirdPartyNotices } from '../scripts/third-party-licenses';
 import { CANONICAL_SITE, sharePreview, siteUrl } from '../scripts/share-preview';
@@ -155,6 +156,31 @@ describe('Third-party notices in the published site', () => {
     expect(readFileSync('vite.config.ts', 'utf8')).toMatch(
       /plugins: \[[^\]]*thirdPartyLicenses\(\)/,
     );
+  });
+
+  it('includes the packages only a music worker uses', () => {
+    type Generate = (this: unknown, options: unknown, bundle: Record<string, unknown>) => void;
+    const plugin = thirdPartyLicenses();
+    const config = (plugin.config as unknown as () => UserConfig)();
+    const [worker] = (config.worker!.plugins as () => Plugin[])();
+    (worker.generateBundle as unknown as Generate).call(
+      {},
+      {},
+      {
+        'assets/render-worker.js': {
+          type: 'chunk',
+          moduleIds: [shipped('zod/v4/classic/schemas.js')],
+        },
+      },
+    );
+    const emitted: { source: string }[] = [];
+    (plugin.generateBundle as unknown as Generate).call(
+      { emitFile: (file: { source: string }) => emitted.push(file) },
+      {},
+      { 'main.js': { type: 'chunk', moduleIds: [shipped('react/cjs/react.production.js')] } },
+    );
+    expect(emitted[0].source).toMatch(/^zod \d/m);
+    expect(emitted[0].source).toMatch(/^react \d/m);
   });
 
   it('stops the build when a bundled package has no license file', () => {

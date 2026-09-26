@@ -61,23 +61,40 @@ export function thirdPartyNotices(moduleIds: Iterable<string>, root = process.cw
   return { packages, text: `${text}\n` };
 }
 
-/** Writes licenses/third-party.txt next to the font licenses in every production build. */
+const moduleIdsOf = (bundle: Record<string, { type: string; moduleIds?: string[] }>) =>
+  Object.values(bundle).flatMap((item) => (item.type === 'chunk' ? (item.moduleIds ?? []) : []));
+
+/**
+ * Writes licenses/third-party.txt next to the font licenses in every production build.
+ * The music workers are bundled on their own, while the town's modules are still being
+ * transformed, so a small worker plugin hands their modules over before the file is written.
+ */
 export function thirdPartyLicenses(): Plugin {
   let root = process.cwd();
+  const workerModules = new Set<string>();
   return {
     name: 'forktown-third-party-licenses',
     apply: 'build',
+    config: () => ({
+      worker: {
+        plugins: () => [
+          {
+            name: 'forktown-third-party-licenses-worker',
+            generateBundle(_, bundle) {
+              for (const id of moduleIdsOf(bundle)) workerModules.add(id);
+            },
+          },
+        ],
+      },
+    }),
     configResolved(config) {
       root = config.root;
     },
     generateBundle(_, bundle) {
-      const ids = Object.values(bundle).flatMap((item) =>
-        item.type === 'chunk' ? item.moduleIds : [],
-      );
       this.emitFile({
         type: 'asset',
         fileName: 'licenses/third-party.txt',
-        source: thirdPartyNotices(ids, root).text,
+        source: thirdPartyNotices([...moduleIdsOf(bundle), ...workerModules], root).text,
       });
     },
   };
