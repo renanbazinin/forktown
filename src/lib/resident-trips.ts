@@ -6,6 +6,14 @@ import { cinemaGuests, CINEMA_ENTRANCE } from './cinema';
 import { FOOTBALL_ENTRANCE, FOOTBALL_VENUE, spectatorSpot, footballAt } from './football';
 import { zooRoute } from './zoo';
 import {
+  MILLPOND_GATE,
+  MILLPOND_VENUE,
+  SKATING,
+  millpondRoute,
+  millpondSkatingDay,
+  skateGlide,
+} from './millpond';
+import {
   alongRoute,
   planTravel,
   roadPath,
@@ -17,7 +25,7 @@ import {
 import { nightBedtime } from './night-routine';
 
 type VisitEvent = Omit<TownEvent, 'venue' | 'period'> & {
-  venue: Venue | typeof FOOTBALL_VENUE;
+  venue: Venue | typeof FOOTBALL_VENUE | typeof MILLPOND_VENUE;
   period: 'morning' | 'afternoon' | 'evening' | 'night';
 };
 export type ResidentTrip = TravelPlan & {
@@ -67,6 +75,8 @@ export function eventRoute(home: Place, event: VisitEvent, seat: number): Point[
     const path = zooRoute(eventSpot(event.venue, seat).position);
     return [...roadPath(doorstep, path[0]), ...path.slice(1)];
   }
+  if (event.venue.kind === 'millpond')
+    return [...roadPath(doorstep, MILLPOND_GATE), ...millpondRoute(seat).slice(1)];
   const approach = venueApproach(event.venue, seat);
   return [...roadPath(doorstep, approach[0]), ...approach.slice(1)];
 }
@@ -153,6 +163,27 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
       period,
     );
   }
+  // Winter skating on the frozen Millpond, for afternoon strollers nobody else has claimed.
+  if (millpondSkatingDay(day)) {
+    const afternoonFans = sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]);
+    const fanIds = afternoonFans
+      .slice(0, Math.min(6, Math.ceil(afternoonFans.length / 2)))
+      .map((h) => h.id);
+    const skaters = sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]);
+    add(
+      {
+        id: 'millpond',
+        name: 'Skating on the Millpond',
+        description: 'Skating on the frozen millpond',
+        venue: MILLPOND_VENUE,
+        period: 'afternoon',
+        ...SKATING,
+        // Whoever leaves last (stagger 5 × 1.3) is still off the ice by the posted 16:40.
+        end: SKATING.end - 6.5,
+      },
+      skaters.slice(0, Math.min(6, Math.ceil(skaters.length / 2))).map((h) => h.id),
+    );
+  }
   const result = new Map<string, ResidentTrip[]>();
   for (const home of places) {
     if (!getPlot(home.plot)) continue;
@@ -218,7 +249,10 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
         ...window,
         event,
         seat,
-        facing: event.venue.kind === 'football' ? 'ne' : eventSpot(event.venue, seat).facing,
+        facing:
+          event.venue.kind === 'football' || event.venue.kind === 'millpond'
+            ? 'ne'
+            : eventSpot(event.venue, seat).facing,
       });
     }
     result.set(home.id, trips);
@@ -258,8 +292,22 @@ export function tripState(
     returnRoute,
     returnDuration,
   } = trip;
+  // Skaters step onto the ice at their loop's south point and glide from that moment on.
+  const skating = event.venue.kind === 'millpond';
   const phase =
-    time < Math.max(arrive, event.start) ? 'going' : time < leave ? 'attending' : 'returning';
+    time < (skating ? arrive : Math.max(arrive, event.start))
+      ? 'going'
+      : time < leave
+        ? 'attending'
+        : 'returning';
+  if (skating && phase === 'attending')
+    return {
+      ...skateGlide(seat, arrive, leave, time),
+      moving: false,
+      activity: 'stroll',
+      pose: 'skate',
+      event: { id: event.id, name: event.name, phase },
+    };
   const movement =
     phase === 'going'
       ? alongRoute(route, (time - depart) / duration)

@@ -57,6 +57,12 @@ export function residentActivityLabel(state: ResidentState): string {
       : state.event.phase === 'returning'
         ? 'Walking home from the football'
         : 'Watching football at The Meadow Ground';
+  if (state.event?.id === 'millpond')
+    return state.event.phase === 'going'
+      ? 'Walking to the Millpond'
+      : state.event.phase === 'returning'
+        ? 'Walking home from the Millpond'
+        : 'Skating on the Millpond';
   if (state.event)
     return state.event.phase === 'going'
       ? `Walking to ${state.event.name}`

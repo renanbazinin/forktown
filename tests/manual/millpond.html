@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forktown · The Millpond</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #eaf0df;
+        color: #304d40;
+        font: 15px system-ui;
+      }
+      h1 {
+        font: 32px Georgia;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font:
+          13px 'Space Mono',
+          monospace;
+        letter-spacing: 0.06em;
+        margin: 14px 0 4px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+        cursor: pointer;
+      }
+      button[aria-pressed='true'] {
+        background: #d9e6c8;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      select {
+        padding: 6px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+      }
+      .sliders {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 6px 12px;
+        align-items: center;
+        margin: 8px 0;
+      }
+      input[type='range'] {
+        width: 100%;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+        border-radius: 12px;
+        background: #dae4cd;
+      }
+      a {
+        color: inherit;
+      }
+      #status {
+        font:
+          13px/1.5 'Space Mono',
+          monospace;
+        min-height: 3em;
+        margin: 8px 0;
+      }
+      .problem {
+        color: #8a3b2b;
+        background: #fbe9e2;
+        border: 1px solid #d9a898;
+        border-radius: 6px;
+        padding: 8px 12px;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      #panel {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
+      #panel article {
+        background: #fffbed;
+        border: 1px solid #c9d6bf;
+        border-radius: 10px;
+        padding: 10px 14px;
+      }
+      #panel small {
+        font:
+          11px 'Space Mono',
+          monospace;
+        letter-spacing: 0.06em;
+      }
+      #panel h3 {
+        font: 18px Georgia;
+        margin: 4px 0;
+      }
+      #panel p {
+        margin: 4px 0;
+      }
+      #panel .muted {
+        opacity: 0.72;
+      }
+    </style>
+    <script>
+      // A module caught mid-edit should say so instead of leaving a blank canvas.
+      window.millpondProblem = (message) => {
+        const box = document.querySelector('#problem');
+        if (!box) return;
+        box.textContent = String(message ?? 'Something failed.').split('\n')[0];
+        box.hidden = false;
+      };
+      addEventListener('error', (event) =>
+        window.millpondProblem(event.message || 'A script failed to load.'),
+      );
+      addEventListener('unhandledrejection', (event) =>
+        window.millpondProblem(event.reason?.message ?? event.reason),
+      );
+    </script>
+  </head>
+  <body>
+    <h1>The Millpond</h1>
+    <p>
+      Development fixture. H3–I6 with the real renderer and residents at a pinned town day and
+      minute (Year 3). It never saves houses or changes the live town clock. Deep links:
+      <code>?day=95&amp;time=870&amp;crowd=1&amp;view=close</code> (day is the year day 0–111).
+    </p>
+    <p class="problem" id="problem" role="alert" hidden></p>
+    <h2>SCENES</h2>
+    <nav id="scenes" aria-label="Scenes"></nav>
+    <h2>SECRET AND CONTROLS</h2>
+    <nav id="secret" aria-label="Secret and controls"></nav>
+    <h2>LANTERN HOUR</h2>
+    <nav id="lanterns" aria-label="Lantern hour"></nav>
+    <nav aria-label="View">
+      <label
+        >Moon (22:00, this season)
+        <select id="phase">
+          <option value="">—</option>
+          <option value="1">New</option>
+          <option value="4">Waxing crescent</option>
+          <option value="8">First quarter</option>
+          <option value="12">Waxing gibbous</option>
+          <option value="15">Full</option>
+          <option value="19">Waning gibbous</option>
+          <option value="22">Last quarter</option>
+          <option value="26">Waning crescent</option>
+        </select></label
+      >
+      <label
+        >View
+        <select id="view">
+          <option value="close">Close</option>
+          <option value="pond">Pond panel (app framing)</option>
+          <option value="football">Football panel (app framing)</option>
+          <option value="opening">Opening view</option>
+          <option value="whole">Whole town</option>
+        </select></label
+      >
+      <label><input id="crowd" type="checkbox" /> Synthetic crowd (36 all-stroll homes)</label>
+      <label><input id="rules" type="checkbox" /> Sightline rules</label>
+      <button id="play" aria-pressed="false">Play</button>
+      <button id="live" aria-pressed="false">Live UTC</button>
+      <a href="/#venue=millpond">Open the pond in town</a>
+    </nav>
+    <div class="sliders">
+      <label for="day">Year day</label>
+      <input id="day" type="range" min="0" max="111" step="1" value="42" />
+      <label for="time">Minute</label>
+      <input id="time" type="range" min="0" max="1439.9" step="0.1" value="720" />
+    </div>
+    <p id="status" role="status"></p>
+    <canvas id="map" width="1440" height="900" aria-label="The Millpond preview"></canvas>
+    <section id="panel" aria-label="What the panel and the events list say"></section>
+    <script type="module">
+      // Every module loads with import() so a half-written file shows up in the problem box
+      // instead of a blank page; the pond's own modules are optional.
+      const report = (error) => window.millpondProblem?.(error?.message ?? error);
+      const load = (path) => import(/* @vite-ignore */ path);
+      const optional = (path) =>
+        load(path).catch((error) => {
+          report(`${path}: ${error?.message ?? error}`);
+          return {};
+        });
+
+      const [
+        { renderCity },
+        { places },
+        { townArrivals },
+        { HOUSE_PLOTS, VENUES, eventsForDay },
+        { simulateResidents, timeLabel },
+        { WORLD_BOUNDS, getPlot, plotCenter, project },
+        { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt, townSkyAt },
+        { lanternHourAt, lanternRegister },
+        { townDayAt, townMinutesAt },
+        { FOOTBALL_CENTER },
+      ] = await Promise.all(
+        [
+          '/src/city/render.ts',
+          '/src/lib/places.ts',
+          '/src/lib/arrivals.ts',
+          '/src/lib/events.ts',
+          '/src/lib/simulation.ts',
+          '/src/lib/world.ts',
+          '/src/lib/town-calendar.ts',
+          '/src/lib/lanterns.ts',
+          '/src/lib/town-time.ts',
+          '/src/lib/football.ts',
+        ].map(load),
+      ).catch((error) => {
+        report(`The renderer did not load: ${error?.message ?? error}`);
+        throw error;
+      });
+      const pond = await optional('/src/lib/millpond.ts');
+      const copy = await optional('/src/lib/millpond-copy.ts');
+
+      const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like seasons.html
+      const dayOf = (season, date) => YEAR + 28 * season + date - 1;
+      const W = 1440,
+        H = 900;
+      const crowd = HOUSE_PLOTS.slice(0, 36).map((plot, index) => ({
+        ...places[index % places.length],
+        id: `pond-neighbor-${index}`,
+        plot: plot.id,
+        resident: {
+          ...places[index % places.length].resident,
+          routine: { morning: 'stroll', afternoon: 'stroll', evening: 'stroll', night: 'stroll' },
+        },
+      }));
+
+      const query = new URLSearchParams(location.search);
+      const state = {
+        day: dayOf(1, 15),
+        minutes: 720,
+        view: 'close',
+        crowd: false,
+        rules: false,
+        playing: false,
+        live: false,
+        stopAt: null,
+      };
+      if (query.has('day')) state.day = YEAR + Math.max(0, Math.min(111, Number(query.get('day'))));
+      if (query.has('time'))
+        state.minutes = Math.max(0, Math.min(1439.9, Number(query.get('time'))));
+      if (query.has('view')) state.view = query.get('view');
+      state.crowd = query.has('crowd') && query.get('crowd') !== '0';
+      state.rules = query.has('rules') && query.get('rules') !== '0';
+      // Scripted access for screenshots: millpondPreview.go(95, 870) or change the fields directly.
+      window.millpondPreview = Object.assign(state, {
+        go: (yearDay, minutes, extra = {}) => set({ day: YEAR + yearDay, minutes, ...extra }),
+        pond,
+        copy,
+      });
+
+      const writeUrl = () => {
+        const params = new URLSearchParams({
+          day: String(state.day - YEAR),
+          time: String(Math.round(state.minutes * 10) / 10),
+          view: state.view,
+        });
+        if (state.crowd) params.set('crowd', '1');
+        if (state.rules) params.set('rules', '1');
+        history.replaceState(null, '', `${location.pathname}?${params}`);
+      };
+      function set(change) {
+        Object.assign(state, { playing: false, live: false, stopAt: null }, change);
+        writeUrl();
+        syncControls();
+      }
+
+      // Moments that depend on the model: search the day for them, fall back when the model
+      // has none yet (the page must work while the pond is still being built).
+      const openDay = (day) =>
+        !pond.iceOn || pond.iceOn(pond.millpondGroundDay(720, day)).stage === 'open';
+      const firstMoment = (day, from, to, test, step = 0.05) => {
+        for (let m = from; m < to; m += step) if (test(m, day)) return m;
+        return null;
+      };
+      function heronStrike() {
+        const day = openDay(state.day) ? state.day : dayOf(1, 10);
+        const catchAfter = (m) =>
+          [0.5, 1, 1.5, 2, 2.5].some((d) => pond.heronAt?.(m + d, day)?.fish);
+        const strike = (m) => pond.heronAt?.(m, day)?.pose === 'strike';
+        const at =
+          firstMoment(day, 360, 480, (m) => strike(m) && catchAfter(m)) ??
+          firstMoment(day, 960, 1110, (m) => strike(m) && catchAfter(m)) ??
+          firstMoment(day, 360, 1110, strike) ??
+          990;
+        set({ day, minutes: Math.max(0, at - 0.4) });
+      }
+      // A leap at take-off, or a moment later as the fish lands (and its landing ring spreads).
+      function fishLeap(from = 0, to = 0.2) {
+        const day = openDay(state.day) ? state.day : dayOf(1, 15);
+        const at = firstMoment(day, 1110, 1230, (m) =>
+          (pond.fishRisesAt?.(m, day) ?? []).some(
+            (rise) => rise.leap && rise.progress >= from && rise.progress < to,
+          ),
+        );
+        set({ day, minutes: at ?? 1140 });
+      }
+      // The heron stays through the freezing and thawing days, resting by the open water.
+      function heronOnIceDay(season, date) {
+        const day = dayOf(season, date);
+        const at = firstMoment(day, 600, 900, (m) => !!pond.heronAt?.(m, day), 5);
+        set({ day, minutes: at ?? 720 });
+      }
+      const SCENES = [
+        ['Spring 20 · petals + heron', () => set({ day: dayOf(0, 20), minutes: 600 })],
+        ['Heron strike + catch', heronStrike],
+        ['Dusk · fish rising 19:00', () => set({ day: dayOf(1, 15), minutes: 1140 })],
+        ['Fish leap (search)', () => fishLeap(0, 0.2)],
+        ['Fish leap · landing ring (search)', () => fishLeap(0.6, 0.85)],
+        ['Summer 15 noon · rowboats', () => set({ day: dayOf(1, 15), minutes: 720 })],
+        ['Summer 15 22:00 · fireflies + moon', () => set({ day: dayOf(1, 15), minutes: 1320 })],
+        ['Autumn 20 · leaves', () => set({ day: dayOf(2, 20), minutes: 720 })],
+        ['Winter 6 · freezing', () => set({ day: dayOf(3, 6), minutes: 720 })],
+        [
+          'Winter 12 14:30 · skating + crowd',
+          () => set({ day: dayOf(3, 12), minutes: 870, crowd: true }),
+        ],
+        ['Winter 21 · thaw', () => set({ day: dayOf(3, 21), minutes: 720 })],
+        ['Winter 6 · heron by the ice edge', () => heronOnIceDay(3, 6)],
+        ['Winter 21 · heron back on the thaw', () => heronOnIceDay(3, 21)],
+        ['Summer 10 noon · lily flowers', () => set({ day: dayOf(1, 10), minutes: 720 })],
+        [
+          'Dawn 06:15 · fisher + mist + heron',
+          () => set({ day: openDay(state.day) ? state.day : dayOf(1, 10), minutes: 375 }),
+        ],
+      ];
+      const SECRET = [
+        ['Winter 15, 03:00', () => set({ day: dayOf(3, 15), minutes: 180 })],
+        ['Winter 15, 03:04 (crack spread)', () => set({ day: dayOf(3, 15), minutes: 184 })],
+        ['Winter 15, 03:40', () => set({ day: dayOf(3, 15), minutes: 220 })],
+        ['Control · Winter 13, 03:00', () => set({ day: dayOf(3, 13), minutes: 180 })],
+        ['Control · Winter 15, 02:00', () => set({ day: dayOf(3, 15), minutes: 120 })],
+      ];
+      const LANTERNS = [
+        '19:59',
+        '20:00',
+        '20:08',
+        '20:16',
+        '20:20',
+        '20:22',
+        '20:25',
+        '20:30',
+        '03:00',
+      ];
+      const button = (parent, label, onclick) => {
+        const b = document.createElement('button');
+        b.textContent = label;
+        b.onclick = onclick;
+        document.querySelector(parent).append(b);
+        return b;
+      };
+      for (const [label, go] of SCENES) button('#scenes', label, go);
+      for (const [label, go] of SECRET) button('#secret', label, go);
+      for (const label of LANTERNS) {
+        const [h, m] = label.split(':').map(Number);
+        button('#lanterns', label, () => set({ minutes: h * 60 + m }));
+      }
+      button('#lanterns', 'Play 19:59 → 20:30', () => {
+        set({ minutes: 1199 });
+        Object.assign(state, { playing: true, stopAt: 1230 });
+      });
+
+      const $ = (selector) => document.querySelector(selector);
+      function syncControls() {
+        $('#view').value = state.view;
+        $('#crowd').checked = state.crowd;
+        $('#rules').checked = state.rules;
+        $('#play').setAttribute('aria-pressed', String(state.playing));
+        $('#live').setAttribute('aria-pressed', String(state.live));
+      }
+      $('#phase').onchange = (event) => {
+        if (!event.target.value) return;
+        const seasonStart = YEAR + Math.floor((state.day - YEAR) / 28) * 28;
+        set({ day: seasonStart + Number(event.target.value) - 1, minutes: 1320 });
+      };
+      $('#view').onchange = (event) => set({ view: event.target.value });
+      $('#crowd').onchange = (event) => set({ crowd: event.target.checked });
+      $('#rules').onchange = (event) => set({ rules: event.target.checked });
+      $('#day').oninput = (event) => set({ day: YEAR + Number(event.target.value) });
+      $('#time').oninput = (event) => set({ minutes: Number(event.target.value) });
+      $('#play').onclick = () => {
+        state.playing = !state.playing;
+        state.live = false;
+        syncControls();
+      };
+      $('#live').onclick = () => {
+        state.live = !state.live;
+        state.playing = false;
+        syncControls();
+      };
+      syncControls();
+
+      // Cameras: copies of the app's framings (City.tsx) for a 1440 × 900 window.
+      function wholeTown(width, height) {
+        const zoom = Math.max(
+          0.01,
+          Math.min(
+            (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
+            (height - 85) / (WORLD_BOUNDS.bottom + 98),
+          ),
+        );
+        return {
+          x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
+          y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
+          zoom,
+        };
+      }
+      const OPENING = (() => {
+        const all = [
+          ...places.map((place) => place.plot),
+          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
+            (venue) => venue.plot,
+          ),
+        ].flatMap((id) => {
+          const plot = getPlot(id);
+          return plot ? [plotCenter(plot)] : [];
+        });
+        const median = (values) => values.sort((a, b) => a - b)[values.length >> 1];
+        const mid = { x: median(all.map((p) => p.x)), y: median(all.map((p) => p.y)) };
+        const distance = (p) => Math.hypot(p.x - mid.x, p.y - mid.y);
+        const typical = median(all.map(distance));
+        const points = all.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
+        return {
+          left: Math.min(...points.map((point) => point.x)) - 110,
+          right: Math.max(...points.map((point) => point.x)) + 110,
+          top: Math.min(...points.map((point) => point.y)) - 145,
+          bottom: Math.max(...points.map((point) => point.y)) + 80,
+        };
+      })();
+      function openingView(width, height) {
+        const { left, right, top, bottom } = OPENING;
+        const zoom = Math.max(
+          wholeTown(width, height).zoom,
+          Math.min(
+            0.85,
+            (width < 600 ? width * 1.6 : width - Math.min(150, width * 0.08)) / (right - left),
+            (height - Math.min(160, height * 0.08)) / (bottom - top),
+          ),
+        );
+        return {
+          x: width / 2 - ((left + right) / 2) * zoom,
+          y: height / 2 - ((top + bottom) / 2) * zoom,
+          zoom,
+        };
+      }
+      function footballCamera(width, height) {
+        const pt = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y);
+        const mobile = width < 600;
+        const usableWidth = mobile ? width - 20 : width - 400;
+        const usableHeight = mobile ? height * 0.43 : height - 150;
+        const zoom = Math.max(0.25, Math.min(1.45, usableWidth / 735, usableHeight / 445));
+        return {
+          x: (mobile ? width / 2 : (width - 370) / 2) - pt.x * zoom,
+          y: (mobile ? height * 0.3 : height * 0.52) - pt.y * zoom,
+          zoom,
+        };
+      }
+      const frame = () =>
+        pond.MILLPOND_FRAME ?? {
+          center: project(17.5, 33.5),
+          width: 936,
+          height: 638,
+        };
+      function millpondCamera(width, height) {
+        const f = frame();
+        const mobile = width < 600;
+        const zoom = Math.max(
+          0.05,
+          Math.min(
+            1.4,
+            (width - (mobile ? 24 : 400)) / f.width,
+            (mobile ? height * 0.43 : height - 150) / f.height,
+          ),
+        );
+        return {
+          x: (mobile ? width / 2 : (width - 370) / 2) - f.center.x * zoom,
+          y: (mobile ? height * 0.29 : height * 0.5) - f.center.y * zoom,
+          zoom,
+        };
+      }
+      function camera() {
+        if (state.view === 'whole') return wholeTown(W, H);
+        if (state.view === 'opening') return openingView(W, H);
+        if (state.view === 'football') return footballCamera(W, H);
+        if (state.view === 'pond') return millpondCamera(W, H);
+        const center = frame().center;
+        return { x: W / 2 - center.x * 2, y: H / 2 - (center.y - 20) * 2, zoom: 2 };
+      }
+      const panelView = () => state.view === 'pond' || state.view === 'football';
+
+      // The three sightline rules (docs/MILLPOND.md), drawn in world pixels.
+      function drawRules(ctx, cam) {
+        ctx.save();
+        ctx.setTransform(cam.zoom, 0, 0, cam.zoom, cam.x, cam.y);
+        ctx.lineWidth = 2 / cam.zoom;
+        ctx.setLineDash([8 / cam.zoom, 6 / cam.zoom]);
+        const line = (color, x1, y1, x2, y2) => {
+          ctx.strokeStyle = color;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        };
+        line('#c2185b', -1400, 1102 - 700, 400, 1102 + 200); // north: sy = 1102 + sx/2
+        line('#6a1b9a', -1400, 342 + 700, 0, 342); // west: sy = 342 - sx/2
+        line('#0d47a1', -770, 600, -770, 1300); // framing: uprights > 40 px stay left
+        if (pond.MILLPOND_WATER) {
+          ctx.setLineDash([]);
+          ctx.strokeStyle = '#0d47a1';
+          ctx.beginPath();
+          pond.MILLPOND_WATER.forEach((p, i) => {
+            const s = project(p.x, p.y);
+            if (i) ctx.lineTo(s.x, s.y);
+            else ctx.moveTo(s.x, s.y);
+          });
+          ctx.closePath();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      const canvas = $('#map'),
+        ctx = canvas.getContext('2d');
+      let last = performance.now(),
+        lastPanel = '';
+      function describe(day, minutes, residents) {
+        const c = townCalendarAt(day, minutes);
+        const sky = townSkyAt(day, minutes);
+        const hour = lanternHourAt(lanternRegister(places, townArrivals).total, minutes);
+        const bits = [
+          c.label,
+          timeLabel(minutes) + (minutes % 1 ? `.${Math.round((minutes % 1) * 10)}` : ''),
+          `${c.moonName} ${Math.round(c.illumination * 100)}%${sky.moon?.opacity > 0 ? ' (up)' : ''}`,
+        ];
+        if (pond.millpondStatusAt) {
+          const s = pond.millpondStatusAt(minutes, day);
+          bits.push(`ice ${s.ice}`);
+          if (s.skating) bits.push(s.skating.live ? 'skating now' : 'skating day');
+          bits.push(`boats ${s.boats}${s.boatsOut ? ` (${s.boatsOut} out)` : ''}`);
+          if (s.heron)
+            bits.push(`heron ${s.heron}${s.heronWalking ? ` walking ${s.heronWalking}` : ''}`);
+          // Every other flag the status carries (fishRising, fisher, mist, petals, flowers…).
+          for (const [key, value] of Object.entries(s)) if (value === true) bits.push(key);
+        }
+        const heron = pond.heronAt?.(minutes, day);
+        if (heron)
+          bits.push(
+            `heron ${heron.pose}${heron.fish ? ' + fish' : ''} (${heron.position.x.toFixed(2)}, ${heron.position.y.toFixed(2)})`,
+          );
+        const rises = pond.fishRisesAt?.(minutes, day) ?? [];
+        if (rises.length)
+          bits.push(`${rises.length} rings, ${rises.filter((r) => r.leap).length} leaping`);
+        const boats = pond.boatsAt?.(minutes, day) ?? [];
+        if (boats.length) bits.push(`boats ${boats.map((b) => b.state).join('/')}`);
+        if (pond.fisherAt?.(minutes, day)) bits.push('fisher on the jetty');
+        const mist = pond.mistAt?.(minutes, day) ?? 0;
+        if (mist > 0) bits.push(`mist ${Math.round(mist * 100)}%`);
+        // The same filter App.tsx uses: the names of the neighbours on the ice right now.
+        const skaters = residents
+          .filter((r) => r.event?.id === 'millpond' && r.event.phase === 'attending')
+          .map((r) => r.resident.name);
+        const going = residents.filter((r) => r.event?.id === 'millpond').length;
+        const scenery = pond.sceneSkatersAt?.(minutes, day)?.length ?? 0;
+        if (going || scenery)
+          bits.push(`skaters ${skaters.length} on ice (${going} on trips) + ${scenery} scenery`);
+        const secret = pond.iceSecretAt?.(minutes, day);
+        if (secret)
+          bits.push(`secret crack ${secret.crack.toFixed(2)} glint ${secret.glint.toFixed(2)}`);
+        bits.push(`Lantern hour ${hour.phase} ${hour.lit}/${hour.total}`);
+        if (state.live) bits.push('Live UTC');
+        return { text: bits.join(' · '), skaters };
+      }
+      function renderPanel(day, minutes, skaters) {
+        if (!copy.millpondCopy) return;
+        const text = copy.millpondCopy(minutes, day, skaters);
+        const card = copy.skatingCard(minutes, day, skaters.length);
+        const key = JSON.stringify([text, card]);
+        if (key === lastPanel) return;
+        lastPanel = key;
+        const panel = $('#panel');
+        panel.replaceChildren();
+        const article = (eyebrow, heading, ...lines) => {
+          const a = document.createElement('article');
+          const small = document.createElement('small');
+          small.textContent = eyebrow;
+          const h = document.createElement('h3');
+          h.textContent = heading;
+          a.append(small, h);
+          for (const [line, muted] of lines) {
+            if (!line) continue;
+            const p = document.createElement('p');
+            p.textContent = line;
+            if (muted) p.className = 'muted';
+            a.append(p);
+          }
+          panel.append(a);
+        };
+        article(text.label, 'The Millpond', [text.footer, true]);
+        for (const block of text.blocks)
+          article(block.eyebrow, block.heading, [block.body], [block.note, true]);
+        article('EVENTS CARD', card ? card.name : 'No skating card today.', [
+          card
+            ? `${card.live ? '● ' : ''}${card.status} · ${card.time}${card.skaters ? ` · ${card.skaters} on the ice` : ''}`
+            : '',
+        ]);
+      }
+      function tick(now) {
+        if (state.live) {
+          state.day = townDayAt(Date.now());
+          state.minutes = townMinutesAt(Date.now());
+        } else if (state.playing) {
+          state.minutes += Math.min(0.25, (now - last) / 1000);
+          if (state.stopAt !== null && state.minutes >= state.stopAt) {
+            state.minutes = state.stopAt;
+            state.playing = false;
+            state.stopAt = null;
+            syncControls();
+          }
+          if (state.minutes >= 1440) {
+            state.minutes %= 1440;
+            state.day++;
+          }
+        }
+        last = now;
+        const { day, minutes } = state;
+        const homes = state.crowd ? crowd : places;
+        let residents = [];
+        try {
+          residents = simulateResidents(homes, minutes, day);
+          const cam = camera();
+          renderCity({
+            ctx,
+            width: W,
+            height: H,
+            camera: cam,
+            places: homes,
+            ufoPlaces: places,
+            residents,
+            events: eventsForDay(day),
+            minutes,
+            day,
+            night: minutes < 360 || minutes >= 1200,
+            selectedPlot: state.view === 'pond' ? 'H4' : null,
+            hoveredPlot: null,
+            showPlots: false,
+          });
+          if (state.rules) drawRules(ctx, cam);
+          if (panelView()) {
+            // The app's side panel covers the right 370 px of a desktop window.
+            ctx.fillStyle = 'rgba(255, 251, 237, 0.55)';
+            ctx.fillRect(W - 370, 0, 370, H);
+          }
+          const { text, skaters } = describe(day, minutes, residents);
+          $('#status').textContent = text;
+          renderPanel(day, minutes, skaters);
+        } catch (error) {
+          report(error);
+        }
+        $('#day').value = String((((day - YEAR) % DAYS_PER_YEAR) + DAYS_PER_YEAR) % DAYS_PER_YEAR);
+        $('#time').value = String(minutes);
+        requestAnimationFrame(tick);
+      }
+      requestAnimationFrame(tick);
+    </script>
+  </body>
+</html>

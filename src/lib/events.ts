@@ -1,6 +1,7 @@
 import { getPlot, hash, PLOTS } from './world.ts';
 import { isFootballPlot } from './football.ts';
 import { isFarmPlot } from './farm.ts';
+import { isMillpondPlot } from './millpond.ts';
 import { ZOO_VENUE, ZOO_SPOTS, isZooPlot, insideZoo } from './zoo.ts';
 import { CINEMA_VENUE, CINEMA_SEATS, isCinemaPlot, insideCinema, cinemaProgram } from './cinema.ts';
 import { FORK_ID, FORK_NAME, FORK_PLOT } from './lanterns.ts';
@@ -16,7 +17,8 @@ export const VENUES = [
   { id: FORK_ID, plot: FORK_PLOT, name: FORK_NAME, kind: 'fork' },
 ] as const;
 export type Venue = (typeof VENUES)[number];
-export type EventPose = 'sit' | 'read' | 'sip' | 'chat' | 'play' | 'cheer' | 'sway' | 'dance';
+export type EventPose =
+  'sit' | 'read' | 'sip' | 'chat' | 'play' | 'cheer' | 'sway' | 'dance' | 'skate';
 type EventSpot = { x: number; y: number; facing: 'se' | 'sw' | 'ne' | 'nw' };
 // Coordinates relative to the plot center. These are usable lawn spots, not a street queue.
 // Keep the stage audience in front of the platform (which ends at local y = 0.2).
@@ -66,7 +68,11 @@ export const venueAt = (plot: string) =>
       ? CINEMA_VENUE
       : VENUES.find((venue) => venue.plot === plot);
 export const HOUSE_PLOTS = PLOTS.filter(
-  (plot) => !venueAt(plot.id) && !isFootballPlot(plot.id) && !isFarmPlot(plot.id),
+  (plot) =>
+    !venueAt(plot.id) &&
+    !isFootballPlot(plot.id) &&
+    !isFarmPlot(plot.id) &&
+    !isMillpondPlot(plot.id),
 );
 
 export const EVENT_CHOICES = {

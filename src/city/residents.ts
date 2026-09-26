@@ -18,15 +18,26 @@ export function drawResident(
   const left = facing === 'sw' || facing === 'nw';
   const female = resident.figure === 'female';
   const seated = !!state?.pose && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
+  // Skating on the Millpond: a forward lean, arms out for balance, one foot pushing back on a blade.
+  const skating = state?.pose === 'skate';
   const cheering = state?.pose === 'cheer';
   const disco = state?.pose === 'dance';
   const dancing = cheering || disco || state?.pose === 'sway';
-  const stepping = state?.moving || disco;
-  const stride = state?.moving || dancing ? Math.sin((state.walkPhase ?? 0) * Math.PI * 2) : 0;
+  const stepping = state?.moving || disco || skating;
+  const stride =
+    state?.moving || dancing || skating ? Math.sin((state.walkPhase ?? 0) * Math.PI * 2) : 0;
   const swing = Math.round(stride * 2);
-  const bob = seated ? 5 : state?.moving || dancing ? -Math.round(Math.abs(stride) * 0.8) : 0;
-  const nearLift = stepping ? Math.max(0, Math.round(stride * 2)) : 0;
-  const farLift = stepping ? Math.max(0, Math.round(-stride * 2)) : 0;
+  const bob = seated
+    ? 5
+    : skating
+      ? 1
+      : state?.moving || dancing
+        ? -Math.round(Math.abs(stride) * 0.8)
+        : 0;
+  // A walker lifts the foot swinging forward; a skater lifts the one pushing back.
+  const push = skating ? -1 : 1;
+  const nearLift = stepping ? Math.max(0, Math.round(push * stride * 2)) : 0;
+  const farLift = stepping ? Math.max(0, Math.round(-push * stride * 2)) : 0;
   const footSwing = stepping ? swing : 0;
   const outfitShadow = tint(resident.outfit, -24);
   ctx.save();
@@ -39,6 +50,7 @@ export function drawResident(
 
   ctx.save();
   if (left) ctx.scale(-1, 1);
+  if (skating) ctx.transform(1, 0, -0.16, 1, 0, 0);
   // The far arm and foot sit behind the body; feet lift rather than stretch.
   ctx.fillStyle = outfitShadow;
   if (cheering || (disco && stride > 0)) {
@@ -46,6 +58,10 @@ export function drawResident(
     ctx.fillRect(-7, -22 + bob - Math.max(0, swing), 3, 10);
     ctx.fillStyle = resident.skin;
     ctx.fillRect(-7, -25 + bob - Math.max(0, swing), 3, 3);
+  } else if (skating) {
+    ctx.fillRect(-9, -12 + bob, 6, 2);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(-11, -12 + bob, 2, 2);
   } else {
     ctx.fillRect(-4, -11 + bob - swing, 2, 6);
     ctx.fillStyle = resident.skin;
@@ -66,6 +82,12 @@ export function drawResident(
     ctx.fillRect(1 + footSwing, -6, 2, 6 - nearLift);
     ctx.fillStyle = '#35413D';
     ctx.fillRect(1 + footSwing, -1 - nearLift, 4, 2);
+    if (skating) {
+      // Pale 1-px blades under both boots.
+      ctx.fillStyle = '#DCE4E2';
+      ctx.fillRect(-3 - footSwing, 1 - farLift, 6, 1);
+      ctx.fillRect(footSwing, 1 - nearLift, 6, 1);
+    }
   }
 
   // Longer hair sits behind the shoulders; the same limbs and poses serve both figures.
@@ -101,6 +123,10 @@ export function drawResident(
     ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);
     ctx.fillStyle = resident.skin;
     ctx.fillRect(5, -24 + bob + Math.min(0, swing), 3, 3);
+  } else if (skating) {
+    ctx.fillRect(3, -12 + bob, 6, 2);
+    ctx.fillStyle = resident.skin;
+    ctx.fillRect(9, -11 + bob, 2, 2);
   } else {
     ctx.fillRect(3, -11 + bob + swing, 2, 6);
     ctx.fillStyle = resident.skin;

@@ -10,6 +10,7 @@ import {
   FALLEN_LEAVES,
   FIREFLY,
   FOLIAGE,
+  ICE,
   PUMPKIN,
   SNOW,
   type Pair,
@@ -102,7 +103,17 @@ const painted = (calls: RecordedCall[]) =>
 const SIGNATURE = {
   /** Snow lying on roofs, crowns, tufts and furrows. */
   settled: both(SNOW.top, SNOW.shade, SNOW.frost),
-  snow: both(SNOW.top, SNOW.shade, SNOW.frost, SNOW.ice, SNOW.flake),
+  /** Snow, and the Millpond's ice: winter's alone. */
+  snow: both(
+    SNOW.top,
+    SNOW.shade,
+    SNOW.frost,
+    SNOW.ice,
+    SNOW.flake,
+    ICE.sheet,
+    ICE.crack,
+    ICE.crackLight,
+  ),
   roofSnow: both(SNOW.top),
   flakes: both(SNOW.flake),
   fireflies: [FIREFLY.core, FIREFLY.halo],
@@ -132,7 +143,8 @@ describe('The opening view through the year', () => {
         base = frame(summer, minutes).length;
       expect(calls, `${minutes}`).toBeGreaterThan(1000);
       expect(calls, `${minutes}`).toBeLessThan(40_000);
-      // Measured: -585 to +216 over these moments. A season only rests on top of the town;
+      // Measured: -754 to +287 over these moments (with the Millpond, whose ice, boats and lily
+      // pads follow the year). A season only rests on top of the town;
       // it never adds a layer, and never loses one (the houses alone are ~3,000 calls).
       expect(calls - base, `${minutes}`).toBeLessThanOrEqual(1_000);
       expect(calls - base, `${minutes}`).toBeGreaterThanOrEqual(-1_500);

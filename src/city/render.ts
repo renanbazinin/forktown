@@ -3,6 +3,14 @@ import { drawSky } from './sky';
 import { drawFarm, drawFarmGround, drawUfo } from './farm';
 import { FARM, insideFarm, isFarmPlot } from '../lib/farm';
 import { insideZoo, isZooPlot, ZOO_VENUE } from '../lib/zoo';
+import { insideMillpond, isMillpondPlot, MILLPOND_VENUE } from '../lib/millpond';
+import {
+  drawMillpond,
+  drawMillpondGround,
+  drawMillpondSurface,
+  millpondSignHit,
+  MILLPOND_SIGN_DEPTH,
+} from './millpond';
 import { drawHouse, houseBounds } from './houses';
 import { drawResident } from './residents';
 import { drawVenue, venueBounds } from './venues';
@@ -149,6 +157,7 @@ const trees = terrain.flatMap(({ x, y, point }) => {
     !insideCinema({ x, y }) &&
     !insideZoo({ x, y }) &&
     !insideFarm({ x, y }) &&
+    !insideMillpond({ x, y }) &&
     !venuePlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
     x % BLOCK_SIZE === 0 &&
     y % BLOCK_SIZE === 2 &&
@@ -343,6 +352,7 @@ export function renderCity({
     );
     for (const { x, y, point: pt, seed, road } of terrain) {
       if (!visible(pt, 60, 24, 24)) continue;
+      if (insideMillpond({ x, y })) continue;
       if (seed % 4 === 0) diamond(ctx, pt.x, pt.y, 38, 19, p.grassAlt);
       if (x === WORLD_WIDTH - 2 || (x === WORLD_WIDTH - 1 && y < 8)) {
         diamond(ctx, pt.x, pt.y, 38, 19, p.water);
@@ -370,7 +380,8 @@ export function renderCity({
         isFootballPlot(plot.id) ||
         isCinemaPlot(plot.id) ||
         isZooPlot(plot.id) ||
-        isFarmPlot(plot.id)
+        isFarmPlot(plot.id) ||
+        isMillpondPlot(plot.id)
       )
         continue;
       const pt = plotCenter(plot);
@@ -414,6 +425,7 @@ export function renderCity({
       if (!occupied) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
     }
     drawFarmGround(ctx, night, season);
+    drawMillpondGround(ctx, night, season, p.water, p.waterLight);
   });
   const objects = drawFootball(
     ctx,
@@ -443,6 +455,19 @@ export function renderCity({
       isCinemaPlot(selectedPlot ?? '') || isCinemaPlot(hoveredPlot ?? ''),
     ),
   );
+  // The Millpond: flat water art now, under everyone on its banks; its uprights join the sort.
+  const pond = {
+    minutes,
+    day,
+    night,
+    season,
+    visible,
+    litCount,
+    total: register.total,
+    selected: isMillpondPlot(selectedPlot ?? '') || isMillpondPlot(hoveredPlot ?? ''),
+  };
+  drawMillpondSurface(ctx, pond);
+  objects.push(...drawMillpond(ctx, pond));
   for (const venue of VENUES) {
     if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
@@ -603,6 +628,15 @@ export function cityHit(
   if (insideFarm(unproject(point.x, point.y)) && depth < 0) {
     target = { kind: 'place', id: FARM.plot };
     depth = -1;
+  }
+  // The pond and its mill, under any roof in front; the gate sign rises over the south road.
+  if (insideMillpond(unproject(point.x, point.y)) && depth < 0) {
+    target = { kind: 'place', id: MILLPOND_VENUE.plot };
+    depth = -1;
+  }
+  if (millpondSignHit(point) && MILLPOND_SIGN_DEPTH >= depth) {
+    target = { kind: 'place', id: MILLPOND_VENUE.plot };
+    depth = MILLPOND_SIGN_DEPTH;
   }
   const hitsZooSign = zooSignHit(point);
   if (insideZoo(unproject(point.x, point.y)) || hitsZooSign) {

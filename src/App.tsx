@@ -1,6 +1,8 @@
 import ZooInfo from './components/ZooInfo';
 import FarmInfo from './components/FarmInfo';
 import { FARM, isFarmPlot } from './lib/farm';
+import MillpondInfo from './components/MillpondInfo';
+import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
 import { isZooPlot, ZOO_VENUE } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -78,6 +80,8 @@ function initialWelcome() {
 function initialSelection() {
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'fork') return FORK_PLOT;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'farm') return FARM.plot;
+  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'millpond')
+    return MILLPOND_VENUE.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'zoo')
     return ZOO_VENUE.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'cinema')
@@ -116,6 +120,7 @@ export default function App() {
   const cinema = useMemo(() => cinemaAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const selectedFootball = isFootballPlot(selectedPlot ?? '');
   const selectedFarm = isFarmPlot(selectedPlot ?? '');
+  const selectedMillpond = isMillpondPlot(selectedPlot ?? '');
   const night = clock.minutes < 360 || clock.minutes >= 1200;
   const cinemaEvening = clock.minutes < 360;
   const events = useMemo(
@@ -134,6 +139,9 @@ export default function App() {
     [displayPlaces, clock.minutes, clock.day],
   );
   const lanternTown = useLanternTown(places, clock.minutes, clock.day);
+  const skaters = residents
+    .filter((r) => r.event?.id === 'millpond' && r.event.phase === 'attending')
+    .map((r) => r.resident.name);
   const selected = displayPlaces.find((place) => place.plot === selectedPlot);
   const selectedResident = residents.find((resident) => resident.id === selected?.id);
   const selectedVenue = selectedPlot ? venueAt(selectedPlot) : undefined;
@@ -174,7 +182,7 @@ export default function App() {
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
+      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isMillpondPlot(plotId ?? '') ? '#venue=millpond' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -264,6 +272,7 @@ export default function App() {
   const heading =
     selected?.name ??
     (selectedFarm ? FARM.name : undefined) ??
+    (selectedMillpond ? MILLPOND_VENUE.name : undefined) ??
     (selectedFootball ? FOOTBALL_VENUE.name : undefined) ??
     selectedVenue?.name ??
     (selectedPlot
@@ -429,6 +438,8 @@ export default function App() {
           <div className="town-panel-content">
             {selectedFarm ? (
               <FarmInfo />
+            ) : selectedMillpond ? (
+              <MillpondInfo minutes={clock.minutes} day={clock.day} skaters={skaters} />
             ) : selectedVenue?.kind === 'zoo' ? (
               <ZooInfo
                 minutes={clock.minutes}
@@ -562,6 +573,8 @@ export default function App() {
                 football={football}
                 events={events}
                 minutes={clock.minutes}
+                day={clock.day}
+                skaters={skaters.length}
                 evening={{
                   hour: lanternTown.hour,
                   tale: lanternTown.tale,

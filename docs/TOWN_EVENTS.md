@@ -27,6 +27,10 @@ Two things happen every evening, whatever the lineup. They open the Events panel
 
 Lantern hour is not a gathering: it has no guests, no spots and no venue schedule, and it never changes who attends the lunch, the concert or the disco.
 
+## Winter skating
+
+On the Millpond's frozen days, Winter 9–19, the Events panel also shows **Skating on the Millpond**, 14:00–16:40. It waits after the day's other cards, and while skating is live it moves up to join the cards that are happening now. It reads "Later today", "Happening now" with the live dot, or "Finished today". While skating is live it adds "· 1 on the ice" (or however many neighbors are skating), when there are any. Its button opens the pond, and its label says the status, the time and the count aloud. Skating is not a scheduled venue event, just as Lantern hour is not: it follows the ice rather than the day's lineup, and it never appears in `eventsForDay`. Skaters are chosen from the afternoon strollers whom the lunch, the zoo and the football have not claimed, so skating never takes a guest from them. See [The Millpond](MILLPOND.md).
+
 ## Extend it
 
 `src/lib/events.ts` owns venues, event choices, and schedules; `src/city/venues.ts` draws them. `src/lib/simulation.ts` handles attendance, and `TownEvents.tsx` exposes the daily program through keyboard-accessible buttons. Existing house JSON requires no new fields.

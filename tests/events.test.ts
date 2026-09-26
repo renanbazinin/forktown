@@ -38,7 +38,7 @@ describe('Shared town events', () => {
     expect(eventsForDay(7)).toEqual(eventsForDay(7));
   });
   it('reserves venues in both builder options and shared save/CI validation', () => {
-    expect(HOUSE_PLOTS).toHaveLength(151);
+    expect(HOUSE_PLOTS).toHaveLength(143);
     for (const venue of VENUES) {
       expect(HOUSE_PLOTS.some((plot) => plot.id === venue.plot)).toBe(false);
       expect(
@@ -85,6 +85,7 @@ describe('Shared town events', () => {
       const { event } = trip;
       if (event.venue.kind === 'football')
         throw new Error('Home routine must exclude morning football');
+      if (event.venue.kind === 'millpond') throw new Error('Day 4 is spring: nobody skates');
       const stateAt = (t: number) => simulateResidents(homes, t, 4)[0];
       expect(
         Math.hypot(

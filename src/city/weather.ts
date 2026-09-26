@@ -3,6 +3,7 @@ import { insideCinema } from '../lib/cinema';
 import { insideFarm } from '../lib/farm';
 import { insideFootball } from '../lib/football';
 import { insideZoo } from '../lib/zoo';
+import { insideMillpond, MILLPOND_REEDS } from '../lib/millpond';
 import { VENUES } from '../lib/events';
 import { hash, isRoad, PLOTS, project, WORLD_HEIGHT, WORLD_WIDTH, type Point } from '../lib/world';
 import { FIREFLY, SNOW, pick, type Pair } from './season-palette';
@@ -47,15 +48,23 @@ const onGrass = (x: number, y: number) =>
   x < WORLD_WIDTH &&
   y < WORLD_HEIGHT &&
   !isRoad(Math.floor(x), Math.floor(y)) &&
-  ![insideCinema, insideZoo, insideFootball, insideFarm].some((inside) => inside({ x, y }));
-function swarm(key: string, x: number, y: number, spread: number) {
+  ![insideCinema, insideZoo, insideFootball, insideFarm, insideMillpond].some((inside) =>
+    inside({ x, y }),
+  );
+function swarm(
+  key: string,
+  x: number,
+  y: number,
+  spread: number,
+  accept: (x: number, y: number) => boolean = onGrass,
+) {
   const seed = hash(`firefly:${key}`);
   const flies: Firefly[] = [];
   for (let k = 0; k < 3 + (seed % 4); k++) {
     const s = hash(`firefly:${key}:${k}`);
     const fx = x + (unit(s, 0) - 0.5) * spread,
       fy = y + (unit(s, 10) - 0.5) * spread;
-    if (!onGrass(fx, fy)) continue;
+    if (!accept(fx, fy)) continue;
     const t = hash(`firefly-flight:${key}:${k}`);
     flies.push({
       ground: project(fx, fy),
@@ -69,6 +78,12 @@ function swarm(key: string, x: number, y: number, spread: number) {
   }
   return { point: project(x, y), depth: x + y, flies };
 }
+// Over the Millpond's reed beds on summer nights: a few swarms, low over the reeds and the water.
+export const MILLPOND_SWARMS = MILLPOND_REEDS.filter((_, i) => i % 2 === 0)
+  .slice(0, 5)
+  .map((reed) =>
+    swarm(`reeds:${reed.seed}`, reed.x, reed.y, 0.7, (x, y) => insideMillpond({ x, y })),
+  );
 const SWARMS = [
   // Around the plots, a tile out from the middle: over a meadow, or the lawn beside a house.
   ...PLOTS.filter((plot) => !venueTiles.has(`${plot.x},${plot.y}`)).flatMap((plot) => {
@@ -95,6 +110,7 @@ const SWARMS = [
     const y = 9 + 2 * i + unit(seed, 4) * 2;
     return seed % 3 ? [swarm(`river:${i}`, WORLD_WIDTH - 1.4 + unit(seed, 14) * 0.6, y, 0.8)] : [];
   }).flat(),
+  ...MILLPOND_SWARMS,
 ];
 
 // A blink is a short flash: a quick brightening, a steady glow, then two fading steps.
