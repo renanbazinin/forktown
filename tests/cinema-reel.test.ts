@@ -1,10 +1,11 @@
 import { beforeAll, describe, expect, it } from 'vitest';
-import { drawCinemaFilm, loadReel } from '../src/city/cinema-films';
-import { REEL } from '../src/films';
+import { drawCinemaAd, drawCinemaFilm, loadReel } from '../src/city/cinema-films';
+import { ADS, REEL } from '../src/films';
+import { slateSeconds } from '../src/films/kit';
 import { CLASHES } from '../src/films/duel-at-dusk';
-import { REEL_SCORES } from '../src/films/scores';
+import { AD_SCORES, REEL_SCORES } from '../src/films/scores';
 import { LAST_DROP, ROOM_DROPS, STREET_DROPS } from '../src/films/the-rain-orchestra';
-import { CINEMA_FILMS, type FilmArtwork } from '../src/lib/cinema';
+import { CINEMA_ADS, CINEMA_FILMS, type FilmArtwork } from '../src/lib/cinema';
 import { cinemaScore } from '../src/music/cinema-score';
 import { recordingContext } from './recording-context';
 
@@ -19,8 +20,8 @@ const frame = (film: (typeof reel)[number], elapsed: number) => {
 describe('The film library', () => {
   beforeAll(() => loadReel());
 
-  it('gives all sixteen films their own module and end-card dedication', () => {
-    expect(reel).toHaveLength(16);
+  it('gives every film its own module and end-card dedication', () => {
+    expect(reel).toHaveLength(22);
     expect(Object.keys(REEL).sort()).toEqual(reel.map((film) => film.artwork).sort());
     expect(Object.keys(REEL_SCORES).sort()).toEqual(Object.keys(REEL).sort());
     for (const film of reel) {
@@ -50,6 +51,16 @@ describe('The film library', () => {
       expect.arrayContaining(['The End', module(film.artwork).look.dedication]),
     );
     expect(text(film.duration / 2)).not.toContain('The End');
+    // Grown-up films wear their 14+ badge and genre on the title card; family films do not.
+    if (film.rating) expect(text(1)).toEqual(expect.arrayContaining([film.rating]));
+    else expect(text(1)).not.toContain('14+');
+    expect(text(1)).toContain(
+      film.genre === 'action'
+        ? 'a forktown action picture'
+        : film.genre
+          ? `a forktown ${film.genre}`
+          : 'a forktown original',
+    );
   });
 
   it.each(reel)('$title plays the same score from the reel and from the audio registry', (film) => {
@@ -74,5 +85,46 @@ describe('The film library', () => {
     expect(clashes).toHaveLength(CLASHES.length);
     for (const contact of CLASHES)
       expect(clashes.some((cue) => Math.abs(cue.at - (3 + contact.p * story)) < 1e-9)).toBe(true);
+  });
+});
+
+describe('The ads between films', () => {
+  beforeAll(() => loadReel());
+  const spot = (ad: (typeof CINEMA_ADS)[number], elapsed: number) => {
+    const recording = recordingContext(320, 180);
+    drawCinemaAd(recording.ctx, ad, elapsed);
+    return recording.calls;
+  };
+  const text = (ad: (typeof CINEMA_ADS)[number], elapsed: number) =>
+    spot(ad, elapsed)
+      .filter((call) => call.name === 'fillText')
+      .map((call) => call.args[0]);
+
+  it('gives every ad its own module, jingle, and slate colours', () => {
+    expect(Object.keys(ADS).sort()).toEqual(CINEMA_ADS.map((ad) => ad.artwork).sort());
+    expect(Object.keys(AD_SCORES).sort()).toEqual(Object.keys(ADS).sort());
+    for (const ad of CINEMA_ADS) {
+      expect(ADS[ad.artwork].score).toBe(AD_SCORES[ad.artwork]);
+      expect(cinemaScore(ad)).toEqual(ADS[ad.artwork].score(ad));
+      for (const color of Object.values(ADS[ad.artwork].look))
+        expect(color).toMatch(/^#[0-9A-F]{6}$/i);
+    }
+  });
+
+  it.each(CINEMA_ADS)(
+    '$sponsor draws the same frame every time, within the canvas budget',
+    (ad) => {
+      for (let elapsed = 0; elapsed < ad.duration; elapsed += 0.5) {
+        const first = spot(ad, elapsed);
+        expect(first.length).toBeLessThan(4000);
+        expect(JSON.stringify(spot(ad, elapsed))).toBe(JSON.stringify(first));
+      }
+    },
+  );
+
+  it.each(CINEMA_ADS)('$sponsor ends on its sponsor slate', (ad) => {
+    const late = ad.duration - slateSeconds(ad) + 1.5;
+    expect(text(ad, late)).toEqual(expect.arrayContaining([ad.sponsor, ad.tagline]));
+    expect(text(ad, 1)).not.toContain(ad.tagline);
   });
 });

@@ -1,4 +1,4 @@
-import type { CinemaFilm } from '../lib/cinema';
+import type { CinemaAd, CinemaFilm } from '../lib/cinema';
 import type { FilmCue, FilmEffect } from '../music/cinema-score';
 import type { Voice } from '../music/score';
 
@@ -62,21 +62,13 @@ export type Score = {
   section: (section: Section) => void;
 };
 
-/**
- * Builds a deterministic film score. Every cue is kept inside the film, so the rendered
- * mix never runs past the end card, and the opening/closing motifs frame the titles.
- */
-export function composeFilm(
-  film: CinemaFilm,
-  motif: { root: number; voice: Voice; intro: readonly number[]; outro: readonly number[] },
-  write: (score: Score) => void,
-): FilmCue[] {
+/** A cue sheet for one screening: `lead` seconds of titles, then `story` seconds of picture. */
+function cueSheet(duration: number, lead: number, story: number) {
   const cues: FilmCue[] = [];
-  const story = film.duration - 6;
-  const time = (p: number) => 3 + p * story;
+  const time = (p: number) => lead + p * story;
   const push = (cue: FilmCue) => {
-    if (!(cue.at >= 0) || cue.at >= film.duration - 0.05) return;
-    cues.push({ ...cue, duration: Math.min(cue.duration, film.duration - cue.at) });
+    if (!(cue.at >= 0) || cue.at >= duration - 0.05) return;
+    cues.push({ ...cue, duration: Math.min(cue.duration, duration - cue.at) });
   };
   const noteAt = (at: number, pitch: number, seconds: number, voice: Voice, gain = 0.08, pan = 0) =>
     push({ kind: 'note', at, pitch, duration: seconds, voice, gain, pan });
@@ -168,9 +160,23 @@ export function composeFilm(
       }
     }
   };
+  const score: Score = { time, story, duration, note, noteAt, fx, chord, section };
+  return { cues, score };
+}
+
+/**
+ * Builds a deterministic film score. Every cue is kept inside the film, so the rendered
+ * mix never runs past the end card, and the opening/closing motifs frame the titles.
+ */
+export function composeFilm(
+  film: CinemaFilm,
+  motif: { root: number; voice: Voice; intro: readonly number[]; outro: readonly number[] },
+  write: (score: Score) => void,
+): FilmCue[] {
+  const { cues, score } = cueSheet(film.duration, 3, film.duration - 6);
   // The opening motif sits under the title card; the resolved chord sits under "The End".
   motif.intro.forEach((degree, i) =>
-    noteAt(
+    score.noteAt(
       0.3 + i * 0.4,
       motif.root + degree,
       1.3,
@@ -179,9 +185,9 @@ export function composeFilm(
       (i / Math.max(1, motif.intro.length - 1) - 0.5) * 0.4,
     ),
   );
-  write({ time, story, duration: film.duration, note, noteAt, fx, chord, section });
+  write(score);
   motif.outro.forEach((degree, i) =>
-    noteAt(
+    score.noteAt(
       film.duration - 2.9 + i * 0.12,
       motif.root + degree,
       2.7 - i * 0.12,
@@ -191,4 +197,16 @@ export function composeFilm(
     ),
   );
   return cues.sort((a, b) => a.at - b.at);
+}
+
+/** An ad's jingle: no titles, so story time runs across the spot, inside a breath of silence. */
+export function composeAd(ad: CinemaAd, write: (score: Score) => void): FilmCue[] {
+  const { cues, score } = cueSheet(ad.duration, 0.1, ad.duration - 0.4);
+  write(score);
+  // Pads that would ring past the spot stop just short of it, so the next one starts clean.
+  const end = ad.duration - 0.2;
+  return cues
+    .filter((cue) => cue.at < end)
+    .map((cue) => ({ ...cue, duration: Math.min(cue.duration, end - cue.at) }))
+    .sort((a, b) => a.at - b.at);
 }

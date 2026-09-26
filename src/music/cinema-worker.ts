@@ -1,6 +1,6 @@
-import type { CinemaFilm } from '../lib/cinema';
+import type { Screening } from '../lib/cinema';
 import { renderCinemaPCM } from './cinema-render';
-self.onmessage = (event: MessageEvent<CinemaFilm>) => {
+self.onmessage = (event: MessageEvent<Screening>) => {
   try {
     const mix = renderCinemaPCM(event.data);
     self.postMessage(mix, { transfer: [mix.left.buffer, mix.right.buffer] });

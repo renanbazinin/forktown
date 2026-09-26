@@ -1,6 +1,6 @@
 import type { TrackId } from './score';
 import type { Mix } from './render';
-import type { CinemaFilm } from '../lib/cinema';
+import type { Screening } from '../lib/cinema';
 
 export function renderTrack(track: TrackId): Promise<AudioBuffer> {
   return renderAudio(
@@ -9,7 +9,7 @@ export function renderTrack(track: TrackId): Promise<AudioBuffer> {
   );
 }
 
-export function renderCinemaTrack(film: CinemaFilm): Promise<AudioBuffer> {
+export function renderCinemaTrack(film: Screening): Promise<AudioBuffer> {
   return renderAudio(
     new Worker(new URL('./cinema-worker.ts', import.meta.url), { type: 'module' }),
     film,
@@ -42,7 +42,7 @@ export function renderFootballTakes(sampleRate: number): Promise<Map<string, Flo
   });
 }
 
-function renderAudio(worker: Worker, input: TrackId | CinemaFilm): Promise<AudioBuffer> {
+function renderAudio(worker: Worker, input: TrackId | Screening): Promise<AudioBuffer> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       worker.terminate();

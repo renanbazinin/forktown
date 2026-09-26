@@ -51,6 +51,13 @@ export function cinemaListening(
 export const CINEMA_CARD_SECONDS = 6;
 export const CINEMA_SCREEN_RISE = 20 * 60;
 export const CINEMA_SCREEN_ROLL_SECONDS = 6;
+/**
+ * Seconds of films and ads on the screen each night. Films run from one to three minutes in
+ * ten-second steps, and ads fill whatever the night's films leave, so every bill is the same
+ * length and still ends before midnight.
+ */
+export const CINEMA_SCREEN_TIME = 180;
+export const FILM_LENGTH = { min: 60, max: 180, step: 10 } as const;
 /** Every film is a self-contained module in `src/films/`, keyed by its artwork. */
 export type FilmArtwork =
   | 'popcorn'
@@ -68,14 +75,37 @@ export type FilmArtwork =
   | 'bloom'
   | 'train'
   | 'mitten'
-  | 'lanterns';
+  | 'lanterns'
+  | 'table'
+  | 'nightbus'
+  | 'courier'
+  | 'whiteout'
+  | 'replyall'
+  | 'roadtest';
+export type FilmGenre = 'drama' | 'action' | 'comedy';
 export type CinemaFilm = {
   id: string;
   title: string;
   description: string;
   duration: number;
   artwork: FilmArtwork;
+  /** Grown-up films carry a 14+ badge on their title card; the rest are for everyone. */
+  rating?: '14+';
+  genre?: FilmGenre;
 };
+/** Every ad is a self-contained module in `src/films/ads/`, keyed by its artwork. */
+export type AdArtwork = 'snacks' | 'phones' | 'eggs' | 'matchday' | 'disco' | 'millpond' | 'zoo';
+/** A short spot from somewhere in town, shown in the breaks between films. */
+export type CinemaAd = {
+  id: string;
+  sponsor: string;
+  tagline: string;
+  duration: number;
+  artwork: AdArtwork;
+};
+/** Anything the projector can play: a film or an ad. */
+export type Screening = CinemaFilm | CinemaAd;
+export const isAd = (screening: Screening): screening is CinemaAd => 'sponsor' in screening;
 export const CINEMA_FILMS: readonly CinemaFilm[] = [
   {
     id: 'runaway-popcorn',
@@ -190,60 +220,206 @@ export const CINEMA_FILMS: readonly CinemaFilm[] = [
     duration: 60,
     artwork: 'lanterns',
   },
+  {
+    id: 'the-long-table',
+    title: 'The Long Table',
+    description:
+      'After the funeral, three grown siblings share their mother’s kitchen and one recipe none of them can make alone.',
+    duration: 180,
+    artwork: 'table',
+    rating: '14+',
+    genre: 'drama',
+  },
+  {
+    id: 'night-bus',
+    title: 'Night Bus',
+    description:
+      'A nurse after a double shift, an old man with fresh flowers, and the stop he never gets off at.',
+    duration: 120,
+    artwork: 'nightbus',
+    rating: '14+',
+    genre: 'drama',
+  },
+  {
+    id: 'night-courier',
+    title: 'Night Courier',
+    description:
+      'Rain, neon, one bike messenger, and a cold box that has to reach the hospital before the clock runs out.',
+    duration: 150,
+    artwork: 'courier',
+    rating: '14+',
+    genre: 'action',
+  },
+  {
+    id: 'whiteout',
+    title: 'Whiteout',
+    description:
+      'A mountain rescuer, a stranded climber, and a storm that will not wait for either of them.',
+    duration: 120,
+    artwork: 'whiteout',
+    rating: '14+',
+    genre: 'action',
+  },
+  {
+    id: 'reply-all',
+    title: 'Reply All',
+    description: 'One email. Four hundred inboxes. One very long corridor to the server room.',
+    duration: 90,
+    artwork: 'replyall',
+    rating: '14+',
+    genre: 'comedy',
+  },
+  {
+    id: 'mirror-signal-panic',
+    title: 'Mirror, Signal, Panic',
+    description:
+      'Grace is forty-three, on her ninth driving test, and the examiner has not blinked once.',
+    duration: 100,
+    artwork: 'roadtest',
+    rating: '14+',
+    genre: 'comedy',
+  },
+];
+/** The spots between films: short, cheerful, and all from around town. */
+export const CINEMA_ADS: readonly CinemaAd[] = [
+  {
+    id: 'starlight-snack-bar',
+    sponsor: 'Starlight Snack Bar',
+    tagline: 'Popcorn: the other feature.',
+    duration: 10,
+    artwork: 'snacks',
+  },
+  {
+    id: 'phones-off',
+    sponsor: 'The Starlight Cinema',
+    tagline: 'Phones off. Stars on.',
+    duration: 10,
+    artwork: 'phones',
+  },
+  {
+    id: 'moon-harvest-eggs',
+    sponsor: 'Moon Harvest Farm',
+    tagline: 'Fresh eggs at the farm gate, every morning.',
+    duration: 10,
+    artwork: 'eggs',
+  },
+  {
+    id: 'meadow-matchday',
+    sponsor: 'The Meadow Ground',
+    tagline: 'Five-a-side. Bring your loudest voice.',
+    duration: 10,
+    artwork: 'matchday',
+  },
+  {
+    id: 'little-stage-disco',
+    sponsor: 'Midnight at the Little Stage',
+    tagline: 'One more song. Every night at midnight.',
+    duration: 20,
+    artwork: 'disco',
+  },
+  {
+    id: 'the-millpond',
+    sponsor: 'The Millpond',
+    tagline: 'Reeds, ripples, and ducks with opinions.',
+    duration: 20,
+    artwork: 'millpond',
+  },
+  {
+    id: 'willow-grove-zoo',
+    sponsor: 'Willow Grove Zoo',
+    tagline: 'Come and say hello. The penguins insist.',
+    duration: 30,
+    artwork: 'zoo',
+  },
 ];
 export type CinemaSlot = {
-  kind: 'opening' | 'film' | 'interval' | 'closing';
+  kind: 'opening' | 'film' | 'ad' | 'interval' | 'closing';
   start: number;
   end: number;
   film?: CinemaFilm;
+  ad?: CinemaAd;
   nextFilm?: CinemaFilm;
 };
 
+const shuffled = <T extends { id: string }>(items: readonly T[], seed: string) =>
+  [...items].sort(
+    (a, b) => hash(`${seed}:${a.id}`) - hash(`${seed}:${b.id}`) || a.id.localeCompare(b.id),
+  );
+const unique = (items: readonly { id: string }[]) =>
+  items.every((item) => item.id) && new Set(items.map((item) => item.id)).size === items.length;
+const onStep = (seconds: number) =>
+  Number.isFinite(seconds) && seconds > 0 && seconds % FILM_LENGTH.step === 0;
+
 /** The UTC-based town day is the only seed: hosts, sessions, and reloads share a bill.
- * Registry order never changes the three selected films or their screening order.
+ * Registry order never changes the selected films, the ads, or their screening order.
  */
-export function cinemaProgram(day: number, library: readonly CinemaFilm[] = CINEMA_FILMS) {
+export function cinemaProgram(
+  day: number,
+  library: readonly CinemaFilm[] = CINEMA_FILMS,
+  adReel: readonly CinemaAd[] = CINEMA_ADS,
+) {
   if (
     library.length < 3 ||
-    new Set(library.map((film) => film.id)).size !== library.length ||
-    library.some((film) => !film.id || !Number.isFinite(film.duration) || film.duration <= 0)
-  )
-    throw new Error('Cinema needs at least three unique films with positive finite durations.');
-  const films = [...library]
-    .sort(
-      (a, b) =>
-        hash(`cinema:${Math.floor(day)}:${a.id}`) - hash(`cinema:${Math.floor(day)}:${b.id}`) ||
-        a.id.localeCompare(b.id),
+    !unique(library) ||
+    library.some(
+      (film) =>
+        !onStep(film.duration) ||
+        film.duration < FILM_LENGTH.min ||
+        film.duration > FILM_LENGTH.max,
     )
-    .slice(0, 3);
+  )
+    throw new Error('Cinema needs three or more unique films of one to three minutes each.');
+  if (
+    !unique(adReel) ||
+    adReel.some((ad) => !onStep(ad.duration) || ad.duration >= FILM_LENGTH.min) ||
+    !adReel.some((ad) => ad.duration === FILM_LENGTH.step)
+  )
+    throw new Error('Cinema ads must be short, and at least one must fill a single step.');
+  const night = Math.floor(day);
+  // The shuffle's first film always plays, then any later film that still fits tonight.
+  let left = CINEMA_SCREEN_TIME;
+  const films: CinemaFilm[] = [];
+  for (const film of shuffled(library, `cinema:${night}`)) {
+    if (film.duration > left) continue;
+    films.push(film);
+    left -= film.duration;
+    if (left < FILM_LENGTH.min) break;
+  }
+  // Ads fill the rest exactly: each spot once, then repeats only if the reel runs short.
+  const ads: CinemaAd[] = [];
+  const order = shuffled(adReel, `cinema-ads:${night}`);
+  for (let pass = 0; left > 0; pass++)
+    for (const ad of order)
+      if (ad.duration <= left && (pass || !ads.includes(ad))) {
+        ads.push(ad);
+        left -= ad.duration;
+      }
+  // Ads run in the breaks between films, or before the film on a one-film night.
+  const breaks = Math.max(1, films.length - 1);
+  const breakAds = (index: number) => ads.filter((_, i) => i % breaks === index);
   const slots: CinemaSlot[] = [];
   let cursor = CINEMA_START;
-  const add = (
-    kind: CinemaSlot['kind'],
-    duration: number,
-    film?: CinemaFilm,
-    nextFilm?: CinemaFilm,
-  ) => {
-    slots.push({
-      kind,
-      start: cursor,
-      end: cursor + duration,
-      ...(film ? { film } : {}),
-      ...(nextFilm ? { nextFilm } : {}),
-    });
+  const add = (slot: Omit<CinemaSlot, 'start' | 'end'>, duration: number) => {
+    slots.push({ ...slot, start: cursor, end: cursor + duration });
     cursor += duration;
   };
-  add('opening', CINEMA_CARD_SECONDS, undefined, films[0]);
+  const advertise = (index: number) =>
+    breakAds(index).forEach((ad) => add({ kind: 'ad', ad }, ad.duration));
+  add({ kind: 'opening', nextFilm: films[0] }, CINEMA_CARD_SECONDS);
+  if (films.length === 1) advertise(0);
   films.forEach((film, index) => {
-    add('film', film.duration, film);
-    if (index < films.length - 1) add('interval', CINEMA_CARD_SECONDS, undefined, films[index + 1]);
+    add({ kind: 'film', film }, film.duration);
+    if (index === films.length - 1) return;
+    advertise(index);
+    add({ kind: 'interval', nextFilm: films[index + 1] }, CINEMA_CARD_SECONDS);
   });
-  add('closing', CINEMA_CARD_SECONDS);
-  if (cursor + 45 > 1800)
-    throw new Error('The cinema bill must finish by 05:15 so guests can get home before morning.');
+  add({ kind: 'closing' }, CINEMA_CARD_SECONDS);
+  if (cursor + CINEMA_SCREEN_ROLL_SECONDS > 1440)
+    throw new Error('The cinema bill must end before midnight for the disco and bedtimes.');
   return {
-    day: Math.floor(day),
+    day: night,
     films,
+    ads,
     slots,
     depart: 1170,
     start: CINEMA_START,

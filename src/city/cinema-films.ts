@@ -1,6 +1,6 @@
-import type { CinemaFilm, CinemaSlot, FilmArtwork } from '../lib/cinema';
-import { titles } from '../films/kit';
-import type { FilmModule } from '../films/types';
+import type { AdArtwork, CinemaAd, CinemaFilm, CinemaSlot, FilmArtwork } from '../lib/cinema';
+import { slate, titles } from '../films/kit';
+import type { AdModule, FilmModule } from '../films/types';
 
 type Ctx = CanvasRenderingContext2D;
 const W = 320,
@@ -32,13 +32,17 @@ function nightSky(ctx: Ctx, seconds: number) {
     );
 }
 let reel: Record<FilmArtwork, FilmModule> | undefined;
+let ads: Record<AdArtwork, AdModule> | undefined;
 let reeling: Promise<Record<FilmArtwork, FilmModule>> | undefined;
 /**
- * The film library's pictures are their own chunk, fetched as the screen starts to rise (or
- * when a reel film is first asked for), so a daytime visit never downloads them.
+ * The film library's pictures (and the ads') are their own chunk, fetched as the screen starts
+ * to rise (or when a reel film is first asked for), so a daytime visit never downloads them.
  */
 export function loadReel() {
-  reeling ??= import('../films').then((module) => (reel = module.REEL));
+  reeling ??= import('../films').then((module) => {
+    ads = module.ADS;
+    return (reel = module.REEL);
+  });
   return reeling;
 }
 
@@ -68,6 +72,25 @@ export function drawCinemaFilm(ctx: Ctx, film: CinemaFilm, elapsed: number) {
   ctx.restore();
 }
 
+/** An ad from around town, closing on its sponsor slate. */
+export function drawCinemaAd(ctx: Ctx, ad: CinemaAd, elapsed: number) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, H);
+  ctx.clip();
+  const module = ads?.[ad.artwork];
+  if (module) {
+    module.draw(ctx, clamp(elapsed / ad.duration), elapsed);
+    slate(ctx, ad, elapsed, module.look);
+  } else {
+    void loadReel();
+    nightSky(ctx, elapsed);
+    words(ctx, ad.sponsor.toUpperCase(), 96, 9, '#DBBF89');
+    words(ctx, ad.tagline, 114, 7, '#ADBFBA');
+  }
+  ctx.restore();
+}
+
 export function drawCinemaCard(ctx: Ctx, slot?: CinemaSlot, seconds = 0) {
   nightSky(ctx, seconds);
   for (let i = 0; i < 4; i++)
@@ -85,7 +108,7 @@ export function drawCinemaCard(ctx: Ctx, slot?: CinemaSlot, seconds = 0) {
   words(
     ctx,
     !slot
-      ? 'THREE LITTLE FILMS · TONIGHT 20:30'
+      ? 'FILMS UNDER THE STARS · TONIGHT 20:30'
       : slot.kind === 'closing'
         ? 'THANK YOU. GET HOME UNDER THE STARS.'
         : slot.kind === 'opening'
