@@ -104,6 +104,14 @@ describe('Trusted PR policy', () => {
   it.each([
     'CLAUDE.md',
     'AGENTS.md',
+    'docs/CLAUDE.md',
+    'docs/claude.md',
+    'docs/CLAUDE.local.md',
+    'docs/AGENTS.md',
+    'docs/agents.override.md',
+    'docs/GEMINI.md',
+    'docs/review.instructions.md',
+    'docs/release.prompt.md',
     '.claude/commands/release.md',
     '.claude/agents/reviewer.md',
     '.claude/skills/deploy/SKILL.md',
@@ -137,6 +145,10 @@ describe('Trusted PR policy', () => {
   });
   it('needs a maintainer when a rename moves code into a reader-only path', async () => {
     const moved = house('docs/app.md', 'renamed', { previous_filename: 'src/App.tsx' });
+    expect((await check({ files: [moved] })).reviewReasons).toHaveLength(1);
+  });
+  it('needs a maintainer when a reader page is renamed to an agent instruction file', async () => {
+    const moved = house('docs/CLAUDE.md', 'renamed', { previous_filename: 'docs/notes.md' });
     expect((await check({ files: [moved] })).reviewReasons).toHaveLength(1);
   });
   it('rejects anything in places/ that is not a plain file, even with approval', async () => {

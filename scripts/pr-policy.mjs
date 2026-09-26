@@ -1,9 +1,15 @@
 export const isHouse = (path) => /^places\/[^/]+\.json$/.test(path);
 export const isMaintainer = (permission) => ['admin', 'maintain', 'write'].includes(permission);
+// Files coding agents load as instructions from whatever folder they sit in, docs/ included.
+export const isAgentFile = (path) =>
+  /(?:^|\/)(?:(?:claude|agents|gemini)(?:\.local|\.override)?\.md|[^/]*\.(?:instructions|prompt)\.md)$/i.test(
+    path,
+  );
 // Pages people only read. Everything else outside a house, including agent instructions
 // (CLAUDE.md, AGENTS.md, .claude/), .github/, and the security, conduct, contributing,
 // license and notice files, can steer tools or people, so outside changes need review.
 export const isReaderOnly = (path) =>
+  !isAgentFile(path) &&
   /^(?:docs\/[^/]+\.md|docs\/images\/[^/]+\.(?:png|jpe?g|gif|webp)|examples\/[^/]+\.json|README\.md)$/.test(
     path,
   );
