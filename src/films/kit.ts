@@ -355,8 +355,10 @@ export function captions(
   p: number,
   lines: readonly (readonly [number, number, string])[],
   style: Parameters<typeof caption>[3] = {},
+  /** Fade width in story units; longer films want a smaller one (about 0.3 s of story). */
+  edge?: number,
 ) {
-  for (const [from, to, text] of lines) caption(ctx, text, presence(p, from, to), style);
+  for (const [from, to, text] of lines) caption(ctx, text, presence(p, from, to, edge), style);
 }
 /** A silent-film intertitle card: centred lines on a bordered panel. */
 export function intertitle(
