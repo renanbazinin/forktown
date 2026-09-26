@@ -199,6 +199,8 @@ const STARTER_IDS = new Set([
   'stargazer',
   'sunday-morning',
 ]);
+// New homes have one or two floors. These were built with three before that, and keep them.
+const THREE_FLOOR_IDS = new Set(['arts']);
 
 export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
   const errors: string[] = [];
@@ -220,6 +222,8 @@ export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
       errors.push(
         `${file}: The creator "forktown" is reserved for the original starter places. Use your GitHub username.`,
       );
+    if (place.design.floors === 3 && !THREE_FLOOR_IDS.has(place.id))
+      errors.push(`${file}: New homes can have one or two floors. Set "floors" to 1 or 2.`);
     if (file !== `${place.id}.json`)
       errors.push(`${file}: Rename this file to ${place.id}.json so its name matches the id.`);
     if (ids.has(place.id))

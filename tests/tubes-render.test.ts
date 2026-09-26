@@ -958,6 +958,8 @@ describe('Depth', () => {
 
 describe('The station plots', () => {
   it('keep their meadow and lose only the stake, the label and the outline', () => {
+    // B1 stands empty for comparison, even once someone lives there.
+    const town = places.filter((place) => place.plot !== 'B1');
     const paintGround = (showPlots: boolean) => {
       vi.mocked(drawMeadow).mockClear();
       vi.mocked(drawSproutStake).mockClear();
@@ -967,7 +969,7 @@ describe('The station plots', () => {
         width: 1440,
         height: 900,
         camera: WHOLE,
-        places,
+        places: town,
         selectedPlot: null,
         hoveredPlot: null,
         night: false,
