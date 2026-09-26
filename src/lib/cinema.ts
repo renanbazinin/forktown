@@ -463,10 +463,8 @@ export function cinemaGuests<
       home.resident.routine.evening === 'stroll' && home.resident.routine.night === 'stroll',
   );
   return eligible
-    .sort(
-      (a, b) =>
-        hash(`cinema-guests:${day}:${a.id}`) - hash(`cinema-guests:${day}:${b.id}`) || byId(a, b),
-    )
+    .map((home) => ({ id: home.id, draw: hash(`cinema-guests:${day}:${home.id}`) }))
+    .sort((a, b) => a.draw - b.draw || byId(a, b))
     .slice(0, Math.min(CINEMA_SEATS.length, Math.floor(eligible.length / 2)))
     .map((home) => home.id);
 }

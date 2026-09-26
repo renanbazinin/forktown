@@ -200,12 +200,12 @@ export function planResidentTrips(
             !excluded.includes(home.id) &&
             getPlot(home.plot),
         )
+        .map((home) => ({ home, draw: hash(`${key}:${home.id}`) }))
         // Ids break a tie by code unit, never by the browser's language.
         .sort(
-          (a, b) =>
-            hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) ||
-            (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-        ),
+          (a, b) => a.draw - b.draw || (a.home.id < b.home.id ? -1 : a.home.id > b.home.id ? 1 : 0),
+        )
+        .map(({ home }) => home),
     );
   /**
    * Seat guests in line order until the seats are full or nobody else can make it. `seats` counts
