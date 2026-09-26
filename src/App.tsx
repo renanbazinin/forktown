@@ -15,6 +15,7 @@ import {
   Code2,
   Compass,
   ExternalLink,
+  Info,
   Music2,
   Plus,
   Search,
@@ -38,6 +39,7 @@ import SignPreview from './components/SignPreview';
 import Contribute from './components/Contribute';
 import HouseFiles from './components/HouseFiles';
 import Modal from './components/Modal';
+import Toast from './components/Toast';
 import BrandMark, { LanternDot } from './components/BrandMark';
 import WelcomeCard from './components/WelcomeCard';
 import TownEvents from './components/TownEvents';
@@ -115,7 +117,7 @@ export default function App() {
   const [sourceId, setSourceId] = useState<string>();
   const [buildPlot, setBuildPlot] = useState<string>();
   const [draft, setDraft] = useState<Place | null>(null);
-  const [toast, setToast] = useState('');
+  const [toast, setToast] = useState<{ text: string; note?: boolean } | null>(null);
   const [shared, setShared] = useState(false);
   const [welcome, setWelcome] = useState(initialWelcome);
   const clock = useTownClock();
@@ -223,7 +225,7 @@ export default function App() {
   }, [draft, places]);
   useEffect(() => {
     if (!toast) return;
-    const timer = setTimeout(() => setToast(''), 4000);
+    const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);
   }, [toast]);
   function startBuilding(plot?: string) {
@@ -232,7 +234,7 @@ export default function App() {
       return;
     }
     if (!available.length && !draft) {
-      setToast('All house plots are taken.');
+      setToast({ text: 'All house plots are taken.', note: true });
       return;
     }
     setBuildPlot(plot);
@@ -251,9 +253,9 @@ export default function App() {
     try {
       await navigator.clipboard.writeText(url.href);
       setShared(true);
-      setToast('Link copied.');
+      setToast({ text: 'Link copied.' });
     } catch {
-      setToast('Copy the browser address to share this home.');
+      setToast({ text: 'Copy the browser address to share this home.', note: true });
     }
   }
   const dismissWelcome = useCallback(() => {
@@ -706,15 +708,6 @@ export default function App() {
         </section>
       )}
 
-      {toast && (
-        <div className="toast" role="status">
-          <Check size={15} />
-          {toast}
-          <button aria-label="Dismiss notification" onClick={() => setToast('')}>
-            <X size={15} />
-          </button>
-        </div>
-      )}
       {modal === 'contribute' && localSaveAvailable && (
         <Contribute plot={buildPlot} places={places} onClose={closeBuilder} onPreview={preview} />
       )}
@@ -781,6 +774,14 @@ export default function App() {
             </div>
           </div>
         </Modal>
+      )}
+      {toast && (
+        <Toast
+          icon={toast.note ? <Info size={15} /> : <Check size={15} />}
+          onDismiss={() => setToast(null)}
+        >
+          {toast.text}
+        </Toast>
       )}
     </main>
   );

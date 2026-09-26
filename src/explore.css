@@ -566,6 +566,10 @@ body,
 .town-app .toast {
   bottom: 90px;
 }
+/* Inside an open dialog, clear of its buttons. */
+.town-app .modal .toast {
+  bottom: 24px;
+}
 @media (max-width: 600px) {
   .map-header {
     top: max(18px, env(safe-area-inset-top));
