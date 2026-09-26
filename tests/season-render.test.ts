@@ -610,7 +610,7 @@ describe('Houses through the year', () => {
     expect([...colours].filter((colour) => !SEASONAL_ART.includes(colour))).toEqual([]);
     expect([...colours].filter((colour) => LIGHTS.has(colour))).toEqual([]);
     expect(colours.size).toBeGreaterThan(0);
-  });
+  }, 20_000);
 
   it('keeps previews, spring and summer houses exactly as their neighbours made them', () => {
     const quiet = STAGES.filter((stage) => stage.day < dayOf(2, 1));

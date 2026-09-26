@@ -10,7 +10,7 @@ Each 24-minute UTC town day selects one lunch event and one evening show, follow
 
 Neighbors set to `stroll` during that period are eligible. The green has six spots around its blanket; the stage has eight spots across its audience lawn. Guests are chosen deterministically by day and house ID. When all spots are taken, other neighbors keep their regular stroll instead of waiting in a queue. The selection changes with each town day.
 
-Guests leave home shortly after 12:00 or 18:00, follow roads, then walk onto the venue lawn. Departures are staggered slightly; everyone gets home before the next routine starts. Neighbors at work or home remain indoors.
+Guests leave home shortly after 12:00 or 18:00, follow roads (or ride the Treeline when it saves at least ten minutes), then walk onto the venue lawn. Departures are staggered slightly; everyone gets home before the next routine starts. Neighbors at work or home remain indoors.
 
 Night owls (`routine.night: "stroll"`) can join the midnight party. Up to eight guests have staggered arrivals and departures during the 23:30–02:30 show. Cinema guests are eligible too: when travel and bedtime leave at least fifteen town minutes to dance, they walk directly from the cinema aisle to the stage, then return to their own home. Their guest list and spots remain attached to the evening across midnight. Night owls take short local walks and visible doorstep breaks in the free time around events. Each has a stable bedtime in one of three bands: 00:00–01:00, 02:00–03:00, or 04:00–05:00. All journeys fit before that bedtime; explicit sleepers stay indoors. The stage becomes a tiny DJ booth with a pastel dance floor, steady colored bulbs, alternating raised hands, and dancing feet.
 

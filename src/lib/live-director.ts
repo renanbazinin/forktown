@@ -33,6 +33,19 @@ const cycle = (value: number, length: number) => ((value % length) + length) % l
 export const SCENERY_START = 300;
 export const SCENERY_SECONDS = 60;
 export const FOLLOW_SECONDS = 45;
+/** The camera's easing time constant, in real seconds. */
+export const LIVE_EASE_SECONDS = 1.6;
+/** While the followed neighbor rides the tube (10 tiles a second), so the glass stays in frame. */
+export const LIVE_RIDE_EASE_SECONDS = 0.12;
+type Lifted = Pick<ResidentState, 'transit'> | undefined;
+/** Easing time constant: short only while the followed neighbor rides (10 tiles a second). */
+export const liveEaseSeconds = (state: Lifted) =>
+  state?.transit?.stage === 'riding' ? LIVE_RIDE_EASE_SECONDS : LIVE_EASE_SECONDS;
+/** World px above the ground point where the camera centres a followed neighbor. Continuous: a
+ *  walker's 22 px until the tube lifts them higher, so boarding and stepping off never jump the shot. */
+export const liveCenterLift = (state: Lifted) => Math.max(22, state?.transit?.altitude ?? 0);
+/** World px above the ground point for the follow label. */
+export const liveLabelLift = (state: Lifted) => Math.max(43, (state?.transit?.altitude ?? 0) + 14);
 /** Lantern hour on air: two seconds of dark tree, the lanterns, then the first lamps. */
 export const LANTERN_SHOT = { start: 1198, end: 1224 };
 const FORK_CENTER = plotCenter(getPlot(FORK_PLOT)!);
@@ -213,12 +226,14 @@ export function liveShotAt(
     .find((resident) => resident !== undefined);
   if (neighbor) {
     const point = project(neighbor.position.x, neighbor.position.y);
+    // A rider is centred on the glass, not on the ground beneath it.
+    const lift = liveCenterLift(neighbor);
     return {
       id: `neighbor:${program.day}:${neighbor.id}`,
       kind: 'neighbor',
       label: `Following ${neighbor.resident.name}`,
       residentId: neighbor.id,
-      center: { x: point.x, y: point.y - 22 },
+      center: { x: point.x, y: point.y - lift },
       width: 430,
       height: 320,
     };
@@ -269,8 +284,13 @@ export function liveCamera(shot: LiveShot, width: number, height: number, second
   };
 }
 
-export function easeLiveCamera(current: Camera, target: Camera, seconds: number): Camera {
-  const amount = 1 - Math.exp(-Math.max(0, seconds) / 1.6);
+export function easeLiveCamera(
+  current: Camera,
+  target: Camera,
+  seconds: number,
+  tau = LIVE_EASE_SECONDS,
+): Camera {
+  const amount = 1 - Math.exp(-Math.max(0, seconds) / tau);
   return {
     x: current.x + (target.x - current.x) * amount,
     y: current.y + (target.y - current.y) * amount,

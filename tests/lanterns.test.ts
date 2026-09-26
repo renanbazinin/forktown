@@ -347,7 +347,7 @@ describe("Tonight's tale", () => {
 
 describe('The Fork reserves D3', () => {
   it('keeps D3 free of houses and the venue order intact', () => {
-    expect(HOUSE_PLOTS).toHaveLength(143);
+    expect(HOUSE_PLOTS).toHaveLength(141);
     expect(HOUSE_PLOTS.some((plot) => plot.id === FORK_PLOT)).toBe(false);
     const sample = places.find((place) => place.id === 'my-little-place')!;
     const result = placeSchema.safeParse({ ...sample, plot: FORK_PLOT });

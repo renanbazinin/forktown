@@ -5,6 +5,7 @@ import type { EventPose } from './events';
 import { roadNodes, roadPath, facingAlong, WALK_SPEED } from './walking';
 import { residentTrips, tripState } from './resident-trips';
 import { nightBedtime, nightLeisure } from './night-routine';
+import { tubeStation, type ResidentTransit } from './tubes';
 export { roadPath, facingAlong } from './walking';
 
 export type ResidentState = {
@@ -22,6 +23,8 @@ export type ResidentState = {
   nightPorch?: boolean;
   pose?: EventPose;
   event?: { name: string; id: string; phase: 'going' | 'attending' | 'returning' };
+  /** Only while boarding, riding or stepping off the tube on the way to or from an event. */
+  transit?: ResidentTransit;
 };
 export function timeLabel(minutes: number) {
   const value = ((Math.floor(minutes) % 1440) + 1440) % 1440;
@@ -37,8 +40,25 @@ export function periodAt(minutes: number) {
         ? 'afternoon'
         : 'evening';
 }
+// Where a tube ride is heading, and where it is coming home from.
+const TUBE_PLACES: Record<string, readonly [to: string, from: string]> = {
+  zoo: ['Willow Grove Zoo', 'the zoo'],
+  cinema: ['the Starlight Cinema', 'the movies'],
+  football: ['the football', 'the football'],
+  millpond: ['the Millpond', 'the Millpond'],
+};
+function tubeLabel(transit: ResidentTransit, event: NonNullable<ResidentState['event']>) {
+  if (transit.stage === 'alighting')
+    return `Stepping off the tube at ${tubeStation(transit.to).name}`;
+  const [to, from] = TUBE_PLACES[event.id] ?? [event.name, 'the event'];
+  const verb = transit.stage === 'boarding' ? 'Boarding' : 'Riding';
+  return event.phase === 'returning'
+    ? `${verb} the tube home from ${from}`
+    : `${verb} the tube to ${to}`;
+}
 export function residentActivityLabel(state: ResidentState): string {
   if (state.duckLove) return 'Stopped to admire the ducklings';
+  if (state.transit && state.event) return tubeLabel(state.transit, state.event);
   if (state.event?.id === 'zoo')
     return state.event.phase === 'going'
       ? 'Walking to Willow Grove Zoo'
@@ -79,9 +99,15 @@ export function residentActivityLabel(state: ResidentState): string {
   }[state.activity];
 }
 
-export function simulateResidents(places: Place[], minutes: number, day = 0): ResidentState[] {
+/** The minute of the town day, wrapped by 1440. A single `%` keeps every in-day minute bit-exact,
+ *  so anything else that reads the day's plans at a minute (the tube panel) agrees with the town. */
+export function townClock(minutes: number) {
   const wrapped = minutes % 1440;
-  const time = wrapped < 0 ? wrapped + 1440 : wrapped;
+  return wrapped < 0 ? wrapped + 1440 : wrapped;
+}
+
+export function simulateResidents(places: Place[], minutes: number, day = 0): ResidentState[] {
+  const time = townClock(minutes);
   const period = periodAt(time);
   const eventDay = time < 360 ? day - 1 : day;
   const itinerary = residentTrips(places, eventDay);

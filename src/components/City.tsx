@@ -1,6 +1,7 @@
 import { isZooPlot, ZOO_FRAME } from '../lib/zoo';
 import { FARM, FARM_FRAME, isFarmPlot } from '../lib/farm';
 import { isMillpondPlot, MILLPOND_FRAME, MILLPOND_VENUE } from '../lib/millpond';
+import { isTubePlot, tubeFrame, tubeStation, TUBE_LINE_NAME } from '../lib/tubes';
 import { places as publishedPlaces } from '../lib/places';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Crosshair, Minus, Plus, MapPin } from 'lucide-react';
@@ -85,7 +86,12 @@ const City = forwardRef<CityHandle, Props>(function City(
   selectedRef.current = selectedPlot;
   const cameraRef = useRef(camera);
   const tracked = residents.find((resident) => resident.id === followed);
-  const trackedPoint = tracked ? project(tracked.position.x, tracked.position.y) : null;
+  const trackedGround = tracked ? project(tracked.position.x, tracked.position.y) : null;
+  // A neighbor on the tube is followed up the stack and along the glass. The lift is continuous
+  // through boarding, riding and stepping off, so the map never jumps.
+  const trackedPoint = trackedGround
+    ? { x: trackedGround.x, y: trackedGround.y - (tracked?.transit?.altitude ?? 0) }
+    : null;
   const renderedCamera = trackedPoint
     ? {
         ...camera,
@@ -163,6 +169,24 @@ const City = forwardRef<CityHandle, Props>(function City(
     return {
       x: (mobile ? width / 2 : (width - 370) / 2) - MILLPOND_FRAME.center.x * zoom,
       y: (mobile ? height * 0.29 : height * 0.5) - MILLPOND_FRAME.center.y * zoom,
+      zoom,
+    };
+  };
+  // Frames one station, its spur and the stretch of trunk behind it.
+  const tubeCamera = (width: number, height: number, id: string): Camera => {
+    const frame = tubeFrame(id);
+    const mobile = width < 600;
+    const zoom = Math.max(
+      0.05,
+      Math.min(
+        1.4,
+        (width - (mobile ? 24 : 400)) / frame.width,
+        (mobile ? height * 0.43 : height - 150) / frame.height,
+      ),
+    );
+    return {
+      x: (mobile ? width / 2 : (width - 370) / 2) - frame.center.x * zoom,
+      y: (mobile ? height * 0.29 : height * 0.5) - frame.center.y * zoom,
       zoom,
     };
   };
@@ -269,6 +293,10 @@ const City = forwardRef<CityHandle, Props>(function City(
           setCamera(millpondCamera(size.width, size.height));
           return;
         }
+        if (isTubePlot(id)) {
+          setCamera(tubeCamera(size.width, size.height, id));
+          return;
+        }
         if (isCinemaPlot(id)) {
           setCamera(cinemaCamera(size.width, size.height));
           return;
@@ -301,6 +329,8 @@ const City = forwardRef<CityHandle, Props>(function City(
       if (selected && isFarmPlot(selected.id)) setCamera(farmCamera(width, height));
       else if (selected && isZooPlot(selected.id)) setCamera(zooCamera(width, height));
       else if (selected && isMillpondPlot(selected.id)) setCamera(millpondCamera(width, height));
+      else if (selected && isTubePlot(selected.id))
+        setCamera(tubeCamera(width, height, selected.id));
       else if (selected && isCinemaPlot(selected.id)) setCamera(cinemaCamera(width, height));
       else if (selected && isFootballPlot(selected.id)) setCamera(footballCamera(width, height));
       else if (selected) {
@@ -528,7 +558,9 @@ const City = forwardRef<CityHandle, Props>(function City(
                   ? FOOTBALL_VENUE.name
                   : isMillpondPlot(hover)
                     ? MILLPOND_VENUE.name
-                    : PLOT_COPY.tooltip(hover))}
+                    : isTubePlot(hover)
+                      ? `${tubeStation(hover).name} · ${TUBE_LINE_NAME}`
+                      : PLOT_COPY.tooltip(hover))}
           </span>
         </div>
       )}

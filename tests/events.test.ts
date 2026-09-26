@@ -14,6 +14,7 @@ import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
 import { getPlot, isRoad, plotEntrance } from '../src/lib/world';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { onRoadOrTube, stepBound } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const walker = {
@@ -38,7 +39,7 @@ describe('Shared town events', () => {
     expect(eventsForDay(7)).toEqual(eventsForDay(7));
   });
   it('reserves venues in both builder options and shared save/CI validation', () => {
-    expect(HOUSE_PLOTS).toHaveLength(143);
+    expect(HOUSE_PLOTS).toHaveLength(141);
     for (const venue of VENUES) {
       expect(HOUSE_PLOTS.some((plot) => plot.id === venue.plot)).toBe(false);
       expect(
@@ -211,11 +212,8 @@ describe('Shared town events', () => {
               state.position.x - next[index].position.x,
               state.position.y - next[index].position.y,
             ),
-          ).toBeLessThan(0.01);
-          expect(
-            isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
-              insideVenue(event.venue, state.position),
-          ).toBe(true);
+          ).toBeLessThan(stepBound(state, next[index], 0.001, 0.01));
+          expect(onRoadOrTube(state) || insideVenue(event.venue, state.position)).toBe(true);
         });
       }
       for (const state of simulateResidents(crowd, event.homeBy, 2))

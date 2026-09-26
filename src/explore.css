@@ -394,6 +394,19 @@ body,
   border-radius: 4px;
   box-shadow: 0 2px 8px #1d39241f;
 }
+/* The Treeline's enamel station plate, in its in-world colors day and night (it is a real sign). */
+.home-sign .tube-sign {
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px solid #6f8b66;
+  border-radius: 3px;
+  background: #cfddb9;
+  color: #2f4a3b;
+  font:
+    700 0.8rem/1.4 'Space Mono',
+    monospace;
+  text-align: center;
+}
 .home-actions {
   display: flex;
   align-items: center;

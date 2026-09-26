@@ -25,6 +25,8 @@ import {
 } from '../src/lib/walking';
 import { residentTrips } from '../src/lib/resident-trips';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
+import { walkingPace } from '../src/lib/tube-journeys';
+import { onRoadOrTube, stepBound } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const homes: Place[] = HOUSE_PLOTS.slice(0, 36).map((plot, index) => ({
@@ -182,7 +184,8 @@ describe('Willow Grove Zoo and physical journey times', () => {
   it.each(zooVisits)(
     'walks $home.id from $home.plot to the zoo and home at a constant speed without shortcuts',
     ({ home, trip }) => {
-      const speed = routeLength(trip.route) / trip.duration;
+      // A tube trip is judged on its walking legs; the ride keeps its own time.
+      const speed = trip.legs ? walkingPace(trip.legs) : routeLength(trip.route) / trip.duration;
       expect(speed).toBeGreaterThanOrEqual(WALK_SPEED);
       expect(speed).toBeLessThanOrEqual(WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER + 1e-8);
       const stateAt = (time: number) => at(time).find((r) => r.id === home.id)!;
@@ -197,14 +200,19 @@ describe('Willow Grove Zoo and physical journey times', () => {
       for (let time = trip.depart; time < trip.homeBy; time += 1.71) {
         const now = stateAt(time),
           next = stateAt(time + 0.001);
-        expect(
-          isRoad(Math.floor(now.position.x), Math.floor(now.position.y)) || insideZoo(now.position),
-        ).toBe(true);
+        expect(onRoadOrTube(now) || insideZoo(now.position)).toBe(true);
         expect(insideZooHabitat(now.position)).toBe(false);
         expect(distance(now.position, next.position)).toBeLessThanOrEqual(
-          WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER * 0.001 + 1e-8,
+          stepBound(now, next, 0.001, WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER * 0.001 + 1e-8),
         );
-        if (now.moving && next.moving && now.facing === next.facing)
+        // The short walks between a station door and its stack keep their own fixed pace.
+        if (
+          now.moving &&
+          next.moving &&
+          now.facing === next.facing &&
+          !now.transit &&
+          !next.transit
+        )
           expect(distance(now.position, next.position) / 0.001).toBeCloseTo(speed, 6);
       }
       expect(
@@ -220,10 +228,13 @@ describe('Willow Grove Zoo and physical journey times', () => {
         720,
         1080,
         1320,
-      ])
-        expect(
-          distance(stateAt(boundary - 0.001).position, stateAt(boundary + 0.001).position),
-        ).toBeLessThan(0.002);
+      ]) {
+        const before = stateAt(boundary - 0.001),
+          after = stateAt(boundary + 0.001);
+        expect(distance(before.position, after.position)).toBeLessThan(
+          stepBound(before, after, 0.002, 0.002),
+        );
+      }
     },
   );
 
@@ -245,7 +256,10 @@ describe('Willow Grove Zoo and physical journey times', () => {
       .filter((p) => p.event.id === 'zoo');
     expect(visits.length).toBeGreaterThan(0);
     expect(
-      visits.every((p) => p.depart >= 720 && p.arrive > p.event.start && p.arrive < p.event.end),
+      // Riders can make the 14:00 start; walkers from this far away cannot.
+      visits.every(
+        (p) => p.depart >= 720 && (p.legs || p.arrive > p.event.start) && p.arrive < p.event.end,
+      ),
     ).toBe(true);
     expect(at(650, workers).every((r) => r.activity === 'work' && !r.event && !r.moving)).toBe(
       true,
@@ -260,7 +274,9 @@ describe('Willow Grove Zoo and physical journey times', () => {
       const before = at(boundary - 0.001),
         after = at(boundary + 0.001);
       before.forEach((r, index) =>
-        expect(distance(r.position, after[index].position)).toBeLessThan(0.002),
+        expect(distance(r.position, after[index].position)).toBeLessThan(
+          stepBound(r, after[index], 0.002, 0.002),
+        ),
       );
     }
     expect(at(900, [...homes].reverse()).reverse()).toEqual(at(900));
@@ -275,10 +291,7 @@ describe('Willow Grove Zoo and physical journey times', () => {
       for (const state of at(time, fullTown)) {
         if (!state.event || state.event.id === 'football') continue;
         const event = eventsForDay(7).find((e) => e.id === state.event!.id)!;
-        expect(
-          isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
-            insideVenue(event.venue, state.position),
-        ).toBe(true);
+        expect(onRoadOrTube(state) || insideVenue(event.venue, state.position)).toBe(true);
       }
   });
 });

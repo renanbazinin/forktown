@@ -80,6 +80,37 @@ export const routeLength = (route: readonly Point[]) =>
       (sum, point, index) => sum + Math.hypot(point.x - route[index].x, point.y - route[index].y),
       0,
     );
+/**
+ * Plan a journey of `walkTiles` walked tiles plus `fixed` minutes that never speed up (boarding,
+ * riding and stepping off the tube). Only the walking picks up the pace, up to 1.4×. With
+ * `fixed = 0` every number is bit-identical to the walking-only planner.
+ */
+export function planJourney(
+  walkTiles: number,
+  fixed: number,
+  start: number,
+  end: number,
+  availableFrom: number,
+  availableUntil: number,
+  preferredDepart: number,
+  stagger = 0,
+) {
+  const normalDuration = walkTiles / WALK_SPEED;
+  const targetArrival = start - 5 - stagger;
+  const travelWindow = targetArrival - Math.max(preferredDepart, availableFrom) - fixed;
+  // Pick up the pace before borrowing time from an earlier free period.
+  const speedMultiplier = Math.min(
+    MAX_TRAVEL_SPEED_MULTIPLIER,
+    Math.max(1, travelWindow > 0 ? normalDuration / travelWindow : MAX_TRAVEL_SPEED_MULTIPLIER),
+  );
+  const duration = normalDuration / speedMultiplier + fixed;
+  const depart = Math.max(availableFrom, targetArrival - duration);
+  const arrive = depart + duration;
+  const leave = Math.min(end + stagger, availableUntil - duration);
+  // Count only time while the event is open, excluding early arrival and lingering.
+  if (Math.min(end, leave) - Math.max(start, arrive) < MIN_VISIT_MINUTES) return undefined;
+  return { duration, depart, arrive, leave, homeBy: leave + duration, speedMultiplier };
+}
 export function planTravel(
   route: Point[],
   start: number,
@@ -89,20 +120,18 @@ export function planTravel(
   preferredDepart: number,
   stagger = 0,
 ) {
-  const normalDuration = routeLength(route) / WALK_SPEED;
-  const targetArrival = start - 5 - stagger;
-  const travelWindow = targetArrival - Math.max(preferredDepart, availableFrom);
-  // Pick up the pace before borrowing time from an earlier free period.
-  const speedMultiplier = Math.min(
-    MAX_TRAVEL_SPEED_MULTIPLIER,
-    Math.max(1, travelWindow > 0 ? normalDuration / travelWindow : MAX_TRAVEL_SPEED_MULTIPLIER),
+  const plan = planJourney(
+    routeLength(route),
+    0,
+    start,
+    end,
+    availableFrom,
+    availableUntil,
+    preferredDepart,
+    stagger,
   );
-  const duration = normalDuration / speedMultiplier;
-  const depart = Math.max(availableFrom, targetArrival - duration);
-  const arrive = depart + duration;
-  const leave = Math.min(end + stagger, availableUntil - duration);
-  // Count only time while the event is open, excluding early arrival and lingering.
-  if (Math.min(end, leave) - Math.max(start, arrive) < MIN_VISIT_MINUTES) return undefined;
-  return { route, duration, depart, arrive, leave, homeBy: leave + duration };
+  if (!plan) return undefined;
+  const { duration, depart, arrive, leave, homeBy } = plan;
+  return { route, duration, depart, arrive, leave, homeBy };
 }
 export type TravelPlan = NonNullable<ReturnType<typeof planTravel>>;

@@ -3,6 +3,9 @@ import FarmInfo from './components/FarmInfo';
 import { FARM, isFarmPlot } from './lib/farm';
 import MillpondInfo from './components/MillpondInfo';
 import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
+import TubeInfo from './components/TubeInfo';
+import { isTubePlot, TUBE_VENUE } from './lib/tubes';
+import { tubeStatus } from './lib/tube-traffic';
 import { isZooPlot, ZOO_VENUE } from './lib/zoo';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -82,6 +85,8 @@ function initialSelection() {
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'farm') return FARM.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'millpond')
     return MILLPOND_VENUE.plot;
+  if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'tube')
+    return TUBE_VENUE.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'zoo')
     return ZOO_VENUE.plot;
   if (new URLSearchParams(window.location.hash.slice(1)).get('venue') === 'cinema')
@@ -121,6 +126,7 @@ export default function App() {
   const selectedFootball = isFootballPlot(selectedPlot ?? '');
   const selectedFarm = isFarmPlot(selectedPlot ?? '');
   const selectedMillpond = isMillpondPlot(selectedPlot ?? '');
+  const selectedTube = isTubePlot(selectedPlot ?? '');
   const night = clock.minutes < 360 || clock.minutes >= 1200;
   const cinemaEvening = clock.minutes < 360;
   const events = useMemo(
@@ -182,7 +188,7 @@ export default function App() {
     window.history.replaceState(
       null,
       '',
-      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isMillpondPlot(plotId ?? '') ? '#venue=millpond' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
+      `${window.location.pathname}${window.location.search}${place ? `#place=${encodeURIComponent(place.id)}` : isFarmPlot(plotId ?? '') ? '#venue=farm' : isMillpondPlot(plotId ?? '') ? '#venue=millpond' : isTubePlot(plotId ?? '') ? '#venue=tube' : isFootballPlot(plotId ?? '') ? '#venue=football' : isCinemaPlot(plotId ?? '') ? '#venue=cinema' : isZooPlot(plotId ?? '') ? '#venue=zoo' : plotId === FORK_PLOT ? '#venue=fork' : ''}`,
     );
     if (plotId && focus) city.current?.focus(plotId);
   }, []);
@@ -273,6 +279,7 @@ export default function App() {
     selected?.name ??
     (selectedFarm ? FARM.name : undefined) ??
     (selectedMillpond ? MILLPOND_VENUE.name : undefined) ??
+    (selectedTube ? TUBE_VENUE.name : undefined) ??
     (selectedFootball ? FOOTBALL_VENUE.name : undefined) ??
     selectedVenue?.name ??
     (selectedPlot
@@ -440,6 +447,8 @@ export default function App() {
               <FarmInfo />
             ) : selectedMillpond ? (
               <MillpondInfo minutes={clock.minutes} day={clock.day} skaters={skaters} />
+            ) : selectedTube ? (
+              <TubeInfo status={tubeStatus(displayPlaces, clock.minutes, clock.day)} />
             ) : selectedVenue?.kind === 'zoo' ? (
               <ZooInfo
                 minutes={clock.minutes}

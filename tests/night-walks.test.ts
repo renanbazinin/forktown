@@ -14,6 +14,7 @@ import { getPlot, isRoad, plotEntrance } from '../src/lib/world';
 import { insideCinema } from '../src/lib/cinema';
 import { nightBedtime } from '../src/lib/night-routine';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, routeLength, WALK_SPEED } from '../src/lib/walking';
+import { stepBound } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const owls: Place[] = HOUSE_PLOTS.slice(0, 32).map((plot, index) => ({
@@ -205,7 +206,9 @@ describe('Night owls and the midnight party', () => {
       const before = at(boundary - 0.001),
         after = at(boundary + 0.001);
       before.forEach((state, index) =>
-        expect(distance(state.position, after[index].position)).toBeLessThan(0.01),
+        expect(distance(state.position, after[index].position)).toBeLessThan(
+          stepBound(state, after[index], 0.002, 0.01),
+        ),
       );
     }
     let previous = at(1320);

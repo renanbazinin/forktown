@@ -10,9 +10,15 @@ import {
   SCENERY_SECONDS,
   FOLLOW_SECONDS,
   LANTERN_SHOT,
+  LIVE_EASE_SECONDS,
+  LIVE_RIDE_EASE_SECONDS,
+  liveCenterLift,
+  liveEaseSeconds,
+  liveLabelLift,
 } from '../src/lib/live-director';
+import { tubeRides } from '../src/lib/tube-traffic';
 import { placeSchema } from '../src/lib/schema';
-import { simulateResidents } from '../src/lib/simulation';
+import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { eventsForDay, isEventLive } from '../src/lib/events';
 import { footballAt } from '../src/lib/football';
 import { townCatAt } from '../src/lib/town-cat';
@@ -439,6 +445,57 @@ describe('Live broadcast director', () => {
       expect(['cat', 'neighbor']).toContain(shot.kind);
       expect(liveCamera(shot, 1920, 1080, 35)).toEqual(liveCamera(shot, 1920, 1080));
     }
+  });
+
+  it('keeps a neighbor riding the tube near the centre, then settles as before', () => {
+    const day = CALENDAR_EPOCH_DAY + 3;
+    const ride = tubeRides(places, day).find((r) => r.direction === 'there' && r.board > 400)!;
+    const program = { ...liveProgram(places, day), highlights: [], previousHighlights: [] };
+    program.cast = program.cast.map((ids) => [
+      ride.residentId,
+      ...ids.filter((id) => id !== ride.residentId),
+    ]);
+    for (const [width, height] of [
+      [1920, 1080],
+      [390, 844],
+    ]) {
+      let camera: ReturnType<typeof liveCamera> | undefined;
+      let previous: ResidentState | undefined;
+      let worst = 0;
+      const stages = new Set<string>();
+      for (let t = ride.board - 1; t < ride.off + 2; t += 1 / 60) {
+        const residents = simulateResidents(places, t, day);
+        const shot = liveShotAt(program, t, residents);
+        expect(shot.residentId).toBe(ride.residentId);
+        const rider = residents.find((r) => r.id === ride.residentId)!;
+        const target = liveCamera(shot, width, height, t);
+        camera = camera ? easeLiveCamera(camera, target, 1 / 60, liveEaseSeconds(rider)) : target;
+        const p = project(rider.position.x, rider.position.y);
+        worst = Math.max(
+          worst,
+          Math.abs(p.x * camera.zoom + camera.x - width / 2) / (width / 2),
+          Math.abs((p.y - liveCenterLift(rider)) * camera.zoom + camera.y - height / 2) /
+            (height / 2),
+        );
+        // The label and the centre never jump, through the fwoomp, the ride and the drop.
+        if (previous) {
+          expect(Math.abs(liveLabelLift(rider) - liveLabelLift(previous))).toBeLessThanOrEqual(6);
+          expect(Math.abs(liveCenterLift(rider) - liveCenterLift(previous))).toBeLessThanOrEqual(6);
+        }
+        if (rider.transit) stages.add(rider.transit.stage);
+        previous = rider;
+      }
+      expect([...stages]).toEqual(['boarding', 'riding', 'alighting']);
+      expect(worst).toBeLessThan(0.25);
+    }
+    expect(liveEaseSeconds(undefined)).toBe(LIVE_EASE_SECONDS);
+    expect(liveCenterLift(undefined)).toBe(22);
+    expect(liveLabelLift(undefined)).toBe(43);
+    expect(LIVE_RIDE_EASE_SECONDS).toBe(0.12);
+    const from = { x: 0, y: 40, zoom: 0.5 },
+      to = { x: 900, y: -100, zoom: 1.5 };
+    expect(easeLiveCamera(from, to, 1)).toEqual(easeLiveCamera(from, to, 1, LIVE_EASE_SECONDS));
+    expect(LIVE_EASE_SECONDS).toBe(1.6);
   });
 
   it('eases camera changes without overshoot and independently of frame rate', () => {

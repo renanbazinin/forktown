@@ -103,6 +103,7 @@ describe('The first-visit welcome', () => {
     expect(shouldWelcome('', storage())).toBe(true);
     expect(shouldWelcome('#place=arts', storage())).toBe(false);
     expect(shouldWelcome('#venue=fork', storage())).toBe(false);
+    expect(shouldWelcome('#venue=tube', storage())).toBe(false);
     expect(shouldWelcome('', storage({ [WELCOME_KEY]: '1' }))).toBe(false);
     expect(shouldWelcome('#other=1&place=arts', storage())).toBe(false);
   });

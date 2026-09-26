@@ -12,6 +12,8 @@ export function drawResident(
     ResidentState,
     'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove' | 'event'
   >,
+  /** `shadow: false` leaves out the ground shadow, for a figure lifted off the ground. */
+  options: { shadow?: boolean } = {},
 ) {
   const facing = state?.facing ?? 'se';
   const back = facing === 'ne' || facing === 'nw';
@@ -43,10 +45,12 @@ export function drawResident(
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
-  ctx.fillStyle = '#23341B30';
-  ctx.beginPath();
-  ctx.ellipse(0, 1, seated ? 7 : 5, 2, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (options.shadow !== false) {
+    ctx.fillStyle = '#23341B30';
+    ctx.beginPath();
+    ctx.ellipse(0, 1, seated ? 7 : 5, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.save();
   if (left) ctx.scale(-1, 1);
