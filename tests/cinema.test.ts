@@ -23,6 +23,8 @@ import { simulateResidents, residentActivityLabel } from '../src/lib/simulation'
 import { isRoad, getPlot, plotEntrance, project } from '../src/lib/world';
 import { liveProgram, liveShotAt, liveCamera, liveHighlights } from '../src/lib/live-director';
 import { cinemaScreenHit, SCREEN_ORIGIN, SCREEN_SCALE } from '../src/city/cinema';
+import { CINEMA_PROPS } from '../src/city/cinema-props';
+import { eventApproach } from '../src/lib/resident-trips';
 import { cityHit } from '../src/city/render';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
 
@@ -270,6 +272,33 @@ describe('Starlight Cinema', () => {
     expect(isRoad(25, 21)).toBe(true);
     expect(new Set(CINEMA_SEATS.map((p) => JSON.stringify(p))).size).toBe(12);
     for (const seat of CINEMA_SEATS) expect(insideCinema(seat)).toBe(true);
+  });
+  it('parks the popcorn cart and projector on the lawn, clear of every rug and the way in', () => {
+    const event = cinemaEventForDay(0);
+    for (const box of Object.values(CINEMA_PROPS)) {
+      expect(insideCinema({ x: box.x0, y: box.y0 })).toBe(true);
+      expect(insideCinema({ x: box.x1, y: box.y1 })).toBe(true);
+      // A rug reaches 0.24 either side of its seat; walkers need a little room at the edges.
+      const clear = (x: number, y: number, pad: number) =>
+        x < box.x0 - pad || x > box.x1 + pad || y < box.y0 - pad || y > box.y1 + pad;
+      for (const seat of CINEMA_SEATS)
+        for (const [dx, dy] of [
+          [-1, -1],
+          [1, -1],
+          [1, 1],
+          [-1, 1],
+        ])
+          expect(clear(seat.x + dx * 0.24, seat.y + dy * 0.24, 0)).toBe(true);
+      for (const [seat] of CINEMA_SEATS.entries()) {
+        const route = eventApproach(event, seat);
+        for (let i = 1; i < route.length; i++)
+          for (let t = 0; t <= 1; t += 0.05) {
+            const x = route[i - 1].x + (route[i].x - route[i - 1].x) * t,
+              y = route[i - 1].y + (route[i].y - route[i - 1].y) * t;
+            expect(clear(x, y, 0.1), `seat ${seat} at ${x}, ${y}`).toBe(true);
+          }
+      }
+    }
   });
   it('walks a bounded audience continuously, then goes home or continues to the disco', () => {
     const day = 8,
