@@ -6,7 +6,8 @@
 // node_modules there (a junction on Windows, a symlink elsewhere), and adds a made-up house from
 // tests/full-town.ts on every free plot. places/ in the repository is never touched. It prints a
 // summary naming every failing test, and exits non-zero if the validator or any test failed.
-// Works on Windows, macOS and Linux; the whole suite takes a minute or two.
+// Written to run on Windows, macOS and Linux: checked on Windows, and the Full town workflow runs
+// it on Linux. The whole suite takes a minute or two.
 //
 // Anything after `--` goes to Vitest, e.g. `npm run check:full-town -- tests/render-smoke.test.ts`.
 // `--keep` leaves the temporary town in place and prints its path, for a closer look.
