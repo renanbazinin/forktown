@@ -176,6 +176,21 @@ describe('Trusted PR policy', () => {
       expect(readHead).not.toHaveBeenCalled();
     }
   });
+  it('rejects house files in a folder under places/, even with approval', async () => {
+    for (const status of ['added', 'modified', 'renamed']) {
+      const readHead = vi.fn(async () => ({ creator: 'neighbor' }));
+      const result = await check({
+        approved: true,
+        authorPermission: 'admin',
+        files: [house('places/sub/mine.json', status, { previous_filename: 'places/mine.json' })],
+        readHead,
+      });
+      expect(result.errors.join(' '), status).toContain('must be a plain file');
+      expect(readHead).not.toHaveBeenCalled();
+    }
+    const removed = await check({ files: [house('places/sub/old.json', 'removed')] });
+    expect(removed.errors.join(' ')).not.toContain('must be a plain file');
+  });
   it('needs a maintainer for links and submodules anywhere else', async () => {
     for (const mode of ['120000', '160000']) {
       const files = [house('docs/q.md', 'added')];

@@ -77,7 +77,11 @@ export async function evaluatePolicy({
       const mode = await modeOf(file.filename);
       if (mode === undefined)
         throw new Error(`Could not find ${JSON.stringify(file.filename)} in the PR's commit.`);
-      if (file.filename.startsWith('places/') && mode !== '100644') {
+      // Folders too: house files sit directly in places/, where the validator looks.
+      if (
+        file.filename.startsWith('places/') &&
+        (mode !== '100644' || /^places\/[^/]+\//.test(file.filename))
+      ) {
         errors.push(
           `${JSON.stringify(file.filename)} must be a plain file. Links, folders and executable files can't live in places/.`,
         );
