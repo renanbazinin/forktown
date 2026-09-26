@@ -23,14 +23,14 @@ If you receive feedback, edit the file in the same branch of your fork. Your exi
 
 ## Or write one file yourself
 
-Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not change the example itself. Here is the contract:
+Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not change the example itself. Then make the copy yours: choose your own `id` and rename the file to match it, put your GitHub username in `creator`, and pick an open `plot`. Here is the contract:
 
 ```json
 {
   "id": "sam-moon-cafe",
   "name": "Sam’s Moon Café",
   "creator": "your-github-username",
-  "plot": "A1",
+  "plot": "T3",
   "building": "cafe",
   "color": "#C97878",
   "decoration": "flowers",
@@ -38,7 +38,7 @@ Copy `examples/my-little-place.json` to `places/your-unique-id.json`. Do not cha
 }
 ```
 
-`A1` is an example. Check that your chosen plot is still open before submitting.
+`T3` is an example. Check that your chosen plot is still open before submitting.
 
 | Field        | What to put here                                                                                                                                                                                                                                                 |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

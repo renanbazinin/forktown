@@ -26,6 +26,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readPlaceFiles } from '../scripts/place-files';
+import { readFileSync } from 'node:fs';
+import { places } from '../src/lib/places';
 
 const sample: Place = placeSchema.parse({
   id: 'tiny-library',
@@ -279,5 +281,20 @@ describe('Place files on disk', () => {
     } finally {
       await rm(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe('The examples a newcomer copies', () => {
+  it.each(['examples/my-little-place.json', 'examples/living-place.json'])(
+    '%s is a valid house on a house plot, with an id no house uses',
+    (file) => {
+      const example = placeSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
+      expect(HOUSE_PLOTS.map((plot) => plot.id)).toContain(example.plot);
+      expect(places.map((place) => place.id)).not.toContain(example.id);
+    },
+  );
+  it('copies to places/your-unique-id.json without a rename error', () => {
+    const example = JSON.parse(readFileSync('examples/my-little-place.json', 'utf8'));
+    expect(example.id).toBe('your-unique-id');
   });
 });
