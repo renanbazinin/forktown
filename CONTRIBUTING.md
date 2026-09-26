@@ -101,6 +101,8 @@ npm run check
 
 You can also run only `npm run validate` for a quick data check. The check points to the exact file and field that needs attention.
 
+The pull request check also runs `npm run format:check`. If it lists your file, run `npm run format` to tidy the spacing, then commit the change.
+
 After committing, run `npm run check:pr -- origin/main HEAD` to check the house allowance locally (fetch the target branch first). On GitHub, **Contribution policy** uses trusted default-branch policy and API data without executing code from the PR. It checks credit and ownership too; see [Contribution policy and merge protection](docs/CONTRIBUTION_POLICY.md).
 
 ## A few things that help everyone
