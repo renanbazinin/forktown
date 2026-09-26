@@ -415,6 +415,13 @@ describe('One commit status for every PR that shares a head commit', () => {
     expect(await alone.run({ number: '2' })).toBe('skipped');
     expect(alone.statuses).toEqual([]);
   });
+  it('fails closed when too many PRs share a commit to check them all', async () => {
+    const github = fakeGitHub({
+      pulls: Array.from({ length: 11 }, (_, i) => pull(i + 1, `neighbor-${i}`)),
+    });
+    expect(await github.run({ number: '1' })).toBe('failure');
+    expect(github.statuses.map((status) => status.state)).toEqual(['failure']);
+  });
   it('rejects a house that is a link without reading the link text', async () => {
     const github = fakeGitHub({ pulls: [pull(1, 'alice')], mode: '120000' });
     expect(await github.run({ number: '1' })).toBe('failure');

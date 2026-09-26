@@ -200,25 +200,6 @@ export async function runContributionPolicy({ api, repo, number, sha, runUrl, lo
   }
   const head = trigger ? trigger.head.sha : sha;
   if (!/^[a-f0-9]{40,64}$/.test(head ?? '')) throw new Error('Missing PR revision.');
-  const defaultBranch = (await api(root)).default_branch;
-  const numbers = new Set();
-  for (const item of [
-    ...(trigger ? [trigger] : []),
-    ...(await paginate(api, `${root}/commits/${head}/pulls`)),
-  ])
-    if (
-      item.state === 'open' &&
-      item.head?.sha === head &&
-      item.base?.repo?.full_name === repo &&
-      item.base.ref === defaultBranch
-    )
-      numbers.add(item.number);
-  if (!numbers.size) {
-    log.log(`No open PR into ${defaultBranch} uses this commit; no status changed.`);
-    return 'skipped';
-  }
-  if (numbers.size > 10)
-    throw new Error('Too many open PRs share this commit. Close the duplicates and retry.');
   const status = (state, description) =>
     api(`${root}/statuses/${head}`, {
       state,
@@ -226,8 +207,27 @@ export async function runContributionPolicy({ api, repo, number, sha, runUrl, lo
       description,
       target_url: runUrl,
     });
-  await status('pending', 'Checking house allowance, credit and ownership');
   try {
+    const defaultBranch = (await api(root)).default_branch;
+    const numbers = new Set();
+    for (const item of [
+      ...(trigger ? [trigger] : []),
+      ...(await paginate(api, `${root}/commits/${head}/pulls`)),
+    ])
+      if (
+        item.state === 'open' &&
+        item.head?.sha === head &&
+        item.base?.repo?.full_name === repo &&
+        item.base.ref === defaultBranch
+      )
+        numbers.add(item.number);
+    if (!numbers.size) {
+      log.log(`No open PR into ${defaultBranch} uses this commit; no status changed.`);
+      return 'skipped';
+    }
+    if (numbers.size > 10)
+      throw new Error('Too many open PRs share this commit. Close the duplicates and retry.');
+    await status('pending', 'Checking house allowance, credit and ownership');
     const permissions = new Map();
     const permissionFor = async (login) => {
       const key = login.toLowerCase();
