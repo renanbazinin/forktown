@@ -106,6 +106,32 @@ export function houseBounds(place: HouseAppearance) {
         : 34;
   return { height, top: height + roof + 8, bottom: 46, left: 72, right: 72 };
 }
+export type HouseLife = {
+  minutes: number;
+  activity?: ResidentState['activity'];
+  lantern?: HouseLantern;
+  /** Only the map passes a season: previews and the builder keep the neighbour's own colours. */
+  season?: TownSeason;
+};
+const CHIMNEYS = new Set(['cottage', 'cafe', 'bookshop', 'studio']);
+/** Where the chimney stands in house-local px, or null for the homes built without one. */
+function chimneyOf(place: HouseAppearance, h: number) {
+  if (!CHIMNEYS.has(place.building)) return null;
+  const d = place.design;
+  const flat =
+    d.roof === 'flat' || (d.roof === 'classic' && ['studio', 'cafe'].includes(place.building));
+  return { x: -18, y: -h - (flat ? 2 : 16) };
+}
+/**
+ * Everything a home paints, smoke included, in house-local px: the map skips a house when this
+ * box is off screen. The plume climbs up to 57px above the chimney's top edge, and 2px more
+ * leaves room for its soft edge.
+ */
+export function houseReach(place: HouseAppearance) {
+  const bounds = houseBounds(place);
+  const chimney = chimneyOf(place, bounds.height);
+  return chimney ? { ...bounds, top: Math.max(bounds.top, 59 - chimney.y) } : bounds;
+}
 export function drawHouse(
   ctx: Ctx,
   place: HouseAppearance,
@@ -113,13 +139,7 @@ export function drawHouse(
   y: number,
   night = false,
   scale = 1,
-  life?: {
-    minutes: number;
-    activity?: ResidentState['activity'];
-    lantern?: HouseLantern;
-    /** Only the map passes a season: previews and the builder keep the neighbour's own colours. */
-    season?: TownSeason;
-  },
+  life?: HouseLife,
 ) {
   const d = place.design,
     { height: h } = houseBounds(place);
@@ -514,9 +534,9 @@ export function drawHouse(
       );
     });
   }
-  if (['cottage', 'cafe', 'bookshop', 'studio'].includes(place.building)) {
-    const chimneyX = -18,
-      chimneyY = -h - (flat ? 2 : 16);
+  const chimney = chimneyOf(place, h);
+  if (chimney) {
+    const { x: chimneyX, y: chimneyY } = chimney;
     const brick = night ? '#827E6C' : '#B3977F';
     box(ctx, chimneyX, chimneyY - 13, 7, 14, brick);
     polygon(

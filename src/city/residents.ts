@@ -2,6 +2,19 @@ import type { Resident } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { tint } from './houses';
 
+/**
+ * How far a figure, its props and its speech reach from its feet, in its own px before scaling,
+ * with 2px to spare: sideways either way, above and below. A greeting bubble is budgeted 12px a
+ * character, wider than any 10px glyph, since the map culls before any text is measured.
+ */
+export function residentReach(
+  resident: Resident,
+  state?: Pick<ResidentState, 'greeting' | 'duckLove'>,
+) {
+  const bubble = state?.greeting && !state.duckLove ? 6 * resident.greeting.length + 14 : 0;
+  return { x: Math.max(18, bubble), above: 48, below: 5 };
+}
+
 export function drawResident(
   ctx: CanvasRenderingContext2D,
   resident: Resident,

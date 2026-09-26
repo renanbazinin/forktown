@@ -11,8 +11,8 @@ import {
   millpondSignHit,
   MILLPOND_SIGN_DEPTH,
 } from './millpond';
-import { drawHouse, houseBounds } from './houses';
-import { drawResident } from './residents';
+import { drawHouse, houseBounds, houseReach } from './houses';
+import { drawResident, residentReach } from './residents';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
 import { drawTownTree } from './trees';
@@ -104,6 +104,10 @@ type Palette = {
 };
 export type Camera = { x: number; y: number; zoom: number };
 const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
+/** Houses stand a little larger than their plot art. */
+const HOUSE_SCALE = 1.12;
+/** Walkers are drawn at 1.25 times their preview size. */
+const RESIDENT_SCALE = 1.25;
 const venueDepth = (plot: Plot) => plot.x + plot.y + 0.1;
 export const forkPlot = getPlot(FORK_PLOT)!;
 const forkPt = plotCenter(forkPlot);
@@ -551,9 +555,16 @@ export function renderCity({
       }),
     );
   for (const place of places) {
-    const plot = PLOTS.find((v) => v.id === place.plot);
+    const plot = getPlot(place.plot);
     if (!plot) continue;
     const pt = plotCenter(plot);
+    // Like the trees, a house off screen is skipped: its box holds the roof, the sign, the
+    // lantern post and the chimney smoke.
+    const reach = houseReach(place);
+    if (
+      !visible(pt, reach.right * HOUSE_SCALE, reach.top * HOUSE_SCALE, reach.bottom * HOUSE_SCALE)
+    )
+      continue;
     // Drafts are not on the register, so a local preview gets no lantern post.
     const entry = register.byId.get(place.id);
     const lantern = entry && {
@@ -564,7 +575,7 @@ export function renderCity({
     objects.push({
       depth: houseDepth(plot),
       paint: () =>
-        drawHouse(ctx, place, pt.x, pt.y, night, 1.12, {
+        drawHouse(ctx, place, pt.x, pt.y, night, HOUSE_SCALE, {
           minutes,
           activity: residentsByHome.get(place.id)?.activity,
           lantern,
@@ -605,6 +616,18 @@ export function renderCity({
     if (inTubeGlass(resident.transit)) continue;
     const ground = project(resident.position.x, resident.position.y);
     const pt = { x: ground.x + (offsets.get(resident.id) ?? 0), y: ground.y };
+    // Walkers off screen are skipped too. The ring round a followed one, 10px either way and 7px
+    // below the feet, gets the same 2px to spare.
+    const reach = residentReach(resident.resident, resident);
+    if (
+      !visible(
+        pt,
+        Math.max(reach.x * RESIDENT_SCALE, 12),
+        reach.above * RESIDENT_SCALE,
+        Math.max(reach.below * RESIDENT_SCALE, 9),
+      )
+    )
+      continue;
     objects.push({
       depth: residentDepth(resident),
       paint: () => {
@@ -614,7 +637,7 @@ export function renderCity({
         const alpha = ctx.globalAlpha;
         if (resident.event?.id === 'football')
           ctx.globalAlpha = alpha * spectatorAlpha(football, pt);
-        drawResident(ctx, resident.resident, pt.x, pt.y, 1.25, resident);
+        drawResident(ctx, resident.resident, pt.x, pt.y, RESIDENT_SCALE, resident);
         ctx.globalAlpha = alpha;
       },
     });
@@ -649,7 +672,7 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
     .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
   for (const { place, plot } of ordered) {
     const p = plotCenter(plot);
-    const tall = houseBounds(place).top * 1.12;
+    const tall = houseBounds(place).top * HOUSE_SCALE;
     if (point.x >= p.x - 55 && point.x <= p.x + 55 && point.y >= p.y - tall && point.y <= p.y + 20)
       return plot.id;
   }
