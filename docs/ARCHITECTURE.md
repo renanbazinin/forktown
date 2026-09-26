@@ -20,7 +20,7 @@ Schema validation does not prove creator identity, story suitability, or authori
 
 `town-config.ts` sets the row and column counts; `world-layout.ts` derives the named plots, 200 today (20 rows by 10 columns), on a four-tile street grid. Each block has a three-by-three grass plot with the house centered inside, a wider lawn, and a short entrance path. Road bounds, resident entrances, plot selection, shoreline, and camera framing follow the shared world dimensions. Expanding the row or column counts preserves existing plot ids, coordinates, and share links. A place’s location depends only on its `plot`. Adding a file, changing names, or sorting a directory does not move other buildings. Empty plots can be selected on the map or through the directory.
 
-Plots are not reservations. Concurrent pull requests can conflict; re-run checks against the current main branch before merging. Enable required status checks and require branches to be up to date (or use GitHub’s merge queue) when you publish.
+Plots are not reservations. Concurrent pull requests can conflict; re-run checks against the current main branch before merging. Enable required status checks and require branches to be up to date when you publish; [Contribution policy](CONTRIBUTION_POLICY.md) explains why merge queues stay off.
 
 ### Rendering
 
