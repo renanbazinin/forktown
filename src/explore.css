@@ -604,9 +604,28 @@ body,
 .town-app .toast {
   bottom: 90px;
 }
-/* Inside an open dialog, clear of its buttons. */
+/* Inside an open dialog, at its foot. A dialog as tall as the screen has no room below it, so
+   there the note covers its last lines for the few seconds it shows. */
 .town-app .modal .toast {
   bottom: 24px;
+}
+/* While a newcomer's welcome card shows (28 px from the left, 340 px wide), a note keeps to its
+   right, and on a phone, where the card fills the foot of the screen, under the clock. */
+.town-app:has(> .welcome-card) > .toast {
+  left: calc((368px + 100vw) / 2);
+  width: max-content;
+  min-width: 0;
+  max-width: calc(100vw - 392px);
+}
+@media (max-width: 600px) {
+  .town-app:has(> .welcome-card) > .toast {
+    top: 128px;
+    bottom: auto;
+    left: 50%;
+    width: auto;
+    min-width: 280px;
+    max-width: calc(100vw - 32px);
+  }
 }
 @media (max-width: 600px) {
   .map-header {
