@@ -167,7 +167,8 @@ export function withPreview(places: Place[], draft: Place): Place[] {
  *
  * With `tube: false` the same guests are invited but nobody rides: that is the walking-only
  * planner. A tube plan equals it for every trip before a resident's first ride, and never drops
- * one of its trips for a trip only the tube makes possible.
+ * one of its trips for a trip only the tube makes possible, because a guest is only seated when
+ * the tube plan keeps every one of their outings.
  */
 export function planResidentTrips(
   places: Place[],
@@ -183,11 +184,10 @@ export function planResidentTrips(
   const invite = (home: Place, candidate: Candidate) => {
     const before = days.get(home.id) ?? empty;
     const list = [...before.list, candidate].sort((a, b) => a.event.start - b.event.start);
-    const trips = planWithTube(home, list);
-    const kept = new Set(trips.map((trip) => trip.event));
-    // A visit that costs an outing already planned would leave that seat empty.
-    if (!kept.has(candidate.event) || before.trips.some((trip) => !kept.has(trip.event)))
-      return false;
+    const trips = planHome(home, list, tubeJourneys(home, list));
+    // A visit that costs an outing already planned would leave that seat empty. That rule alone
+    // keeps every trip the walking-only plan makes: all of them are among the outings.
+    if (trips.length < list.length) return false;
     days.set(home.id, { list, trips });
     return true;
   };
@@ -290,32 +290,9 @@ export function planResidentTrips(
 
 type TubeJourney = NonNullable<ReturnType<typeof eventTubeJourney>>;
 
-/**
- * The tube plan, keeping every trip the walking-only plan keeps. The planner is greedy, so a trip
- * only the tube makes possible (one the walking plan leaves out) could take time a later walking
- * trip needs: then the nearest such trip before the lost one gives way and the day is planned
- * again, until every walking trip is back.
- */
-function planWithTube(home: Place, list: readonly Candidate[]): ResidentTrip[] {
-  const journeys = new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
-  const skip = new Set<VisitEvent>();
-  let trips = planHome(home, list, journeys, skip);
-  // Without any ride on offer the tube plan is the walking plan.
-  if (![...journeys.values()].some(Boolean)) return trips;
-  const kept = new Set(planHome(home, list).map((trip) => trip.event));
-  for (;;) {
-    const planned = new Set(trips.map((trip) => trip.event));
-    const lost = list.findIndex((c) => kept.has(c.event) && !planned.has(c.event));
-    if (lost < 0) return trips;
-    let extra: VisitEvent | undefined;
-    for (let i = lost - 1; i >= 0 && !extra; i--)
-      if (planned.has(list[i].event) && !kept.has(list[i].event)) extra = list[i].event;
-    // Nothing the tube added comes before it (the planner's own greed); keep the day as it is.
-    if (!extra) return trips;
-    skip.add(extra);
-    trips = planHome(home, list, journeys, skip);
-  }
-}
+/** Each outing's tube journey, or undefined where walking is as good. */
+const tubeJourneys = (home: Place, list: readonly Candidate[]) =>
+  new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
 
 /** One home's day: each candidate in start order, kept when it fits after the trip before. With
  *  `journeys`, a candidate that has a tube journey rides it; without, everyone walks. */
@@ -323,11 +300,9 @@ function planHome(
   home: Place,
   list: readonly Candidate[],
   journeys?: ReadonlyMap<VisitEvent, TubeJourney | undefined>,
-  skip: ReadonlySet<VisitEvent> = new Set(),
 ): ResidentTrip[] {
   const trips: ResidentTrip[] = [];
   for (const { event, seat, period } of list) {
-    if (skip.has(event)) continue;
     const window = availableWindow(home, period);
     const previous = trips.at(-1);
     const previousReturn = previous?.homeBy ?? window.availableFrom;
