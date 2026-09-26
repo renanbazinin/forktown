@@ -602,10 +602,10 @@ describe('Houses through the year', () => {
     }
     expect(outside.slice(0, 5)).toEqual([]);
     expect(repainted.slice(0, 5)).toEqual([]);
-    // Measured at most +31 calls on one house: a classic-roof cottage with a porch and a pine,
-    // in deep snow. Spring and summer add nothing, autumn at most 6.
+    // Measured at most +45 calls on one house: a gable-roofed cafe with a pine, whose awning and
+    // balcony both hold the first snow. Spring and summer add nothing, autumn at most 6.
     expect(most).toBeGreaterThan(0);
-    expect(most).toBeLessThanOrEqual(45);
+    expect(most).toBeLessThanOrEqual(55);
     // Every added paint is snow or a pumpkin, and never a lantern's light.
     expect([...colours].filter((colour) => !SEASONAL_ART.includes(colour))).toEqual([]);
     expect([...colours].filter((colour) => LIGHTS.has(colour))).toEqual([]);
@@ -649,7 +649,7 @@ describe('Houses through the year', () => {
     const beds = (log: string[]) =>
       log.filter((entry) => /^fillRect\([^)]*,5,4\) /.test(entry) && uses([entry], PUMPKIN.body))
         .length;
-    const step = (log: string[]) => log.some((entry) => entry.startsWith('fillRect(-6,14,7,4) '));
+    const step = (log: string[]) => log.some((entry) => entry.startsWith('fillRect(-3,14,7,4) '));
     const third = hash(`squash:${THIRD_BED}`) & 8 ? 3 : 2;
     for (const night of [false, true]) {
       expect(beds(at(4, vegetables(DOORSTEP), night))).toBe(2);
