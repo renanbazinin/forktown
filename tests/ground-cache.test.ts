@@ -4,23 +4,36 @@ import { paintGroundLayer, type GroundArea } from '../src/city/ground-cache';
 function surface(width = 1280, height = 720) {
   const canvas = { width, height };
   const transform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+  // save() and restore() keep the drawing settings a paint may change, as a canvas does.
+  const settings = { textAlign: 'start', font: '10px sans-serif', lineWidth: 1, lineJoin: 'miter' };
+  const saved: (typeof settings)[] = [];
   const ctx = {
     canvas,
     globalAlpha: 1,
     globalCompositeOperation: 'source-over',
     imageSmoothingEnabled: true,
+    ...settings,
     getTransform: () => ({ ...transform }),
     setTransform: vi.fn(),
     resetTransform: vi.fn(),
     clearRect: vi.fn(),
-    save: vi.fn(),
-    restore: vi.fn(),
+    save: vi.fn(() => {
+      saved.push(drawing(ctx));
+    }),
+    restore: vi.fn(() => {
+      Object.assign(ctx, saved.pop());
+    }),
     drawImage: vi.fn(),
     beginPath: vi.fn(),
     rect: vi.fn(),
     clip: vi.fn(),
   };
   return { ctx: ctx as unknown as CanvasRenderingContext2D, canvas, transform, mock: ctx };
+}
+/** The settings a ground paint may leave behind: the plot labels centre their text. */
+function drawing(ctx: { textAlign: string; font: string; lineWidth: number; lineJoin: string }) {
+  const { textAlign, font, lineWidth, lineJoin } = ctx;
+  return { textAlign, font, lineWidth, lineJoin };
 }
 function browser() {
   const font = { status: 'loaded', check: vi.fn(() => true) };
@@ -178,5 +191,36 @@ describe('Viewport ground caching', () => {
     paintGroundLayer(b.ctx, 'day', paint);
     expect(paint).toHaveBeenLastCalledWith(b.ctx);
     expect(createElement).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the map as it found it whenever the ground is painted straight onto it', () => {
+    // An empty plot's label centres its text. In the layer that stays in the layer; on the map it
+    // must not reach what the map draws next, or the stage's notes slide while the camera moves.
+    const paint = vi.fn((target: CanvasRenderingContext2D) => {
+      target.textAlign = 'center';
+      target.font = '10px "Space Mono", monospace';
+      target.lineWidth = 1.2;
+      target.lineJoin = 'round';
+    });
+    const fresh = drawing(surface().mock);
+    const paintedOnto = (map: ReturnType<typeof surface>, path: string) => {
+      paintGroundLayer(map.ctx, 'day', paint);
+      expect(paint, path).toHaveBeenLastCalledWith(map.ctx);
+      expect(drawing(map.mock), path).toEqual(fresh);
+    };
+    paintedOnto(surface(), 'without a document');
+    const { layers } = browser();
+    const map = surface();
+    paintGroundLayer(map.ctx, 'day', paint);
+    expect(paint).toHaveBeenLastCalledWith(layers[0].ctx, expect.anything());
+    expect(drawing(map.mock)).toEqual(fresh);
+    map.transform.e = 12.5;
+    paintedOnto(map, 'a moving camera');
+    paintedOnto(surface(8192, 8192), 'an oversized canvas');
+    const faded = surface();
+    faded.ctx.globalAlpha = 0.5;
+    paintedOnto(faded, 'a translucent map');
+    vi.stubGlobal('document', { createElement: () => ({ getContext: () => null }) });
+    paintedOnto(surface(), 'no context for the layer');
   });
 });

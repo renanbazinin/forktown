@@ -33,6 +33,16 @@ function bandTops(width: number, height: number) {
   for (let top = 0; top < height; top += rows) tops.push(top);
   return { rows, tops };
 }
+/**
+ * Paints the ground straight onto the map. The settings it leaves behind stay with it, as they do
+ * in the layer, so nothing the map draws next, like the stage's notes, inherits the plot labels'
+ * centred text.
+ */
+function paintDirectly(ctx: Ctx, paint: GroundPaint) {
+  ctx.save();
+  paint(ctx);
+  ctx.restore();
+}
 /** The world area under a band of device rows, for culling that band's paint. */
 function areaOf(t: DOMMatrix, left: number, top: number, right: number, bottom: number) {
   return {
@@ -58,7 +68,7 @@ export function paintGroundLayer(
     ctx.globalAlpha !== 1 ||
     ctx.globalCompositeOperation !== 'source-over'
   ) {
-    paint(ctx);
+    paintDirectly(ctx, paint);
     return;
   }
   const transform = ctx.getTransform();
@@ -81,7 +91,7 @@ export function paintGroundLayer(
   if (layer.key !== key && moving && layer.key) {
     // A camera on the move invalidates the layer every frame, so the ground is painted straight
     // onto the map, saving a clear and a full-screen copy; the layer is rebuilt once it rests.
-    paint(ctx);
+    paintDirectly(ctx, paint);
     return;
   }
   const { rows, tops } = bandTops(width, height);
@@ -93,7 +103,7 @@ export function paintGroundLayer(
       const cachedContext = canvas.getContext('2d');
       if (!cachedContext) {
         layer.bands = [];
-        paint(ctx);
+        paintDirectly(ctx, paint);
         return;
       }
       layer.bands.push({ canvas, ctx: cachedContext, top });
