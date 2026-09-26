@@ -366,7 +366,9 @@ describe('Riding the Treeline over a whole year', () => {
 
   it('is the same for any roster order, any reload and any question asked before', () => {
     const day = YEAR[3];
-    const minute = tubeRides(places, day).find((r) => r.depart < 1440)!.depart + 1;
+    // On a 1/64-minute grid, so minute + 1440 wraps back to exactly the same minute.
+    const depart = tubeRides(places, day).find((r) => r.depart < 1440)!.depart;
+    const minute = Math.round((depart + 1) * 64) / 64;
     const states = simulateResidents(places, minute, day);
     expect(states.some(riding)).toBe(true);
     simulateResidents(places, 1300, day + 1);
