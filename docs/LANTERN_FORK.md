@@ -12,7 +12,7 @@ By day the lanterns are paper. One house, one neighbor, one lantern: a lantern n
 
 Nightfall is 20:00 town time, the minute the night palette begins. The town then lights itself in arrival order:
 
-- **20:00:** Lantern No. 1 lights, then one more every real second. With 17 houses, the last lights at 20:16.
+- **20:00:** Lantern No. 1 lights, then one more every real second. With 18 houses, the last lights at 20:17.
 - **Any size:** a larger town lights faster, so every lantern is lit by 20:20.
 - **20:20–20:30:** the streetlamps ignite, starting beside the Fork and carrying the light outward.
 - **06:00:** dawn. Everything goes out until the next nightfall.

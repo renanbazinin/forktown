@@ -83,4 +83,4 @@ Want to help beyond building a house? Improve the guides, report a bug, or contr
 
 [JSON fields & contribution rules](CONTRIBUTING.md) · [Features, project map & commands](docs/PROJECT_GUIDE.md) · [Architecture](docs/ARCHITECTURE.md) · [Publishing](docs/PUBLISHING.md) · [Live view](docs/LIVE.md) · [Roadmap](docs/ROADMAP.md)
 
-[Code of conduct](CODE_OF_CONDUCT.md) · [MIT license](LICENSE)
+[Code of conduct](CODE_OF_CONDUCT.md) · [Security](SECURITY.md) · [MIT license](LICENSE)

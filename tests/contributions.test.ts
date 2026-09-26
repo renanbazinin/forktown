@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { readPlaceFiles } from '../scripts/place-files';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { places } from '../src/lib/places';
 
 const sample: Place = placeSchema.parse({
@@ -297,4 +297,32 @@ describe('The examples a newcomer copies', () => {
     const example = JSON.parse(readFileSync('examples/my-little-place.json', 'utf8'));
     expect(example.id).toBe('your-unique-id');
   });
+});
+
+describe('The buttons the guides tell newcomers to click', () => {
+  const sources = (dir: string): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? sources(join(dir, entry.name))
+        : /\.tsx?$/.test(entry.name)
+          ? [readFileSync(join(dir, entry.name), 'utf8')]
+          : [],
+    );
+  const app = sources('src').join('\n');
+  // GitHub's own buttons, which the README walks through too.
+  const github = new Set(['Create fork', 'Compare & pull request', 'Create pull request']);
+
+  it.each(['README.md', 'CONTRIBUTING.md'])(
+    '%s names only labels the town really shows',
+    (file) => {
+      const labels = [
+        ...readFileSync(file, 'utf8').matchAll(
+          /\b(?:click|choose|select|press|says|see|opens?|in the) \*\*([^*]+)\*\*/gi,
+        ),
+      ].flatMap(([, label]) => label.split('→').map((part) => part.trim()));
+      expect(labels.length).toBeGreaterThan(5);
+      for (const label of labels)
+        if (!github.has(label)) expect(app.includes(label), label).toBe(true);
+    },
+  );
 });

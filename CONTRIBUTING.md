@@ -4,7 +4,7 @@ New here? Start with the [visual quick start](README.md): live site → localhos
 
 You don’t need to be an expert to contribute to Forktown. A thoughtful first contribution is a small place with your own name, style, and story.
 
-Want to learn from another house? Choose **Browse house files** in the builder, or select a house in town and click **See the little file behind it**. You can read and copy its actual JSON from `places/`, then return to your draft. After saving locally, **See my saved JSON** opens your new file. Local saves, private previews, and downloads do not publish anything to the shared town; a reviewed and merged pull request is how your house gets there.
+Want to learn from another house? Choose **Browse house files** in the builder, or select a house in town and click **View JSON**. In the **Find your way in** dialog, **House files** opens every house's JSON too. You can read and copy its actual JSON from `places/`, then return to your draft. After saving locally, **See my saved JSON** opens your new file. Local saves, private previews, and downloads do not publish anything to the shared town; a reviewed and merged pull request is how your house gets there.
 
 ## Build in your own copy
 
@@ -68,7 +68,7 @@ One place brings one resident. A resident can be fictional; the creator credit s
 
 The Little Stage (B5), the Lunch Green (C5) and the Lantern Fork (D3) are public venues, reserved for everyone. Choose another plot for your house. Neighbors who choose `stroll` in the afternoon or evening may walk to a town event, enjoy it, and walk home. There is no extra scheduling to configure, and work/home routines stay indoors. Lunch events run 13:00–16:00; evening shows run 19:00–21:00, in town time. Everyone sees the same daily lineup when their device clocks agree.
 
-The Meadow Ground also reserves F3–F5 and G3–G5 for daytime four-a-side football. The Starlight Cinema, Willow Grove Zoo, Moon Harvest Farm, the Millpond, and the Treeline's two tube stations (C1 and N1) reserve plots too; [Expanding the town](docs/EXPANDING_THE_TOWN.md) lists every reserved plot. The town has 200 plots, with 141 available for houses before existing homes are counted. Morning and afternoon strollers can stop to watch a match and walk home, and in deep winter some afternoon strollers skate on the frozen Millpond; no extra fields are needed in your JSON. See [Football at the Meadow Ground](docs/FOOTBALL.md), [The Millpond](docs/MILLPOND.md) and [The Treeline](docs/TUBES.md).
+The Meadow Ground also reserves F3–F5 and G3–G5 for daytime five-a-side football. The Starlight Cinema, Willow Grove Zoo, Moon Harvest Farm, the Millpond, and the Treeline's two tube stations (C1 and N1) reserve plots too; [Expanding the town](docs/EXPANDING_THE_TOWN.md) lists every reserved plot. The town has 200 plots, with 141 available for houses before existing homes are counted. Morning and afternoon strollers can stop to watch a match and walk home, and in deep winter some afternoon strollers skate on the frozen Millpond; no extra fields are needed in your JSON. See [Football at the Meadow Ground](docs/FOOTBALL.md), [The Millpond](docs/MILLPOND.md) and [The Treeline](docs/TUBES.md).
 
 The town follows a shared UTC-based day: one real minute equals one town hour. The cycle repeats every 24 minutes, starting at UTC midnight. Visitors can pause their view; returning to live catches up to the current town time. Following a neighbor keeps the camera with them; dragging the map or pressing Stop following returns to exploring.
 

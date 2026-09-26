@@ -18,7 +18,7 @@ Schema validation does not prove creator identity, story suitability, or authori
 
 ### Stable world positions
 
-`town-config.ts` sets the row and column counts; `world-layout.ts` derives 50 named plots on a four-tile street grid. Each block has a three-by-three grass plot with the house centered inside, a wider lawn, and a short entrance path. Road bounds, resident entrances, plot selection, shoreline, and camera framing follow the shared world dimensions. Expanding the row or column counts preserves existing plot ids, coordinates, and share links. A place’s location depends only on its `plot`. Adding a file, changing names, or sorting a directory does not move other buildings. Empty plots can be selected on the map or through the directory.
+`town-config.ts` sets the row and column counts; `world-layout.ts` derives the named plots, 200 today (20 rows by 10 columns), on a four-tile street grid. Each block has a three-by-three grass plot with the house centered inside, a wider lawn, and a short entrance path. Road bounds, resident entrances, plot selection, shoreline, and camera framing follow the shared world dimensions. Expanding the row or column counts preserves existing plot ids, coordinates, and share links. A place’s location depends only on its `plot`. Adding a file, changing names, or sorting a directory does not move other buildings. Empty plots can be selected on the map or through the directory.
 
 Plots are not reservations. Concurrent pull requests can conflict; re-run checks against the current main branch before merging. Enable required status checks and require branches to be up to date (or use GitHub’s merge queue) when you publish.
 
@@ -68,7 +68,7 @@ Every planned event visit must include at least fifteen town minutes while the e
 
 ## Where to extend it
 
-The Meadow Ground occupies a six-plot public site in the expanded town. Its internal roads and lamps are removed before road graph construction. `footballAt` derives the ball, eight players, scores, breaks, and sound cues from the shared clock. The renderer adds the pitch beneath depth-sorted players and furnishings; strolling contributors reach spectators' spots through the south entrance. Sound proximity uses the displayed camera, including follow mode. See [Football](FOOTBALL.md) for the match model, boundaries, and verification fixture.
+The Meadow Ground occupies a six-plot public site in the expanded town. Its internal roads and lamps are removed before road graph construction. `footballAt` derives the ball, ten players and the referee, scores, breaks, and sound cues from the shared clock. The renderer adds the pitch beneath depth-sorted players and furnishings; strolling contributors reach spectators' spots through the south entrance. Sound proximity uses the displayed camera, including follow mode. See [Football](FOOTBALL.md) for the match model, boundaries, and verification fixture.
 
 - **Building family:** add an enum member and label in `schema.ts`, add its geometry in `houses.ts`, and consider its selection bounds in `buildingHit`. The editor discovers enum values automatically.
 - **Decoration:** extend the enum and renderer.
