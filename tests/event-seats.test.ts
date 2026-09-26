@@ -10,10 +10,10 @@ import {
   withPreview,
   type ResidentTrip,
 } from '../src/lib/resident-trips';
-import { legsMinutes } from '../src/lib/tube-journeys';
+import { fixedMinutes, legsMinutes, walkedTiles } from '../src/lib/tube-journeys';
 import { tubeParcels, tubeRides } from '../src/lib/tube-traffic';
 import { TUBE_PARCELS } from '../src/lib/tubes';
-import { MIN_VISIT_MINUTES, routeLength, WALK_SPEED } from '../src/lib/walking';
+import { MIN_VISIT_MINUTES, planJourney, routeLength, WALK_SPEED } from '../src/lib/walking';
 import { simulateResidents } from '../src/lib/simulation';
 import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
 import { millpondSkatingDay } from '../src/lib/millpond';
@@ -46,11 +46,25 @@ const fullTown = (prefix: string, routineOf: (index: number) => Routine): Place[
       resident: { ...sample.resident, routine: routineOf(index) },
     }),
   );
+/** Evening owls who all go to bed by ten past midnight: the farthest can't see a whole film. */
+const sleepyOwls = HOUSE_PLOTS.map((plot) => {
+  const owl = (n: number): Place => ({
+    ...sample,
+    id: `owl-${plot.id.toLowerCase()}-${n}`,
+    plot: plot.id,
+    resident: { ...sample.resident, routine: routine(8) },
+  });
+  let n = 0;
+  while (nightBedtime(owl(n)) >= 1450) n++;
+  return placeSchema.parse(owl(n));
+});
 const TOWNS = {
   // Every routine, spread over the plots.
   mixed: fullTown('mixed', (index) => routine((index * 7) % 54)),
   // Everyone out all day and a night owl: every seat has 141 takers.
   eager: fullTown('eager', () => routine(0)),
+  // Out only in the evening and at night: twelve film guests a night, from every corner.
+  owls: sleepyOwls,
   real,
 };
 const GREEN = ['picnic', 'books', 'games'],
@@ -105,10 +119,78 @@ describe('Event seats at a full town', () => {
         for (const [kind, capacity] of Object.entries(CAPACITY) as [Outing, number][]) {
           const seated = guests.get(kind)?.length ?? 0;
           if (kind === 'millpond' && !millpondSkatingDay(day)) expect(seated).toBe(0);
-          // The cinema keeps its own guest list: half the evening owls, and every one of them goes.
-          else if (kind === 'cinema') expect(seated).toBe(cinemaGuests(homes, day).length);
+          // The film keeps its own guest list, half the evening owls, and passes no seat on; see
+          // the film guests' own test below.
+          else if (kind === 'cinema')
+            expect(seated).toBeLessThanOrEqual(cinemaGuests(homes, day).length);
           else expect(seated, `${kind} on day ${day}`).toBe(capacity);
         }
+  }, 60_000);
+
+  it('seats every film guest who can get to the film and home by bedtime', () => {
+    let missed = 0;
+    for (const homes of [TOWNS.mixed, TOWNS.eager, TOWNS.owls])
+      for (const { day, plans } of year(homes)) {
+        const film = eventsForDay(day).find((event) => event.id === 'cinema')!;
+        cinemaGuests(homes, day).forEach((id, seat) => {
+          const going = plans.get(id)!.find((trip) => trip.event.id === 'cinema');
+          if (going) return expect(going.seat).toBe(seat);
+          // The film is planned first, so a seat stays empty only for a guest who couldn't make
+          // it with nothing else on: not by the tube either, from as early as their day allows.
+          missed++;
+          const home = homes.find((place) => place.id === id)!;
+          const { morning, afternoon } = home.resident.routine;
+          const tube = eventTubeJourney(home, film, seat);
+          const plan = planJourney(
+            tube ? walkedTiles(tube.legs) : routeLength(eventRoute(home, film, seat)),
+            tube ? fixedMinutes(tube.legs) : 0,
+            film.start,
+            film.end,
+            afternoon !== 'stroll' ? 1080 : morning !== 'stroll' ? 720 : 360,
+            nightBedtime(home),
+            film.depart,
+            seat * 1.3,
+          );
+          expect(plan, `${id} on day ${day}`).toBeUndefined();
+        });
+      }
+    // The sleepy owls in the far corners do miss it.
+    expect(missed).toBeGreaterThan(5);
+  }, 60_000);
+
+  it('keeps every trip on foot, and the day up to the first ride, at a full town', () => {
+    const key = (trip: ResidentTrip) => `${trip.event.id}@${trip.event.start}`;
+    const plan = ({ event, seat, depart, arrive, leave, homeBy, continuesTo }: ResidentTrip) => ({
+      event: event.id,
+      seat,
+      depart,
+      arrive,
+      leave,
+      homeBy,
+      continuesTo,
+    });
+    let added = 0;
+    for (const homes of [TOWNS.mixed, TOWNS.eager, TOWNS.owls])
+      for (const { day, plans } of year(homes).filter((_, index) => index % 4 === 0)) {
+        // The same guests on foot.
+        const walking = planResidentTrips(homes, day, { tube: false });
+        for (const home of homes) {
+          const trips = plans.get(home.id)!,
+            walked = walking.get(home.id)!;
+          for (const trip of walked) expect(trips.map(key)).toContain(key(trip));
+          added += trips.length - walked.length;
+          // Up to the first ride, the day is the one they would walk.
+          const first = trips.findIndex((trip) => trip.legs || trip.returnLegs);
+          for (let i = 0; i < (first < 0 ? trips.length : first); i++) {
+            // A film that now hands over to a party with a ride home ends at the handover.
+            const handover = i === first - 1 && trips[i].continuesTo === 'night-party';
+            const { homeBy: _a, continuesTo: _b, ...mine } = plan(trips[i]);
+            const { homeBy: _c, continuesTo: _d, ...theirs } = plan(walked[i]);
+            expect(handover ? mine : plan(trips[i])).toEqual(handover ? theirs : plan(walked[i]));
+          }
+        }
+      }
+    expect(added).toBeGreaterThan(100);
   }, 60_000);
 
   it('never seats more guests than spots, or two guests on one spot', () => {
@@ -195,6 +277,7 @@ describe('Event seats at a full town', () => {
       new Set(
         year(homes).flatMap(({ guests }) => (guests.get('night-party') ?? []).map(([id]) => id)),
       );
+    // Spare minutes count the tube: an owl who can only get there by riding keeps their turn too.
     for (const homes of [TOWNS.eager, TOWNS.mixed, TOWNS.real]) {
       const danced = dancers(homes);
       for (const owl of homes)
