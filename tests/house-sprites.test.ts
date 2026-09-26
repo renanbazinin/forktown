@@ -170,7 +170,8 @@ describe('House sprites', () => {
     }).length;
     expect(fading).toBeGreaterThan(0);
     frame(view, homes, life);
-    frame(view, homes, life);
+    // The rest get their pictures a few a frame, however many homes the town has.
+    for (let i = 0; i < Math.ceil(homes.length / PAINTS_PER_FRAME); i++) frame(view, homes, life);
     expect(frame(view, homes, life)).toMatchObject({ direct: fading, painted: 0 });
   });
 
