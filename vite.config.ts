@@ -2,11 +2,12 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import { localPlacesPlugin } from './scripts/local-places.ts';
 import { readArrivalOrder } from './scripts/town-arrivals.ts';
+import { thirdPartyLicenses } from './scripts/third-party-licenses.ts';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_');
   return {
-    plugins: [react(), localPlacesPlugin()],
+    plugins: [react(), localPlacesPlugin(), thirdPartyLicenses()],
     base: env.VITE_BASE_PATH || '/',
     define: { __TOWN_ARRIVALS__: JSON.stringify(readArrivalOrder(process.cwd())) },
     build: { rollupOptions: { input: { town: 'index.html', live: 'live/index.html' } } },
