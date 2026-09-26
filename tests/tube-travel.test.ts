@@ -84,7 +84,7 @@ const allowed = (trip: ResidentTrip, state: ReturnType<typeof tripState>) => {
 };
 
 describe('Riding the Treeline over a whole year', () => {
-  it('plans every trip before a ride exactly as without the tube', () => {
+  it('plans every trip before a ride exactly as on foot', () => {
     // Synthetic full town for a week, then the real roster for a year.
     const crowd = HOUSE_PLOTS.map((plot, i) => ({
       ...sample,

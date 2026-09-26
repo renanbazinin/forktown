@@ -162,13 +162,15 @@ export function withPreview(places: Place[], draft: Place): Place[] {
 
 /**
  * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
- * neighbor in line whenever someone ahead can't make it (too far to walk there and home in time,
- * or an earlier outing runs late), so a seat is only given out when it will be filled.
+ * neighbor in line whenever someone ahead can't make it (too far to get there, on foot or by tube,
+ * and home in time, or an earlier outing runs late), so a seat is only given out when it will be
+ * filled. A far neighbor who can only make it by tube keeps their turn, so the tube changes who
+ * gets a seat as well as how they travel.
  *
- * With `tube: false` the same guests are invited but nobody rides: that is the walking-only
- * planner. A tube plan equals it for every trip before a resident's first ride, and never drops
- * one of its trips for a trip only the tube makes possible, because a guest is only seated when
- * the tube plan keeps every one of their outings.
+ * With `tube: false` the same guests are seated but nobody rides. That is not the town without
+ * the tube, whose lines would pass a rider's seat on. A tube plan equals it for every trip before
+ * a resident's first ride, and never drops one of its trips for a trip only the tube makes
+ * possible, because a guest is only seated when the tube plan keeps every one of their outings.
  */
 export function planResidentTrips(
   places: Place[],
