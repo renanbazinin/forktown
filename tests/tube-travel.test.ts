@@ -111,7 +111,7 @@ describe('Riding the Treeline over a whole year', () => {
         for (const home of homes) {
           const trips = now.get(home.id)!,
             old = walking.get(home.id)!;
-          // Without the tube nobody has legs.
+          // On foot nobody has legs.
           for (const trip of old) expect('legs' in trip || 'returnLegs' in trip).toBe(false);
           const first = trips.findIndex(rides);
           if (first < 0) {
