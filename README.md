@@ -12,7 +12,7 @@ Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find 
 
 <img src="docs/images/contribute-live.jpg" alt="Live site: Make yourself at home shows the three contribution steps and a Fork on GitHub button." width="640">
 
-**Why can’t I build here?** The published town is read-only. It can show houses and their JSON, but cannot save files to your computer’s project. Building happens in your local copy; a reviewed pull request brings your house to the shared town.
+**Why can’t I build here?** The published town is read-only. It can show houses and their JSON, but cannot save files to your computer’s project. Building happens in your local copy; a merged pull request brings your house to the shared town.
 
 ## 2. Fork it and run it locally
 
@@ -69,7 +69,7 @@ git push -u origin add-my-place
 
 On your GitHub fork, click **Compare & pull request**. Target **renanbazinin/forktown → main**, check that only your new house file is included, complete the checklist, and click **Create pull request**.
 
-After checks, maintainer review, merge, and deployment, your house appears in the [live town](https://renanbazinin.github.io/forktown/). If changes are requested, commit and push them on the same branch to update that pull request.
+After checks, merge, and deployment, your house appears in the [live town](https://renanbazinin.github.io/forktown/). Your first house merges automatically once every check passes, if the PR changes nothing else; anything else waits for a maintainer’s review. If changes are requested, commit and push them on the same branch to update that pull request.
 
 ## About Forktown
 

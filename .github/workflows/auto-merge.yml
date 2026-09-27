@@ -1,0 +1,53 @@
+name: Auto-merge
+
+# A PR whose only change is one new house, credited to its author, merges itself once every other
+# check has passed, unless a house in town already credits that author: then a maintainer decides.
+# Only trusted default-branch code runs. PR contents are read through the API.
+on:
+  # Every workflow a house PR runs. Add any new PR workflow here, or a PR that passes it last
+  # waits for someone to run this by hand.
+  workflow_run:
+    workflows: [Check town, Contribution policy, Contribution review signal]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: Pull request number to check for auto-merge
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: auto-merge-${{ github.event.workflow_run.head_sha || inputs.pr }}
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    name: Merge a new neighbor
+    # Only runs for PR events name the PR's head commit. Pushes, merge-queue runs and policy
+    # reruns after a comment or review name the default branch instead.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+      contains(fromJSON('["pull_request", "pull_request_target", "pull_request_review"]'), github.event.workflow_run.event))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write # merge the PR
+      pull-requests: write # ask a contributor, once, to update their branch
+      checks: read
+      statuses: write
+      actions: write # start Publish town: a merge by this token starts no push workflow
+    steps:
+      - name: Read trusted policy and the current town
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Merge a first house once every other check has passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ inputs.pr }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/auto-merge-github.mjs

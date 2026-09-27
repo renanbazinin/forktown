@@ -4,7 +4,7 @@ New here? Start with the [visual quick start](README.md): live site → localhos
 
 You don’t need to be an expert to contribute to Forktown. A thoughtful first contribution is a small place with your own name, style, and story.
 
-Want to learn from another house? Choose **Browse house files** in the builder, or select a house in town and click **View JSON**. In the **Find your way in** dialog, **House files** opens every house's JSON too. You can read and copy its actual JSON from `places/`, then return to your draft. After saving locally, **See my saved JSON** opens your new file. Local saves, private previews, and downloads do not publish anything to the shared town; a reviewed and merged pull request is how your house gets there.
+Want to learn from another house? Choose **Browse house files** in the builder, or select a house in town and click **View JSON**. In the **Find your way in** dialog, **House files** opens every house's JSON too. You can read and copy its actual JSON from `places/`, then return to your draft. After saving locally, **See my saved JSON** opens your new file. Local saves, private previews, and downloads do not publish anything to the shared town; a merged pull request is how your house gets there.
 
 ## Build in your own copy
 
@@ -17,7 +17,7 @@ The published GitHub Pages town is read-only: explore houses and their JSON ther
 5. Click **See my saved JSON** to inspect the file. Commit it and push your contribution branch.
 6. Open a pull request from your fork to the original repository, complete the checklist, and submit it.
 
-Our checks will validate the file. A maintainer reviews the story, credit, and change before merging. Once the updated site is deployed, your place appears in the neighborhood.
+Our checks will validate the file. If it’s your first house and the PR changes nothing else, it merges automatically once every check passes; otherwise a maintainer reviews the story, credit, and change before merging. If the **Auto-merge** check or a comment says your branch is behind `main`, click **Update branch** on your pull request. Once the updated site is deployed, your place appears in the neighborhood.
 
 If you receive feedback, edit the file in the same branch of your fork. Your existing pull request updates automatically. You don’t need another pull request.
 

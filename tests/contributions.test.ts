@@ -310,8 +310,13 @@ describe('The buttons the guides tell newcomers to click', () => {
           : [],
     );
   const app = sources('src').join('\n');
-  // GitHub's own buttons, which the README walks through too.
-  const github = new Set(['Create fork', 'Compare & pull request', 'Create pull request']);
+  // GitHub's own buttons, which the guides walk through too.
+  const github = new Set([
+    'Create fork',
+    'Compare & pull request',
+    'Create pull request',
+    'Update branch',
+  ]);
 
   it.each(['README.md', 'CONTRIBUTING.md'])(
     '%s names only labels the town really shows',

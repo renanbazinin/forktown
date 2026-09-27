@@ -22,3 +22,17 @@ Protect `main` with required checks `Contribution policy` and `check`, strict up
 Merge queues are not configured. Do not enable one until policy evaluates each constituent PR separately; a one-house limit on the whole group would be incorrect.
 
 Bootstrap the policy by merging it once, then verify a successful real PR status before requiring it. A skipped workflow or missing status is not a passed check.
+
+## Auto-merge
+
+A new neighbor's first house doesn't wait for a maintainer. The `Auto-merge` workflow merges a PR by itself when all of these hold:
+
+- Its only change is one new file in `places/`. Edits, deletions, renames, and anything else, even alongside a new house, wait for a maintainer as before.
+- The house credits the PR author, and no house on `main` credits that username yet, ignoring case. For someone who already has a house, a failing `Auto-merge` status says so, and a maintainer decides. Merging by hand still works.
+- Every other check on the head commit has passed, `check` and `Contribution policy` included, and none is still running.
+- The branch is up to date with `main`, so the commit that passed is exactly what lands. If it isn't, the `Auto-merge` status asks the contributor to click **Update branch**, without waiting for the other checks. A status notifies nobody, so one comment per PR also asks them by @mention. The workflow can't update the branch itself: its token can't push to a contributor's fork.
+- The PR isn't a draft, and no maintainer's request for changes is outstanding.
+
+The workflow runs when Check town, Contribution policy or the review signal finishes for a PR, and a maintainer can run it with a PR number. Like the policy, it runs only trusted default-branch code and reads PR contents through the API. It merges with a merge commit pinned to the head that passed, so a newer push makes GitHub refuse. Then it starts Publish town, because a merge made with the workflow's token starts no push workflow. PRs that aren't one new house get no `Auto-merge` status. The workflow only runs from `main`, so it takes over from the first house PR after it lands.
+
+These merges skip a person's reading of the name, story and sign. The repository's Actions setting holds checks for a maintainer's approval only when a first-time contributor is also new to GitHub, so most first houses go live before anyone reads them, and moderation happens afterwards. To stop an auto-merge, request changes or convert the PR to a draft. It goes ahead once the maintainer who asked for changes approves, or once the PR is ready for review again. Never make `Auto-merge` a required check: its failure means a maintainer decides, not that the PR can't merge.
