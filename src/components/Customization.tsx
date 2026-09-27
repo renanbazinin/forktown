@@ -196,8 +196,8 @@ export function NeighborDetails({
           </select>
         </label>
         <small>
-          Night owls can follow the movies with dancing, take moonlit walks, and relax on their
-          doorstep. Each has a bedtime between midnight and 05:00.
+          Night owls can follow the movies with dancing, take moonlit walks round the block, and
+          relax on their bench, porch or front step. Each has a bedtime between midnight and 05:00.
         </small>
       </div>
     </div>

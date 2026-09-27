@@ -5,6 +5,7 @@ import { roadPath, simulateResidents } from '../src/lib/simulation';
 import { placeSchema } from '../src/lib/schema';
 import { readFileSync } from 'node:fs';
 import { HOUSE_PLOTS } from '../src/lib/events';
+import { plotDoor } from '../src/lib/home-life';
 
 describe('Growing the town without moving contributions', () => {
   it('doubles the capacity while preserving every original address and coordinate', () => {
@@ -66,7 +67,8 @@ describe('Growing the town without moving contributions', () => {
     });
     const state = simulateResidents([home], 0)[0];
     expect(state.home.plot).toBe('T10');
-    expect(state.position).toEqual(plotEntrance(PLOTS.find((plot) => plot.id === 'T10')!));
+    // Asleep at midnight, just inside the new home's front door.
+    expect(state.position).toEqual(plotDoor(PLOTS.find((plot) => plot.id === 'T10')!));
     expect(placeSchema.safeParse({ ...home, plot: 'T11' }).success).toBe(false);
   });
 });

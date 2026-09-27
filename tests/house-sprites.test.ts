@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { drawHouse, houseBounds, houseLook, type HouseLife } from '../src/city/houses';
+import { DOOR_AJAR, drawHouse, houseBounds, houseLook, type HouseLife } from '../src/city/houses';
 import {
   housePainter,
   houseSpriteStats,
@@ -153,6 +153,49 @@ describe('House sprites', () => {
     expect(frame(view, homes, { activity: 'home' }).painted).toBe(0);
   });
 
+  it('swings the front door open live over the cached picture, never repainting it', () => {
+    browser();
+    const view = map();
+    const porch = places.find((place) => place.design.feature === 'porch')!;
+    const homes = row([cottage, porch]);
+    frame(view, homes, { lantern: { lit: true } });
+    expect(frame(view, homes, { lantern: { lit: true } }).painted).toBe(2);
+    const door = (open: number | undefined, night = false) => {
+      const shot = frame(
+        view,
+        homes.map((home) => ({ ...home, night })),
+        { door: open, lantern: { lit: true } },
+      );
+      expect(shot, `door ${open}`).toMatchObject({ direct: 0, painted: 0 });
+      return shot.drawn.filter((call) => call.name !== 'drawImage').map((call) => call.name);
+    };
+    // Shut, or opened less than a hair, the sprite's own door is all there is: each copy's own
+    // save, setTransform and restore, and nothing painted.
+    const shut = door(0);
+    expect(shut).toEqual(Array(2).fill(['save', 'setTransform', 'restore']).flat());
+    expect(door(undefined)).toEqual(shut);
+    expect(door(DOOR_AJAR / 2)).toEqual(shut);
+    const ajar = door(0.3),
+      wide = door(1);
+    expect(ajar.length).toBeGreaterThan(shut.length);
+    expect(ajar).toContain('fill');
+    expect(wide).toEqual(ajar);
+    // Each frame's door is painted where it stands: the leaf moves as it swings.
+    const leaf = (open: number) =>
+      frame(view, homes, { door: open, lantern: { lit: true } })
+        .drawn.filter((call) => call.name === 'lineTo')
+        .map((call) => call.args.join(','));
+    expect(leaf(0.3)).not.toEqual(leaf(0.7));
+    // At night the picture is painted once for the dark; a lit hall then spills its light
+    // through the open door, still without a repaint.
+    frame(
+      view,
+      homes.map((home) => ({ ...home, night: true })),
+      { lantern: { lit: true } },
+    );
+    expect(door(1, true).length).toBeGreaterThan(wide.length);
+  });
+
   it('paints a new sprite when the season, the night, the lantern or the design changes', () => {
     browser();
     const view = map();
@@ -214,6 +257,9 @@ describe('House sprites', () => {
     const combos = [false, true].flatMap((night) =>
       lanterns.flatMap((lantern) => activities.map((activity) => ({ night, lantern, activity }))),
     );
+    // The front door swings live over the picture, so however far it stands open, the still
+    // picture is the same: each moment gets one of these in turn too.
+    const doors = [undefined, 0.6, 1];
     // Every noon, and every six hours through the pumpkins, the first snow and the thaw.
     const moments: [number, number][] = [];
     for (let day = 0; day < DAYS_PER_YEAR; day++) {
@@ -230,12 +276,19 @@ describe('House sprites', () => {
     homes.forEach((place, h) =>
       moments.forEach(([day, minutes], m) => {
         const { night, lantern, activity } = combos[(h * 7 + m) % combos.length];
-        const life: HouseLife = { minutes, lantern, activity, season: seasonOn(day, minutes) };
+        const door = doors[(h + m) % doors.length];
+        const life: HouseLife = {
+          minutes,
+          lantern,
+          activity,
+          season: seasonOn(day, minutes),
+          door,
+        };
         const look = houseLook(place, night, life);
         if (look === undefined) return;
         const key = `${h}:${look}`,
           drawn = picture(place, night, life),
-          at = `day ${day} ${minutes} ${JSON.stringify({ night, lantern, activity })}`;
+          at = `day ${day} ${minutes} ${JSON.stringify({ night, lantern, activity, door })}`;
         const before = pictures.get(key);
         if (!before) return void pictures.set(key, { picture: drawn, at });
         compared++;

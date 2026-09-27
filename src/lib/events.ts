@@ -19,7 +19,28 @@ export const VENUES = [
 ] as const;
 export type Venue = (typeof VENUES)[number];
 export type EventPose =
-  'sit' | 'read' | 'sip' | 'chat' | 'play' | 'cheer' | 'sway' | 'dance' | 'skate';
+  | 'sit'
+  | 'read'
+  | 'sip'
+  | 'chat'
+  | 'play'
+  | 'cheer'
+  | 'sway'
+  | 'dance'
+  | 'skate'
+  // At home, and on the way into or out of a seat:
+  /** Sitting on a raised seat (a garden bench or porch chair), feet on the ground. */
+  | 'perch'
+  /** `perch` with a cup, lifted now and then like `sip`. */
+  | 'tea'
+  /** Standing with a watering can over a bed or the flowers. */
+  | 'water'
+  /** Standing, sweeping a paved path with a broom. */
+  | 'sweep'
+  /** Halfway between standing and sitting, for a moment on the way down or up. */
+  | 'crouch'
+  /** Arms up for a stretch, just out of the door in the morning. */
+  | 'stretch';
 type EventSpot = { x: number; y: number; facing: 'se' | 'sw' | 'ne' | 'nw' };
 // Coordinates relative to the plot center. These are usable lawn spots, not a street queue.
 // Keep the stage audience in front of the platform (which ends at local y = 0.2).

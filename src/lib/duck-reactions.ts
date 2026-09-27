@@ -1,5 +1,6 @@
 import { ducksAt, DUCK_STREET_Y, DUCK_WALK_START, DUCK_WALK_END } from './ducks';
 import type { ResidentState } from './simulation';
+import { facingToward, opposite } from './walking';
 import type { Point } from './world';
 
 export const DUCK_NOTICE_RADIUS = 1.4;
@@ -44,6 +45,8 @@ export function duckAwareWalk(
       DUCK_WALK_END - DUCK_LOVE_SECONDS,
     );
     for (let at = Math.max(start, DUCK_WALK_START); at < lastStart; at += 0.5) {
+      // Just setting off (off a garden path onto the road), a walker looks where they are going.
+      if (at < start + 0.5) continue;
       const motion = sample(at);
       if (!motion.moving || Math.abs(motion.position.y - DUCK_STREET_Y) > DUCK_NOTICE_RADIUS)
         continue;
@@ -51,7 +54,9 @@ export function duckAwareWalk(
       if (
         duck &&
         Math.hypot(duck.position.x - motion.position.x, duck.position.y - motion.position.y) <=
-          DUCK_NOTICE_RADIUS
+          DUCK_NOTICE_RADIUS &&
+        // A walker notices the ducklings ahead or beside them, never by spinning round in a frame.
+        !opposite(facingToward(motion.position, duck.position), motion.facing)
       ) {
         pauses.push(at);
         at += COOLDOWN_SECONDS - 0.5;
@@ -66,14 +71,14 @@ export function duckAwareWalk(
   const elapsed = time - pause;
   if (elapsed < DUCK_LOVE_SECONDS) {
     const motion = sample(pause);
-    const duck = nearestDuck(motion.position, time);
-    const dx = (duck?.position.x ?? motion.position.x) - motion.position.x;
-    const dy = (duck?.position.y ?? motion.position.y) - motion.position.y;
+    // Turn to the duckling that caught their eye and keep looking that way for the whole stop,
+    // rather than snapping round after whichever duck is nearest from frame to frame.
+    const duck = nearestDuck(motion.position, pause);
     return {
       ...motion,
       moving: false,
       duckLove: true,
-      facing: Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'se' : 'nw') : dy > 0 ? 'sw' : 'ne',
+      facing: duck ? facingToward(motion.position, duck.position) : motion.facing,
     };
   }
   const delay = DUCK_LOVE_SECONDS * (1 - (elapsed - DUCK_LOVE_SECONDS) / RECOVERY_SECONDS);

@@ -1,14 +1,43 @@
-import { ArrowUpRight, Footprints, House, Moon, BriefcaseBusiness } from 'lucide-react';
+import {
+  Armchair,
+  ArrowUpRight,
+  BookOpen,
+  Brush,
+  BriefcaseBusiness,
+  DoorOpen,
+  Eye,
+  Footprints,
+  House,
+  Moon,
+  MoonStar,
+  Sprout,
+} from 'lucide-react';
 import type { ResidentState } from '../lib/simulation';
 import { residentActivityLabel } from '../lib/simulation';
 import ResidentPreview from './ResidentPreview';
-export const ACTIVITY_LABELS = {
-  stroll: 'Out for a stroll',
-  work: 'Working at home',
-  home: 'Relaxing at home',
-  sleep: 'Sleeping',
-};
+// One copy of the activity labels, kept with residentActivityLabel.
+export { ACTIVITY_LABELS } from '../lib/simulation';
 const icons = { stroll: Footprints, work: BriefcaseBusiness, home: House, sleep: Moon };
+const spotIcons = {
+  door: DoorOpen,
+  bench: Armchair,
+  porch: Armchair,
+  step: Armchair,
+  tree: BookOpen,
+  flowers: Sprout,
+  beds: Sprout,
+  paving: Brush,
+  gate: Eye,
+  kerb: House,
+};
+/** The icon beside the label: what they are doing at home, or else the routine's own. */
+function activityIcon(state: ResidentState) {
+  if (state.lot?.stage === 'out' || state.lot?.stage === 'in') return DoorOpen;
+  if (state.lot?.stage === 'from') return Footprints;
+  if (state.lot) return state.nightPorch ? MoonStar : spotIcons[state.lot.spot];
+  if (state.nightWalk) return MoonStar;
+  return icons[state.activity];
+}
 export default function Neighbors({
   residents,
   followed,
@@ -34,7 +63,7 @@ export default function Neighbors({
       </div>
       <div className="neighbor-grid">
         {residents.map((state) => {
-          const Icon = icons[state.activity];
+          const Icon = activityIcon(state);
           return (
             <article
               className={`neighbor-card ${followed === state.id ? 'is-followed' : ''}`}

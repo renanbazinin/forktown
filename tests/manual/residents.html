@@ -25,7 +25,11 @@
   </head>
   <body>
     <h1>Resident figures</h1>
-    <p>Male and female figures in all four directions, with shared poses and accessories.</p>
+    <p>
+      Male and female figures in all four directions, with shared poses and accessories. The magenta
+      dot is where each figure stands: a perched sitter's feet, with the seat behind them. The night
+      rows are dimmed as the map dims them after dark; greetings and a tea's steam stay bright.
+    </p>
     <label
       >Accessory
       <select id="accessory">
@@ -37,7 +41,7 @@
     <label>Skin <input id="skin" type="color" value="#D9B68B" /></label>
     <label>Hair <input id="hair" type="color" value="#675A48" /></label>
     <button id="play">Pause animation</button>
-    <canvas width="1440" height="1120" aria-label="Male and female figure comparison"></canvas>
+    <canvas width="1440" height="2000" aria-label="Male and female figure comparison"></canvas>
     <script type="module">
       import { drawResident } from '/src/city/residents.ts';
       import { DEFAULT_RESIDENT } from '/src/lib/schema.ts';
@@ -74,7 +78,25 @@
           'sway',
           'play',
           'duckLove',
+          // At home: on a bench or porch chair, gardening, and the moments between.
+          'perch',
+          'tea',
+          // The porch chair is lower than the bench: its sitter perches 2px lower.
+          'porch tea',
+          'water',
+          'sweep',
+          'crouch',
+          'stretch',
+          // After dark, beside the dimmed houses: out walking with a greeting, and tea on the porch.
+          'night walk',
+          'night tea',
         ];
+        const night = (pose) => pose.startsWith('night ');
+        const porchTea = (pose) => pose === 'porch tea' || pose === 'night tea';
+        // The night rows' dark ground, from just under the row above, greeting room included.
+        const first = poses.findIndex(night);
+        ctx.fillStyle = '#2E3B36';
+        ctx.fillRect(0, 120 + first * 98 - 94, canvas.width, canvas.height);
         columns.forEach(({ figure, facing }, column) => {
           const x = 135 + column * 170;
           ctx.fillStyle = '#304c40';
@@ -82,9 +104,11 @@
           poses.forEach((pose, row) => {
             const y = 120 + row * 98;
             if (column === 0) {
-              ctx.fillStyle = '#304c40';
+              ctx.fillStyle = night(pose) ? '#dfe7cf' : '#304c40';
               ctx.fillText(pose, 40, y - 20);
             }
+            ctx.fillStyle = '#C0399A';
+            ctx.fillRect(x - 1, y - 1, 2, 2);
             drawResident(
               ctx,
               {
@@ -99,12 +123,18 @@
               2,
               {
                 facing,
-                moving: pose === 'walk',
+                moving: pose === 'walk' || pose === 'night walk',
                 walkPhase: phase,
-                pose: ['stand', 'walk', 'duckLove'].includes(pose) ? undefined : pose,
+                pose: ['stand', 'walk', 'duckLove', 'night walk'].includes(pose)
+                  ? undefined
+                  : porchTea(pose)
+                    ? 'tea'
+                    : pose,
+                lot: porchTea(pose) ? { spot: 'porch', stage: 'at' } : undefined,
                 duckLove: pose === 'duckLove',
-                greeting: false,
+                greeting: pose === 'night walk',
               },
+              { night: night(pose) },
             );
           });
         });

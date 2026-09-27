@@ -13,6 +13,16 @@ import {
 type Ctx = CanvasRenderingContext2D;
 export const SCREEN_ORIGIN = project(22.3, 14.7);
 export const SCREEN_SCALE = 0.76;
+/** The screen's two masts stand at these x on its line, y = 14.7, at each end of the picture. */
+export const MAST_X = [22.3, 28.7] as const;
+/**
+ * How tall the masts stand, in world px, as the screen rises (0 stowed, 1 up): their tops ride
+ * 1.68px over the cloth's lifting bar, 157px up with the screen raised and 10px stowed.
+ */
+export function mastHeight(reveal: number) {
+  const top = 187 - 194 * reveal;
+  return Math.round(150 + 1.68 - top * SCREEN_SCALE);
+}
 function polygon(ctx: Ctx, points: { x: number; y: number }[], color: string) {
   ctx.fillStyle = color;
   ctx.beginPath();
@@ -87,11 +97,15 @@ export function drawCinema(
     depth: 25.5 + 14.7,
     paint: () => {
       ctx.save();
+      const top = 187 - 194 * state.screenReveal;
       // Projected screen plane: horizontal runs along the town's x axis, vertical stays upright.
-      for (const x of [22.3, 28.7]) {
+      // The two masts telescope out of the ground cassette with the cloth, their tops just over
+      // its lifting bar: stowed by day, they leave the Lunch Green in front of them in sight.
+      const mast = mastHeight(state.screenReveal);
+      for (const x of MAST_X) {
         const p = project(x, 14.7);
         ctx.fillStyle = '#5A625A';
-        ctx.fillRect(p.x - 3, p.y - 157, 6, 157);
+        ctx.fillRect(p.x - 3, p.y - mast, 6, mast);
         ctx.fillStyle = '#BCAD84';
         ctx.fillRect(p.x - 7, p.y - 4, 14, 4);
       }
@@ -103,7 +117,6 @@ export function drawCinema(
         SCREEN_ORIGIN.x,
         SCREEN_ORIGIN.y - 150,
       );
-      const top = 187 - 194 * state.screenReveal;
       if (state.screenReveal > 0) {
         ctx.save();
         ctx.beginPath();

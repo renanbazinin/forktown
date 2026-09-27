@@ -65,6 +65,38 @@ describe('Residents admiring the duck family', () => {
     for (const time of [0, 360, 479.9, 780, 1200, 1439]) expect(reaction(time)).toEqual(walk(time));
   });
 
+  it('turns to ducklings ahead or beside, never spinning round in a frame, and not mid-step off a path', () => {
+    const opposite = { se: 'nw', nw: 'se', sw: 'ne', ne: 'sw' } as const;
+    let stops = 0;
+    for (const day of [0, 42]) {
+      let before = simulateResidents(places, DUCK_WALK_START, day);
+      for (let time = DUCK_WALK_START + 0.1; time < DUCK_WALK_END + 12; time += 0.1) {
+        const now = simulateResidents(places, time, day);
+        now.forEach((state, i) => {
+          const was = before[i];
+          if (state.duckLove === was.duckLove) return;
+          if (state.duckLove) stops++;
+          // Into the stop and out of it again: a quarter turn at most.
+          expect(state.facing, `${state.id} on day ${day} at ${time}`).not.toBe(
+            opposite[was.facing],
+          );
+        });
+        before = now;
+      }
+    }
+    expect(stops).toBeGreaterThan(0);
+    // Right beside the family the moment a walk begins: they set off first, and look after.
+    const start = DUCK_WALK_START + 60;
+    const beside = () => ({
+      position: { ...ducksAt(start)[0].position },
+      moving: true,
+      facing: 'se' as const,
+      walkPhase: 0,
+    });
+    for (let t = start; t < start + 0.5; t += 0.05)
+      expect(duckAwareWalk('test:setting-off', t, start, start + 60, beside).duckLove).toBeFalsy();
+  });
+
   it('remembers every route’s encounters however many neighbors stroll at once', () => {
     let samples = 0;
     const counted = (time: number) => (samples++, walk(time));

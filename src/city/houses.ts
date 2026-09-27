@@ -1,8 +1,10 @@
 import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
-import { hash } from '../lib/world';
+import { hasPorch, PORCH_CHAIR } from '../lib/home-life';
+import { hash, type Point } from '../lib/world';
 import { drawChimneySmoke } from './ambience';
 import { drawSign } from './signs';
+import { drawGlow } from './glow';
 import { drawLanternPost, type HouseLantern } from './lantern-post';
 import {
   AUTUMN,
@@ -44,7 +46,7 @@ export function tint(color: string, delta: number) {
   }
   return shade;
 }
-function polygon(ctx: Ctx, points: number[][], fill: string) {
+function polygon(ctx: Ctx, points: readonly (readonly number[])[], fill: string) {
   ctx.beginPath();
   points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
@@ -68,8 +70,73 @@ const SLOPE = 15 / 29;
 const onRight = (x: number, out: number, z: number) => [x + out, 18 - SLOPE * (x - out) - z];
 /** The same for the left wall, whose front faces down and to the left. */
 const onLeft = (x: number, out: number, z: number) => [x - out, 18 + SLOPE * (x + out) - z];
+/** Houses stand a little larger than their plot art: the map draws them at this scale. */
+export const HOUSE_SCALE = 1.12;
+/**
+ * A ground point on the lot, as an offset in world tiles from (plot.x, plot.y), in house-local
+ * px at the map's house scale: where the map's houses paint it.
+ */
+export const lotToHouse = ({ x, y }: { x: number; y: number }) => ({
+  x: ((x - y) * 38) / HOUSE_SCALE,
+  y: ((x + y - 1) * 19) / HOUSE_SCALE,
+});
+/** A perched sitter's hips rest this far behind their feet, in world tiles (residents.ts). */
+export const PERCH_HIPS_BEHIND = 0.088;
+/**
+ * The porch roof over the front door, in house-local px: along the street wall from `from` to
+ * `to`, leaning out `out` px from `high` px up the wall to `low` at its front edge, where a 2px
+ * fascia hangs and a post stands under each corner. Its underside clears a neighbour sitting on
+ * the porch chair, and the ground floor's windows stay below it.
+ */
+const PORCH = { from: -31, to: 2, out: 6, high: 30, low: 26 } as const;
+/** How high the porch chair's seat stands, in house-local px: lower than the bench's 7px. */
+const PORCH_SEAT = 5;
+/**
+ * The porch chair on the street wall, centred under the hips of a neighbour perched at
+ * PORCH_CHAIR: the ends of its seat along the wall, and how far out its back and front stand.
+ */
+const CHAIR = (() => {
+  const hips = lotToHouse({ x: PORCH_CHAIR.feet.x, y: PORCH_CHAIR.feet.y - PERCH_HIPS_BEHIND });
+  // Undo onLeft at z = 0: x - out = hips.x and 18 + SLOPE (x + out) = hips.y.
+  const sum = (hips.y - 18) / SLOPE;
+  const x = (hips.x + sum) / 2,
+    out = (sum - hips.x) / 2;
+  return { from: x - 3.5, to: x + 3.5, back: out - 2.25, front: out + 1.75 };
+})();
+/**
+ * The tops of the two seats a neighbour perches on, in house-local px: the garden bench's, 7px
+ * up, and the porch chair's, a low one under the porch roof. A perched sitter's lap rests on them.
+ */
+export const SEAT_TOPS = {
+  bench: [
+    [18, 7],
+    [36, 16],
+    [30, 19],
+    [12, 10],
+  ],
+  porch: [
+    onLeft(CHAIR.from, CHAIR.back, PORCH_SEAT),
+    onLeft(CHAIR.to, CHAIR.back, PORCH_SEAT),
+    onLeft(CHAIR.to, CHAIR.front, PORCH_SEAT),
+    onLeft(CHAIR.from, CHAIR.front, PORCH_SEAT),
+  ],
+} as const;
+/**
+ * The stepping stones from the front door, in house-local px: the first just below the door,
+ * each next one a step toward the street. At the map's house scale they run along world
+ * x + 0.76 (home-life's STONE_X), and the map's ground carries them on past the lawn.
+ */
+export const STEPPING_STONES = { x: -13.5, y: 15.6, dx: -8, dy: 4, rx: 6, ry: 3 } as const;
 /** Garden beds line the lawn's front edges, leaving a gap where the path runs from the door. */
 const BEDS = [-39, -30, -9, 0, 9, 18, 27];
+/** The beds a garden bench would stand on and behind: a bench home leaves them unplanted. */
+const UNDER_BENCH = [5, 6];
+/**
+ * Where each bed's wildflower stem stands, in px from the bed's left edge: over the patch where
+ * a watering can pours (home-life's watering spots), but the third bed's left of the porch post
+ * and the last one's left of the mailbox, so neither hides behind them.
+ */
+const WILDFLOWER_X = [4, 4, 2, 4, 4, 4, 0];
 const BASE_HEIGHT = {
   cottage: 32,
   cafe: 34,
@@ -113,6 +180,11 @@ export type HouseLife = {
   lantern?: HouseLantern;
   /** Only the map passes a season: previews and the builder keep the neighbour's own colours. */
   season?: TownSeason;
+  /**
+   * How far the front door stands open, 0..1, while the neighbour steps in or out. Painted live
+   * over the still picture by drawHouseDoor, like the smoke, so it never enters houseLook.
+   */
+  door?: number;
 };
 const CHIMNEYS = new Set(['cottage', 'cafe', 'bookshop', 'studio']);
 /** Where the chimney stands in house-local px, or null for the homes built without one. */
@@ -133,6 +205,150 @@ export function houseReach(place: HouseAppearance) {
   const chimney = chimneyOf(place, bounds.height);
   return chimney ? { ...bounds, top: Math.max(bounds.top, 59 - chimney.y) } : bounds;
 }
+/** The convex outline round a set of points, in order (Andrew's monotone chain). */
+function hull(points: number[][]) {
+  const sorted = [...points].sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const cross = (o: number[], p: number[], q: number[]) =>
+    (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  const half = (list: number[][]) => {
+    const chain: number[][] = [];
+    for (const point of list) {
+      while (
+        chain.length >= 2 &&
+        cross(chain[chain.length - 2], chain[chain.length - 1], point) <= 0
+      )
+        chain.pop();
+      chain.push(point);
+    }
+    chain.pop();
+    return chain;
+  };
+  return [...half(sorted), ...half([...sorted].reverse())];
+}
+const corners = (x: number, y: number, w: number, h: number) => [
+  [x, y],
+  [x + w, y],
+  [x + w, y + h],
+  [x, y + h],
+];
+// A home's outlines depend only on its appearance, so each is worked out once per design.
+const outlines = new WeakMap<HouseAppearance, number[][][]>();
+/**
+ * What a home paints above its lawn, in house-local px, as convex outlines: the walls under the
+ * roof, the chimney, the sign, a porch or balcony and the garden's bench, mailbox, tree or
+ * flowers. Clicks select the home only on its art, so a neighbor walking past beside it stays
+ * clickable; the lawn itself is the plot's, under the click.
+ */
+function houseOutlines(place: HouseAppearance) {
+  const cached = outlines.get(place);
+  if (cached) return cached;
+  const d = place.design,
+    { height: h } = houseBounds(place);
+  const walls = [
+    [-29, -h],
+    [0, 15 - h],
+    [29, -h],
+    [29, 3],
+    [0, 18],
+    [-29, 3],
+  ];
+  const parts: number[][][] = [];
+  const flat =
+    d.roof === 'flat' || (d.roof === 'classic' && ['studio', 'cafe'].includes(place.building));
+  if (flat)
+    parts.push([
+      ...walls,
+      [-33, -h],
+      [0, -h - 17],
+      [33, -h],
+      [33, 5 - h],
+      [0, 22 - h],
+      [-33, 5 - h],
+    ]);
+  else if (d.roof === 'classic' && place.building === 'observatory') {
+    const dome = Array.from({ length: 9 }, (_, i) => [
+      -25 * Math.cos((Math.PI * i) / 8),
+      -h - 29 * Math.sin((Math.PI * i) / 8),
+    ]);
+    parts.push([...walls, [-30, -h], [0, 16 - h], [30, -h], ...dome]);
+    parts.push([
+      [8, -h - 25],
+      [28, -h - 42],
+      [33, -h - 35],
+      [12, -h - 18],
+    ]);
+  } else parts.push([...walls, [-33, -h], [0, 17 - h], [-18, -h - 35], [15, -h - 18], [33, -h]]);
+  const chimney = chimneyOf(place, h);
+  if (chimney) parts.push(corners(chimney.x - 1, chimney.y - 16, 12, 17));
+  if (place.sign.mode !== 'none')
+    // The board hangs on the right wall under transform(1, -0.5, 0, 1, 1.5, 5 - h).
+    parts.push(corners(-1, -1, 29, 16).map(([u, v]) => [u + 1.5, v - u / 2 + 5 - h]));
+  if (hasPorch(place)) {
+    const { from, to, out, high, low } = PORCH;
+    const posts = [from, to].flatMap((x) => {
+      const [px, py] = onLeft(x, out, 0);
+      return corners(px - 1, py - low + 2, 2, low - 2);
+    });
+    parts.push([
+      onLeft(from, 0, high + 1),
+      onLeft(to, 0, high + 1),
+      onLeft(to, out, low - 2),
+      onLeft(from, out, low - 2),
+      ...posts,
+    ]);
+  }
+  if (d.feature === 'balcony') {
+    const deck = d.floors === 1,
+      out = deck ? 5 : 8,
+      low = deck ? 0 : 21,
+      high = deck ? 11.5 : 38.5;
+    parts.push(
+      [3, 26].flatMap((x) => [0, out].flatMap((o) => [onRight(x, o, low), onRight(x, o, high)])),
+    );
+  }
+  if (place.decoration === 'bench')
+    parts.push([
+      [18, -4],
+      [20, -4],
+      [36, 4],
+      [37, 23],
+      [30, 26],
+      [11, 17],
+      [12, 10],
+    ]);
+  if (place.decoration === 'mailbox') parts.push(corners(30, 8, 9, 19));
+  if (place.decoration === 'tree')
+    parts.push([
+      [40, -22],
+      [52, -3],
+      [55, 9],
+      [42, 24],
+      [39, 24],
+      [26, 9],
+      [28, -3],
+    ]);
+  if (place.decoration === 'flowers')
+    parts.push([
+      [28, 17],
+      [43, 20],
+      [43, 23],
+      [42, 28],
+      [29, 25],
+      [28, 20],
+    ]);
+  const shapes = parts.map(hull);
+  outlines.set(place, shapes);
+  return shapes;
+}
+/** Whether a point, in house-local px from the house origin, lands on the home's painted art. */
+export function houseHit(place: HouseAppearance, x: number, y: number) {
+  return houseOutlines(place).some((shape) =>
+    shape.every((p, i) => {
+      const q = shape[(i + 1) % shape.length];
+      return (q[0] - p[0]) * (y - p[1]) - (q[1] - p[1]) * (x - p[0]) >= 0;
+    }),
+  );
+}
 /** What the clock and the calendar do to one home: its lit windows, its snow and its pumpkins. */
 function houseMoment(place: HouseAppearance, night: boolean, life?: HouseLife) {
   const schedule = scheduleOf(place.id);
@@ -146,6 +362,7 @@ function houseMoment(place: HouseAppearance, night: boolean, life?: HouseLife) {
   if (beforeSnow && place.design.garden === 'vegetables')
     for (let bed = 0; bed < BEDS.length; bed++)
       if (
+        (place.decoration !== 'bench' || !UNDER_BENCH.includes(bed)) &&
         (bed === squash % 7 ||
           bed === (squash + 3) % 7 ||
           (!doorstep && squash & 8 && bed === (squash + 5) % 7)) &&
@@ -212,6 +429,226 @@ export function drawHouseSmoke(
   );
   ctx.restore();
 }
+/** A door opened less than this still looks shut: the still picture's own door shows. */
+export const DOOR_AJAR = 0.02;
+/**
+ * How far of a quarter turn a porch home's door swings: the chair stands left of the door, and
+ * the leaf stops short of it, its edge clear of the chair's.
+ */
+export const PORCH_DOOR_SWING = 0.8;
+/**
+ * The front door standing open, exactly where drawHouse paints it shut: the dark doorway (warm
+ * when the windows are lit) and the leaf, hinged on the left jamb and swung out toward the
+ * street, square to the wall when fully open. Sprites leave it out; it is painted live on top,
+ * inside the door's own frame and the ground just in front of it, clear of the porch roof, the
+ * right porch post, the pumpkin and the beds.
+ */
+export function drawHouseDoor(
+  ctx: Ctx,
+  place: HouseAppearance,
+  x: number,
+  y: number,
+  night: boolean,
+  scale: number,
+  life: HouseLife,
+) {
+  const open = life.door ?? 0;
+  if (!(open >= DOOR_AJAR)) return;
+  const trim = tint(place.design.trim, night ? -25 : 0);
+  const lit = night && (life.lantern?.lit ?? true);
+  // 0 shut, flat against the wall, to 1 swung a quarter turn out toward +y (short of the chair
+  // on a porch).
+  const swing = hasPorch(place) ? PORCH_DOOR_SWING : 1;
+  const angle = (Math.min(1, open) * swing * Math.PI) / 2;
+  const a = Math.cos(angle) - Math.sin(angle),
+    b = (Math.cos(angle) + Math.sin(angle)) / 2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  ctx.save();
+  ctx.transform(1, 0.5, 0, 1, -13, 0);
+  box(ctx, 1, -2, 6, 14, lit ? '#F1D68F' : night ? '#2E3431' : '#3B3128');
+  ctx.restore();
+  if (lit) {
+    // Lamplight from the hall spills onto the path, and glows softly in the doorway.
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * 0.35 * Math.min(1, open);
+    polygon(
+      ctx,
+      [
+        [-12, 12.5],
+        [-6, 15.5],
+        [-14.5, 19.75],
+        [-20.5, 16.75],
+      ],
+      '#F1D68F',
+    );
+    ctx.globalAlpha = alpha;
+    drawGlow(ctx, -9, 6, 9, 0.3 * Math.min(1, open));
+  }
+  // The leaf: its outer face, shading as it turns from the light, then its inner face past
+  // halfway, and its edge as a 1px line wherever it points. The knob keeps its place on it.
+  const fx = -13 + 8 * a,
+    fy = 8 * b;
+  polygon(
+    ctx,
+    [
+      [-13, -2],
+      [fx, fy - 2],
+      [fx, fy + 12],
+      [-13, 12],
+    ],
+    a > 0 ? tint(trim, -Math.round(12 * (1 - a))) : tint(trim, 14),
+  );
+  box(ctx, a > 0 ? fx - 1 : fx, fy - 2, 1, 14, tint(trim, -30));
+  box(ctx, -13.5 + 5.5 * a, 5.5 * b + 3, 1, 2, '#EFD8A4');
+  ctx.restore();
+}
+/**
+ * A little low chair on the porch, its back toward the wall, its seat PORCH_SEAT px up under the
+ * hips of a neighbour perched at PORCH_CHAIR.
+ */
+function drawPorchChair(ctx: Ctx, trim: string) {
+  const wood = tint(trim, 24),
+    frame = tint(trim, -18);
+  const { from, to, back, front } = CHAIR;
+  const seat = PORCH_SEAT,
+    edge = seat - 1.5;
+  polygon(
+    ctx,
+    [
+      onLeft(from - 0.5, back - 0.5, 0),
+      onLeft(to + 0.5, back - 0.5, 0),
+      onLeft(to + 0.5, front + 0.5, 0),
+      onLeft(from - 0.5, front + 0.5, 0),
+    ],
+    '#23341B25',
+  );
+  // The back legs rise into the backrest; the seat and its front legs stand in front of them.
+  for (const leg of [from + 0.5, to - 0.5]) {
+    const [px, py] = onLeft(leg, back + 0.5, 0);
+    box(ctx, px - 0.5, py - seat - 8, 1, seat + 8, frame);
+  }
+  for (const [top, bottom] of [
+    [seat + 8, seat + 6],
+    [seat + 4, seat + 2.5],
+  ])
+    polygon(
+      ctx,
+      [
+        onLeft(from, back + 0.5, top),
+        onLeft(to, back + 0.5, top),
+        onLeft(to, back + 0.5, bottom),
+        onLeft(from, back + 0.5, bottom),
+      ],
+      wood,
+    );
+  polygon(ctx, SEAT_TOPS.porch, wood);
+  polygon(
+    ctx,
+    [
+      onLeft(from, front, seat),
+      onLeft(to, front, seat),
+      onLeft(to, front, edge),
+      onLeft(from, front, edge),
+    ],
+    trim,
+  );
+  polygon(
+    ctx,
+    [
+      onLeft(to, back, seat),
+      onLeft(to, front, seat),
+      onLeft(to, front, edge),
+      onLeft(to, back, edge),
+    ],
+    frame,
+  );
+  for (const leg of [from + 0.5, to - 0.5]) {
+    const [px, py] = onLeft(leg, front - 0.5, 0);
+    box(ctx, px - 0.5, py - edge, 1, edge, frame);
+  }
+}
+/**
+ * The porch roof with a post under each front corner, as the still picture has it; drawPorchEave
+ * paints it again over a neighbour standing or sitting under it.
+ */
+function paintPorchRoof(ctx: Ctx, roof: string, trim: string, snow: number, snowTop: string) {
+  const { from, to, out, high, low } = PORCH;
+  polygon(
+    ctx,
+    [onLeft(from, 0, high), onLeft(to, 0, high), onLeft(to, out, low), onLeft(from, out, low)],
+    roof,
+  );
+  polygon(
+    ctx,
+    [
+      onLeft(from, out, low),
+      onLeft(to, out, low),
+      onLeft(to, out, low - 2),
+      onLeft(from, out, low - 2),
+    ],
+    tint(roof, -24),
+  );
+  if (snow) {
+    // Snow banks against the wall on the upper part of the porch roof.
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * snow;
+    const [a, b] = [onLeft(from, 0, high + 1), onLeft(to, 0, high + 1)];
+    drift(
+      ctx,
+      [a, b, onLeft(to, out / 2, (high + low) / 2), onLeft(from, out / 2, (high + low) / 2)],
+      snowTop,
+    );
+    ctx.globalAlpha = alpha;
+  }
+  for (const x of [from, to]) {
+    const [px, py] = onLeft(x, out, 0);
+    box(ctx, px - 1, py - low + 2, 2, low - 2, trim);
+  }
+}
+/**
+ * Whether a neighbour whose body stands at `body` (an offset from the plot in world tiles: the
+ * feet, or a perched sitter's hips) is under this home's porch roof, between the wall and the
+ * roof's front edge, where the edge hangs in front of their head.
+ */
+export function underPorchRoof(place: Pick<Place, 'building' | 'design'>, body: Point) {
+  if (!hasPorch(place)) return false;
+  const at = lotToHouse(body);
+  // Undo onLeft at z = 0, as CHAIR does: x - out = at.x and 18 + SLOPE (x + out) = at.y.
+  const sum = (at.y - 18) / SLOPE;
+  const x = (at.x + sum) / 2,
+    out = (sum - at.x) / 2;
+  return out >= 0 && out <= PORCH.out && x >= PORCH.from && x <= PORCH.to;
+}
+/**
+ * The porch roof and its posts again, exactly where and as drawHouse paints them, over a
+ * neighbour under it: the house is one picture sorted behind whoever stands on its lot, but the
+ * roof's front edge hangs in front of anyone in the doorway or on the porch chair.
+ */
+export function drawPorchEave(
+  ctx: Ctx,
+  place: HouseAppearance,
+  x: number,
+  y: number,
+  night: boolean,
+  scale: number,
+  life?: HouseLife,
+) {
+  if (!hasPorch(place)) return;
+  const { snow } = houseMoment(place, night, life);
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(scale, scale);
+  paintPorchRoof(
+    ctx,
+    tint(place.color, night ? -35 : 0),
+    tint(place.design.trim, night ? -25 : 0),
+    snow,
+    pick(SNOW.top, night),
+  );
+  ctx.restore();
+}
 /** `smoke: false` paints the still picture a sprite keeps; drawHouseSmoke adds the plume. */
 export function drawHouse(
   ctx: Ctx,
@@ -274,22 +711,25 @@ export function drawHouse(
       } else box(ctx, gx + 2, gy - 4, 3, 6, '#567B44');
     }
     if (d.garden === 'wildflowers') {
-      box(ctx, gx, gy - 3, 1, 5, '#668654');
-      box(ctx, gx - 1, gy - 4, 3, 2, ['#EDC88B', '#D18F87', '#B3A5CD'][i % 3]);
+      const stem = gx + WILDFLOWER_X[i];
+      box(ctx, stem, gy - 3, 1, 5, '#668654');
+      box(ctx, stem - 1, gy - 4, 3, 2, ['#EDC88B', '#D18F87', '#B3A5CD'][i % 3]);
     }
   };
-  for (let i = 0; i < BEDS.length; i++) bed(i);
+  for (let i = 0; i < BEDS.length; i++)
+    if (place.decoration !== 'bench' || !UNDER_BENCH.includes(i)) bed(i);
   // Stepping stones cross the lawn from the front door toward the street.
   for (let step = 0; step < 3; step++) {
-    const sx = -13.5 - step * 8,
-      sy = 15.6 + step * 4;
+    const { x, y, dx, dy, rx, ry } = STEPPING_STONES;
+    const sx = x + step * dx,
+      sy = y + step * dy;
     polygon(
       ctx,
       [
-        [sx, sy - 3],
-        [sx + 6, sy],
-        [sx, sy + 3],
-        [sx - 6, sy],
+        [sx, sy - ry],
+        [sx + rx, sy],
+        [sx, sy + ry],
+        [sx - rx, sy],
       ],
       night ? '#899483' : '#E3DABF',
     );
@@ -661,38 +1101,11 @@ export function drawHouse(
       drift(ctx, [a, b, [b[0], b[1] - 1], [a[0], a[1] - 1]], snowTop);
     });
   }
-  if (d.feature === 'porch' || place.building === 'cafe') {
-    // The porch roof leans out from above the front door, so the door stays in sight beneath it;
-    // a post stands under each front corner.
-    const [from, to, out, high, low] = [-31, 2, 6, 26, 22];
-    polygon(
-      ctx,
-      [onLeft(from, 0, high), onLeft(to, 0, high), onLeft(to, out, low), onLeft(from, out, low)],
-      roof,
-    );
-    polygon(
-      ctx,
-      [
-        onLeft(from, out, low),
-        onLeft(to, out, low),
-        onLeft(to, out, low - 2),
-        onLeft(from, out, low - 2),
-      ],
-      tint(roof, -24),
-    );
-    // Snow banks against the wall on the upper part of the porch roof.
-    frosted(() => {
-      const [a, b] = [onLeft(from, 0, high + 1), onLeft(to, 0, high + 1)];
-      drift(
-        ctx,
-        [a, b, onLeft(to, out / 2, (high + low) / 2), onLeft(from, out / 2, (high + low) / 2)],
-        snowTop,
-      );
-    });
-    for (const x of [from, to]) {
-      const [px, py] = onLeft(x, out, 0);
-      box(ctx, px - 1, py - low + 2, 2, low - 2, trim);
-    }
+  if (hasPorch(place)) {
+    // A chair waits left of the door, under the roof, where the neighbour sits out. The porch
+    // roof leans out from above the front door, so the door stays in sight beneath it.
+    drawPorchChair(ctx, trim);
+    paintPorchRoof(ctx, roof, trim, snow, snowTop);
   }
   if (place.decoration === 'bench') {
     const wood = tint(trim, 24),
@@ -713,16 +1126,7 @@ export function drawHouse(
     box(ctx, 13, 10, 2, 7, frame);
     box(ctx, 29, 18, 2, 7, frame);
     // A raised seat with a visible front edge and two backrest slats.
-    polygon(
-      ctx,
-      [
-        [18, 7],
-        [36, 16],
-        [30, 19],
-        [12, 10],
-      ],
-      wood,
-    );
+    polygon(ctx, SEAT_TOPS.bench, wood);
     polygon(
       ctx,
       [
@@ -816,4 +1220,6 @@ export function drawHouse(
     ctx.restore();
   }
   ctx.restore();
+  // Painted last, as a sprite has it painted over its copy: nothing after the door touches it.
+  if (smoke && life) drawHouseDoor(ctx, place, x, y, night, scale, life);
 }

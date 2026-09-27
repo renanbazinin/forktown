@@ -3,6 +3,7 @@
 import type { ResidentState } from './simulation';
 import type { Point } from './world';
 import { alongRoute, facingAlong, roadPath, routeLength, WALK_SPEED } from './walking';
+import { laneOffset, routeLane } from './lanes';
 import {
   TUBE_ALIGHT,
   TUBE_ALIGHT_STEPS,
@@ -98,22 +99,29 @@ export function tubeLineMinutes(from: string, to: string) {
 }
 
 /** Join the road walk to the venue's approach at the first approach point that lies on the road's last
- *  straight run (row or column), so nobody walks past the gate and back. Tube legs only. */
+ *  straight run (row or column), so nobody walks past the gate and back. When that run starts
+ *  between the gate and the road's end, heading away from the gate, the walk turns toward the
+ *  gate right where the run starts, along the approach's own first stretch. Tube legs and
+ *  walking routes alike. */
 export function joinApproach(after: readonly Point[], tail: readonly Point[]): Point[] {
   if (tail.length < 2) return [...after];
   const c = tail[1];
+  const onLine = (a: Point, b: Point) =>
+    (a.y === c.y && b.y === c.y) || (a.x === c.x && b.x === c.x);
   for (let i = after.length - 1; i > 0; i--) {
     const a = after[i - 1],
       b = after[i];
-    const row = a.y === c.y && b.y === c.y,
-      column = a.x === c.x && b.x === c.x;
-    if (!row && !column) break;
+    const row = a.y === c.y && b.y === c.y;
+    if (!onLine(a, b)) break;
     const [p, q, v] = row ? [a.x, b.x, c.x] : [a.y, b.y, c.y];
+    const head = after.slice(0, i);
     if (Math.min(p, q) <= v && v <= Math.max(p, q)) {
-      const head = after.slice(0, i);
       if (head.at(-1)!.x === c.x && head.at(-1)!.y === c.y) head.pop();
       return [...head, c, ...tail.slice(2)];
     }
+    // The run starts at `a` walking away from the gate: turn toward it here instead.
+    if ((i === 1 || !onLine(after[i - 2], a)) && (q - p) * (v - p) < 0)
+      return [...head, c, ...tail.slice(2)];
   }
   return [...after, ...tail.slice(1)];
 }
@@ -185,16 +193,36 @@ export const reverseLegs = (legs: readonly TripLeg[]): TripLeg[] =>
 /** A point k of the way from p to q, landing exactly on either end. */
 const between = (p: Point, q: Point, k: number): Point =>
   k <= 0 ? { ...p } : k >= 1 ? { ...q } : { x: p.x + (q.x - p.x) * k, y: p.y + (q.y - p.y) * k };
-type Movement = Pick<ResidentState, 'position' | 'moving' | 'facing' | 'walkPhase'> & {
+type Movement = Pick<
+  ResidentState,
+  'position' | 'moving' | 'facing' | 'walkPhase' | 'lane' | 'laneOffset'
+> & {
   transit?: ResidentTransit;
 };
+
+export { LANE_RAMP, laneSide, walkLane } from './lanes';
+/** alongRoute, with the walker's lane while they are on the move (none when `side` is 0). */
+export function walkAlong(route: Point[], progress: number, side = 0): Movement {
+  const movement = alongRoute(route, progress);
+  if (!side || !movement.moving) return movement;
+  const walked = Math.min(1, Math.max(0, progress)) * routeLength(route);
+  const lane = routeLane(route, walked, side);
+  return lane ? { ...movement, lane, laneOffset: laneOffset(route, walked, lane) } : movement;
+}
+
 /**
  * Where a traveller is at `time` on a journey that sets out at `start`. Each leg ends at the
  * running sum start + minutes + …, added leg by leg exactly as tubeRides adds them, so the town
  * and the panel change stage at the same instant, even on a pinned whole minute. Walking legs
- * match alongRoute exactly.
+ * match alongRoute exactly, plus the walker's lane on `side` (each walk leg eased on its own).
+ * Boarding, riding and stepping off keep no lane: the station's crowd offsets space those out.
  */
-export function journeyAt(legs: readonly TripLeg[], start: number, time: number): Movement {
+export function journeyAt(
+  legs: readonly TripLeg[],
+  start: number,
+  time: number,
+  side = 0,
+): Movement {
   let startAt = start;
   for (let i = 0; i < legs.length; i++) {
     const leg = legs[i],
@@ -204,7 +232,7 @@ export function journeyAt(legs: readonly TripLeg[], start: number, time: number)
       continue;
     }
     const progress = time >= endAt ? 1 : Math.min(1, Math.max(0, time - startAt) / leg.minutes);
-    if (leg.kind === 'walk') return alongRoute(leg.route, progress);
+    if (leg.kind === 'walk') return walkAlong(leg.route, progress, side);
     const { from, to } = leg;
     if (leg.kind === 'ride') {
       const distance = progress * tubeLength(from, to);

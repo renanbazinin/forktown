@@ -1,5 +1,6 @@
 import {
   drawHouse,
+  drawHouseDoor,
   drawHouseSmoke,
   houseBounds,
   houseLook,
@@ -20,7 +21,8 @@ export type HousePainter = (
 // A full town paints well over a hundred homes on every frame, each a few hundred vector calls,
 // though a home looks the same from one frame to the next. So each keeps a sprite: its still
 // picture painted once at the device scale and sub-pixel position the map draws it at, then
-// copied pixel for pixel onto whole device pixels. The chimney smoke is painted live on top.
+// copied pixel for pixel onto whole device pixels. The chimney smoke and a front door standing
+// open are painted live on top.
 
 type Sprite = {
   canvas: HTMLCanvasElement;
@@ -209,5 +211,6 @@ export function housePainter(ctx: Ctx): HousePainter {
     );
     ctx.restore();
     drawHouseSmoke(ctx, place, x, y, night, scale, life);
+    drawHouseDoor(ctx, place, x, y, night, scale, life);
   };
 }

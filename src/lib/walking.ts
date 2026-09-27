@@ -5,6 +5,21 @@ export function facingAlong(from: Point, to: Point): ResidentState['facing'] {
   if (to.x !== from.x) return to.x > from.x ? 'se' : 'nw';
   return to.y >= from.y ? 'sw' : 'ne';
 }
+/** Facing by the dominant axis, for the slightly slanted steps on a garden path. */
+export function facingToward(from: Point, to: Point): ResidentState['facing'] {
+  const dx = to.x - from.x,
+    dy = to.y - from.y;
+  return Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'se' : 'nw') : dy > 0 ? 'sw' : 'ne';
+}
+/** Whether two facings look opposite ways. */
+export const opposite = (a: ResidentState['facing'], b: ResidentState['facing']) =>
+  (a === 'sw' && b === 'ne') ||
+  (a === 'ne' && b === 'sw') ||
+  (a === 'se' && b === 'nw') ||
+  (a === 'nw' && b === 'se');
+/** The facing a quarter of the way round from `facing`, halfway through an about-face. */
+export const sideways = (facing: ResidentState['facing']): ResidentState['facing'] =>
+  facing === 'sw' || facing === 'ne' ? 'se' : 'sw';
 export const roadNodes: Point[] = [];
 // Road tiles by integer index, so a search needs no string keys: tile (x, y) is x * ROWS + y.
 const ROWS = ROAD_MAX_Y + 1;

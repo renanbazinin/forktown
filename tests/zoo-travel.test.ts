@@ -24,7 +24,7 @@ import {
   routeLength,
   WALK_SPEED,
 } from '../src/lib/walking';
-import { residentTrips } from '../src/lib/resident-trips';
+import { CHAIN_TURN_TILES, residentTrips } from '../src/lib/resident-trips';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { walkingPace } from '../src/lib/tube-journeys';
 import { onRoadOrTube, stepBound } from './tube-riders';
@@ -203,9 +203,17 @@ describe('Willow Grove Zoo and physical journey times', () => {
       expect(speed).toBeGreaterThanOrEqual(WALK_SPEED);
       expect(speed).toBeLessThanOrEqual(WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER + 1e-8);
       const stateAt = (time: number) => at(time).find((r) => r.id === home.id)!;
-      expect(
-        distance(stateAt(trip.depart).position, plotEntrance(getPlot(home.plot)!)),
-      ).toBeLessThan(1e-8);
+      // Out from the doorstep, or a step short of it where they turned round from an outing
+      // that got home at this very minute (and home to it likewise); dead on it otherwise.
+      const doorstep = (time: number) =>
+        distance(stateAt(time).position, plotEntrance(getPlot(home.plot)!));
+      const trips = zooPlans.get(home.id)!;
+      const index = trips.indexOf(trip);
+      const before = trips[index - 1],
+        after = trips[index + 1];
+      const turnOut = !!before && !before.continuesTo && before.homeBy === trip.depart,
+        turnIn = !!after && !trip.continuesTo && after.depart === trip.homeBy;
+      expect(doorstep(trip.depart)).toBeLessThan((turnOut ? CHAIN_TURN_TILES : 0) + 1e-8);
       expect(stateAt(Math.max(trip.arrive, trip.event.start) + 0.01).event).toMatchObject({
         id: 'zoo',
         phase: 'attending',
@@ -229,9 +237,7 @@ describe('Willow Grove Zoo and physical journey times', () => {
         )
           expect(distance(now.position, next.position) / 0.001).toBeCloseTo(speed, 6);
       }
-      expect(
-        distance(stateAt(trip.homeBy).position, plotEntrance(getPlot(home.plot)!)),
-      ).toBeLessThan(1e-8);
+      expect(doorstep(trip.homeBy)).toBeLessThan((turnIn ? CHAIN_TURN_TILES : 0) + 1e-8);
       expect(stateAt(trip.homeBy).event?.id).not.toBe('zoo');
       for (const boundary of [
         trip.depart,

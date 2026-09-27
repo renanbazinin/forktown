@@ -14,7 +14,10 @@ export type TownCat = {
 
 const NIGHT_START = 1200;
 const NIGHT_END = 360;
-const SPEED = 0.065; // Tiles per town minute: 30% faster than the old street stroll.
+/** Minutes of Miso's night out, 20:00 to 06:00. */
+const NIGHT = NIGHT_END + 1440 - NIGHT_START;
+// Tiles per town minute: 30% faster than the old street stroll. Each night fits it to whole laps.
+const SPEED = 0.065;
 const byId = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
 /** An outdoor town animal, not an extra resident or a change to anyone's routine. */
@@ -50,16 +53,21 @@ export function townCatAt(places: Place[], minutes: number, day = 0): TownCat {
   }
   const outside = time >= NIGHT_START || time < NIGHT_END;
   const elapsed = (time - NIGHT_START + 1440) % 1440;
-  const step = outside ? (elapsed * SPEED) % (route.length - 1) : 0;
+  // Whole laps of the round (one tile per step) at one even pace for the night, as near SPEED as
+  // whole laps allow, so the last lap ends on the cat's own doorstep as the night ends at 06:00.
+  const tiles = route.length - 1;
+  const pace = tiles ? (Math.max(1, Math.round((NIGHT * SPEED) / tiles)) * tiles) / NIGHT : 0;
+  const step = outside && tiles ? (elapsed * pace) % tiles : 0;
   const index = Math.floor(step);
   const from = route[index],
-    to = route[index + 1];
+    to = route[index + 1] ?? from;
   const fraction = step - index;
   return {
     position: { x: from.x + (to.x - from.x) * fraction, y: from.y + (to.y - from.y) * fraction },
     homePlot: plot.id,
     left: to.x - from.x - (to.y - from.y) < 0,
-    stride: outside ? Math.sin((elapsed * Math.PI * 1.3) / 1.5) : 0,
+    // The paws keep time with the night's pace.
+    stride: outside && tiles ? Math.sin((elapsed * Math.PI * 1.3 * (pace / SPEED)) / 1.5) : 0,
     outside,
   };
 }

@@ -1,4 +1,4 @@
-import { residentTrips } from '../src/lib/resident-trips';
+import { POSE_HOLD, residentTrips, SEAT_SETTLE, ZOO_TURN } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
@@ -11,8 +11,16 @@ import {
   VENUES,
 } from '../src/lib/events';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
-import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
-import { getPlot, isRoad, plotEntrance } from '../src/lib/world';
+import {
+  residentActivityLabel,
+  simulateResidents,
+  type ResidentState,
+} from '../src/lib/simulation';
+import { findPlotAt, getPlot, isRoad, plotEntrance } from '../src/lib/world';
+
+/** Away from events, a gesture only while still at a spot on their own lot (a seat, the beds). */
+const homePoseOnly = (state: ResidentState) =>
+  !state.pose || (!state.event && !!state.lot && !state.moving && state.activity === 'stroll');
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
 import { onRoadOrTube, stepBound } from './tube-riders';
 
@@ -138,7 +146,15 @@ describe('Shared town events', () => {
             )!;
           };
           const early = at((trip.arrive + event.start) / 2);
-          expect(early).toMatchObject({ moving: false, facing: trip.facing });
+          expect(early).toMatchObject({ moving: false });
+          // Zoo visitors look at the habitats on either side of the promenade, and turn between.
+          if (event.venue.kind === 'zoo')
+            expect(
+              [early, at((trip.arrive + event.start) / 2 + ZOO_TURN)].some(
+                (state) => state.facing === 'ne' || state.facing === 'sw',
+              ),
+            ).toBe(true);
+          else expect(early.facing).toBe(trip.facing);
           expect(early.position).toEqual(at(event.start + 1).position);
           seen.add(event.venue.kind);
           // The animals and the match are on all day: those guests join in straight away.
@@ -151,8 +167,19 @@ describe('Shared town events', () => {
           expect(residentActivityLabel(early)).toBe(
             event.id === 'cinema' ? 'Waiting for the film to start' : `Waiting for ${event.name}`,
           );
+          // A blanket or a cinema seat is sat on while the show gets ready. With under a minute to
+          // wait once settled, a guest takes up at once what they will do when it starts.
+          const seated = event.venue.kind === 'green' || event.venue.kind === 'cinema';
+          const brief = event.start - (trip.arrive + SEAT_SETTLE) < POSE_HOLD;
+          const starting = at(event.start).pose;
           expect(early.pose).toBe(
-            event.venue.kind === 'green' || event.venue.kind === 'cinema' ? 'sit' : undefined,
+            !seated
+              ? undefined
+              : !brief
+                ? 'sit'
+                : starting && ['sit', 'read', 'sip', 'chat'].includes(starting)
+                  ? starting
+                  : undefined,
           );
           expect(at(event.start).event?.phase).toBe('attending');
         }
@@ -193,12 +220,14 @@ describe('Shared town events', () => {
       expect(attending.every((state) => !state.greeting)).toBe(true);
       const overflow = first.filter((state) => !state.event);
       expect(overflow.length + first.filter((state) => state.event).length).toBe(crowd.length);
+      // Those left out stroll on the road or spend the time on their own lot: no event gestures.
       expect(
         overflow.every(
           (state) =>
             state.activity === 'stroll' &&
-            !state.pose &&
-            isRoad(Math.floor(state.position.x), Math.floor(state.position.y)),
+            homePoseOnly(state) &&
+            (isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
+              findPlotAt(state.position.x, state.position.y)?.id === state.home.plot),
         ),
       ).toBe(true);
     }
@@ -223,12 +252,13 @@ describe('Shared town events', () => {
     for (let day = 0; day < 10; day++)
       for (const minute of [880, 895, 912, 934, 1160, 1175, 1190, 1210]) {
         const state = simulateResidents([walker], minute, day)[0];
-        if (state.pose) poses.add(state.pose);
+        if (state.pose && state.event) poses.add(state.pose);
       }
     expect([...poses].sort()).toEqual(['chat', 'cheer', 'play', 'read', 'sip', 'sit', 'sway']);
     for (let minute = 360; minute < 1440; minute += 7.7) {
       const state = simulateResidents([walker], minute)[0];
-      if (state.moving || !state.event) expect(state.pose).toBeUndefined();
+      if (state.moving || state.activity !== 'stroll') expect(state.pose).toBeUndefined();
+      expect(homePoseOnly(state) || !!state.event).toBe(true);
     }
   });
   it('keeps all slots continuous on staggered departures and returns, without entering houses', () => {
@@ -254,7 +284,7 @@ describe('Shared town events', () => {
         });
       }
       for (const state of simulateResidents(crowd, event.homeBy, 2))
-        if (!state.event) expect(state.pose).toBeUndefined();
+        if (!state.event) expect(homePoseOnly(state)).toBe(true);
     }
   });
   it('labels exact event boundaries and keeps sleeping residents out of the party', () => {

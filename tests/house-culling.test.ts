@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { drawHouse, houseReach, type HouseLife } from '../src/city/houses';
-import { renderCity, type Camera } from '../src/city/render';
+import {
+  LANE_SHIFT,
+  renderCity,
+  residentGround,
+  residentShown,
+  type Camera,
+} from '../src/city/render';
 import { drawResident, residentReach } from '../src/city/residents';
 import { inTubeGlass, tubeCrowdOffsets } from '../src/city/tubes';
 import { eventsForDay } from '../src/lib/events';
@@ -155,17 +161,21 @@ function expectInside(
 describe('Culling houses and walkers', () => {
   it('keeps every mark a home makes, smoke and lantern included, inside its reach', () => {
     glows();
+    // The front door stands open over the still picture: wide at night, with the hall's light
+    // spilling out, and halfway by day.
     const night: HouseLife = {
       minutes: 1300,
       activity: 'home',
       season: winter,
       lantern: { lit: true, tale: true, newest: true },
+      door: 1,
     };
     const day: HouseLife = {
       minutes: 720,
       activity: 'work',
       season: autumn,
       lantern: { lit: false },
+      door: 0.4,
     };
     const paint = (place: Place, dark: boolean, life: HouseLife, what: string) => {
       const recorder = matrixContext();
@@ -218,6 +228,22 @@ describe('Culling houses and walkers', () => {
       { pose: 'dance', walkPhase: 0.2 },
       { pose: 'cheer', walkPhase: 0.6 },
       { pose: 'skate', walkPhase: 0.4, facing: 'nw' },
+      // At home: perched on a bench or porch chair, with tea, gardening, and the moments between.
+      { pose: 'perch', facing: 'sw' },
+      { pose: 'perch', facing: 'se' },
+      { pose: 'tea', walkPhase: 0.3, facing: 'sw' },
+      { pose: 'tea', walkPhase: 0.7, facing: 'ne' },
+      // On the porch chair, a little lower, the mug steaming.
+      { pose: 'perch', facing: 'sw', lot: { spot: 'porch', stage: 'at' } },
+      { pose: 'tea', walkPhase: 0.95, facing: 'se', lot: { spot: 'porch', stage: 'at' } },
+      { pose: 'water', walkPhase: 0.1, facing: 'ne' },
+      { pose: 'water', walkPhase: 0.95, facing: 'sw' },
+      { pose: 'sweep', walkPhase: 0.25, facing: 'se' },
+      { pose: 'sweep', walkPhase: 0.75, facing: 'nw' },
+      { pose: 'crouch', facing: 'sw' },
+      { pose: 'stretch', facing: 'se' },
+      { pose: 'stretch', facing: 'nw' },
+      { pose: 'perch', facing: 'sw', greeting: true },
       { greeting: true },
       { duckLove: true, greeting: true },
     ];
@@ -240,8 +266,21 @@ describe('Culling houses and walkers', () => {
   it('draws exactly the homes and walkers whose reach meets the view', () => {
     const day = CALENDAR_EPOCH_DAY + 20,
       minutes = 1050;
-    const residents = simulateResidents(town, minutes, day);
-    const walkers = residents.filter((r) => r.activity === 'stroll' && !inTubeGlass(r.transit));
+    // Walkers in every lane, and a few fading through their front doors, one all but gone.
+    const residents = simulateResidents(town, minutes, day).map((resident, i) =>
+      resident.activity === 'stroll'
+        ? {
+            ...resident,
+            lane: resident.lane ?? (i % 3) - 1,
+            // Drawn a whole lane off their line, to one side of the way they walk or the other.
+            laneOffset: resident.laneOffset ?? { x: 0, y: LANE_SHIFT * ((i % 3) - 1) },
+            fade: resident.fade ?? (i % 7 === 0 ? 0.01 : i % 5 === 0 ? 0.5 : 1),
+          }
+        : resident,
+    );
+    expect(residents.some((r) => r.fade === 0.01 && r.activity === 'stroll')).toBe(true);
+    // Everyone out walking, except riders in the glass and anyone faded out in their doorway.
+    const walkers = residents.filter((r) => residentShown(r) && !inTubeGlass(r.transit));
     expect(walkers.length).toBeGreaterThan(10);
     const offsets = tubeCrowdOffsets(residents);
     const views: [string, number, number, Camera][] = [
@@ -312,7 +351,9 @@ describe('Culling houses and walkers', () => {
       drawnHomes.set(name, homes);
       const figures = new Set(vi.mocked(drawResident).mock.calls.map((call) => call[5]));
       const expectedFigures = walkers.filter((walker) => {
-        const ground = project(walker.position.x, walker.position.y);
+        // The figure stands where its lane puts it.
+        const feet = residentGround(walker);
+        const ground = project(feet.x, feet.y);
         const reach = residentReach(measure, walker.resident, walker);
         return meets(
           { x: ground.x + (offsets.get(walker.id) ?? 0), y: ground.y },
@@ -336,8 +377,9 @@ describe('Culling houses and walkers', () => {
     const day = CALENDAR_EPOCH_DAY + 20,
       minutes = 1050;
     const residents = simulateResidents(town, minutes, day);
-    const index = residents.findIndex((r) => r.activity === 'stroll' && !inTubeGlass(r.transit));
-    const ground = project(residents[index].position.x, residents[index].position.y);
+    const index = residents.findIndex((r) => residentShown(r) && !inTubeGlass(r.transit));
+    const at = residentGround(residents[index]);
+    const ground = project(at.x, at.y);
     const feet = {
       x: ground.x + (tubeCrowdOffsets(residents).get(residents[index].id) ?? 0),
       y: ground.y,

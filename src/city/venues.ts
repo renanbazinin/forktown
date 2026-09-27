@@ -1,7 +1,38 @@
-import { isEventLive, type TownEvent, type Venue } from '../lib/events';
+import { EVENT_SPOTS, isEventLive, type TownEvent, type Venue } from '../lib/events';
 import { FORK_BOUNDS } from '../lib/lanterns';
+import { project } from '../lib/world';
 import { drawDiscoFloor, drawDiscoStage, drawStageSpeakers } from './disco';
 import { drawVenueTitle } from './venue-title';
+
+/** The Lunch Green's patchwork: rows and columns of 22 by 11 px diamonds round its middle. */
+export const PATCHWORK = { rows: 4, columns: 5 } as const;
+/** Whether a point on the green, in px from its plot centre, lies on the patchwork. */
+export function onPatchwork(x: number, y: number) {
+  // Patch (col, row) is centred at ((col - row) * 11 - 18, (col + row) * 5.5 - 6.5).
+  const across = (x + 18) / 11,
+    down = (y + 6.5) / 5.5;
+  const col = (across + down) / 2,
+    row = (down - across) / 2;
+  return (
+    col >= -0.5 && col <= PATCHWORK.columns - 0.5 && row >= -0.5 && row <= PATCHWORK.rows - 0.5
+  );
+}
+/** Guests' own blankets, a check in two shades, by day and by night: blue, then sage. */
+const BLANKETS = [
+  [
+    ['#8FAABD', '#C8D7DF'],
+    ['#566D79', '#6E828C'],
+  ],
+  [
+    ['#A3B87C', '#D5DFB4'],
+    ['#5A6D52', '#728465'],
+  ],
+] as const;
+/** The guests whose seats are off the patchwork, and where they sit, in px from the centre. */
+const OFF_RUG = EVENT_SPOTS.green.flatMap((spot, i) => {
+  const seat = project(spot.x, spot.y);
+  return onPatchwork(seat.x, seat.y) ? [] : [{ seat, i }];
+});
 
 export const venueBounds = (venue: Venue) =>
   venue.kind === 'fork'
@@ -167,8 +198,8 @@ export function drawVenue(
   } else {
     if (layer === 'ground') {
       // Patchwork picnic rugs and a lemonade/book table, kept clear of the front pavement.
-      for (let row = 0; row < 4; row++)
-        for (let col = 0; col < 5; col++) {
+      for (let row = 0; row < PATCHWORK.rows; row++)
+        for (let col = 0; col < PATCHWORK.columns; col++) {
           const px = (col - row) * 11 - 18,
             py = (col + row) * 5.5 - 12;
           poly(
@@ -181,6 +212,29 @@ export function drawVenue(
             (row + col) % 2 ? (night ? '#70847A' : '#E7DAB7') : night ? '#886F70' : '#CC8F82',
           );
         }
+      // A guest whose seat is off the patchwork brings a small checked blanket of their own,
+      // 16 px either side of them and 8 px above and below.
+      for (const { seat, i } of OFF_RUG) {
+        const [check, plain] = BLANKETS[i % BLANKETS.length][night ? 1 : 0];
+        for (const [dc, dr] of [
+          [0, 0],
+          [1, 0],
+          [0, 1],
+          [1, 1],
+        ]) {
+          const px = seat.x + (dc - dr) * 8,
+            py = seat.y + (dc + dr - 2) * 4;
+          poly(
+            [
+              [px, py],
+              [px + 8, py + 4],
+              [px, py + 8],
+              [px - 8, py + 4],
+            ],
+            (dc + dr) % 2 ? plain : check,
+          );
+        }
+      }
       // A shared basket and a few snacks sit between the seated neighbors.
       rect(-20, 8, 10, 7, '#AB805B');
       rect(-19, 7, 8, 2, '#D8B883');

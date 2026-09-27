@@ -1,9 +1,11 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { cityHit } from '../src/city/render';
+import { houseBounds } from '../src/city/houses';
+import { cityHit, LANE_SHIFT, MIN_FADE } from '../src/city/render';
 import { tubeHit } from '../src/city/tubes';
 import { placeSchema } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
+import { plotDoor } from '../src/lib/home-life';
 import { getPlot, plotCenter, project, unproject } from '../src/lib/world';
 import { ZOO_SIGN, ZOO_SIGN_DEPTH } from '../src/city/zoo';
 import { FORK_PLOT } from '../src/lib/lanterns';
@@ -68,6 +70,82 @@ describe('Map selection follows visible depth', () => {
     expect(cityHit(point, [home], [resident])).toEqual({ kind: 'resident', id: home.id });
   });
 
+  it('selects a house only on its painted art, so a walker seen beside it stays clickable', () => {
+    const home = places.find((place) => place.id === 'after-hours')!;
+    const plot = getPlot(home.plot)!;
+    const centre = plotCenter(plot);
+    const local = (x: number, y: number) => ({ x: centre.x + x * 1.12, y: centre.y + y * 1.12 });
+    // The front corner, the left wall, the roof's right eave and the tree are the house's.
+    for (const [x, y] of [
+      [0, 15],
+      [-20, -40],
+      [31, -60],
+      [44, -5],
+    ])
+      expect(cityHit(local(x, y), [home], []), `${x},${y}`).toEqual({ kind: 'place', id: plot.id });
+    // Beside the roof, clear of the art, a walker on the road behind the house is seen and
+    // clicked on the torso, though the house stands in front of the road.
+    const walker = {
+      ...simulateResidents([home], 402)[0],
+      id: 'walker',
+      activity: 'stroll',
+      position: { x: plot.x - 0.13, y: plot.y - 1.5 },
+    } satisfies ResidentState;
+    expect(walker.position.x + walker.position.y).toBeLessThan(plot.x + plot.y + 0.8);
+    const feet = project(walker.position.x, walker.position.y);
+    const torso = { x: feet.x, y: feet.y - 12 };
+    expect(Math.abs(torso.x - centre.x)).toBeLessThan(55);
+    expect(cityHit(torso, [home], [walker])).toEqual({ kind: 'resident', id: 'walker' });
+    expect(cityHit(torso, [home], [])).toBeUndefined();
+    // Beside the left wall, below the eaves, is the lawn: the map picks the plot under it.
+    expect(cityHit(local(-31, 0), [home], [])).toBeUndefined();
+  });
+
+  it('clicks walkers where their lane draws them, and not while faded out in their doorway', () => {
+    const seed = simulateResidents(places, 402)[0];
+    // Walking along +x, a whole lane puts the figure LANE_SHIFT tiles to their side, along +y.
+    const walker = {
+      ...seed,
+      id: 'laned',
+      activity: 'stroll',
+      position: { x: 5, y: 5 },
+      facing: 'se',
+      lane: 1,
+      laneOffset: { x: 0, y: LANE_SHIFT },
+    } satisfies ResidentState;
+    const unlaned = { ...walker, lane: 0, laneOffset: undefined };
+    const drawn = project(5, 5 + LANE_SHIFT);
+    const plain = project(5, 5);
+    // A whole lane moves the figure clear of the middle of the road, about 8 px across and 4
+    // down the screen, and its click box with it.
+    expect(plain.x - drawn.x).toBeGreaterThan(7);
+    expect(plain.x - drawn.x).toBeLessThan(9);
+    expect(drawn.y - plain.y).toBeGreaterThan(3.5);
+    expect(cityHit({ x: drawn.x, y: drawn.y - 26 }, [], [walker])).toEqual({
+      kind: 'resident',
+      id: 'laned',
+    });
+    expect(cityHit({ x: plain.x, y: plain.y - 26 }, [], [walker])).toBeUndefined();
+    expect(cityHit({ x: plain.x, y: plain.y - 26 }, [], [unlaned])).toEqual({
+      kind: 'resident',
+      id: 'laned',
+    });
+    // Side by side on one spot, the walker in the nearer lane is in front, whatever the order.
+    const near = { ...walker, id: 'near' },
+      far = { ...walker, id: 'far', lane: -1, laneOffset: { x: 0, y: -LANE_SHIFT } };
+    const between = { x: plain.x, y: plain.y - 14 };
+    for (const residents of [
+      [near, far],
+      [far, near],
+    ])
+      expect(cityHit(between, [], residents)).toEqual({ kind: 'resident', id: 'near' });
+    // Fading through the front door: clickable while they can be seen, not once all but gone.
+    const click = { x: plain.x, y: plain.y - 12 };
+    const stepping = { ...unlaned, fade: 0.5 };
+    expect(cityHit(click, [], [stepping])).toEqual({ kind: 'resident', id: 'laned' });
+    expect(cityHit(click, [], [{ ...stepping, fade: MIN_FADE / 2 }])).toBeUndefined();
+  });
+
   it('selects the frontmost of overlapping residents regardless of input order', () => {
     const seed = simulateResidents(places, 402)[0];
     const back = {
@@ -109,7 +187,9 @@ describe('Map selection follows visible depth', () => {
   });
 
   it.each(['work', 'home', 'sleep'] as const)('ignores residents indoors during %s', (activity) => {
-    const resident = { ...simulateResidents(places, 402)[0], activity };
+    // Indoors is just inside their own front door, wherever the day has taken the others.
+    const seed = simulateResidents(places, 402)[0];
+    const resident = { ...seed, activity, position: plotDoor(getPlot(seed.home.plot)!) };
     expect(
       cityHit(project(resident.position.x, resident.position.y), [], [resident]),
     ).toBeUndefined();
@@ -187,8 +267,8 @@ describe('Map selection follows visible depth', () => {
     // The trunk behind the trees selects the nearer station.
     expect(cityHit(lifted(-0.5, 33, 8), [], [])).toEqual(C1);
     expect(cityHit(lifted(-0.5, 34, 8), [], [])).toEqual({ kind: 'place', id: 'N1' });
-    // A tall house on D1 stands in front of the C1 dip: its roof covers the glass band's lower
-    // half over column 0.
+    // A tall house on D1 rises just in front of the C1 dip, its telescope a few px short of the
+    // glass band over column 0: the glass there stays the line's, and the dome is the house's.
     const dip = tubeRoute('C1', 'N1')[12];
     const point = lifted(dip.x, dip.y, dip.h - 4);
     expect(cityHit(point, [], [])).toEqual(C1);
@@ -198,7 +278,11 @@ describe('Map selection follows visible depth', () => {
       building: 'observatory' as const,
       design: { ...places[0].design, floors: 3 as const, roof: 'classic' as const },
     };
-    expect(cityHit(point, [home], [])).toEqual({ kind: 'place', id: 'D1' });
+    expect(cityHit(point, [home], [])).toEqual(C1);
+    const d1 = plotCenter(getPlot('D1')!);
+    const dome = { x: d1.x, y: d1.y - (houseBounds(home).height + 20) * 1.12 };
+    expect(cityHit(dome, [home], [])).toEqual({ kind: 'place', id: 'D1' });
+    expect(cityHit(dome, [], [])?.id).not.toBe('D1');
     // A stroller in front of the spur keeps the click; one behind it is seen through the glass.
     const seed = { ...simulateResidents(places, 402)[0], activity: 'stroll' as const };
     const front = { ...seed, id: 'front', position: { x: 1.5, y: 11.95 } };

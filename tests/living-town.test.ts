@@ -3,7 +3,8 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
-import { getPlot, plotEntrance, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
+import { findPlotAt, getPlot, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
+import { plotDoor } from '../src/lib/home-life';
 import { eventsForDay, HOUSE_PLOTS, insideVenue } from '../src/lib/events';
 import { insideFootball } from '../src/lib/football';
 import { TUBE_TRUNK_X } from '../src/lib/tubes';
@@ -95,7 +96,7 @@ describe('A small predictable daily life', () => {
     expect(simulateResidents(places, 810.25 + 1440)).toEqual(before);
   });
   // Everyone out walking all day: about 2.5 s alone with all 141 plots taken.
-  it('keeps residents on roads except when entering their assigned public venue', () => {
+  it('keeps residents on roads, their own lot, or their assigned public venue', () => {
     const wanderers = places.map((place) => ({
       ...place,
       resident: {
@@ -116,8 +117,13 @@ describe('A small predictable daily life', () => {
         const { x, y } = state.position;
         const stray = (where: string) =>
           astray.push(`${state.id} at ${minute}: ${where} ${x},${y}`);
+        // Off the road only on their own lot (never across anyone else's), and there only on the
+        // garden path or at a spot of their own, or indoors at the door.
+        const ownLot = findPlotAt(x, y)?.id === state.home.plot;
+        if (ownLot && state.activity === 'stroll' && !state.lot) stray('loose on their lot at');
         if (
           !onRoadOrTube(state) &&
+          !ownLot &&
           !(state.event?.id === 'football' && insideFootball(state.position)) &&
           !(event && insideVenue(event.venue, state.position))
         )
@@ -148,7 +154,9 @@ describe('A small predictable daily life', () => {
       expect(
         Math.hypot(after.position.x - before.position.x, after.position.y - before.position.y),
       ).toBeLessThan(0.001);
-      if (boundary === 1320) expect(after.position).toEqual(plotEntrance(plot));
+      // In at their own front door by bedtime.
+      if (boundary === 1320)
+        expect(after).toMatchObject({ activity: 'sleep', position: plotDoor(plot) });
     }
   });
   it('keeps sleepers indoors and follows daytime activity choices', () => {

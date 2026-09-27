@@ -35,7 +35,7 @@ import { moonSlice, townSkyAt } from '../lib/town-calendar';
 import { hash, project, unproject, type Point } from '../lib/world';
 import { lampBlocksGoal } from './football';
 import { LIGHT } from './glow';
-import { LAMPS, lampOn } from './lamplight';
+import { LAMPS, lampFoot, lampOn } from './lamplight';
 import { drawResident } from './residents';
 import { groundTuft } from './season-ground';
 import {
@@ -809,14 +809,23 @@ export const WATER_LAMPS = LAMPS.filter(
   (lamp) => (lamp.x === 17 && lamp.y === 29) || (lamp.x === 9 && lamp.y === 33),
 );
 /** The bars of each water lamp's reflection, fixed in place: the ones that fall on water 0.15
- * tile deep or more, 34 px and further below the lamp's foot. */
+ * tile deep or more, 34 px and further below the foot of the lamp's pole, and clear of the mill
+ * standing in front of the water however a bar wobbles (1 px either way). */
 export const lampColumns = lazy(() =>
   WATER_LAMPS.map((lamp) => {
-    const foot = project(lamp.x + 0.5, lamp.y + 0.5);
+    const pole = lampFoot(lamp);
+    const foot = project(pole.x, pole.y);
     return LAMP_BARS.flatMap((w, k) => {
       const y = foot.y + 34 + 2 * k;
       if (shoreDistance(unproject(foot.x + 1, y)) < 0.15) return [];
-      return [{ k, x: Math.round(foot.x + 1 - w / 2), y, w, alpha: 0.8 - (0.65 * k) / 8 }];
+      const x = Math.round(foot.x + 1 - w / 2);
+      if (
+        [x - 1, x + w + 1].some(
+          (end) => behindMill({ x: end, y }) || behindMill({ x: end, y: y + 1 }),
+        )
+      )
+        return [];
+      return [{ k, x, y, w, alpha: 0.8 - (0.65 * k) / 8 }];
     });
   }),
 );

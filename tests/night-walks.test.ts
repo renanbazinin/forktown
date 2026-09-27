@@ -10,7 +10,8 @@ import {
   insideVenue,
 } from '../src/lib/events';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
-import { getPlot, isRoad, plotEntrance } from '../src/lib/world';
+import { findPlotAt, getPlot, isRoad, plotEntrance } from '../src/lib/world';
+import { BENCH_SEAT, FRONT_STEP, PORCH_CHAIR, plotDoor } from '../src/lib/home-life';
 import { insideCinema } from '../src/lib/cinema';
 import { nightBedtime } from '../src/lib/night-routine';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, routeLength, WALK_SPEED } from '../src/lib/walking';
@@ -56,7 +57,8 @@ describe('Night owls and the midnight party', () => {
         expect(state.activity).toBe('sleep');
         expect(state.moving).toBe(false);
         expect(state.event).toBeUndefined();
-        expect(state.position).toEqual(plotEntrance(getPlot(state.home.plot)!));
+        // Indoors, just inside their own front door.
+        expect(state.position).toEqual(plotDoor(getPlot(state.home.plot)!));
       }
     }
   });
@@ -82,12 +84,14 @@ describe('Night owls and the midnight party', () => {
     ).toBeGreaterThanOrEqual(2);
     expect(at(1740, homes).every((state) => state.activity === 'sleep')).toBe(true);
   });
-  it('fills free nights with local walks and doorstep breaks until varied bedtimes', () => {
+  it('fills free nights with moonlit loops and night stays on their own lot until varied bedtimes', () => {
     expect(overflow.length).toBeGreaterThan(0);
     const bedtimes = new Set<number>();
+    const seats = new Set<string>();
     for (const home of overflow) {
       const bedtime = nightBedtime(home),
-        doorstep = plotEntrance(getPlot(home.plot)!);
+        plot = getPlot(home.plot)!,
+        doorstep = plotEntrance(plot);
       bedtimes.add(bedtime);
       expect(bedtime).toBeGreaterThanOrEqual(1440);
       expect(bedtime).toBeLessThanOrEqual(1740);
@@ -97,27 +101,48 @@ describe('Night owls and the midnight party', () => {
         const state = at(minute).find((state) => state.id === home.id)!;
         expect(state.activity).toBe(minute < bedtime ? 'stroll' : 'sleep');
         expect(state.event).toBeUndefined();
-        expect(isRoad(Math.floor(state.position.x), Math.floor(state.position.y))).toBe(true);
         if (state.nightWalk) {
+          // Round the blocks by road, never far from home.
           walked = true;
           expect(state.moving).toBe(true);
+          expect(isRoad(Math.floor(state.position.x), Math.floor(state.position.y))).toBe(true);
           expect(residentActivityLabel(state)).toBe('Out for a moonlit stroll');
           expect(
             Math.abs(state.position.x - doorstep.x) + Math.abs(state.position.y - doorstep.y),
           ).toBeLessThanOrEqual(12.001);
-        } else {
-          expect(state.position).toEqual(doorstep);
+        } else if (minute >= bedtime) {
+          expect(state.position).toEqual(plotDoor(plot));
           expect(state.moving).toBe(false);
-          if (minute < bedtime) {
-            rested = true;
-            expect(state.nightPorch).toBe(true);
-            expect(residentActivityLabel(state)).toBe('Enjoying the night on the doorstep');
-          }
+        } else {
+          // Otherwise on their own lot: on the garden path, or out on a seat for the night.
+          expect(state.lot).toBeDefined();
+          const { x, y } = state.position;
+          expect(
+            findPlotAt(x, y)?.id === home.plot ||
+              (Math.abs(x - doorstep.x) < 0.3 && y <= doorstep.y),
+          ).toBe(true);
+          if (state.lot!.stage !== 'at' || !state.nightPorch) continue;
+          rested = true;
+          seats.add(state.lot!.spot);
+          expect(state.moving).toBe(false);
+          const seat = { bench: BENCH_SEAT, porch: PORCH_CHAIR, step: FRONT_STEP }[
+            state.lot!.spot as 'bench' | 'porch' | 'step'
+          ];
+          // Only a seat for the night: the bench, the porch or the front step, never the road.
+          expect(seat).toBeDefined();
+          expect(state.position).toEqual({ x: plot.x + seat.feet.x, y: plot.y + seat.feet.y });
+          expect(['crouch', state.lot!.spot === 'step' ? 'sit' : 'perch']).toContain(state.pose);
+          expect(residentActivityLabel(state)).toBe(
+            state.lot!.spot === 'step'
+              ? 'Enjoying the night on the doorstep'
+              : `Enjoying the night on the ${state.lot!.spot}`,
+          );
         }
       }
       expect(walked && rested).toBe(true);
     }
     expect(bedtimes.size).toBeGreaterThan(3);
+    expect([...seats].sort()).toEqual(['bench', 'step']);
   });
   it('keeps attendance bounded, seats unique, and the itinerary stable across midnight', () => {
     const invited = [...plans.values()].flat().filter((trip) => trip.event.id === 'night-party');

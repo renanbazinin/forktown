@@ -750,7 +750,8 @@ function paintStack(ctx: Ctx, station: TubeStation, scene: TubeScene, inside: In
       if (!last) ctx.save();
       const offset = (i - (figures.length - 1) / 2) * 3;
       ctx.transform(pose.sx, 0, 0, pose.sy, x + offset, y - 2 - pose.lift);
-      drawResident(ctx, figure.resident, 0, 0, 1.25, STANDING, { shadow: false });
+      // Dimmed at night like the walker who stepped in.
+      drawResident(ctx, figure.resident, 0, 0, 1.25, STANDING, { shadow: false, night });
       if (!last) ctx.restore();
     });
     ctx.restore();

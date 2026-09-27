@@ -11,9 +11,17 @@ import {
   millpondSignHit,
   MILLPOND_SIGN_DEPTH,
 } from './millpond';
-import { houseBounds, houseReach } from './houses';
+import {
+  drawPorchEave,
+  HOUSE_SCALE,
+  houseHit,
+  houseReach,
+  PERCH_HIPS_BEHIND,
+  STEPPING_STONES,
+  underPorchRoof,
+} from './houses';
 import { housePainter } from './house-sprites';
-import { drawResident, residentReach } from './residents';
+import { drawResident, drawResidentSpeech, residentReach } from './residents';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
 import { drawTownTree } from './trees';
@@ -66,9 +74,10 @@ import { townArrivals } from '../lib/arrivals';
 import { drawForkPlaza, drawLanternFork } from './lantern-fork';
 import { drawSproutStake } from './lantern-post';
 import { drawGlow } from './glow';
-import { LAMPS, lampOn } from './lamplight';
+import { LAMPS, lampFoot, lampLift, lampOn } from './lamplight';
 import { drawCommitStone, drawFarFields, drawGoldenHour } from './horizon';
 import type { ResidentState } from '../lib/simulation';
+import { residentGround } from '../lib/lanes';
 export { drawHouse as drawBuilding } from './houses';
 import type { Place } from '../lib/schema';
 import {
@@ -105,8 +114,6 @@ type Palette = {
 };
 export type Camera = { x: number; y: number; zoom: number };
 const houseDepth = (plot: Plot) => plot.x + plot.y + 0.8;
-/** Houses stand a little larger than their plot art. */
-const HOUSE_SCALE = 1.12;
 /** Walkers are drawn at 1.25 times their preview size. */
 const RESIDENT_SCALE = 1.25;
 const venueDepth = (plot: Plot) => plot.x + plot.y + 0.1;
@@ -141,9 +148,105 @@ function taleFor(roster: readonly Place[], eveningDay: number) {
   tales.set(roster, { eveningDay, tale });
   return tale;
 }
-const residentDepth = (resident: ResidentState) => resident.position.x + resident.position.y;
+// Where a walker's feet are drawn, sorted and clicked: their position, moved sideways of the way
+// they walk by their lane (src/lib/lanes.ts, shared with the greeting bubbles).
+export { LANE_SHIFT, residentGround } from '../lib/lanes';
+/** Below this, a neighbor stepping through their front door is not drawn or clicked at all. */
+export const MIN_FADE = 0.02;
+/** Whether a neighbor is out to be drawn and clicked: walking, and not faded out in the doorway. */
+export const residentShown = (resident: Pick<ResidentState, 'activity' | 'fade'>) =>
+  resident.activity === 'stroll' && (resident.fade ?? 1) >= MIN_FADE;
+const residentDepth = (resident: ResidentState) => {
+  const ground = residentGround(resident);
+  return ground.x + ground.y;
+};
+/** How far a figure itself (no speech) reaches from its feet on the map, in world px. */
+const FIGURE_REACH = {
+  x: 18 * RESIDENT_SCALE,
+  above: 48 * RESIDENT_SCALE,
+  below: 5 * RESIDENT_SCALE,
+};
+// A figure fading in their doorway or at the touchline is drawn whole into this layer, then
+// copied at its opacity, so its own overlapping parts (hair under a hat, an arm over the body)
+// never show through each other. One per map canvas, reused and grown as needed.
+const ghosts = new WeakMap<Ctx, { canvas: HTMLCanvasElement; ctx: Ctx }>();
+/**
+ * Paints `paint`'s marks, around (x, y) within `reach` world px, at `alpha` as one see-through
+ * layer. Without a canvas to draw on (tests), or under a skewed transform, each mark takes the
+ * alpha instead.
+ */
+function seeThrough(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  reach: { x: number; above: number; below: number },
+  alpha: number,
+  paint: (target: Ctx) => void,
+) {
+  if (alpha >= 1) return paint(ctx);
+  const t =
+    typeof document !== 'undefined' && typeof ctx.getTransform === 'function'
+      ? ctx.getTransform()
+      : undefined;
+  const plain = !!t && !t.b && !t.c && t.a > 0 && t.d > 0;
+  let ghost = plain ? ghosts.get(ctx) : undefined;
+  if (plain && !ghost) {
+    const canvas = document.createElement('canvas');
+    const layer = canvas.getContext('2d');
+    if (layer) ghosts.set(ctx, (ghost = { canvas, ctx: layer }));
+  }
+  if (!t || !ghost) {
+    const before = ctx.globalAlpha;
+    ctx.globalAlpha = before * alpha;
+    paint(ctx);
+    ctx.globalAlpha = before;
+    return;
+  }
+  // The feet land on the same sub-pixel in the layer as on the map, so the copy is pixel exact.
+  const X = t.e + x * t.a,
+    Y = t.f + y * t.d;
+  const px = Math.floor(X),
+    py = Math.floor(Y);
+  const left = Math.ceil(reach.x * t.a) + 1,
+    top = Math.ceil(reach.above * t.d) + 1;
+  const w = left + Math.ceil(reach.x * t.a) + 2,
+    h = top + Math.ceil(reach.below * t.d) + 2;
+  const { canvas, ctx: layer } = ghost;
+  if (canvas.width < w || canvas.height < h) {
+    canvas.width = Math.max(canvas.width, w);
+    canvas.height = Math.max(canvas.height, h);
+  }
+  layer.setTransform(1, 0, 0, 1, 0, 0);
+  layer.clearRect(0, 0, w, h);
+  layer.setTransform(t.a, 0, 0, t.d, left + X - px - x * t.a, top + Y - py - y * t.d);
+  paint(layer);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha *= alpha;
+  ctx.drawImage(canvas, 0, 0, w, h, px - left, py - top, w, h);
+  ctx.restore();
+}
+/**
+ * The centre of this neighbor's own home when they stand in its doorway or sit on its porch
+ * chair, under the porch roof, whose front edge is then painted again over them.
+ */
+function porchOver(resident: ResidentState): Point | undefined {
+  if (!resident.lot) return;
+  const plot = getPlot(resident.home.plot);
+  if (!plot) return;
+  // A perched sitter's body rests over the seat, behind the feet.
+  const perched = resident.pose === 'perch' || resident.pose === 'tea';
+  const body = {
+    x: resident.position.x - plot.x,
+    y: resident.position.y - plot.y - (perched ? PERCH_HIPS_BEHIND : 0),
+  };
+  return underPorchRoof(resident.home, body) ? plotCenter(plot) : undefined;
+}
 /** Each streetlamp's snow schedule, fixed by where it stands. */
 const LAMP_SNOW = LAMPS.map(({ x, y }) => seedFraction(`lamp:${x},${y}`));
+/** Where each streetlamp's pole stands, on a corner of its crossing, and how much taller it is. */
+const LAMP_FEET = LAMPS.map(lampFoot);
+const LAMP_LIFTS = LAMPS.map(lampLift);
 // World geometry and seeds are fixed between builds; only their palette changes.
 const terrain = Array.from({ length: WORLD_WIDTH * WORLD_HEIGHT }, (_, i) => {
   const x = Math.floor(i / WORLD_HEIGHT),
@@ -458,11 +561,26 @@ export function renderCity({
       if (occupied) {
         diamond(ctx, pt.x, pt.y, 105, 52.5, night ? '#577468' : '#BFD5A4');
         if (plot.id === FORK_PLOT) drawForkPlaza(ctx, pt.x, pt.y, night);
-        // A short footpath connects the front of the lawn to the street.
-        for (let step = 0; step < 5; step++) {
-          const stone = project(plot.x + 0.5, plot.y + 1.02 + step * 0.25);
-          diamond(ctx, stone.x, stone.y, 7, 3.5, night ? '#899483' : '#E3DABF');
-        }
+        // A short footpath connects the front of the lawn to the street. A home's own stepping
+        // stones run from its door, so the path carries on in the same line and step, two more
+        // stones past the lawn to the kerb; the venues keep theirs down the middle.
+        if (byPlot.has(plot.id))
+          for (let step = 3; step < 5; step++) {
+            const { x, y, dx, dy, rx, ry } = STEPPING_STONES;
+            diamond(
+              ctx,
+              pt.x + (x + step * dx) * HOUSE_SCALE,
+              pt.y + (y + step * dy) * HOUSE_SCALE,
+              rx * HOUSE_SCALE,
+              ry * HOUSE_SCALE,
+              night ? '#899483' : '#E3DABF',
+            );
+          }
+        else
+          for (let step = 0; step < 5; step++) {
+            const stone = project(plot.x + 0.5, plot.y + 1.02 + step * 0.25);
+            diamond(ctx, stone.x, stone.y, 7, 3.5, night ? '#899483' : '#E3DABF');
+          }
       }
       if (!occupied) drawMeadow(ctx, plot, night, season);
       if (active || hover) diamond(ctx, pt.x, pt.y, 108, 54, night ? '#B5C59B40' : '#F4EDCD80');
@@ -604,37 +722,44 @@ export function renderCity({
       tale: tale?.placeId === place.id,
       newest: register.newest === place.id,
     };
+    // Their neighbor's routine lights the windows; stepping in or out, they open the front door.
+    const home = residentsByHome.get(place.id);
     objects.push({
       depth: houseDepth(plot),
       paint: () =>
         paintHouse(place, pt.x, pt.y, night, HOUSE_SCALE, {
           minutes,
-          activity: residentsByHome.get(place.id)?.activity,
+          activity: home?.activity,
           lantern,
           season,
+          door: home?.door,
         }),
     });
   }
-  // After the lanterns, the lamps carry the light outward from the Fork.
+  // After the lanterns, the lamps carry the light outward from the Fork. Each pole stands on a
+  // corner of its crossing, clear of the walkers, and sorts by where its foot really is.
   LAMPS.forEach(({ x, y, distance }, i) => {
-    const pt = project(x + 0.5, y + 0.5);
-    if (!visible(pt, 26, 57, 2) || lampBlocksGoal(x + 0.5, y + 0.5)) return;
+    const foot = LAMP_FEET[i];
+    const pt = project(foot.x, foot.y);
+    // The head hangs `up` px higher on a tall lamp, and its glow with it.
+    const up = LAMP_LIFTS[i];
+    if (!visible(pt, 26, 57 + up, 2) || lampBlocksGoal(x + 0.5, y + 0.5)) return;
     const lit = night && lampOn(distance, minutes);
     const snow = snowAt(season.yearDay, LAMP_SNOW[i]);
     objects.push({
-      depth: x + y,
+      depth: foot.x + foot.y,
       paint: () => {
-        rect(ctx, pt.x, pt.y - 29, 2, 30, night ? '#637266' : '#8B9073');
-        rect(ctx, pt.x - 3, pt.y - 33, 8, 6, lit ? '#F4D79A' : night ? '#7C8272' : '#EDE5C1');
-        rect(ctx, pt.x - 4, pt.y - 35, 10, 2, night ? '#7A8C7D' : '#748269');
+        rect(ctx, pt.x, pt.y - 29 - up, 2, 30 + up, night ? '#637266' : '#8B9073');
+        rect(ctx, pt.x - 3, pt.y - 33 - up, 8, 6, lit ? '#F4D79A' : night ? '#7C8272' : '#EDE5C1');
+        rect(ctx, pt.x - 4, pt.y - 35 - up, 10, 2, night ? '#7A8C7D' : '#748269');
         if (snow > 0) {
           // A line of snow on the hood, settling and thawing with the roofs around it.
           const alpha = ctx.globalAlpha;
           ctx.globalAlpha = alpha * snow;
-          rect(ctx, pt.x - 3, pt.y - 36, 8, 1, pick(SNOW.top, night));
+          rect(ctx, pt.x - 3, pt.y - 36 - up, 8, 1, pick(SNOW.top, night));
           ctx.globalAlpha = alpha;
         }
-        if (lit) drawGlow(ctx, pt.x + 1, pt.y - 30, 24, 0.19);
+        if (lit) drawGlow(ctx, pt.x + 1, pt.y - 30 - up, 24, 0.19);
       },
     });
   });
@@ -643,10 +768,11 @@ export function renderCity({
   // Neighbors walking in lockstep to or from a stack stand side by side.
   const offsets = tubeCrowdOffsets(residents);
   for (const resident of residents) {
-    if (resident.activity !== 'stroll') continue;
+    if (!residentShown(resident)) continue;
     // Riders in the glass and figures in a stack are the tube's to draw.
     if (inTubeGlass(resident.transit)) continue;
-    const ground = project(resident.position.x, resident.position.y);
+    const feet = residentGround(resident);
+    const ground = project(feet.x, feet.y);
     const pt = { x: ground.x + (offsets.get(resident.id) ?? 0), y: ground.y };
     // Walkers off screen are skipped too. The ring round a followed one, 10px either way and 7px
     // below the feet, gets the same 2px to spare.
@@ -665,12 +791,35 @@ export function renderCity({
       paint: () => {
         if (followed === resident.id)
           diamond(ctx, pt.x, pt.y + 2, 10, 5, night ? '#F0DBA575' : '#FFF7D5');
-        // Spectators at the football fade while play near the touchline is behind them.
-        const alpha = ctx.globalAlpha;
-        if (resident.event?.id === 'football')
-          ctx.globalAlpha = alpha * spectatorAlpha(football, pt);
-        drawResident(ctx, resident.resident, pt.x, pt.y, RESIDENT_SCALE, resident);
-        ctx.globalAlpha = alpha;
+        // Spectators at the football fade while play near the touchline is behind them, and a
+        // neighbor fades in or out on their own threshold.
+        const seen =
+          (resident.event?.id === 'football' ? spectatorAlpha(football, pt) : 1) *
+          Math.min(1, resident.fade ?? 1);
+        // Under their own porch roof, its front edge hangs in front of them; words stay on top.
+        const eave = porchOver(resident);
+        // At night a figure is dimmed like the houses around it; its words stay bright.
+        if (seen >= 1 && !eave)
+          return drawResident(ctx, resident.resident, pt.x, pt.y, RESIDENT_SCALE, resident, {
+            night,
+          });
+        seeThrough(ctx, pt.x, pt.y, FIGURE_REACH, seen, (target) =>
+          drawResident(target, resident.resident, pt.x, pt.y, RESIDENT_SCALE, resident, {
+            speech: false,
+            night,
+          }),
+        );
+        if (eave)
+          drawPorchEave(ctx, resident.home, eave.x, eave.y, night, HOUSE_SCALE, {
+            minutes,
+            season,
+          });
+        if (resident.greeting || resident.duckLove) {
+          const alpha = ctx.globalAlpha;
+          ctx.globalAlpha = alpha * seen;
+          drawResidentSpeech(ctx, resident.resident, pt.x, pt.y, RESIDENT_SCALE, resident);
+          ctx.globalAlpha = alpha;
+        }
       },
     });
   }
@@ -704,8 +853,8 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
     .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
   for (const { place, plot } of ordered) {
     const p = plotCenter(plot);
-    const tall = houseBounds(place).top * HOUSE_SCALE;
-    if (point.x >= p.x - 55 && point.x <= p.x + 55 && point.y >= p.y - tall && point.y <= p.y + 20)
+    // Only the painted house counts: a walker seen beside its walls or roof stays clickable.
+    if (houseHit(place, (point.x - p.x) / HOUSE_SCALE, (point.y - p.y) / HOUSE_SCALE))
       return plot.id;
   }
 }
@@ -791,12 +940,13 @@ export function cityHit(
   // and figures in a stack are never hit: clicking them selects the line.
   for (const resident of residents) {
     if (
-      resident.activity !== 'stroll' ||
+      !residentShown(resident) ||
       residentDepth(resident) < depth ||
       inTubeGlass(resident.transit)
     )
       continue;
-    const p = project(resident.position.x, resident.position.y);
+    const feet = residentGround(resident);
+    const p = project(feet.x, feet.y);
     if (Math.abs(point.x - p.x) < 9 && point.y > p.y - 28 && point.y < p.y + 5) {
       target = { kind: 'resident', id: resident.id };
       depth = residentDepth(resident);

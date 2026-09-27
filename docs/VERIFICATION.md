@@ -30,7 +30,7 @@ The living edition was merged in PR #2 and deployed on September 20, 2026 at htt
 
 ## Living edition checks
 
-- New automated cases cover deterministic replay, road-only movement throughout the day, returning home before activity boundaries, nighttime sleep, incidental greetings, and reserved starter credit.
+- New automated cases cover deterministic replay, road-only movement throughout the day, returning home before activity boundaries, nighttime sleep, incidental greetings, and reserved starter credit. (Residents have since gained their own lot: they may also walk their garden path and sit or potter at its spots, and they are in through their own front door within a few borrowed minutes of a boundary; `tests/home-life.test.ts` and `tests/living-town.test.ts` hold the new rules.)
 - Sign tests cover inherited styles and entity decoding, source/nesting/text bounds, and rejection of scripts, events, links, images, SVG, iframes, forms, external CSS, and unsupported layout properties.
 - Verified the three-tab builder in the browser: three-floor house, shutters, named resident, hat, morning stroll, and an HTML welcome sign. Unsupported link markup showed a useful error and blocked continuing.
 - Saved the complete test contribution through the local builder. Verified its nested JSON on the confirmation screen, its appearance in the town, and its resident in the directory. Removed only that temporary `lantern-lane.json` test file afterward; the nine real places remain.

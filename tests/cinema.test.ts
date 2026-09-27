@@ -1,5 +1,6 @@
 import { residentTrips } from '../src/lib/resident-trips';
 import { nightBedtime } from '../src/lib/night-routine';
+import { BORROW_MAX } from '../src/lib/home-life';
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
@@ -348,9 +349,14 @@ describe('Starlight Cinema', () => {
         expect(r.event?.id).toBe('night-party');
         expect(distance(r.position, trip.route.at(-1)!)).toBeLessThan(0.01);
       } else {
-        expect(r.activity).toBe(trip.homeBy >= nightBedtime(r.home) ? 'sleep' : 'stroll');
+        // Home at the doorstep, then up their own path: even at bedtime they walk in through the
+        // front door rather than vanish on the road, and are inside a few minutes later.
+        expect(r.activity).toBe('stroll');
         expect(r.event).toBeUndefined();
-        expect(r.position).toEqual(plotEntrance(getPlot(r.home.plot)!));
+        expect(r.lot).toBeDefined();
+        expect(distance(r.position, plotEntrance(getPlot(r.home.plot)!))).toBeLessThan(0.01);
+        if (trip.homeBy >= nightBedtime(r.home))
+          expect(at(trip.homeBy + BORROW_MAX + 1).find((r) => r.id === id)!.activity).toBe('sleep');
       }
     }
     const sleepers = crowd.map((p) => ({

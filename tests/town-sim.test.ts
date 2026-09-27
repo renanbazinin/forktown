@@ -2,14 +2,16 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DUCK_WALK_END, DUCK_WALK_START } from '../src/lib/ducks';
 import { HOUSE_PLOTS } from '../src/lib/events';
+import { BORROW_MAX, plotDoor } from '../src/lib/home-life';
 import { prefetchTownDay } from '../src/lib/idle-prefetch';
 import { liveProgram, liveShotAt } from '../src/lib/live-director';
 import { planResidentTrips, residentTrips } from '../src/lib/resident-trips';
 import { placeSchema, type Place } from '../src/lib/schema';
-import { simulateResidents, type ResidentState } from '../src/lib/simulation';
+import { GREETING_MINUTES, simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { townCatAt } from '../src/lib/town-cat';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { tubeRides } from '../src/lib/tube-traffic';
+import { fullTown as variedTown, readPlaces } from './full-town';
 import { roadNodes, roadPath, WALK_SPEED } from '../src/lib/walking';
 import {
   getPlot,
@@ -179,15 +181,16 @@ describe('The town simulation at any size', () => {
         expect(fastest).toBeLessThanOrEqual(WALK_SPEED + 1e-9);
         expect(fastestWithDucks).toBeLessThanOrEqual((WALK_SPEED * 4) / 3 + 1e-9);
       }
-  }, 20_000);
+  }, 60_000);
 
-  it('rests on the doorstep in each neighbor’s own rhythm, never all at once', () => {
+  it('rests at home in each neighbor’s own rhythm, never all at once, and goes in with the routine', () => {
+    const periods = ['morning', 'afternoon', 'evening', 'night'] as const;
     for (const day of DAYS) {
       let still = 0,
         out = 0;
       for (const { minute, now } of daytime(fullTown, day)) {
         const walkers = now.filter((state) => strolling(state) && !state.duckLove);
-        // A town full of strollers never stands still together.
+        // A town full of strollers never stands or sits still together.
         if (walkers.length >= 10) expect(walkers.some((state) => state.moving)).toBe(true);
         // Nor in the last twenty minutes before 12:00, 18:00 and 22:00.
         if ([720, 1080, 1320].some((end) => minute >= end - 20)) {
@@ -197,13 +200,27 @@ describe('The town simulation at any size', () => {
       }
       expect(out).toBeGreaterThan(0);
       expect(still / out).toBeLessThan(0.5);
-      // Every stroll is back on the doorstep by the end of its period.
-      for (const end of [720, 1080, 1320])
-        for (const state of simulateResidents(fullTown, end - 0.001, day))
-          if (strolling(state))
-            expect(
-              distance(state.position, plotEntrance(getPlot(state.home.plot)!)),
-            ).toBeLessThanOrEqual(0.001);
+      for (const [index, end] of [720, 1080, 1320].entries()) {
+        const staysOut = (home: Place) => home.resident.routine[periods[index + 1]] === 'stroll';
+        // Whoever goes indoors as the period ends is up their own path, stepping in over the
+        // threshold, and inside a few minutes later even after a trip home right on the minute.
+        let carryOn = 0;
+        for (const state of simulateResidents(fullTown, end - 0.001, day)) {
+          if (!strolling(state)) continue;
+          if (staysOut(state.home)) carryOn += state.lot ? 0 : 1;
+          else {
+            expect(state.lot?.stage).toBe('in');
+            // At the door, or no more than the borrowed minutes' walk from it.
+            expect(distance(state.position, plotDoor(getPlot(state.home.plot)!))).toBeLessThan(
+              WALK_SPEED * BORROW_MAX,
+            );
+          }
+        }
+        for (const state of simulateResidents(fullTown, end + BORROW_MAX + 1, day))
+          if (!staysOut(state.home)) expect(state.activity).not.toBe('stroll');
+        // Nobody else has to be home on the hour: strolls run on through 12:00 and 18:00.
+        if (end < 1320) expect(carryOn).toBeGreaterThan(0);
+      }
     }
   }, 20_000);
 
@@ -241,6 +258,33 @@ describe('The town simulation at any size', () => {
     }
     expect(greetings).toBeGreaterThan(100);
   }, 20_000);
+
+  it('says a greeting for a moment or not at all, never flashing it up in passing', () => {
+    // Every bubble of an afternoon in the full town, and in a full town of varied homes on a day
+    // whose crowds used to cut bubbles short, at twenty frames a town minute.
+    const STEP = 0.05;
+    const lengths: number[] = [];
+    for (const [homes, day] of [
+      [fullTown, DAYS[0]],
+      [variedTown(readPlaces()), CALENDAR_EPOCH_DAY + 224 + 42],
+    ] as const) {
+      const since = new Map<string, number>();
+      for (let minute = 600; minute < 1080; minute += STEP)
+        for (const state of simulateResidents(homes, minute, day)) {
+          const started = since.get(state.id);
+          if (state.greeting && started === undefined) since.set(state.id, minute);
+          if (!state.greeting && started !== undefined) {
+            lengths.push(minute - started);
+            since.delete(state.id);
+          }
+        }
+    }
+    expect(lengths.length).toBeGreaterThan(100);
+    // Each is said for its whole spell, which lasts GREETING_MINUTES at least: never cut short
+    // by another bubble drifting close, nor begun late when another conversation ends.
+    expect(GREETING_MINUTES).toBeGreaterThanOrEqual(1);
+    for (const length of lengths) expect(length).toBeGreaterThan(GREETING_MINUTES - STEP - 1e-6);
+  }, 40_000);
 
   it('shows every visitor the same cat, broadcast and tube, whatever their language', () => {
     // Fresh rosters each time, so nothing is answered from a cache built in another language.

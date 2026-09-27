@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { residentTrips } from './resident-trips';
+import { planTownDay } from './simulation';
 import type { Place } from './schema';
 
 /** The residents switch to the next town day's plan at 06:00: plan it in the hour before. */
@@ -29,10 +29,11 @@ export function whenIdle(places: Place[], key: string, work: () => unknown) {
   else setTimeout(run, 250);
 }
 
-/** Plan the next town day's trips while idle before 06:00, like football's next match. */
+/** Plan the next town day's trips (and its walkers' lanes) while idle before 06:00, like
+ *  football's next match. */
 export function prefetchTownDay(places: Place[], minutes: number, day: number) {
   if (minutes >= PLAN_AHEAD_FROM && minutes < 360)
-    whenIdle(places, `trips:${day}`, () => residentTrips(places, day));
+    whenIdle(places, `trips:${day}`, () => planTownDay(places, day));
 }
 
 export function useTownDayPrefetch(places: Place[], minutes: number, day: number) {

@@ -33,7 +33,7 @@ import {
   type MillpondPart,
 } from '../src/city/millpond';
 import { lampBlocksGoal } from '../src/city/football';
-import { lampOn } from '../src/city/lamplight';
+import { lampFoot, lampOn } from '../src/city/lamplight';
 import { cityHit, DAY, NIGHT } from '../src/city/render';
 import { drawResident } from '../src/city/residents';
 import { BLOSSOM, FALLEN_LEAVES, ICE, POND, SNOW, type Pair } from '../src/city/season-palette';
@@ -928,12 +928,15 @@ describe('The Millpond’s light', () => {
 
   it('hangs each lamp’s light as 1-px bars below it, fading, and never over the shallows', () => {
     for (const [i, lamp] of WATER_LAMPS.entries()) {
-      const foot = project(lamp.x + 0.5, lamp.y + 0.5);
+      // Straight below the pole, wherever on its crossing the pole stands.
+      const pole = lampFoot(lamp);
+      const foot = project(pole.x, pole.y);
       const bars = lampColumns()[i];
       expect(bars.length, `${lamp.x},${lamp.y}`).toBeGreaterThanOrEqual(5);
       expect(bars.length).toBeLessThanOrEqual(9);
       for (const [k, bar] of bars.entries()) {
         expect(bar.y).toBeGreaterThanOrEqual(foot.y + 34);
+        expect(Math.abs(bar.x + bar.w / 2 - (foot.x + 1))).toBeLessThanOrEqual(0.5);
         if (k) expect(bar.y - bars[k - 1].y).toBe(2);
         if (k) expect(bar.alpha).toBeLessThan(bars[k - 1].alpha);
         expect(shoreDistance(unproject(bar.x + bar.w / 2, bar.y))).toBeGreaterThanOrEqual(0.1);
@@ -1060,7 +1063,8 @@ describe('Picking the Millpond on the map', () => {
     for (const id of ['J3', 'J4', 'J5', 'J6']) {
       const house = { ...first, plot: id, design: { ...first.design, floors: 3 as const } };
       const centre = plotCenter(getPlot(id)!);
-      const top = { x: centre.x, y: centre.y - houseBounds(house).top * 1.12 + 8 };
+      // A point on the flat roof, 9 px above the walls' top corner, with the pond behind it.
+      const top = { x: centre.x, y: centre.y - (houseBounds(house).height + 9) * 1.12 };
       const tile = unproject(top.x, top.y);
       if (tile.x < G.left || tile.x >= G.right || tile.y < G.top || tile.y >= G.bottom) continue;
       expect(cityHit(top, [house], []), id).toEqual({ kind: 'place', id });
