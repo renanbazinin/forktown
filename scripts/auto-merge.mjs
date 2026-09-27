@@ -205,8 +205,14 @@ export async function runAutoMerge({ api, repo, number, sha, town, runUrl, log =
       let { state, description } = verdict;
       if (state === 'merge') {
         try {
-          // Pinned to the head that passed: a newer push makes GitHub refuse.
-          await api(`${root}/pulls/${n}/merge`, { sha: pr.head.sha, merge_method: 'merge' }, 'PUT');
+          // Squashed, so the commit on main credits the contributor, not this workflow. Pinned to
+          // the head that passed: a newer push makes GitHub refuse.
+          const merge = {
+            sha: pr.head.sha,
+            merge_method: 'squash',
+            commit_title: `${pr.title} (#${n})`,
+          };
+          await api(`${root}/pulls/${n}/merge`, merge, 'PUT');
           state = 'success';
           description = 'Merged automatically: a first house for a new neighbor';
         } catch (error) {

@@ -15,6 +15,7 @@ const pull = (number, login, extra = {}) => ({
   state: 'open',
   draft: false,
   merged: false,
+  title: 'Add my house',
   user: { login },
   changed_files: 1,
   head: { sha: HEAD },
@@ -106,9 +107,13 @@ describe('Auto-merge for a new neighbor', () => {
     expect(await github.run()).toEqual([
       { number: 1, state: 'success', description: expect.stringContaining('Merged automatically') },
     ]);
-    // Pinned to the head that passed, with the merge commit the town's history uses.
+    // Pinned to the head that passed, and squashed so the commit on main credits the contributor.
     expect(github.merges()).toEqual([
-      { method: 'PUT', route: '/pulls/1/merge', body: { sha: HEAD, merge_method: 'merge' } },
+      {
+        method: 'PUT',
+        route: '/pulls/1/merge',
+        body: { sha: HEAD, merge_method: 'squash', commit_title: 'Add my house (#1)' },
+      },
     ]);
     expect(github.statuses()).toEqual([
       {
@@ -502,7 +507,7 @@ globalThis.fetch = async (url, init = {}) => {
     const merged = runStep(directory, replies);
     expect(merged.status, merged.stderr).toBe(0);
     expect(merged.stdout).toContain(
-      `PUT ${repo}/pulls/1/merge {"sha":"${HEAD}","merge_method":"merge"}`,
+      `PUT ${repo}/pulls/1/merge {"sha":"${HEAD}","merge_method":"squash","commit_title":"Add my house (#1)"}`,
     );
     expect(merged.stdout).toContain(`POST ${repo}/actions/workflows/pages.yml/dispatches`);
 
