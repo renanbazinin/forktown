@@ -17,7 +17,8 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { WORLD_BOUNDS, getPlot, plotCenter, project } from '../src/lib/world';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
-import { everyShape, fullTown as town, places } from './house-variety';
+import { AFTER_HOURS } from './fixtures';
+import { everyShape, fullTown as town } from './house-variety';
 
 vi.mock('../src/city/houses', async (original) => {
   const houses = await original<typeof import('../src/city/houses')>();
@@ -203,10 +204,10 @@ describe('Culling houses and walkers', () => {
   it('keeps every figure, prop and greeting inside its reach', () => {
     const say = (greeting: string) => {
       expect(greeting.length).toBeLessThanOrEqual(40);
-      return { ...places[0].resident, greeting };
+      return { ...AFTER_HOURS.resident, greeting };
     };
     const greetings = [
-      places[0].resident,
+      AFTER_HOURS.resident,
       say('W'.repeat(40)),
       say('晚上好，邻居们！今天的月亮真圆啊'),
       // One unit each, the widest glyphs a 10px bubble can hold: a 2.7 thousand px bubble.

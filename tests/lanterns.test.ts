@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   BUILDER_DEFAULT_STORY,
@@ -21,12 +20,11 @@ import { eventsForDay, HOUSE_PLOTS, VENUES } from '../src/lib/events';
 import { placeSchema } from '../src/lib/schema';
 import { drawVenue, venueBounds } from '../src/city/venues';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { readPlaces } from './full-town';
 import { ARRIVALS, TOWN } from './lantern-town';
 
 // Every house file, for checks that must hold however the town grows.
-const everyHouse = readdirSync('places')
-  .filter((name) => name.endsWith('.json'))
-  .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
+const everyHouse = readPlaces();
 const places = TOWN;
 const ORDER = [
   'after-hours',

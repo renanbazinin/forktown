@@ -1,3 +1,6 @@
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import {
@@ -8,6 +11,7 @@ import {
   validatePlaces,
 } from '../src/lib/schema';
 import { compileSign } from '../src/lib/sign';
+import { AFTER_HOURS } from './fixtures';
 import {
   FULL_TOWN_CREATOR,
   fullTown,
@@ -53,6 +57,42 @@ describe('A full town', () => {
       expect(place).toMatchObject({ id: fullTownId(plot), creator: FULL_TOWN_CREATOR });
     }
     expect(() => fullTownHouse('Z99')).toThrow();
+  });
+
+  it('puts its made-up houses first when read, then the real ones by file name', () => {
+    // So in check:full-town, a test that leans on "the first house in places/" meets a made-up
+    // one, and most likely fails there rather than in a newcomer's pull request.
+    const folder = mkdtempSync(join(tmpdir(), 'forktown-read-places-'));
+    try {
+      for (const place of [
+        { ...AFTER_HOURS, id: 'zz-top' },
+        fullTownHouse('Q10'),
+        AFTER_HOURS,
+        { ...AFTER_HOURS, id: '0-first' },
+        fullTownHouse('A4'),
+      ])
+        writeFileSync(join(folder, `${place.id}.json`), JSON.stringify(place));
+      expect(readPlaces(folder).map((place) => place.id)).toEqual([
+        fullTownId('A4'),
+        fullTownId('Q10'),
+        '0-first',
+        'after-hours',
+        'zz-top',
+      ]);
+    } finally {
+      rmSync(folder, { recursive: true, force: true });
+    }
+  });
+
+  it('leaves reading places/ to readPlaces(), so every test meets the made-up houses first', () => {
+    // A test with a loader of its own would meet the real houses first, and check:full-town could
+    // not catch it leaning on the first of them.
+    const loaders = readdirSync('tests')
+      .filter((file) => /\.(ts|tsx|js)$/.test(file) && file !== 'full-town.ts')
+      .filter((file) =>
+        /readdir(?:Sync)?\(\s*['"`](?:\.\/)?places\b/.test(readFileSync(`tests/${file}`, 'utf8')),
+      );
+    expect(loaders, 'Read the town with readPlaces() from tests/full-town.ts').toEqual([]);
   });
 
   it('shows everything the builder offers, with at most two floors', () => {

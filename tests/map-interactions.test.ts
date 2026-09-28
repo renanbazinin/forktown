@@ -1,25 +1,23 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { houseBounds } from '../src/city/houses';
 import { cityHit, LANE_SHIFT, MIN_FADE } from '../src/city/render';
 import { tubeHit } from '../src/city/tubes';
-import { placeSchema } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { plotDoor } from '../src/lib/home-life';
 import { getPlot, plotCenter, project, unproject } from '../src/lib/world';
 import { ZOO_SIGN, ZOO_SIGN_DEPTH } from '../src/city/zoo';
 import { FORK_PLOT } from '../src/lib/lanterns';
 import { tubeAt, tubeLength, tubeRoute, tubeStation, type ResidentTransit } from '../src/lib/tubes';
+import { AFTER_HOURS } from './fixtures';
+import { readPlaces } from './full-town';
 
-const places = readdirSync('places')
-  .filter((file) => file.endsWith('.json'))
-  .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+const places = readPlaces();
 
 describe('Map selection follows visible depth', () => {
   it.each(['S5', 'S6', 'S7', 'S8', 'S9', 'P10', 'Q10', 'R10'])(
     'selects the visible roof on %s instead of the zoo ground behind it',
     (plot) => {
-      const home = { ...places[0], plot, design: { ...places[0].design, floors: 3 as const } };
+      const home = { ...AFTER_HOURS, plot, design: { ...AFTER_HOURS.design, floors: 3 as const } };
       const center = plotCenter(getPlot(plot)!);
       expect(cityHit({ x: center.x, y: center.y - 100 }, [home], [])).toEqual({
         kind: 'place',
@@ -33,7 +31,7 @@ describe('Map selection follows visible depth', () => {
     // A walker on the north street, just behind the gate, whose figure the plaque covers.
     const behind = unproject(plaque.x, plaque.y + 14);
     const resident = {
-      ...simulateResidents(places, 402)[0],
+      ...simulateResidents([AFTER_HOURS], 402)[0],
       activity: 'stroll' as const,
       position: behind,
     };
@@ -59,7 +57,7 @@ describe('Map selection follows visible depth', () => {
   });
 
   it('keeps a resident in front of a building selectable', () => {
-    const home = places.find((place) => place.id === 'after-hours')!;
+    const home = AFTER_HOURS;
     const plot = getPlot(home.plot)!;
     const resident = {
       ...simulateResidents([home], 402)[0],
@@ -71,7 +69,7 @@ describe('Map selection follows visible depth', () => {
   });
 
   it('selects a house only on its painted art, so a walker seen beside it stays clickable', () => {
-    const home = places.find((place) => place.id === 'after-hours')!;
+    const home = AFTER_HOURS;
     const plot = getPlot(home.plot)!;
     const centre = plotCenter(plot);
     const local = (x: number, y: number) => ({ x: centre.x + x * 1.12, y: centre.y + y * 1.12 });
@@ -102,7 +100,7 @@ describe('Map selection follows visible depth', () => {
   });
 
   it('clicks walkers where their lane draws them, and not while faded out in their doorway', () => {
-    const seed = simulateResidents(places, 402)[0];
+    const seed = simulateResidents([AFTER_HOURS], 402)[0];
     // Walking along +x, a whole lane puts the figure LANE_SHIFT tiles to their side, along +y.
     const walker = {
       ...seed,
@@ -147,7 +145,7 @@ describe('Map selection follows visible depth', () => {
   });
 
   it('selects the frontmost of overlapping residents regardless of input order', () => {
-    const seed = simulateResidents(places, 402)[0];
+    const seed = simulateResidents([AFTER_HOURS], 402)[0];
     const back = {
       ...seed,
       id: 'back',
@@ -188,7 +186,7 @@ describe('Map selection follows visible depth', () => {
 
   it.each(['work', 'home', 'sleep'] as const)('ignores residents indoors during %s', (activity) => {
     // Indoors is just inside their own front door, wherever the day has taken the others.
-    const seed = simulateResidents(places, 402)[0];
+    const seed = simulateResidents([AFTER_HOURS], 402)[0];
     const resident = { ...seed, activity, position: plotDoor(getPlot(seed.home.plot)!) };
     expect(
       cityHit(project(resident.position.x, resident.position.y), [], [resident]),
@@ -203,7 +201,7 @@ describe('Map selection follows visible depth', () => {
   const C1 = { kind: 'place', id: 'C1' };
 
   it('leaves riders in the glass and in the stack to the tube, and keeps people walking to the stack clickable', () => {
-    const seed = simulateResidents(places, 402)[0];
+    const seed = simulateResidents([AFTER_HOURS], 402)[0];
     const at = tubeAt('C1', 'N1', 27);
     const ride: ResidentTransit = {
       stage: 'riding',
@@ -273,10 +271,10 @@ describe('Map selection follows visible depth', () => {
     const point = lifted(dip.x, dip.y, dip.h - 4);
     expect(cityHit(point, [], [])).toEqual(C1);
     const home = {
-      ...places[0],
+      ...AFTER_HOURS,
       plot: 'D1',
       building: 'observatory' as const,
-      design: { ...places[0].design, floors: 3 as const, roof: 'classic' as const },
+      design: { ...AFTER_HOURS.design, floors: 3 as const, roof: 'classic' as const },
     };
     expect(cityHit(point, [home], [])).toEqual(C1);
     const d1 = plotCenter(getPlot('D1')!);
@@ -284,7 +282,7 @@ describe('Map selection follows visible depth', () => {
     expect(cityHit(dome, [home], [])).toEqual({ kind: 'place', id: 'D1' });
     expect(cityHit(dome, [], [])?.id).not.toBe('D1');
     // A stroller in front of the spur keeps the click; one behind it is seen through the glass.
-    const seed = { ...simulateResidents(places, 402)[0], activity: 'stroll' as const };
+    const seed = { ...simulateResidents([AFTER_HOURS], 402)[0], activity: 'stroll' as const };
     const front = { ...seed, id: 'front', position: { x: 1.5, y: 11.95 } };
     expect(cityHit(lifted(1.5, 11.95, 20), [], [front])).toEqual({ kind: 'resident', id: 'front' });
     const back = { ...seed, id: 'back', position: { x: 1.5, y: 11.05 } };

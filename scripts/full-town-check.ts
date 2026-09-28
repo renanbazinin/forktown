@@ -4,8 +4,11 @@
 // so growth can never turn `npm run check` red for the next neighbor who moves in. It copies the
 // repository's files (tracked, plus new files Git does not ignore) into a temporary folder, links
 // node_modules there (a junction on Windows, a symlink elsewhere), and adds a made-up house from
-// tests/full-town.ts on every free plot. places/ in the repository is never touched. It prints a
-// summary naming every failing test, and exits non-zero if the validator or any test failed.
+// tests/full-town.ts on every free plot. Tests read the town through readPlaces(), which hands
+// out the made-up houses first, so one that takes "the first house in places/" as its fixture
+// will most likely fail here rather than in a newcomer's pull request. places/ in the repository
+// is never touched. It prints a summary naming every failing test, and exits non-zero if the
+// validator or any test failed.
 // Written to run on Windows, macOS and Linux: checked on Windows, and the Full town workflow runs
 // it on Linux. The whole suite takes a minute or two.
 //

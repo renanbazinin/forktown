@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DUCK_WALK_END, DUCK_WALK_START } from '../src/lib/ducks';
 import { HOUSE_PLOTS } from '../src/lib/events';
@@ -23,9 +22,7 @@ import {
   type Point,
 } from '../src/lib/world';
 
-const places = readdirSync('places')
-  .filter((name) => name.endsWith('.json'))
-  .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
+const places = readPlaces();
 const ROUTINES = ['stroll', 'work', 'home'] as const;
 /** Every house plot taken: the published homes, and neighbors modelled on them on the rest. */
 const fullTown: Place[] = [

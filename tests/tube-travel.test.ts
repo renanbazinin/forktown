@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { placeSchema, validatePlaces, type Place } from '../src/lib/schema';
+import { placeSchema, type Place } from '../src/lib/schema';
 import { HOUSE_PLOTS, eventsForDay, insideVenue } from '../src/lib/events';
 import {
   eventRoute,
@@ -28,13 +28,10 @@ import {
 } from '../src/lib/tubes';
 import { fixedMinutes, legsMinutes, walkingPace } from '../src/lib/tube-journeys';
 import { tubeParcels, tubeParcelsAt, tubeRides, tubeStatus } from '../src/lib/tube-traffic';
+import { readPlaces } from './full-town';
 import { onRoadOrTube, riding, stationWalk, stepBound } from './tube-riders';
 
-const places = validatePlaces(
-  readdirSync('places')
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => ({ file, data: JSON.parse(readFileSync(`places/${file}`, 'utf8')) })),
-).places.sort((a, b) => a.plot.localeCompare(b.plot, 'en', { numeric: true }));
+const places = readPlaces().sort((a, b) => a.plot.localeCompare(b.plot, 'en', { numeric: true }));
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);

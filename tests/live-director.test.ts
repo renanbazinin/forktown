@@ -1,4 +1,3 @@
-import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   easeLiveCamera,
@@ -19,7 +18,6 @@ import {
 import { tubeRides } from '../src/lib/tube-traffic';
 import { residentTrips } from '../src/lib/resident-trips';
 import { nightBedtime } from '../src/lib/night-routine';
-import { placeSchema } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { eventsForDay, isEventLive } from '../src/lib/events';
 import { footballAt } from '../src/lib/football';
@@ -29,10 +27,10 @@ import { getPlot, isRoad, plotCenter, project } from '../src/lib/world';
 import { FORK_BOUNDS, FORK_PLOT } from '../src/lib/lanterns';
 import { SKATING, millpondSkatingDay } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
+import { AFTER_HOURS, HOMES } from './fixtures';
+import { readPlaces } from './full-town';
 
-const places = readdirSync('places')
-  .filter((name) => name.endsWith('.json'))
-  .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
+const places = readPlaces();
 const shotAt = (day: number, minute: number) =>
   liveShotAt(liveProgram(places, day), minute, simulateResidents(places, minute, day));
 
@@ -46,7 +44,7 @@ describe('Live broadcast director', () => {
         routine: { morning: 'home', afternoon: 'home', evening: 'home', night: 'sleep' } as const,
       },
     }));
-    for (const homes of [places, sleepers, [], [places[0]]]) {
+    for (const homes of [places, sleepers, [], [AFTER_HOURS]]) {
       for (let day = 0; day < 4; day++) {
         const program = liveProgram(homes, day);
         let scenery = 0;
@@ -225,7 +223,7 @@ describe('Live broadcast director', () => {
   });
 
   it('reshuffles the people followed across days and gives each available neighbor screen time', () => {
-    const homes = places.slice(0, 3).map((home) => ({
+    const homes = HOMES.slice(0, 3).map((home) => ({
       ...home,
       resident: {
         ...home.resident,
@@ -248,7 +246,7 @@ describe('Live broadcast director', () => {
   });
 
   it('shares 45-second clips among outdoor neighbors, including spectators instead of repeating a lone walker', () => {
-    const homes = places.slice(0, 3).map((home) => ({
+    const homes = HOMES.slice(0, 3).map((home) => ({
       ...home,
       resident: {
         ...home.resident,
@@ -286,7 +284,7 @@ describe('Live broadcast director', () => {
   });
 
   it('rotates replacements too, and keeps an only available resident on screen', () => {
-    const homes = places.slice(0, 4).map((home) => ({
+    const homes = HOMES.slice(0, 4).map((home) => ({
       ...home,
       resident: {
         ...home.resident,
@@ -406,7 +404,7 @@ describe('Live broadcast director', () => {
   });
 
   it('keeps the cat on the street, visible during scenery, and continuous across midnight', () => {
-    for (const homes of [places, [], [places[0]]]) {
+    for (const homes of [places, [], [AFTER_HOURS]]) {
       const program = liveProgram(homes, 12);
       for (let minute = 0; minute < 1440; minute += 0.5) {
         const cat = townCatAt(homes, minute, 12);

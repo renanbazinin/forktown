@@ -1,14 +1,11 @@
-import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { duckAwareWalk, DUCK_LOVE_SECONDS, DUCK_NOTICE_RADIUS } from '../src/lib/duck-reactions';
 import { ducksAt, DUCK_STREET_Y, DUCK_WALK_START, DUCK_WALK_END } from '../src/lib/ducks';
-import { placeSchema } from '../src/lib/schema';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { isRoad } from '../src/lib/world';
+import { readPlaces } from './full-town';
 
-const places = readdirSync('places')
-  .filter((name) => name.endsWith('.json'))
-  .map((name) => placeSchema.parse(JSON.parse(readFileSync(`places/${name}`, 'utf8'))));
+const places = readPlaces();
 // A walker crosses the real family's route head-on at 09:00.
 const crossingX = ducksAt(540)[0].position.x;
 const walk = (time: number) => ({

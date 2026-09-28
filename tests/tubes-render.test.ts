@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { drawMeadow } from '../src/city/ambience';
 import { lampOn, MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from '../src/city/lamplight';
@@ -30,7 +30,7 @@ import {
   type TubeScene,
 } from '../src/city/tubes';
 import { FORK_PLOT } from '../src/lib/lanterns';
-import { placeSchema, residentSchema } from '../src/lib/schema';
+import { residentSchema } from '../src/lib/schema';
 import { seedFraction, snowAt, townSeasonAt } from '../src/lib/seasons';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
@@ -51,6 +51,8 @@ import {
   type ResidentTransit,
 } from '../src/lib/tubes';
 import { WORLD_BOUNDS, getPlot, plotCenter, project, type Point } from '../src/lib/world';
+import { AFTER_HOURS } from './fixtures';
+import { readPlaces } from './full-town';
 import { matrixContext, type MatrixPoint } from './matrix-context';
 import { recordingContext, type RecordedCall } from './recording-context';
 
@@ -70,9 +72,7 @@ vi.mock('../src/city/lantern-post', async (importOriginal) => {
 // floating shadow, the depth order of docs/TUBES.md, glass built from every station, the meadow
 // kept, and the same frame every time.
 
-const places = readdirSync('places')
-  .filter((file) => file.endsWith('.json'))
-  .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+const places = readPlaces();
 const [C1, N1] = TUBE_STATIONS;
 // Year 3, so no sampled date touches the calendar's epoch.
 const yearDay = (date: number) => CALENDAR_EPOCH_DAY + 224 + date;
@@ -150,7 +150,7 @@ function realScene(camera: Camera, minutes: number, day: number, extra: Partial<
 // ---------------------------------------------------------------------------------------------
 // Synthetic neighbors in transit, independent of the planner's timing.
 
-const base = simulateResidents(places, 402)[0];
+const base = simulateResidents([AFTER_HOURS], 402)[0];
 const lerp = (a: Point, b: Point, k: number) => ({
   x: a.x + (b.x - a.x) * k,
   y: a.y + (b.y - a.y) * k,

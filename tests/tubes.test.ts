@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { placeSchema } from '../src/lib/schema';
 import { EVENT_SPOTS, HOUSE_PLOTS, VENUES, venueAt } from '../src/lib/events';
@@ -61,6 +61,7 @@ import {
   walkingPace,
 } from '../src/lib/tube-journeys';
 import { eventApproach } from '../src/lib/resident-trips';
+import { readPlaces } from './full-town';
 import { onRoadOrTube, onTubeLine } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -93,8 +94,7 @@ describe('The Treeline stations', () => {
       expect(isTubePlot(plot)).toBe(false);
       expect(placeSchema.safeParse({ ...sample, plot }).success).toBe(true);
     }
-    for (const file of readdirSync('places').filter((f) => f.endsWith('.json')))
-      expect(TUBE_PLOTS).not.toContain(JSON.parse(readFileSync(`places/${file}`, 'utf8')).plot);
+    for (const place of readPlaces()) expect(TUBE_PLOTS).not.toContain(place.plot);
     expect(TUBE_VENUE).toEqual({ id: 'tube', plot: 'C1', name: 'The Treeline', kind: 'tube' });
   });
   it('lists the stations in order along the line, north to south, so the ends are first and last', () => {

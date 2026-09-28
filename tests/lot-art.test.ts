@@ -33,6 +33,7 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { DEFAULT_RESIDENT } from '../src/lib/schema';
 import type { ResidentState } from '../src/lib/simulation';
 import { WORLD_BOUNDS, getPlot, plotCenter, project, unproject } from '../src/lib/world';
+import { AFTER_HOURS, BAZPLACE } from './fixtures';
 import { readPlaces } from './full-town';
 import { matrixContext } from './matrix-context';
 import { recordingContext, type RecordedCall } from './recording-context';
@@ -146,7 +147,7 @@ describe('Gardening', () => {
       });
     const union = (list: number[][]) =>
       [0, 1, 2, 3].map((i) => (i < 2 ? Math.min : Math.max)(...list.map((r) => r[i])));
-    const [base] = places;
+    const base = AFTER_HOURS;
     for (const garden of ['vegetables', 'wildflowers'] as const) {
       const place = {
         ...base,
@@ -227,7 +228,7 @@ describe('Gardening', () => {
       top: Math.min(...seat.map(([, y]) => y)) - 9,
       bottom: Math.max(...seat.map(([, y]) => y)) + 6,
     };
-    const [base] = places;
+    const base = AFTER_HOURS;
     for (const garden of ['vegetables', 'wildflowers'] as const)
       for (const building of ['cottage', 'cafe'] as const) {
         const place = {
@@ -281,7 +282,7 @@ describe('Gardening', () => {
   });
 
   it('plants nothing under or behind the garden bench', () => {
-    const [base] = places;
+    const base = AFTER_HOURS;
     for (const garden of ['vegetables', 'wildflowers'] as const)
       for (const decoration of ['bench', 'mailbox'] as const) {
         const house = matrixContext();
@@ -354,7 +355,7 @@ describe('Cheering', () => {
 
 describe('The front door', () => {
   it('opens inside its own frame and the path in front, clear of the porch, post and pumpkin', () => {
-    const place = places.find((home) => home.design.feature === 'porch')!;
+    const place = BAZPLACE;
     let marks = 0;
     for (const night of [false, true])
       for (let k = 0; k <= 50; k++) {
@@ -385,9 +386,7 @@ describe('The front door', () => {
   });
 
   it("swings a porch home's door short of the chair beside it, and others' all the way", () => {
-    const porch = places.find(
-      (home) => home.design.feature === 'porch' && home.building !== 'cafe',
-    )!;
+    const porch = BAZPLACE;
     const leafEdge = (place: typeof porch) => {
       const recorder = matrixContext();
       drawHouseDoor(recorder.ctx, place, 0, 0, false, 1, { minutes: 720, door: 1 });
@@ -406,7 +405,7 @@ describe('The front door', () => {
 });
 
 describe('Under the porch roof', () => {
-  const porch = places.find((home) => home.design.feature === 'porch' && home.building !== 'cafe')!;
+  const porch = BAZPLACE;
   const plot = getPlot(porch.plot)!;
   // A skin colour nothing else on the map uses, to find the figure among the calls.
   const SKIN = '#123457';
@@ -547,7 +546,7 @@ describe('Doorways', () => {
       },
     });
     try {
-      const [place] = places;
+      const place = AFTER_HOURS;
       const plot = getPlot(place.plot)!;
       const width = 900,
         height = 700;
@@ -657,8 +656,8 @@ describe('Streets and paths', () => {
     const foot = lampFoot(lamp);
     const walker = (id: string, dx: number, dy: number): ResidentState => ({
       id,
-      resident: places[0].resident,
-      home: places[0],
+      resident: AFTER_HOURS.resident,
+      home: AFTER_HOURS,
       activity: 'stroll',
       position: { x: foot.x + dx, y: foot.y + dy },
       moving: true,

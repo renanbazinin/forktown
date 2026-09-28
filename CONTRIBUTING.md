@@ -120,4 +120,4 @@ Improve the guide, report a reproducible bug, test the site with a screen reader
 
 Implementation notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Please keep meaningful tests for contribution rules, geometry, and other behavior that newcomers depend on.
 
-`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy.
+`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Tests read the town with `readPlaces()` from `tests/full-town.ts`, which hands out the made-up houses first, so a test that leans on "the first house" in `places/` will most likely fail there; a test that needs a particular home takes it from `tests/fixtures.ts`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy.

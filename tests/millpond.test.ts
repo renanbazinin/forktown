@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   BOAT_HULL,
@@ -61,6 +61,7 @@ import { HOUSE_PLOTS, venueAt } from '../src/lib/events';
 import { placeSchema } from '../src/lib/schema';
 import { isRoad, project, STREETLIGHTS, type Point } from '../src/lib/world';
 import { riverGlint } from '../src/city/season-ground';
+import { readPlaces } from './full-town';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 /** The absolute town day of a whole day of the year (0 = Spring 1) in a given year. */
@@ -146,8 +147,7 @@ describe('The Millpond site', () => {
       expect(isMillpondPlot(plot)).toBe(false);
       expect(placeSchema.safeParse({ ...sample, plot }).success).toBe(true);
     }
-    for (const file of readdirSync('places').filter((f) => f.endsWith('.json')))
-      expect(MILLPOND_PLOTS).not.toContain(JSON.parse(readFileSync(`places/${file}`, 'utf8')).plot);
+    for (const place of readPlaces()) expect(MILLPOND_PLOTS).not.toContain(place.plot);
     // Half-open, like the layout's own site test: the perimeter roads stay outside.
     expect(insideMillpond({ x: 10, y: 30 })).toBe(true);
     expect(insideMillpond({ x: 24.99, y: 36.99 })).toBe(true);

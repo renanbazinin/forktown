@@ -41,6 +41,7 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { WINTER } from '../src/lib/seasons';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, opposite, WALK_SPEED } from '../src/lib/walking';
 import { getPlot, isRoad, plotEntrance, project, type Point } from '../src/lib/world';
+import { AFTER_HOURS, BAZPLACE, FUNKY_FUN, MOONBEAM_CAFE } from './fixtures';
 import { fullTown, readPlaces } from './full-town';
 import { riding, stepBound } from './tube-riders';
 
@@ -111,9 +112,12 @@ describe('Life at home: the front door, the garden and loops round the block', (
           const door = plotDoor(plotOf(state));
           const where = `${state.id} d${day - DAY} m${minute.toFixed(1)}`;
           const onRoad = isRoad(Math.floor(state.position.x), Math.floor(state.position.y));
-          // Standing or sitting on a road tile only at the road handoff, and only for a moment.
+          // Standing or sitting on a road tile only at the road handoff, or up on the kerb in
+          // front of the lot between two outings, and only for a moment.
           if (visible(state) && !state.event && !state.duckLove && !state.moving && onRoad) {
-            if (distance(state.position, plotEntrance(plotOf(state))) > 1e-9)
+            const stands = [plotEntrance(plotOf(state))];
+            if (state.lot?.spot === 'kerb') stands.push(offset(state, KERB_OFFSET));
+            if (stands.every((point) => distance(state.position, point) > 1e-9))
               wrong.push(`${where}: stands on the road away from home`);
             if (!since.has(state.id)) since.set(state.id, minute);
             else if (minute - since.get(state.id)! > 4.5) wrong.push(`${where}: waits on the road`);
@@ -260,7 +264,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
   }, 30_000);
 
   it('offers spots by the home’s own look, with the step and the gate for everyone', () => {
-    const [base] = places;
+    const base = AFTER_HOURS;
     const kinds = (look: Partial<Place>, design: Partial<Place['design']> = {}) =>
       homeSpots({ ...base, ...look, design: { ...base.design, ...design } }).map(
         (spot) => spot.kind,
@@ -326,7 +330,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
     );
     expect(DOOR_SWING).toBe(0.4);
     // A morning out from a published home: the door opens, they fade in walking out, and back.
-    const home = places.find((place) => place.id === 'funky-fun')!;
+    const home = FUNKY_FUN;
     const plan = windowPlan(home, getPlot(home.plot)!, DAY, {
       ws: 600,
       we: 700,
@@ -440,13 +444,13 @@ describe('Life at home: the front door, the garden and loops round the block', (
     expect(early).toBeGreaterThan(5);
     expect(late).toBeGreaterThan(5);
     // Before a 06:00 trip, stepping out reads the next plan day.
-    const football = places.find((home) =>
-      residentTrips(places, DAY)
-        .get(home.id)
-        ?.some((trip) => trip.depart === 360),
-    )!;
-    const dawn = simulateResidents(places, 359.9, DAY).find((s) => s.id === football.id)!;
-    expect(dawn).toMatchObject({ activity: 'stroll', lot: { spot: 'door' } });
+    const trips = residentTrips(places, DAY);
+    const dawn = simulateResidents(places, 359.9, DAY).filter((state) =>
+      trips.get(state.id)?.some((trip) => trip.depart === 360),
+    );
+    expect(dawn.length).toBeGreaterThan(0);
+    for (const state of dawn)
+      expect(state, state.id).toMatchObject({ activity: 'stroll', lot: { spot: 'door' } });
   });
 
   it('strolls real loops round the blocks from its own doorstep, on the road the whole way', () => {
@@ -553,9 +557,9 @@ describe('Life at home: the front door, the garden and loops round the block', (
 
   it('labels every moment at home truthfully', () => {
     const state: ResidentState = {
-      id: places[0].id,
-      resident: places[0].resident,
-      home: places[0],
+      id: AFTER_HOURS.id,
+      resident: AFTER_HOURS.resident,
+      home: AFTER_HOURS,
       position: { x: 0, y: 0 },
       activity: 'stroll',
       moving: false,
@@ -563,7 +567,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
       walkPhase: 0,
       greeting: false,
     };
-    const cafe = places.find((place) => place.building === 'cafe')!;
+    const cafe = MOONBEAM_CAFE;
     const label = (lot: ResidentState['lot'], extra: Partial<ResidentState> = {}) =>
       residentActivityLabel({ ...state, activity: 'stroll', lot, ...extra });
     expect(label({ spot: 'door', stage: 'out' })).toBe('Stepping out the front door');
@@ -652,7 +656,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
       forward,
     );
     // A builder draft keeps its id and plot while its look changes: its spots change with it.
-    const home = places.find((place) => place.decoration === 'bench')!;
+    const home = BAZPLACE;
     const plot = getPlot(home.plot)!;
     const window = { ws: 720, we: 1080, start: 'door', end: 'door' } as const;
     const spots = (look: Place) =>
@@ -741,7 +745,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
 
   it('stays in day mode until 22:00, even running on a few minutes into a night out', () => {
     // A window that ends two minutes past 22:00 (an outing leaves then) is an evening, not a night.
-    const home = places.find((place) => place.resident.routine.evening === 'stroll')!;
+    const home = AFTER_HOURS;
     const plot = getPlot(home.plot)!;
     for (const we of [NIGHT_START + 2, NIGHT_START + 10]) {
       const plan = windowPlan(home, plot, DAY, { ws: 1080, we, start: 'door', end: 'road' });
@@ -809,7 +813,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
     // Every short window between the road and the door or the road again, a tenth of a minute
     // apart in length: whatever the spot (the gate, the kerb, the step), a stand between two
     // strides is a real pause.
-    const home = places[0];
+    const home = AFTER_HOURS;
     const plot = getPlot(home.plot)!;
     let short = 0;
     for (const [start, end] of [
@@ -858,7 +862,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
   }, 20_000);
 
   it('waits between two outings at the kerb, and says so', () => {
-    const home = places[0];
+    const home = AFTER_HOURS;
     const plot = getPlot(home.plot)!;
     // Home from one outing three minutes before the next leaves: no time to go up the path.
     const plan = windowPlan(home, plot, DAY, { ws: 700, we: 703, start: 'road', end: 'road' });

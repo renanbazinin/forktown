@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   drawLanternFork,
@@ -19,13 +18,13 @@ import {
   lanternRegister,
   type LanternRegister,
 } from '../src/lib/lanterns';
-import { placeSchema, type Place } from '../src/lib/schema';
+import type { Place } from '../src/lib/schema';
 import { getPlot, STREETLIGHTS } from '../src/lib/world';
+import { ARTS } from './fixtures';
+import { readPlaces } from './full-town';
 import { recordingContext, type RecordedCall } from './recording-context';
 
-const places = readdirSync('places')
-  .filter((file) => file.endsWith('.json'))
-  .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+const places = readPlaces();
 const ARRIVALS = [
   'rehovot-orchard',
   'willow-lodge',
@@ -203,7 +202,7 @@ describe('Painting the Lantern Fork', () => {
 });
 
 describe('Houses wait for their lanterns', () => {
-  const home: Place = places.find((place) => place.design.windows !== 'round')!;
+  const home = ARTS;
   const paintHouse = (night: boolean, lantern?: Parameters<typeof drawHouse>[6]) => {
     const recorder = recordingContext();
     drawHouse(recorder.ctx, home, 0, 0, night, 1.12, lantern);

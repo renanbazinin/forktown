@@ -1,4 +1,3 @@
-import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LIGHT } from '../src/city/glow';
 import { drawFarFields, horizonY } from '../src/city/horizon';
@@ -18,7 +17,7 @@ import {
 import { drawSky } from '../src/city/sky';
 import { drawFireflies, drawSeasonLight, drawSnowfall } from '../src/city/weather';
 import { FORK_BOUNDS, lanternRegister, lanternsLit } from '../src/lib/lanterns';
-import { BUILDING_TYPES, DECORATIONS, designSchema, placeSchema } from '../src/lib/schema';
+import { BUILDING_TYPES, DECORATIONS, designSchema } from '../src/lib/schema';
 import {
   AUTUMN,
   SUMMER,
@@ -31,15 +30,15 @@ import {
 } from '../src/lib/seasons';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { hash, type Point } from '../src/lib/world';
+import { AFTER_HOURS, HOMES } from './fixtures';
+import { readPlaces } from './full-town';
 import { recordingContext, type RecordedCall } from './recording-context';
 import { openingViewBudget } from './render-budget';
 
 // The turning year, seen through the renderer: every season stays inside the town's budgets and
 // bounds, paints the same frame for the same moment, and shows its colours only in its season.
 
-const places = readdirSync('places')
-  .filter((file) => file.endsWith('.json'))
-  .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+const places = readPlaces();
 const isNight = (minutes: number) => minutes < 360 || minutes >= 1200;
 
 // Year 1. The moon repeats every 28 days, so the same date in every season has the same sky.
@@ -515,7 +514,7 @@ const FEATURES = designSchema.shape.feature.options;
 const WINDOWS = designSchema.shape.windows.options;
 const GARDENS = designSchema.shape.garden.options;
 const FLOORS = [1, 2, 3] as const;
-const ids = places.map((place) => place.id);
+const ids = HOMES.map((place) => place.id);
 // One neighbour who puts a pumpkin on the doorstep, and one who grows a third bed instead.
 const DOORSTEP = ids.find((id) => seedFraction(`pumpkin:${id}`) < 0.45)!;
 const THIRD_BED =
@@ -530,13 +529,13 @@ const DESIGNS: HouseAppearance[] = BUILDING_TYPES.flatMap((building) =>
     ),
   ),
 ).map(({ building, roof, floors, decoration, feature }, n) => ({
-  ...places[0],
+  ...AFTER_HOURS,
   // Both neighbours, every window and every garden turn up in each building, roof and height.
   id: n % 2 ? DOORSTEP : THIRD_BED,
   building,
   decoration,
   design: {
-    ...places[0].design,
+    ...AFTER_HOURS.design,
     roof,
     floors,
     feature,

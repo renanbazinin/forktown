@@ -1,6 +1,6 @@
 import { POSE_HOLD, residentTrips, SEAT_SETTLE, ZOO_TURN } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import {
   EVENT_SPOTS,
   eventSpot,
@@ -22,6 +22,7 @@ import { findPlotAt, getPlot, isRoad, plotEntrance } from '../src/lib/world';
 const homePoseOnly = (state: ResidentState) =>
   !state.pose || (!state.event && !!state.lot && !state.moving && state.activity === 'stroll');
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { readPlaces } from './full-town';
 import { onRoadOrTube, stepBound } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -130,9 +131,7 @@ describe('Shared town events', () => {
     }
   });
   it('seats early guests facing the show, waiting for it to start', () => {
-    const town = readdirSync('places')
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+    const town = readPlaces();
     const seen = new Set<string>();
     for (let day = 0; day < 7; day++)
       for (const [id, trips] of residentTrips(town, day))

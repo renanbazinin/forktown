@@ -1,6 +1,6 @@
 import { residentTrips } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { placeSchema, type Place } from '../src/lib/schema';
 import {
   eventAtVenue,
@@ -15,6 +15,7 @@ import { BENCH_SEAT, FRONT_STEP, PORCH_CHAIR, plotDoor } from '../src/lib/home-l
 import { insideCinema } from '../src/lib/cinema';
 import { nightBedtime } from '../src/lib/night-routine';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, routeLength, WALK_SPEED } from '../src/lib/walking';
+import { readPlaces } from './full-town';
 import { stepBound } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -63,9 +64,7 @@ describe('Night owls and the midnight party', () => {
     }
   });
   it('keeps four starter neighbors awake after 22:00 and some outside after 04:00', () => {
-    const homes = readdirSync('places')
-      .filter((file) => file.endsWith('.json'))
-      .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
+    const homes = readPlaces();
     expect(
       homes
         .filter((home) => home.creator === 'forktown' && home.resident.routine.night === 'stroll')

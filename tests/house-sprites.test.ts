@@ -22,6 +22,7 @@ import {
 import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../src/lib/town-calendar';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
+import { BAZPLACE, HELLO_WORLD, HOMES } from './fixtures';
 import { everyShape, places } from './house-variety';
 
 vi.mock('../src/city/houses', async (original) => {
@@ -32,7 +33,7 @@ vi.mock('../src/city/houses', async (original) => {
 // Each home keeps its still picture in a sprite: copied pixel for pixel while nothing about it
 // changes, painted again when something does, and never allowed to grow without bound.
 
-const cottage = places.find((place) => place.building === 'cottage')!;
+const cottage = HELLO_WORLD;
 const seasonOn = (yearDay: number, minutes = 720): TownSeason =>
   townSeasonAt(CALENDAR_EPOCH_DAY + Math.floor(yearDay), minutes);
 
@@ -116,7 +117,7 @@ describe('House sprites', () => {
   it('copies each home from its sprite once painted, instead of drawing it again', () => {
     browser();
     const view = map();
-    const homes = row(places.slice(0, 6));
+    const homes = row(HOMES.slice(0, 6));
     // The first frame cannot know whether the camera is resting, so it draws directly.
     expect(frame(view, homes)).toMatchObject({ direct: 6, painted: 0, copies: [] });
     const second = frame(view, homes);
@@ -156,8 +157,7 @@ describe('House sprites', () => {
   it('swings the front door open live over the cached picture, never repainting it', () => {
     browser();
     const view = map();
-    const porch = places.find((place) => place.design.feature === 'porch')!;
-    const homes = row([cottage, porch]);
+    const homes = row([cottage, BAZPLACE]);
     frame(view, homes, { lantern: { lit: true } });
     expect(frame(view, homes, { lantern: { lit: true } }).painted).toBe(2);
     const door = (open: number | undefined, night = false) => {
@@ -321,7 +321,7 @@ describe('House sprites', () => {
   it('draws directly while zooming or gliding slowly, and repaints once the camera rests', () => {
     browser();
     const view = map();
-    const homes = row(places.slice(0, 8));
+    const homes = row(HOMES.slice(0, 8));
     frame(view, homes);
     frame(view, homes);
     // A zoom changes every sprite's scale: houses are drawn directly until it settles.
@@ -417,7 +417,7 @@ describe('House sprites', () => {
 
   it('draws directly without a document, or on a canvas it cannot copy onto exactly', () => {
     const view = map();
-    const homes = row(places.slice(0, 3));
+    const homes = row(HOMES.slice(0, 3));
     frame(view, homes);
     expect(frame(view, homes)).toMatchObject({ direct: 3, painted: 0 });
     browser();
@@ -434,7 +434,7 @@ describe('House sprites', () => {
   it('draws homes directly after something leaves the transform changed mid-frame', () => {
     browser();
     const view = map();
-    const homes = row(places.slice(0, 3));
+    const homes = row(HOMES.slice(0, 3));
     frame(view, homes);
     frame(view, homes);
     const draws = vi.mocked(drawHouse);

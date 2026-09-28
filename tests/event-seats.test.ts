@@ -1,6 +1,6 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { placeSchema, validatePlaces, type Place } from '../src/lib/schema';
+import { placeSchema, type Place } from '../src/lib/schema';
 import { EVENT_SPOTS, eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
 import { hash } from '../src/lib/world';
 import {
@@ -19,12 +19,9 @@ import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
 import { millpondSkatingDay } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { nightBedtime } from '../src/lib/night-routine';
+import { readPlaces } from './full-town';
 
-const real = validatePlaces(
-  readdirSync('places')
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => ({ file, data: JSON.parse(readFileSync(`places/${file}`, 'utf8')) })),
-).places;
+const real = readPlaces();
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
 type Routine = Place['resident']['routine'];

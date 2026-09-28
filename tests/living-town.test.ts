@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
 import { placeSchema, validatePlaces } from '../src/lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
@@ -8,12 +7,12 @@ import { plotDoor } from '../src/lib/home-life';
 import { eventsForDay, HOUSE_PLOTS, insideVenue } from '../src/lib/events';
 import { insideFootball } from '../src/lib/football';
 import { TUBE_TRUNK_X } from '../src/lib/tubes';
+import { AFTER_HOURS } from './fixtures';
+import { readPlaces } from './full-town';
 import { onRoadOrTube, riding } from './tube-riders';
 
-const places = readdirSync('places')
-  .filter((file) => file.endsWith('.json'))
-  .map((file) => placeSchema.parse(JSON.parse(readFileSync(`places/${file}`, 'utf8'))));
-const sample = places[0];
+const places = readPlaces();
+const sample = AFTER_HOURS;
 
 describe('Exterior artwork is data, not a webpage', () => {
   it('compiles text, inherited styles and character entities into drawing instructions', () => {

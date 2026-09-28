@@ -17,11 +17,21 @@ import { hash } from '../src/lib/world';
 // design, sign and routine the builder offers. New houses stop at two floors, so these do too.
 // Only tests and scripts/full-town-check.ts use these houses; they never go in places/.
 
-/** Every house file in places/, parsed, in file order. */
-export const readPlaces = (directory = 'places') =>
-  readdirSync(directory)
+/**
+ * Every house file in places/, parsed and sorted by file name, so the order is the same on every
+ * OS, with any made-up houses first. Only check:full-town writes those, so there a test that takes
+ * "the first house in places/" as its fixture meets a made-up house instead, which will most
+ * likely break it before a newcomer's house can. Tests read places/ only through here (a check in
+ * full-town.test.ts makes sure), and tests that need a particular home use tests/fixtures.ts.
+ */
+export function readPlaces(directory = 'places'): Place[] {
+  const places = readdirSync(directory)
     .filter((file) => file.endsWith('.json'))
+    .sort()
     .map((file) => placeSchema.parse(JSON.parse(readFileSync(`${directory}/${file}`, 'utf8'))));
+  const madeUp = places.filter((place) => place.creator === FULL_TOWN_CREATOR);
+  return [...madeUp, ...places.filter((place) => !madeUp.includes(place))];
+}
 
 export const FULL_TOWN_CREATOR = 'full-town';
 export const fullTownId = (plot: string) => `full-town-${plot.toLowerCase()}`;
