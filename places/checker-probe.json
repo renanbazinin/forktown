@@ -1,0 +1,10 @@
+{
+  "id": "checker-probe",
+  "name": "Checker Probe",
+  "creator": "someone-else-probe",
+  "plot": "G6",
+  "building": "cottage",
+  "color": "#789B76",
+  "decoration": "flowers",
+  "story": "A test house that checks the checks. It never moves in."
+}
