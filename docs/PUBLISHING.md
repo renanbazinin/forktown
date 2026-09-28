@@ -15,7 +15,7 @@ VITE_GITHUB_REPOSITORY=YOUR-USERNAME/forktown
 VITE_BASE_PATH=/
 ```
 
-Restart the development server after changing environment variables. Source, fork, and place-file links will then point to your repository. Contributor profiles always point to the username in their reviewed place file.
+Restart the development server after changing environment variables. Source, fork, and place-file links will then point to your repository. Contributor profiles always point to the username in their place file.
 
 ## GitHub Pages
 

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { readTown, runAutoMerge } from './auto-merge.mjs';
+import { pagesSite } from './pages-site.mjs';
 
 const repo = process.env.GITHUB_REPOSITORY;
 const token = process.env.GH_TOKEN;
@@ -38,5 +39,8 @@ const outcomes = await runAutoMerge({
   sha,
   town: readTown(fileURLToPath(new URL('..', import.meta.url))),
   runUrl: `https://github.com/${repo}/actions/runs/${process.env.GITHUB_RUN_ID}`,
+  // Found the way Publish town finds it, and only where Publish town runs.
+  site:
+    process.env.ENABLE_PAGES === 'true' ? pagesSite(repo, process.env.PAGES_SITE_URL) : undefined,
 });
 if (outcomes.some((outcome) => outcome.state === 'error')) process.exitCode = 1;

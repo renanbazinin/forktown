@@ -4,7 +4,9 @@ Please report security problems privately through GitHub’s private vulnerabili
 
 The living edition is a static site. Contributions contain bounded JSON data, and no contributed sign HTML or JavaScript executes in the site. The PR build uses read-only repository permissions without deployment secrets. A separate trusted contribution policy reads PR data through the GitHub API and can write commit statuses; it never checks out or runs contributor code. Publishing runs separately on trusted main-branch code, and only in repositories where the owner has turned it on.
 
-Maintainers should keep dependencies current, review workflow changes carefully, review creator credit and content, and require current validation checks before merging.
+One workflow can merge: `.github/workflows/auto-merge.yml`. It also runs only trusted default-branch code and reads PRs through the API, but its token holds `contents: write` to squash-merge, `pull-requests: write` to comment on the PR, `statuses: write` for its `Auto-merge` status, and `actions: write` to start Publish town. It merges only a PR whose one change is a new neighbor's first house, credited to its author, after every other check has passed on that exact commit. Most of those houses go live before anyone reads them, so first houses are moderated after merge. The welcome comment it posts never quotes the house's text. See [Auto-merge](docs/CONTRIBUTION_POLICY.md#auto-merge).
+
+Maintainers should keep dependencies current, review workflow changes carefully, review creator credit and content (after the merge, for a first house that merged itself), and require current validation checks before merging.
 
 ## Exterior signs
 

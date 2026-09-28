@@ -32,7 +32,7 @@ The builder now starts with an empty story and asks a question instead: what a n
 
 ## Safety
 
-Stories render as React text only, never as HTML. The tale quotes what maintainers already reviewed in the pull request, so story suitability stays part of review. Default stories are skipped rather than amplified.
+Stories render as React text only, never as HTML. The tale quotes only a house's own story, so story suitability stays part of review: a maintainer reads it in the pull request, or afterwards for a first house that merged itself. Default stories are skipped rather than amplified.
 
 ## What comes next
 

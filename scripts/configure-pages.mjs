@@ -1,4 +1,5 @@
 import { appendFileSync } from 'node:fs';
+import { pagesSite } from './pages-site.mjs';
 
 const repository = process.env.GITHUB_REPOSITORY;
 if (!repository || !/^[\w.-]+\/[\w.-]+$/.test(repository)) {
@@ -11,12 +12,9 @@ const base =
 if (!/^\/(?:[\w.-]+\/)*$/.test(base)) {
   throw new Error('PAGES_BASE_PATH must be / or a path such as /forktown/.');
 }
-// Link previews need the site's full address. A custom domain can name itself with
-// PAGES_SITE_URL; otherwise the github.io address works, and GitHub redirects it.
-const site =
-  process.env.PAGES_SITE_URL ||
-  `https://${owner.toLowerCase()}.github.io/${name.toLowerCase() === `${owner.toLowerCase()}.github.io` ? '' : `${name}/`}`;
-if (!/^https:\/\/[\w.-]+(?::\d+)?\/(?:[\w.~-]+\/)*$/.test(site)) {
+// Link previews need the site's full address.
+const site = pagesSite(repository, process.env.PAGES_SITE_URL);
+if (!site) {
   throw new Error(
     'PAGES_SITE_URL must be an https address ending in /, such as https://town.example/.',
   );

@@ -596,8 +596,9 @@ const Contribute = memo(function Contribute({
                 <div>
                   <h3>Welcome to the neighborhood</h3>
                   <p>
-                    After review and merging, the town rebuilds with your house, your credit, and
-                    your lantern on the Lantern Fork.
+                    Your first house moves in by itself once the checks pass; anything else waits
+                    for a maintainer. Then the town rebuilds with your house, your credit, and your
+                    lantern on the Lantern Fork.
                   </p>
                 </div>
               </li>

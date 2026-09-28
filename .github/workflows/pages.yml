@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tested:
+        description: Only build, because check already passed on this exact main commit (Auto-merge sets this)
+        type: choice
+        options: ['false', 'true']
+        default: 'false'
 
 permissions:
   contents: read
@@ -32,8 +38,13 @@ jobs:
           PAGES_BASE_PATH: ${{ vars.PAGES_BASE_PATH }}
           PAGES_SITE_URL: ${{ vars.PAGES_SITE_URL }}
       - run: npm ci
-      - run: npm run check
-      - uses: actions/upload-pages-artifact@v3
+      # Auto-merge sets tested once it has seen check pass on the head it merged, up to date with
+      # main, so that run only builds. Pushes, and runs by hand without it, test first.
+      - if: github.event_name != 'workflow_dispatch' || inputs.tested != 'true'
+        run: npm run check
+      - if: github.event_name == 'workflow_dispatch' && inputs.tested == 'true'
+        run: npm run build
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: dist/
   deploy:
@@ -49,4 +60,4 @@ jobs:
     steps:
       - name: Publish the town
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

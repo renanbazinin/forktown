@@ -46,7 +46,7 @@ export default function HouseFiles({
       <p className="local-note">
         {localSaveAvailable
           ? 'These are the house files in the local project running on this computer. Saving here does not publish to the shared town.'
-          : 'These are the house files included in this version of the town. Your new house joins them after its pull request is reviewed, merged, and published.'}
+          : 'These are the house files included in this version of the town. Your new house joins them once its pull request is merged and the town is published.'}
       </p>
       <div className="house-files-layout">
         <nav className="house-file-list" aria-label="House JSON files">

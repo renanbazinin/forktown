@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -33,6 +33,10 @@ const CHECKS = [checkRun('check'), checkRun('Evaluate contribution')];
 const STATUSES = [{ context: 'Contribution policy', state: 'success' }];
 const refused = (status, detail) =>
   Object.assign(new Error(`GitHub API request failed (${status})`), { status, detail });
+// The hidden markers that keep each bot comment to one per PR.
+const REMINDER = '<!-- forktown-auto-merge: update branch -->';
+const WELCOME = '<!-- forktown-auto-merge: welcome -->';
+const bot = (body) => ({ user: { type: 'Bot' }, body });
 
 // A small stand-in for the GitHub REST API: enough routes for one auto-merge run.
 function fakeGitHub({
@@ -49,7 +53,9 @@ function fakeGitHub({
   mainSha = TOWN,
   behindBy = 0,
   merge = () => ({ merged: true }),
+  status = () => ({}),
   dispatch = () => null,
+  comment = () => ({}),
 } = {}) {
   const writes = [];
   const api = async (path, body, method = body ? 'POST' : 'GET') => {
@@ -57,6 +63,8 @@ function fakeGitHub({
     if (method !== 'GET') {
       writes.push({ method, route, body });
       if (route.endsWith('/merge')) return merge();
+      if (route.startsWith('/statuses/')) return status();
+      if (route.endsWith('/comments')) return comment();
       return route.endsWith('/dispatches') ? dispatch() : {};
     }
     const page = Number(new URLSearchParams(query).get('page') ?? '1');
@@ -90,14 +98,28 @@ function fakeGitHub({
   };
   const log = { log: vi.fn(), error: vi.fn() };
   const town = { sha: TOWN, creators: new Map(creators) };
+  const posted = (marker = '') =>
+    writes.filter((write) => write.route.endsWith('/comments') && write.body.body.includes(marker));
   return {
     run: (options = {}) =>
-      runAutoMerge({ api, repo: 'o/r', sha: HEAD, town, runUrl: 'https://run', log, ...options }),
+      runAutoMerge({
+        api,
+        repo: 'o/r',
+        sha: HEAD,
+        town,
+        runUrl: 'https://run',
+        site: 'https://town.example/',
+        log,
+        ...options,
+      }),
+    log,
     writes,
     merges: () => writes.filter((write) => write.route.endsWith('/merge')),
     statuses: () => writes.filter((write) => write.route.startsWith('/statuses/')),
     dispatches: () => writes.filter((write) => write.route.endsWith('/dispatches')),
-    reminders: () => writes.filter((write) => write.route.endsWith('/comments')),
+    comments: () => posted(),
+    reminders: () => posted(REMINDER),
+    welcomes: () => posted(WELCOME),
   };
 }
 
@@ -126,10 +148,30 @@ describe('Auto-merge for a new neighbor', () => {
         }),
       },
     ]);
-    // A merge by the workflow's token starts no push workflow, so it publishes the town itself.
+    // A merge by the workflow's token starts no push workflow, so it publishes the town itself,
+    // saying the merged head already passed its tests.
     expect(github.dispatches()).toEqual([
-      { method: 'POST', route: '/actions/workflows/pages.yml/dispatches', body: { ref: 'main' } },
+      {
+        method: 'POST',
+        route: '/actions/workflows/pages.yml/dispatches',
+        body: { ref: 'main', inputs: { tested: 'true' } },
+      },
     ]);
+    // The welcome comes last, once the town is on its way.
+    expect(github.welcomes()).toHaveLength(1);
+    expect(github.writes.at(-1)).toBe(github.welcomes()[0]);
+    expect(github.reminders()).toEqual([]);
+  });
+
+  it('starts Publish town with an input it declares, which skips only the tests', () => {
+    const workflow = readFileSync('.github/workflows/pages.yml', 'utf8');
+    expect(workflow).toMatch(/workflow_dispatch:\n\s+inputs:\n\s+tested:\n/);
+    expect(workflow).toContain(
+      "- if: github.event_name != 'workflow_dispatch' || inputs.tested != 'true'\n        run: npm run check\n",
+    );
+    expect(workflow).toContain(
+      "- if: github.event_name == 'workflow_dispatch' && inputs.tested == 'true'\n        run: npm run build\n",
+    );
   });
 
   it.each(['neighbor', 'NEIGHBOR', 'Neighbor'])(
@@ -142,11 +184,11 @@ describe('Auto-merge for a new neighbor', () => {
       expect(github.merges()).toEqual([]);
       expect(github.statuses()[0].body).toMatchObject({ state: 'failure', context: CONTEXT });
       expect(github.dispatches()).toEqual([]);
-      expect(github.reminders()).toEqual([]);
+      expect(github.comments()).toEqual([]);
       // Even behind main, no comment asks them to update: a maintainer decides either way.
       const behind = fakeGitHub({ pulls: [pull(1, login)], behindBy: 1 });
       expect((await behind.run())[0].state).toBe('failure');
-      expect(behind.reminders()).toEqual([]);
+      expect(behind.comments()).toEqual([]);
     },
   );
 
@@ -249,6 +291,7 @@ describe('Auto-merge for a new neighbor', () => {
     expect(outcome.description).toContain(name);
     expect(github.merges()).toEqual([]);
     expect(github.statuses()[0].body.state).toBe('pending');
+    expect(github.comments()).toEqual([]);
   });
 
   it('does not wait for its own earlier status', async () => {
@@ -332,6 +375,7 @@ describe('Auto-merge for a new neighbor', () => {
     expect(outcome.state).toBe('pending');
     expect(outcome.description).toContain(detail);
     expect(github.dispatches()).toEqual([]);
+    expect(github.comments()).toEqual([]);
   });
 
   it('says nothing more when someone else merged it first', async () => {
@@ -346,6 +390,7 @@ describe('Auto-merge for a new neighbor', () => {
     expect((await github.run())[0].state).toBe('skipped');
     expect(github.statuses()).toEqual([]);
     expect(github.dispatches()).toEqual([]);
+    expect(github.comments()).toEqual([]);
   });
 
   it('reports any other refusal as an error, claiming nothing', async () => {
@@ -357,6 +402,7 @@ describe('Auto-merge for a new neighbor', () => {
     expect((await github.run())[0].state).toBe('error');
     expect(github.statuses()).toEqual([]);
     expect(github.dispatches()).toEqual([]);
+    expect(github.comments()).toEqual([]);
   });
 
   it('reports a town that could not be published, after merging', async () => {
@@ -367,6 +413,24 @@ describe('Auto-merge for a new neighbor', () => {
     });
     expect((await github.run()).map((outcome) => outcome.state)).toEqual(['success', 'error']);
     expect(github.merges()).toHaveLength(1);
+    // The house did move in, but nothing is publishing it, so the welcome promises no visit.
+    expect(github.welcomes()).toHaveLength(1);
+    expect(github.welcomes()[0].body.body).not.toContain('https://');
+  });
+
+  it('still publishes and welcomes a merged house whose status could not be posted', async () => {
+    const github = fakeGitHub({
+      status: () => {
+        throw refused(502);
+      },
+    });
+    expect(await github.run()).toEqual([
+      { number: 1, state: 'error', description: 'GitHub API request failed (502)' },
+    ]);
+    expect(github.merges()).toHaveLength(1);
+    expect(github.dispatches()).toHaveLength(1);
+    expect(github.welcomes()).toHaveLength(1);
+    expect(github.welcomes()[0].body.body).toContain('https://town.example/#place=newcomer');
   });
 
   it('checks only the PRs whose head just finished, or the one it is given', async () => {
@@ -389,6 +453,93 @@ describe('Auto-merge for a new neighbor', () => {
     const { description } = github.statuses()[0].body;
     expect(description).toHaveLength(140);
     expect(description.endsWith('…')).toBe(true);
+  });
+});
+
+describe('The welcome for a new neighbor', () => {
+  const welcomeText = async (options = {}, run = {}) => {
+    const github = fakeGitHub(options);
+    await github.run(run);
+    expect(github.welcomes()).toHaveLength(1);
+    return github.welcomes()[0].body.body;
+  };
+
+  it('greets them by name, links their house, and says how to change it later', async () => {
+    const github = fakeGitHub();
+    await github.run();
+    expect(github.welcomes()).toEqual([
+      { method: 'POST', route: '/issues/1/comments', body: { body: expect.any(String) } },
+    ]);
+    const { body } = github.welcomes()[0].body;
+    expect(body.startsWith(`${WELCOME}\n@newcomer, welcome to Forktown.`)).toBe(true);
+    expect(body).toContain('in a couple of minutes, once the town is rebuilt');
+    expect(body).toContain('[visit your house](https://town.example/#place=newcomer)');
+    // The site's page is cached for minutes, so an early visitor is told to reload.
+    expect(body).toContain("If it isn't there yet, reload the page.");
+    expect(body).toContain('[the Lantern Fork](https://town.example/#venue=fork)');
+    expect(body).toContain('edits only `places/newcomer.json`. A maintainer reviews edits');
+    expect(github.log.log).toHaveBeenCalledWith('PR #1: welcomed @newcomer.');
+  });
+
+  it('quotes nothing from the house itself, only its URL-encoded file name', async () => {
+    const house = {
+      creator: 'Newcomer',
+      name: 'Loud Name',
+      story: 'A tall tale',
+      sign: 'Sign text',
+    };
+    const body = await welcomeText({
+      house,
+      files: [{ filename: 'places/a&b#venue=zoo.json', status: 'added', sha: BLOB }],
+    });
+    expect(body).toContain('(https://town.example/#place=a%26b%23venue%3Dzoo)');
+    for (const text of Object.values(house).slice(1)) expect(body).not.toContain(text);
+  });
+
+  it('promises no visit and links nothing when the repository publishes no town', async () => {
+    const body = await welcomeText({}, { site: undefined });
+    expect(body).not.toContain('https://');
+    expect(body).not.toContain('couple of minutes');
+    expect(body).not.toContain('reload');
+    expect(body).toContain('the Lantern Fork');
+  });
+
+  it('never welcomes twice, and tells its two comments apart', async () => {
+    const first = fakeGitHub();
+    await first.run();
+    const { body } = first.welcomes()[0].body;
+    const again = fakeGitHub({ comments: [bot(body)] });
+    expect((await again.run())[0].state).toBe('success');
+    expect(again.comments()).toEqual([]);
+    // Someone quoting the welcome doesn't silence it, and nor does an earlier reminder.
+    await welcomeText({ comments: [{ user: { type: 'User' }, body }] });
+    await welcomeText({ comments: [bot(`${REMINDER}\n@newcomer, main has moved on.`)] });
+    // A welcome doesn't stand in for the reminder either.
+    const behind = fakeGitHub({ behindBy: 1, comments: [bot(body)] });
+    await behind.run();
+    expect(behind.reminders()).toHaveLength(1);
+    expect(behind.welcomes()).toEqual([]);
+  });
+
+  it('keeps the merge a success and the town publishing when the welcome fails', async () => {
+    for (const comment of [
+      () => {
+        throw refused(403, 'Unable to create comment because issue is locked.');
+      },
+      () => {
+        throw new Error('network down');
+      },
+    ]) {
+      const github = fakeGitHub({ comment });
+      expect(await github.run()).toEqual([
+        { number: 1, state: 'success', description: expect.stringContaining('Merged') },
+      ]);
+      expect(github.merges()).toHaveLength(1);
+      expect(github.dispatches()).toHaveLength(1);
+      expect(github.log.error).toHaveBeenCalledWith(
+        expect.stringContaining('PR #1: could not post the welcome'),
+      );
+    }
   });
 });
 
@@ -471,6 +622,8 @@ globalThis.fetch = async (url, init = {}) => {
           GITHUB_RUN_ID: '1',
           PR_NUMBER: '',
           HEAD_SHA: HEAD,
+          ENABLE_PAGES: 'true',
+          PAGES_SITE_URL: '',
           ...env,
         },
         encoding: 'utf8',
@@ -482,6 +635,7 @@ globalThis.fetch = async (url, init = {}) => {
     const { directory, sha } = checkout({ 'home.json': '{"creator":"neighbor"}' }, [
       'auto-merge.mjs',
       'auto-merge-github.mjs',
+      'pages-site.mjs',
       'pr-policy.mjs',
     ]);
     const repo = '/repos/o/r';
@@ -503,13 +657,28 @@ globalThis.fetch = async (url, init = {}) => {
       [`${repo}/pulls/1/merge`]: { merged: true },
       [`${repo}/statuses/${HEAD}`]: {},
       [`${repo}/actions/workflows/pages.yml/dispatches`]: {},
+      [`${repo}/issues/1/comments`]: [],
     };
     const merged = runStep(directory, replies);
     expect(merged.status, merged.stderr).toBe(0);
     expect(merged.stdout).toContain(
       `PUT ${repo}/pulls/1/merge {"sha":"${HEAD}","merge_method":"squash","commit_title":"Add my house (#1)"}`,
     );
-    expect(merged.stdout).toContain(`POST ${repo}/actions/workflows/pages.yml/dispatches`);
+    expect(merged.stdout).toContain(
+      `POST ${repo}/actions/workflows/pages.yml/dispatches {"ref":"main","inputs":{"tested":"true"}}`,
+    );
+    // The welcome links the house at the address Publish town builds this repository for.
+    expect(merged.stdout).toContain(`POST ${repo}/issues/1/comments`);
+    expect(merged.stdout).toContain('(https://o.github.io/r/#place=newcomer)');
+    const custom = runStep(directory, replies, { PAGES_SITE_URL: 'https://town.example/' });
+    expect(custom.stdout).toContain('(https://town.example/#place=newcomer)');
+    // Where Publish town doesn't run, or can't, nobody is promised a visit.
+    for (const env of [{ ENABLE_PAGES: '' }, { PAGES_SITE_URL: 'http://town.example' }]) {
+      const unpublished = runStep(directory, replies, env);
+      expect(unpublished.status, unpublished.stderr).toBe(0);
+      expect(unpublished.stdout).toContain(`POST ${repo}/issues/1/comments`);
+      expect(unpublished.stdout).not.toContain('#place=');
+    }
 
     // The existing neighbor's second house waits for a maintainer, and the run still passes.
     const second = runStep(directory, {

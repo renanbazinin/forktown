@@ -3,6 +3,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  readdirSync,
   rmSync,
   rmdirSync,
   unlinkSync,
@@ -87,6 +88,17 @@ describe('Private reports', () => {
       expect(readFileSync(file, 'utf8'), file).toContain(form);
     for (const file of ['SECURITY.md', 'CODE_OF_CONDUCT.md'])
       expect(readFileSync(file, 'utf8'), file).not.toMatch(/when it is enabled|must be listed/);
+  });
+});
+
+describe('Merges in the docs', () => {
+  it('never claim that nothing merges automatically, now that first houses do', () => {
+    const docs = readdirSync('docs').filter((name) => name.endsWith('.md'));
+    const pages = ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', ...docs.map((n) => `docs/${n}`)];
+    for (const file of pages)
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(
+        /(?:no|or) automatic merges|no contribution is automatically merged/i,
+      );
   });
 });
 

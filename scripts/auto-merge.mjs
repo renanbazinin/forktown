@@ -17,6 +17,8 @@ const PASSED = ['success', 'neutral', 'skipped'];
 const SHA = /^[a-f0-9]{40,64}$/;
 // Marks the one comment per PR that asks its author to update the branch.
 const REMINDER = '<!-- forktown-auto-merge: update branch -->';
+// Marks the one comment per PR that welcomes a new neighbor once their house has merged.
+const WELCOME = '<!-- forktown-auto-merge: welcome -->';
 
 /**
  * Every creator in a checked-out town, lower-cased because GitHub usernames ignore case, with the
@@ -103,6 +105,24 @@ async function remindToUpdate(api, root, pr, main) {
   return true;
 }
 
+// Welcomes a new neighbor by name, once per PR. Nobody has read the house yet, so the comment
+// never quotes its name, story or sign: only the file name, which check validated as the house's
+// id. The links, and the promise that it appears soon, need a town that is being published.
+// Returns whether it commented.
+async function welcome(api, root, { number, author, file }, site) {
+  const comments = await paginate(api, `${root}/issues/${number}/comments`);
+  if (comments.some((comment) => comment.user?.type === 'Bot' && comment.body?.includes(WELCOME)))
+    return false;
+  const id = file.slice('places/'.length, -'.json'.length);
+  const visit = site
+    ? `It appears in a couple of minutes, once the town is rebuilt: [visit your house](${site}#place=${encodeURIComponent(id)}). If it isn't there yet, reload the page. At nightfall its lantern lights with the others on [the Lantern Fork](${site}#venue=fork).`
+    : 'At nightfall its lantern lights with the others on the Lantern Fork.';
+  await api(`${root}/issues/${number}/comments`, {
+    body: `${WELCOME}\n@${author}, welcome to Forktown. Your house has moved in.\n\n${visit}\n\nTo change it later, open a new pull request that edits only \`${file}\`. A maintainer reviews edits before they merge.`,
+  });
+  return true;
+}
+
 // What to do with one PR: leave it alone ('skipped'), give it to a maintainer ('failure'), wait
 // ('pending'), or merge it. Merging is left to the caller.
 async function consider({ api, root, repo, main, pr, town, permissionFor }) {
@@ -162,15 +182,16 @@ async function consider({ api, root, repo, main, pr, town, permissionFor }) {
       state: 'pending',
       description: `Merges automatically once these pass: ${unfinished.join(', ')}`,
     };
-  return { state: 'merge' };
+  return { state: 'merge', file: file.filename };
 }
 
 /**
  * Merges the PR with this number, or each open PR whose head is this commit, when it qualifies,
  * and reports why not on an `Auto-merge` status otherwise. PRs that aren't one new house get no
- * status. Returns what happened to each PR; errors merge nothing.
+ * status. Returns what happened to each PR; errors merge nothing. `site` is the address Publish
+ * town puts the town at, when this repository publishes one.
  */
-export async function runAutoMerge({ api, repo, number, sha, town, runUrl, log = console }) {
+export async function runAutoMerge({ api, repo, number, sha, town, runUrl, site, log = console }) {
   const root = `/repos/${repo}`;
   const main = (await api(root)).default_branch;
   const numbers = number
@@ -196,6 +217,7 @@ export async function runAutoMerge({ api, repo, number, sha, town, runUrl, log =
     return permissions.get(key);
   };
   const outcomes = [];
+  const merged = [];
   for (const n of numbers) {
     try {
       const pr = await api(`${root}/pulls/${n}`);
@@ -211,6 +233,9 @@ export async function runAutoMerge({ api, repo, number, sha, town, runUrl, log =
             commit_title: `${pr.title} (#${n})`,
           };
           await api(`${root}/pulls/${n}/merge`, merge, 'PUT');
+          // Counted as soon as it lands, so a status that fails to post below still publishes
+          // the town and welcomes the neighbor.
+          merged.push({ number: n, author: pr.user.login, file: verdict.file });
           state = 'success';
           description = 'Merged automatically: a first house for a new neighbor';
         } catch (error) {
@@ -239,15 +264,31 @@ export async function runAutoMerge({ api, repo, number, sha, town, runUrl, log =
       log.error(`PR #${n}: ${message}`);
     }
   }
-  if (outcomes.some((outcome) => outcome.state === 'success')) {
+  let publishing = false;
+  if (merged.length) {
     // A merge by this workflow's token starts no push workflow, so publish the town directly.
+    // It only needs building: check passed on the exact head merged, up to date with main.
     try {
-      await api(`${root}/actions/workflows/pages.yml/dispatches`, { ref: main });
+      await api(`${root}/actions/workflows/pages.yml/dispatches`, {
+        ref: main,
+        inputs: { tested: 'true' },
+      });
+      publishing = true;
       log.log('Started Publish town for the new house.');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       outcomes.push({ state: 'error', description: `Could not start Publish town: ${message}` });
       log.error(`Could not start Publish town: ${message}`);
+    }
+  }
+  // Last, and only logged when it fails: a welcome never changes what happened above.
+  for (const house of merged) {
+    try {
+      if (await welcome(api, root, house, publishing ? site : undefined))
+        log.log(`PR #${house.number}: welcomed @${house.author}.`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      log.error(`PR #${house.number}: could not post the welcome: ${message}`);
     }
   }
   return outcomes;
