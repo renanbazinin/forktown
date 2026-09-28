@@ -1,7 +1,33 @@
 import { lstat, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PlaceEntry } from '../src/lib/schema';
+import type { Plugin } from 'vite';
+import type { PlaceEntry } from '../src/lib/schema.ts';
+
+/** What the validator says about a house file that is not valid JSON. */
+export const invalidJson = (name: string, error: unknown) =>
+  `${name}: This is not valid JSON. Check quotation marks, commas, and brackets. ${error instanceof Error ? error.message : ''}`;
+
+/**
+ * Vite's own JSON loader reports a broken house file as "File: [object Object]". This reads each
+ * house file first, so the tests, the build and the dev server name it in the validator's words.
+ */
+export function placeJsonErrors(): Plugin {
+  return {
+    name: 'forktown-place-json',
+    enforce: 'pre',
+    transform: {
+      filter: { id: /[\\/]places[\\/][^\\/?]+\.json$/ },
+      handler(code, id) {
+        try {
+          JSON.parse(code);
+        } catch (error) {
+          this.error(invalidJson(id.split(/[\\/]/).at(-1)!, error));
+        }
+      },
+    },
+  };
+}
 
 /**
  * Reads every place file in a folder. Only plain files count: the build would follow a link or
@@ -27,9 +53,7 @@ export async function readPlaceFiles(directory: URL) {
     try {
       entries.push({ file: name, data: JSON.parse(await readFile(file, 'utf8')) });
     } catch (error) {
-      errors.push(
-        `${name}: This is not valid JSON. Check quotation marks, commas, and brackets. ${error instanceof Error ? error.message : ''}`,
-      );
+      errors.push(invalidJson(name, error));
     }
   }
   return { files, entries, errors };

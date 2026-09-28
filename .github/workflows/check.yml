@@ -28,6 +28,9 @@ jobs:
           cache: npm
       - id: install
         run: npm ci
+      # A mistake in a house file stops here, with a note on the file, before any test output.
+      - name: Check house files
+        run: npm run validate
       - name: Test, validate, and build the town
         run: npm run check
       - name: Save the preview build

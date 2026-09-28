@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { SUBPROCESS_TEST } from './subprocess-timeout';
 import {
+  clip,
   evaluatePolicy,
   paginate,
   approvedByMaintainer,
@@ -54,10 +55,49 @@ describe('Trusted PR policy', () => {
       ).added,
     ).toBe(2);
   });
-  it('requires review for mismatched creator credit', async () => {
-    expect(
-      (await check({ readHead: async () => ({ creator: 'someone-else' }) })).errors.join(' '),
-    ).toContain('maintainer');
+  it('says how to fix creator credit that differs from the author', async () => {
+    const result = await check({ readHead: async () => ({ creator: 'your-github-username' }) });
+    expect(result.errors).toEqual([
+      'Set creator to your GitHub username (Neighbor) in "places/mine.json", or ask a maintainer to approve shared credit.',
+    ]);
+    expect(result.reviewReasons).toEqual([
+      'New house credit differs from PR author: "places/mine.json"',
+    ]);
+  });
+  it('still asks a maintainer to approve other changes that come with different credit', async () => {
+    const result = await check({
+      files: [house(), house('src/App.tsx', 'modified')],
+      readHead: async () => ({ creator: 'someone-else' }),
+    });
+    expect(result.errors).toEqual([
+      'Set creator to your GitHub username (Neighbor) in "places/mine.json", or ask a maintainer to approve shared credit.',
+      'A different maintainer must approve this exact commit, then rerun the policy check: Shared app or automation change: "src/App.tsx". After approval, comment /check-contribution on the PR.',
+    ]);
+  });
+  it('leaves the credit on a renamed house to a maintainer, not the author', async () => {
+    const result = await check({
+      author: 'alice',
+      files: [
+        house('places/bobs-house.json', 'renamed', { previous_filename: 'places/bob-house.json' }),
+      ],
+      readHead: async () => ({ creator: 'bob' }),
+      readBase: async () => ({ creator: 'bob' }),
+    });
+    expect(result.errors).toEqual([
+      'A different maintainer must approve this exact commit, then rerun the policy check: New house credit differs from PR author: "places/bobs-house.json"; Existing house ownership/rename change: "places/bob-house.json". After approval, comment /check-contribution on the PR.',
+    ]);
+    // A copied example that moved into places/ is still a new house.
+    const moved = await check({
+      files: [
+        house('places/mine.json', 'renamed', {
+          previous_filename: 'examples/my-little-place.json',
+        }),
+      ],
+      readHead: async () => ({ creator: 'your-github-username' }),
+    });
+    expect(moved.errors).toEqual([
+      'Set creator to your GitHub username (Neighbor) in "places/mine.json", or ask a maintainer to approve shared credit.',
+    ]);
   });
   it('allows documented collaborative credit with explicit approval', async () => {
     expect(
@@ -383,13 +423,13 @@ const pull = (number, login, ref = 'main') => ({
   base: { ref, sha: BASE, repo: { full_name: 'o/r' } },
 });
 // A small stand-in for the GitHub REST API: enough routes for one policy run.
-function fakeGitHub({ pulls, mode = '100644', creator = 'alice', permissions = {} }) {
+function fakeGitHub({ pulls, mode = '100644', creator = 'alice', permissions = {}, text }) {
   const statuses = [];
   const reads = [];
-  const blob = (value) => ({
+  const blob = (content) => ({
     encoding: 'base64',
     size: 64,
-    content: Buffer.from(JSON.stringify(value)).toString('base64'),
+    content: Buffer.from(content).toString('base64'),
   });
   const api = async (path, body) => {
     if (body) {
@@ -414,7 +454,8 @@ function fakeGitHub({ pulls, mode = '100644', creator = 'alice', permissions = {
     }
     if (route === `/git/trees/${HEAD}`)
       return { truncated: false, tree: [{ path: 'places/alice.json', mode }] };
-    if (route === `/git/blobs/${BLOB}`) return blob({ creator, resident: { name: 'Al' } });
+    if (route === `/git/blobs/${BLOB}`)
+      return blob(text ?? JSON.stringify({ creator, resident: { name: 'Al' } }));
     throw new Error(`Unexpected API call ${path}`);
   };
   const log = { log: vi.fn(), error: vi.fn() };
@@ -466,10 +507,42 @@ describe('One commit status for every PR that shares a head commit', () => {
     expect(github.log.error.mock.calls[0][0]).toContain('must be a plain file');
     expect(github.reads.some((path) => path.includes('/git/blobs/'))).toBe(false);
   });
-  it('still needs a maintainer for credit that differs from the author', async () => {
+  it('tells the author how to fix credit that differs from theirs, on the PR itself', async () => {
     const github = fakeGitHub({ pulls: [pull(1, 'alice')], creator: 'bob' });
     expect(await github.run({ number: '1' })).toBe('failure');
-    expect(github.log.error.mock.calls[0][0]).toContain('different maintainer');
+    const fix =
+      'Set creator to your GitHub username (alice) in "places/alice.json", or ask a maintainer to approve shared credit.';
+    expect(github.log.error.mock.calls[0][0]).toBe(fix);
+    expect(github.statuses.at(-1)).toMatchObject({ state: 'failure', description: fix });
+  });
+  it('shows the first thing to fix as the status, clipped to GitHub’s 140 characters', async () => {
+    const link = fakeGitHub({ pulls: [pull(1, 'alice')], mode: '120000' });
+    await link.run({ number: '1' });
+    expect(link.statuses.at(-1).description).toBe(
+      '"places/alice.json" must be a plain file. Links, folders and executable files can\'t live in places/.',
+    );
+    const login = 'someone-with-a-rather-long-github-name';
+    const long = fakeGitHub({ pulls: [pull(1, login)] });
+    await long.run({ number: '1' });
+    const fix = `Set creator to your GitHub username (${login}) in "places/alice.json", or ask a maintainer to approve shared credit.`;
+    expect(long.log.error.mock.calls[0][0]).toBe(fix);
+    expect(long.statuses.at(-1).description).toBe(`${fix.slice(0, 139)}…`);
+  });
+  it('clips a status by characters, so an emoji is never cut in half', () => {
+    expect(clip(`${'a'.repeat(138)}🏠🏠🏠`)).toBe(`${'a'.repeat(138)}🏠…`);
+    expect(clip('🏠'.repeat(140))).toBe('🏠'.repeat(140));
+  });
+  it('keeps other errors off the PR, since they can quote a house file', async () => {
+    const github = fakeGitHub({
+      pulls: [pull(1, 'alice')],
+      text: '{"creator": "alice",\n::stop-commands::x\n}',
+    });
+    expect(await github.run({ number: '1' })).toBe('failure');
+    expect(github.log.error.mock.calls[0][0]).toContain('JSON');
+    expect(github.statuses.at(-1)).toMatchObject({
+      state: 'failure',
+      description: 'Contribution policy needs attention; see workflow log',
+    });
   });
   it('says so when a review matches no open PR, instead of passing quietly', async () => {
     const movedOn = { ...pull(1, 'alice'), head: { sha: 'd'.repeat(40) } };

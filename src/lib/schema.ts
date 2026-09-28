@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { compileSign } from './sign.ts';
-import { getPlot } from './world.ts';
+import { getPlot, PLOTS, type Plot } from './world.ts';
 import { venueAt } from './events.ts';
 import { isFootballPlot } from './football.ts';
 import { isFarmPlot } from './farm.ts';
 import { isMillpondPlot } from './millpond.ts';
 import { isTubePlot } from './tubes.ts';
+import { OPEN_PLOTS_COPY } from './open-plots.ts';
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color.');
 export const ACTIVITIES = ['stroll', 'work', 'home'] as const;
@@ -110,6 +111,20 @@ export const TYPE_LABELS: Record<BuildingType, string> = {
   observatory: 'Observatory',
 };
 
+// A plot a house can stand on: one on the town map that no public venue uses.
+const plotSchema = z
+  .string()
+  .refine((id) => !!getPlot(id), 'Choose an existing plot from the town map.')
+  .refine(
+    (id) =>
+      !venueAt(id) &&
+      !isFootballPlot(id) &&
+      !isFarmPlot(id) &&
+      !isMillpondPlot(id) &&
+      !isTubePlot(id),
+    'This plot is reserved for a public town venue. Choose a house plot.',
+  );
+
 export const placeSchema = z
   .object({
     id: z
@@ -134,18 +149,7 @@ export const placeSchema = z
       .min(1, 'Add your GitHub username so we can credit your contribution.')
       .max(39, 'A GitHub username can have at most 39 characters.')
       .regex(/^[a-z\d](?:[a-z\d]|-(?=[a-z\d]))*$/i, 'Use your GitHub username, without the @.'),
-    plot: z
-      .string()
-      .refine((id) => !!getPlot(id), 'Choose an existing plot from the town map.')
-      .refine(
-        (id) =>
-          !venueAt(id) &&
-          !isFootballPlot(id) &&
-          !isFarmPlot(id) &&
-          !isMillpondPlot(id) &&
-          !isTubePlot(id),
-        'This plot is reserved for a public town venue. Choose a house plot.',
-      ),
+    plot: plotSchema,
     building: z.enum(BUILDING_TYPES),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color, e.g. #A578BD.'),
     decoration: z.enum(DECORATIONS),
@@ -201,12 +205,33 @@ const STARTER_IDS = new Set([
 ]);
 // New homes have one or two floors. These were built with three before that, and keep them.
 const THREE_FLOOR_IDS = new Set(['arts']);
+// The id in the examples a newcomer copies, which the copy has to change.
+const EXAMPLE_ID = 'your-unique-id';
+
+/**
+ * Up to `count` house plots that no one has claimed, nearest to `plot` first. Ties keep map
+ * order, so a town always gets the same suggestions.
+ */
+export function openPlotsNear(plot: string, taken: ReadonlySet<string>, count = 3): string[] {
+  const from = getPlot(plot);
+  if (!from) return [];
+  const distance = (other: Plot) => (other.col - from.col) ** 2 + (other.row - from.row) ** 2;
+  return PLOTS.filter((other) => !taken.has(other.id) && plotSchema.safeParse(other.id).success)
+    .sort((a, b) => distance(a) - distance(b))
+    .slice(0, count)
+    .map((other) => other.id);
+}
+
+const orList = (items: string[]) =>
+  items.length > 1 ? `${items.slice(0, -1).join(', ')} or ${items.at(-1)}` : items[0];
 
 export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
   const errors: string[] = [];
   const places: Place[] = [];
   const ids = new Set<string>();
+  // Which file claimed each plot, and every plot any file asks for, even one that isn't valid yet.
   const plots = new Map<string, string>();
+  let taken: Set<string> | undefined;
   for (const { file, data } of entries) {
     const result = placeSchema.safeParse(data);
     if (!result.success) {
@@ -226,14 +251,27 @@ export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
       errors.push(`${file}: New homes can have one or two floors. Set "floors" to 1 or 2.`);
     if (file !== `${place.id}.json`)
       errors.push(`${file}: Rename this file to ${place.id}.json so its name matches the id.`);
+    if (place.id === EXAMPLE_ID)
+      errors.push(
+        `${file}: "${EXAMPLE_ID}" is the example's id. Choose your own id and rename the file to match.`,
+      );
     if (ids.has(place.id))
       errors.push(`${file}: The id "${place.id}" is already used. Choose another id.`);
-    if (plots.has(place.plot))
-      errors.push(
-        `${file}: Plot ${place.plot} belongs to "${plots.get(place.plot)}". Choose an empty plot in the city.`,
+    // Either file may be the newcomer, so name both.
+    if (plots.has(place.plot)) {
+      taken ??= new Set(
+        entries.flatMap(({ data }) => {
+          const plot = (data as { plot?: unknown } | null)?.plot;
+          return typeof plot === 'string' ? [plot] : [];
+        }),
       );
+      const open = openPlotsNear(place.plot, taken);
+      errors.push(
+        `Plot ${place.plot} is claimed by both "${plots.get(place.plot)}" and "${file}". ${open.length ? `If yours is the new one, pick an open plot such as ${orList(open)}.` : OPEN_PLOTS_COPY.full}`,
+      );
+    }
     ids.add(place.id);
-    plots.set(place.plot, place.name);
+    plots.set(place.plot, file);
     places.push(place);
   }
   return { places, errors };

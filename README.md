@@ -52,11 +52,13 @@ This creates `places/YOUR_FILE_ID.json` and adds the house to your local town. C
 
 ## 5. Send your pull request
 
-Open a second terminal in your `forktown` folder and check your work:
+Open a second terminal in your `forktown` folder and check your house:
 
 ```sh
-npm run check
+npm run validate
 ```
+
+It takes a couple of seconds and names the exact file and field to fix. Changed the town’s code too? Run `npm run check` instead, which also runs the tests and the build.
 
 Once it passes, replace `YOUR_FILE_ID` with the file id from the builder and run:
 
@@ -64,8 +66,11 @@ Once it passes, replace `YOUR_FILE_ID` with the file id from the builder and run
 git add places/YOUR_FILE_ID.json
 git --no-pager diff --cached
 git commit -m "Add my place to Forktown"
+npm run check:pr -- origin/main HEAD
 git push -u origin add-my-place
 ```
+
+`npm run check:pr` makes sure your branch adds just one house.
 
 On your GitHub fork, click **Compare & pull request**. Target **renanbazinin/forktown → main**, check that only your new house file is included, complete the checklist, and click **Create pull request**.
 

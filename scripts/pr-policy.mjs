@@ -15,6 +15,11 @@ export const isReaderOnly = (path) =>
   );
 // Git tree modes for an ordinary file. Links (120000) and submodules (160000) are not files.
 const FILE_MODES = ['100644', '100755'];
+// GitHub's limit for a status description, counted in characters so an emoji stays whole.
+export const clip = (text) => {
+  const characters = [...text];
+  return characters.length > 140 ? `${characters.slice(0, 139).join('')}…` : text;
+};
 
 export async function paginate(api, path, expected) {
   const all = [];
@@ -62,6 +67,9 @@ export async function evaluatePolicy({
 }) {
   const errors = [];
   const reviewReasons = [];
+  // A new house's credit usually differs from the author because of a typo in creator, so each
+  // of these review reasons comes with how to fix it.
+  const creditFixes = new Map();
   const additions = files.filter(
     (f) => isHouse(f.filename) && ['added', 'renamed', 'copied'].includes(f.status),
   );
@@ -124,10 +132,16 @@ export async function evaluatePolicy({
         errors.push(
           `${JSON.stringify(file.filename)} must contain one resident object, never a list.`,
         );
-      if (additions.includes(file) && house.creator.toLowerCase() !== author.toLowerCase())
-        reviewReasons.push(
-          `New house credit differs from PR author: ${JSON.stringify(file.filename)}`,
-        );
+      if (additions.includes(file) && house.creator.toLowerCase() !== author.toLowerCase()) {
+        const reason = `New house credit differs from PR author: ${JSON.stringify(file.filename)}`;
+        reviewReasons.push(reason);
+        // A renamed house already has an owner, so a maintainer reviews its credit instead.
+        if (!(file.status === 'renamed' && isHouse(oldPath)))
+          creditFixes.set(
+            reason,
+            `Set creator to your GitHub username (${author}) in ${JSON.stringify(file.filename)}, or ask a maintainer to approve shared credit.`,
+          );
+      }
       if (additions.includes(file) && house.creator.toLowerCase() === 'forktown')
         errors.push('The forktown creator is reserved for existing starter houses.');
       if (!['added', 'copied'].includes(file.status) && isHouse(oldPath)) {
@@ -151,9 +165,11 @@ export async function evaluatePolicy({
       reviewReasons.push(`House deletion: ${JSON.stringify(oldPath)}`);
     }
   }
-  if (reviewReasons.length && !approved)
+  const others = reviewReasons.filter((reason) => !creditFixes.has(reason));
+  if (!approved) errors.push(...creditFixes.values());
+  if (others.length && !approved)
     errors.push(
-      `A different maintainer must approve this exact commit, then rerun the policy check: ${reviewReasons.join('; ')}. After approval, comment /check-contribution on the PR.`,
+      `A different maintainer must approve this exact commit, then rerun the policy check: ${others.join('; ')}. After approval, comment /check-contribution on the PR.`,
     );
   return { errors, reviewReasons, added: additions.length };
 }
@@ -214,9 +230,12 @@ export async function runContributionPolicy({ api, repo, number, sha, runUrl, lo
     api(`${root}/statuses/${head}`, {
       state,
       context: 'Contribution policy',
-      description,
+      description: clip(description),
       target_url: runUrl,
     });
+  // The first thing to fix, shown on the PR. Only policy messages go there: other errors can
+  // quote a file's contents.
+  let problem;
   try {
     const defaultBranch = (await api(root)).default_branch;
     const sharing = [
@@ -291,13 +310,16 @@ export async function runContributionPolicy({ api, repo, number, sha, runUrl, lo
         'Open PRs that share one commit must all pass. A maintainer can close the duplicate and rerun.',
       );
     if (!results.length) throw new Error('The PR changed before it could be checked.');
-    if (errors.length) throw new Error(errors.join('\n'));
+    if (errors.length) {
+      problem = errors[0];
+      throw new Error(errors.join('\n'));
+    }
     const added = Math.max(...results.map((result) => result.added));
     await status('success', `${added} new house; credit and ownership checks passed`);
     log.log('Contribution policy passed.');
     return 'success';
   } catch (error) {
-    await status('failure', 'Contribution policy needs attention; see workflow log');
+    await status('failure', problem ?? 'Contribution policy needs attention; see workflow log');
     log.error(error instanceof Error ? error.message : String(error));
     return 'failure';
   }

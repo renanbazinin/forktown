@@ -2,7 +2,7 @@
 
 Enabled on `main` on September 21, 2026. See [verified GitHub results](CONTRIBUTION_VERIFICATION.md).
 
-The required `Contribution policy` status inspects PR files through GitHub's API. Only trusted default-branch code runs; PR code is never checked out and its dependencies are never installed. The token reads contents/PRs and writes statuses, but cannot merge or deploy. API failures and incomplete lists fail the check.
+The required `Contribution policy` status inspects PR files through GitHub's API. Only trusted default-branch code runs; PR code is never checked out and its dependencies are never installed. The token reads contents/PRs and writes statuses, but cannot merge or deploy. API failures and incomplete lists fail the check. A failed status shows the first thing to fix, such as a creator that isn't the PR author's username; the workflow log lists every problem.
 
 The result is a status on the PR's head commit, and more than one PR can point at the same commit. So the check evaluates every open PR into the default branch that shares the head commit, and passes only when all of them pass. A duplicate PR can't borrow another PR's pass or flip its result. A failing duplicate does hold the others back until a maintainer closes it and runs the check again. PRs into other branches aren't merge-gated, so they get no status.
 

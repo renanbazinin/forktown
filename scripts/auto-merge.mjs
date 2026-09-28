@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { isHouse, isMaintainer, paginate } from './pr-policy.mjs';
+import { clip, isHouse, isMaintainer, paginate } from './pr-policy.mjs';
 
 // A PR whose only change is one new house, credited to its author, merges itself once every
 // other check has passed, as long as no house in town credits that author yet. Anyone who already
@@ -17,8 +17,6 @@ const PASSED = ['success', 'neutral', 'skipped'];
 const SHA = /^[a-f0-9]{40,64}$/;
 // Marks the one comment per PR that asks its author to update the branch.
 const REMINDER = '<!-- forktown-auto-merge: update branch -->';
-// GitHub's limit for a status description.
-const clip = (text) => (text.length > 140 ? `${text.slice(0, 139)}…` : text);
 
 /**
  * Every creator in a checked-out town, lower-cased because GitHub usernames ignore case, with the

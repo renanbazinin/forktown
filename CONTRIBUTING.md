@@ -93,13 +93,13 @@ You can also let the builder create the file: choose **Find your way in → Buil
 
 The builder and save button are available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy.
 
-Before sending a pull request:
+Before sending a pull request, check your house:
 
 ```sh
-npm run check
+npm run validate
 ```
 
-You can also run only `npm run validate` for a quick data check. The check points to the exact file and field that needs attention.
+It takes a couple of seconds and points to the exact file and field that needs attention. On GitHub, the pull request check runs it first and notes each problem on the file. If you changed code too, run `npm run check`: it runs the tests, the validator, type checks, and the production build.
 
 The pull request check also runs `npm run format:check` on code and docs. If it lists a file you changed, run `npm run format` to tidy the spacing, then commit the change. House files in `places/` are left to the validator, so spacing there never fails a pull request.
 

@@ -3,7 +3,14 @@ import { FARM_PLOTS } from '../src/lib/farm';
 import { MILLPOND_PLOTS } from '../src/lib/millpond';
 import { TUBE_PLOTS } from '../src/lib/tubes';
 import { describe, expect, it } from 'vitest';
-import { draftSchema, placeSchema, validatePlaces, type Place } from '../src/lib/schema';
+import {
+  draftSchema,
+  openPlotsNear,
+  placeSchema,
+  validatePlaces,
+  type Place,
+} from '../src/lib/schema';
+import { OPEN_PLOTS_COPY } from '../src/lib/open-plots';
 import {
   PLOTS,
   findPlotAt,
@@ -21,13 +28,13 @@ import { buildingHit, shade } from '../src/city/render';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { FOOTBALL_PLOTS } from '../src/lib/football';
 import { CINEMA_PLOTS } from '../src/lib/cinema';
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { readPlaceFiles } from '../scripts/place-files';
+import { placeJsonErrors, readPlaceFiles } from '../scripts/place-files';
 import { readdirSync, readFileSync } from 'node:fs';
-import { places } from '../src/lib/places';
+import { createServer } from 'vite';
 
 const sample: Place = placeSchema.parse({
   id: 'tiny-library',
@@ -71,13 +78,24 @@ describe('The contribution contract', () => {
     expect(errors.join('\n')).toContain('six-digit hex color');
     expect(errors.join('\n')).toContain('existing plot from the town map');
   });
-  it('rejects duplicate plot claims without silently replacing another place', () => {
+  it('rejects duplicate plot claims, naming both files and open plots nearby', () => {
     const { errors } = validatePlaces([
       { file: 'tiny-library.json', data: sample },
       { file: 'my-cafe.json', data: { ...sample, id: 'my-cafe', name: 'My Café' } },
     ]);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain('Plot A1 belongs to "Tiny Library"');
+    expect(errors).toEqual([
+      'Plot A1 is claimed by both "tiny-library.json" and "my-cafe.json". If yours is the new one, pick an open plot such as A2, B1 or B2.',
+    ]);
+  });
+  it('never suggests a plot another file asks for, even one that is not valid yet', () => {
+    const { errors } = validatePlaces([
+      { file: 'tiny-library.json', data: sample },
+      { file: 'my-cafe.json', data: { ...sample, id: 'my-cafe' } },
+      { file: 'draft.json', data: { plot: 'A2' } },
+    ]);
+    expect(errors).toContain(
+      'Plot A1 is claimed by both "tiny-library.json" and "my-cafe.json". If yours is the new one, pick an open plot such as B1, B2 or A3.',
+    );
   });
   it('rejects duplicate ids even when the plots differ', () => {
     const { errors } = validatePlaces([
@@ -143,6 +161,47 @@ describe('The contribution contract', () => {
     });
     expect(result.name).toBe('Café קטן');
     expect(result.story).toBe('A tiny place for everyone.');
+  });
+});
+
+describe('The open plots a plot clash suggests', () => {
+  const houses = HOUSE_PLOTS.map((plot) => plot.id);
+  const distance = (a: string, b: string) =>
+    (getPlot(a)!.col - getPlot(b)!.col) ** 2 + (getPlot(a)!.row - getPlot(b)!.row) ** 2;
+
+  it('are the nearest open house plots, never a taken or public one', () => {
+    const problems: string[] = [];
+    // Towns from empty to nearly full, the same on every run: every nth house plot stays free.
+    for (const n of [1, 2, 3, 7, 50]) {
+      const town = houses.filter((_, i) => i % n !== 0);
+      for (const plot of houses) {
+        const taken = new Set([...town, plot]);
+        const open = openPlotsNear(plot, taken);
+        const free = houses.filter((id) => !taken.has(id));
+        const farthest = Math.max(...open.map((id) => distance(plot, id)));
+        if (
+          open.length !== Math.min(3, free.length) ||
+          new Set(open).size !== open.length ||
+          open.some(
+            (id) => taken.has(id) || !placeSchema.safeParse({ ...sample, plot: id }).success,
+          ) ||
+          free.some((id) => !open.includes(id) && distance(plot, id) < farthest)
+        )
+          problems.push(`${plot} in a town of ${taken.size}: ${open.join(', ')}`);
+      }
+    }
+    expect(problems).toEqual([]);
+  });
+
+  it('says the town needs to grow when every house plot is taken', () => {
+    const town = houses.map((plot) => {
+      const id = `home-${plot.toLowerCase()}`;
+      return { file: `${id}.json`, data: { ...sample, id, plot } };
+    });
+    const late = { file: 'late.json', data: { ...sample, id: 'late', plot: 'A1' } };
+    expect(validatePlaces([...town, late]).errors).toEqual([
+      `Plot A1 is claimed by both "home-a1.json" and "late.json". ${OPEN_PLOTS_COPY.full}`,
+    ]);
   });
 });
 
@@ -267,6 +326,36 @@ describe('Place files on disk', () => {
     }
   });
 
+  it('names a broken house file when Vite loads it, never "[object Object]"', async () => {
+    const root = await folder();
+    const server = await createServer({
+      root,
+      configFile: false,
+      logLevel: 'silent',
+      plugins: [placeJsonErrors()],
+      server: { middlewareMode: true, hmr: false, watch: null },
+    });
+    try {
+      const broken = join(root, 'places', 'broken.json');
+      await writeFile(broken, '{\n  "id": "broken",\n}\n');
+      const error = await server.environments.ssr
+        .transformRequest('/places/broken.json')
+        .catch((error: { message: string; id: unknown }) => error);
+      expect(error).toMatchObject({
+        message: expect.stringContaining('broken.json: This is not valid JSON.'),
+        // Vite names a file by its real path, which differs where the temp folder sits behind a
+        // link, as it does on macOS.
+        id: (await realpath(broken)).replaceAll('\\', '/'),
+      });
+      expect(await server.environments.ssr.transformRequest('/places/tiny-library.json')).toEqual(
+        expect.objectContaining({ code: expect.stringContaining('Tiny Library') }),
+      );
+    } finally {
+      await server.close();
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+
   it('rejects a places folder that is itself a link', async () => {
     const root = await folder();
     try {
@@ -292,10 +381,10 @@ describe('The examples a newcomer copies', () => {
       expect(HOUSE_PLOTS.map((plot) => plot.id)).toContain(example.plot);
       // It matches the documented copy target, places/your-unique-id.json.
       expect(example.id).toBe('your-unique-id');
-      expect(
-        places.map((place) => place.id),
-        'A house still uses the example id "your-unique-id". Choose your own id and rename the file to match.',
-      ).not.toContain(example.id);
+      // A copy that keeps it fails the quick check, not only the tests.
+      expect(validatePlaces([{ file: 'your-unique-id.json', data: example }]).errors).toEqual([
+        'your-unique-id.json: "your-unique-id" is the example\'s id. Choose your own id and rename the file to match.',
+      ]);
     },
   );
 });
