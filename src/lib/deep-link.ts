@@ -1,4 +1,5 @@
 import { CINEMA_VENUE, isCinemaPlot } from './cinema';
+import { VENUES } from './events';
 import { FARM, isFarmPlot } from './farm';
 import { FOOTBALL_VENUE, isFootballPlot } from './football';
 import { FORK_PLOT } from './lanterns';
@@ -6,8 +7,14 @@ import { isMillpondPlot, MILLPOND_VENUE } from './millpond';
 import { isTubePlot, TUBE_VENUE } from './tubes';
 import { isZooPlot, ZOO_VENUE } from './zoo';
 
+// The Lunch Green and the Little Stage, where the Midnight Disco plays, are one plot each.
+const GREEN_PLOT = VENUES.find((venue) => venue.id === 'green')!.plot;
+const STAGE_PLOT = VENUES.find((venue) => venue.id === 'stage')!.plot;
+
 const VENUE_LINKS = new Map<string, string>([
   ['fork', FORK_PLOT],
+  ['stage', STAGE_PLOT],
+  ['green', GREEN_PLOT],
   ['farm', FARM.plot],
   ['millpond', MILLPOND_VENUE.plot],
   ['tube', TUBE_VENUE.plot],
@@ -52,6 +59,8 @@ const VENUE_OF: [string, (plot: string) => boolean][] = [
   ['cinema', isCinemaPlot],
   ['zoo', isZooPlot],
   ['fork', (plot) => plot === FORK_PLOT],
+  ['stage', (plot) => plot === STAGE_PLOT],
+  ['green', (plot) => plot === GREEN_PLOT],
 ];
 
 /** The shared link (#place=… or #venue=…) for a selected plot, or '' for none. */
@@ -64,4 +73,22 @@ export function linkHash(
   if (place) return `#place=${encodeURIComponent(place.id)}`;
   const venue = VENUE_OF.find(([, holds]) => holds(plot));
   return venue ? `#venue=${venue[0]}` : '';
+}
+
+/**
+ * The address Share hands on for a plot. A built town gives every published house a page of its
+ * own that link previews can read (scripts/share-preview.ts). The dev server has no such pages and
+ * venues never do, so they share the #place= or #venue= link instead. A draft isn't published: its
+ * panel offers Save my place rather than Share.
+ */
+export function shareUrl(
+  plot: string | null,
+  places: readonly { id: string; plot: string }[],
+  { href, base, pages }: { href: string; base: string; pages: boolean },
+): string {
+  const place = pages ? places.find((place) => place.plot === plot) : undefined;
+  if (place) return new URL(`${base}house/${encodeURIComponent(place.id)}/`, href).href;
+  const url = new URL(href);
+  url.hash = linkHash(plot, places);
+  return url.href;
 }

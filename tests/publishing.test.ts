@@ -13,12 +13,24 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { runInNewContext } from 'node:vm';
 import type { Plugin, UserConfig } from 'vite';
 import { SUBPROCESS_TEST } from './subprocess-timeout';
 import { thirdPartyLicenses, thirdPartyNotices } from '../scripts/third-party-licenses';
-import { CANONICAL_SITE, sharePreview, siteUrl } from '../scripts/share-preview';
+import {
+  CANONICAL_SITE,
+  escapeHtml,
+  housePage,
+  housePages,
+  IMAGE_ALT,
+  missingPage,
+  sharePreview,
+  siteUrl,
+} from '../scripts/share-preview';
 import { CHUNK_WARNING_KB, chunkBudget } from '../scripts/chunk-budget';
+import { shareTitle } from '../src/lib/brand';
+import { places } from '../src/lib/places';
 
 const script = fileURLToPath(new URL('../scripts/configure-pages.mjs', import.meta.url));
 const created: string[] = [];
@@ -218,10 +230,10 @@ const pngSize = (file: string) => {
   return { width: png.readUInt32BE(16), height: png.readUInt32BE(20), bytes: png.length };
 };
 
-describe('Link previews', () => {
-  const meta = (html: string, key: string) =>
-    html.match(new RegExp(`(?:property|name)="${key}"\\s+content="([^"]*)"`))?.[1];
+const meta = (html: string, key: string) =>
+  html.match(new RegExp(`(?:property|name)="${key}"\\s+content="([^"]*)"`))?.[1];
 
+describe('Link previews', () => {
   it.each([
     ['index.html', '%SITE_URL%'],
     ['live/index.html', '%SITE_URL%live/'],
@@ -266,6 +278,146 @@ describe('Link previews', () => {
     expect(html).not.toContain('%SITE_URL%');
     expect(meta(html, 'og:image')).toBe('https://neighbor.github.io/forktown/og-image.png');
     expect(readFileSync('vite.config.ts', 'utf8')).toMatch(/plugins: \[[^\]]*sharePreview\(\)/);
+  });
+});
+
+describe('A link preview for every house', () => {
+  const canonical = (html: string) => html.match(/<link rel="canonical" href="([^"]*)"/)?.[1];
+  const site = 'https://neighbor.github.io/forktown/';
+  async function build(env: Record<string, string>, base?: string) {
+    const plugin = sharePreview();
+    (plugin.configResolved as unknown as (config: unknown) => void)({
+      env,
+      root: process.cwd(),
+      base,
+    });
+    const emitted: { type: string; fileName: string; source: string }[] = [];
+    await (plugin.generateBundle as unknown as (this: unknown) => Promise<void>).call({
+      emitFile: (file: (typeof emitted)[number]) => emitted.push(file),
+    });
+    return emitted;
+  }
+
+  it('builds one page per house, pointing at itself and handing off to the town', async () => {
+    const pages = (await build({ VITE_SITE_URL: site })).filter(
+      (page) => page.fileName !== '404.html',
+    );
+    expect(pages.map((page) => page.fileName).sort()).toEqual(
+      places.map((place) => `house/${place.id}/index.html`).sort(),
+    );
+    for (const { type, fileName, source } of pages) {
+      const place = places.find((place) => fileName === `house/${place.id}/index.html`)!;
+      const address = `${site}${fileName.replace(/index\.html$/, '')}`;
+      expect(type).toBe('asset');
+      expect(source).toMatch(/^<!doctype html>\n<html lang="en">/);
+      expect(source).toContain('<meta charset="UTF-8" />');
+      expect(source).toContain('<meta name="viewport"');
+      expect(source).toContain(`<title>${meta(source, 'og:title')}</title>`);
+      // Facebook and LinkedIn re-read og:url, so it must be this page, not the town.
+      expect(meta(source, 'og:url'), place.id).toBe(address);
+      expect(canonical(source)).toBe(address);
+      expect(meta(source, 'og:title')).toBe(escapeHtml(shareTitle(place.name, place.creator)));
+      expect(meta(source, 'og:description')).toBe(escapeHtml(place.story.replace(/\s+/g, ' ')));
+      expect(meta(source, 'og:image')).toBe(`${site}og-image.png`);
+      expect(meta(source, 'twitter:card')).toBe('summary_large_image');
+      // Relative, so base paths and forks work; a script, so unfurlers stay on this page.
+      expect(source).toContain(`location.replace("../../#place=${place.id}")`);
+      expect(source).toContain(`<a href="../../#place=${place.id}">`);
+      expect(source).toContain('<noscript>');
+    }
+    // Every house gets the same page, so a made-up one shows what it leaves out; a real house's
+    // name or story could say anything.
+    const quiet = housePage(
+      {
+        id: 'quiet-corner',
+        name: 'Quiet Corner',
+        creator: 'someone',
+        story: 'A quiet corner by the water.',
+      },
+      site,
+    );
+    expect(quiet).not.toMatch(/http-equiv|Lantern No/i);
+  });
+
+  it('uses the main town’s address when no site address is set', async () => {
+    const page = (await build({})).find((page) => page.fileName.startsWith('house/'))!;
+    expect(meta(page.source, 'og:url')).toBe(`${CANONICAL_SITE}${page.fileName.slice(0, -10)}`);
+    expect(meta(page.source, 'og:image')).toBe(`${CANONICAL_SITE}og-image.png`);
+  });
+
+  it('escapes everything a neighbor wrote', () => {
+    const html = housePage(
+      {
+        id: 'moon-cafe',
+        name: `<b>"Moe's" & co</b>`,
+        creator: 'neighbor',
+        story: `</title><script>alert('hi')</script>\n"Quotes" & 'more' <img src=x onerror=alert(1)>`,
+      },
+      site,
+    );
+    expect(html.match(/<script/g)).toHaveLength(1);
+    expect(html).not.toMatch(/<b>|<img|<\/title><script>/);
+    expect(meta(html, 'og:title')).toBe(
+      '&lt;b&gt;&quot;Moe&#39;s&quot; &amp; co&lt;/b&gt; by @neighbor · Forktown',
+    );
+    expect(meta(html, 'og:description')).toBe(
+      '&lt;/title&gt;&lt;script&gt;alert(&#39;hi&#39;)&lt;/script&gt; &quot;Quotes&quot; &amp; &#39;more&#39; &lt;img src=x onerror=alert(1)&gt;',
+    );
+    expect(html).toContain('Visit &lt;b&gt;&quot;Moe&#39;s&quot; &amp; co&lt;/b&gt; in Forktown');
+    for (const [, value] of html.matchAll(/="([^"]*)"/g))
+      expect(value).not.toMatch(/[<>']|&(?!(?:amp|lt|gt|quot|#39);)/);
+  });
+
+  it('leaves out the starter credit, and never sends an empty description', () => {
+    const html = housePage(
+      { id: 'old-house', name: 'Old House', creator: 'forktown', story: ' ' },
+      site,
+    );
+    expect(meta(html, 'og:title')).toBe('Old House · Forktown');
+    expect(meta(html, 'og:description')).toBe(
+      'A house in Forktown. A little town, built one pull request at a time.',
+    );
+    expect(meta(readFileSync('index.html', 'utf8'), 'og:image:alt')).toBe(IMAGE_ALT);
+    expect(meta(html, 'og:image:alt')).toBe(IMAGE_ALT);
+  });
+
+  it('sends a link to a house that has left on to the town, and nowhere else', async () => {
+    const script = (html: string) => html.match(/<script>([\s\S]*)<\/script>/)![1];
+    const visit = (html: string, pathname: string) => {
+      let address: string | undefined;
+      runInNewContext(script(html), {
+        location: { pathname, replace: (url: string) => (address = url) },
+      });
+      return address;
+    };
+    const missing = (await build({}, '/forktown/')).find((page) => page.fileName === '404.html')!;
+    expect(missing.source).toMatch(/^<!doctype html>\n<html lang="en">/);
+    expect(missing.source).toContain('<a href="/forktown/">Visit the town</a>');
+    // The town then says the house isn't in town, as it does for any old #place= link.
+    expect(visit(missing.source, '/forktown/house/old-house/')).toBe('/forktown/#place=old-house');
+    expect(visit(missing.source, '/forktown/house/old-house')).toBe('/forktown/#place=old-house');
+    for (const path of [
+      '/forktown/no-such-page/',
+      '/forktown/house/old-house/extra/',
+      '/forktown/house/%3Cb%3E/',
+      '/house/old-house/',
+      '//elsewhere.example/forktown/house/old-house/',
+    ])
+      expect(visit(missing.source, path), path).toBeUndefined();
+    expect(visit(missingPage('/'), '/house/old-house/')).toBe('/#place=old-house');
+    expect(visit(missingPage('/'), '//elsewhere.example/house/old-house/')).toBeUndefined();
+  });
+
+  it('stops the build when a house file would not load', async () => {
+    const directory = mkdtempSync(join(tmpdir(), 'forktown-houses-'));
+    try {
+      writeFileSync(join(directory, 'broken.json'), '{');
+      await expect(housePages(pathToFileURL(join(directory, '/')), site)).rejects.toThrow(
+        'broken.json',
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 

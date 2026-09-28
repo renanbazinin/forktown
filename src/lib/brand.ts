@@ -131,6 +131,25 @@ export function shouldWelcome(hash: string, storage: Pick<Storage, 'getItem'> | 
   }
 }
 
+// A newcomer who follows a shared house link skips the welcome card. The house panel introduces
+// the town in one line instead, and stores the same flag, so that line also appears only once.
+export function shouldIntroduce(hash: string, storage: Pick<Storage, 'getItem'> | null) {
+  return /(?:^|[#&])place=/.test(hash) && shouldWelcome('', storage);
+}
+
+export const ARRIVAL_COPY = {
+  body: (creator: string | null) =>
+    creator
+      ? `Forktown is built by first-time contributors. @${creator} added this house with one JSON file.`
+      : 'Forktown is built by first-time contributors, one JSON file per house. This founding house was here to greet them.',
+  action: 'Add yours',
+};
+
+// How a house or venue is named in link previews and the share sheet. Founding houses have no
+// byline: their "forktown" credit is a starter label, not a neighbor.
+export const shareTitle = (name: string, creator?: string) =>
+  `${name}${creator && creator !== 'forktown' ? ` by @${creator}` : ''} · Forktown`;
+
 export const WELCOME_COPY = {
   eyebrow: 'WELCOME TO FORKTOWN',
   title: 'Every house here started as a fork.',

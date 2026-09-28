@@ -63,13 +63,22 @@ import {
   isEventLive,
 } from './lib/events';
 import { isFoundingPlace, latestArrival, places, repositoryUrl } from './lib/places';
-import { GUIDE_COPY, PLOT_COPY, TITLE, WELCOME_KEY, shouldWelcome } from './lib/brand';
+import {
+  ARRIVAL_COPY,
+  GUIDE_COPY,
+  PLOT_COPY,
+  TITLE,
+  WELCOME_KEY,
+  shareTitle,
+  shouldIntroduce,
+  shouldWelcome,
+} from './lib/brand';
 import { TYPE_LABELS, type Place } from './lib/schema';
 import { localSaveAvailable } from './lib/local-save';
 import { useTownClock } from './lib/use-town-clock';
 import { useLanternTown } from './lib/use-lantern-town';
 import { FORK_PLOT } from './lib/lanterns';
-import { linkHash, MISSING_LINK_COPY, readDeepLink } from './lib/deep-link';
+import { linkHash, MISSING_LINK_COPY, readDeepLink, shareUrl } from './lib/deep-link';
 import { OPEN_PLOTS_COPY } from './lib/open-plots';
 import { simulateResidents, residentActivityLabel, timeLabel } from './lib/simulation';
 import { useTownDayPrefetch } from './lib/idle-prefetch';
@@ -77,16 +86,33 @@ import { useTownDayPrefetch } from './lib/idle-prefetch';
 type Panel = 'places' | 'neighbors' | 'events';
 // Keeps the welcome closed for this page load even when storage refuses the flag.
 let welcomeDismissed = false;
-function initialWelcome() {
-  if (welcomeDismissed) return false;
-  let storage: Storage | null = null;
+function welcomeStorage() {
   try {
-    storage = window.localStorage;
+    return window.localStorage;
   } catch {
     // Blocked storage greets once per session.
+    return null;
   }
+}
+function initialWelcome() {
+  if (welcomeDismissed) return false;
   // A link to a house that isn't here greets a newcomer like a plain visit.
-  return shouldWelcome(initialSelection() ? window.location.hash : '', storage);
+  return shouldWelcome(initialSelection() ? window.location.hash : '', welcomeStorage());
+}
+// The house a newcomer's shared link opened on, which introduces the town once instead.
+function initialArrival() {
+  if (welcomeDismissed) return null;
+  const plot = initialSelection();
+  const place = places.find((place) => place.plot === plot);
+  return place && shouldIntroduce(window.location.hash, welcomeStorage()) ? place.id : null;
+}
+function rememberWelcome() {
+  welcomeDismissed = true;
+  try {
+    localStorage.setItem(WELCOME_KEY, '1');
+  } catch {
+    // The module flag above still keeps it closed.
+  }
 }
 function initialSelection() {
   const link = readDeepLink(window.location.hash, places);
@@ -113,9 +139,10 @@ export default function App() {
   const [sourceId, setSourceId] = useState<string>();
   const [buildPlot, setBuildPlot] = useState<string>();
   const [draft, setDraft] = useState<Place | null>(null);
-  const [toast, setToast] = useState<{ text: string; note?: boolean } | null>(null);
+  const [toast, setToast] = useState<{ text: string; note?: boolean; keep?: boolean } | null>(null);
   const [shared, setShared] = useState(false);
   const [welcome, setWelcome] = useState(initialWelcome);
+  const [arrival, setArrival] = useState(initialArrival);
   const clock = useTownClock();
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
@@ -184,6 +211,7 @@ export default function App() {
     setSelectedPlot(plotId);
     setSelectedEventId(null);
     setShared(false);
+    setArrival(null);
     if (plotId) setPanel('places');
     window.history.replaceState(
       null,
@@ -234,7 +262,11 @@ export default function App() {
       setDraft(null);
   }, [draft, places]);
   useEffect(() => {
-    if (!toast) return;
+    if (arrival) rememberWelcome();
+  }, [arrival]);
+  useEffect(() => {
+    // A link to copy by hand stays until it is dismissed.
+    if (!toast || toast.keep) return;
     const timer = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(timer);
   }, [toast]);
@@ -256,28 +288,41 @@ export default function App() {
     setSelectedPlot(null);
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
   }, []);
-  async function share() {
-    if (!selected) return;
-    const url = new URL(window.location.href);
-    url.hash = `place=${encodeURIComponent(selected.id)}`;
+  async function share(title: string) {
+    if (!selectedPlot) return;
+    const url = shareUrl(selectedPlot, places, {
+      href: window.location.href,
+      base: import.meta.env.BASE_URL,
+      pages: import.meta.env.PROD,
+    });
+    if (navigator.share)
+      try {
+        await navigator.share({ title, url });
+        setShared(true);
+        return;
+      } catch (error) {
+        // Closing the share sheet is not a failure; anything else falls back to copying.
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+      }
     try {
-      await navigator.clipboard.writeText(url.href);
+      await navigator.clipboard.writeText(url);
       setShared(true);
       setToast({ text: 'Link copied.' });
     } catch {
-      setToast({ text: 'Copy the browser address to share this home.', note: true });
+      // A house's own page isn't the address in the browser, so the note spells it out.
+      const what = selected ? 'home' : 'place';
+      setToast(
+        url === window.location.href
+          ? { text: `Copy the browser address to share this ${what}.`, note: true }
+          : { text: `Copy this link to share this ${what}: ${url}`, note: true, keep: true },
+      );
     }
   }
   const dismissWelcome = useCallback(() => {
-    welcomeDismissed = true;
     // The card is about to unmount; don't strand keyboard focus on <body>.
     if (document.activeElement?.closest('.welcome-card')) exploreButton.current?.focus();
     setWelcome(false);
-    try {
-      localStorage.setItem(WELCOME_KEY, '1');
-    } catch {
-      // The module flag above still keeps it closed.
-    }
+    rememberWelcome();
   }, []);
   const closeBuilder = useCallback(() => setModal(null), []);
   const preview = useCallback(
@@ -287,6 +332,8 @@ export default function App() {
     },
     [select],
   );
+  // Every venue panel shares its #venue= link.
+  const sharesVenue = !selected && linkHash(selectedPlot, places).startsWith('#venue=');
   const heading =
     selected?.name ??
     (selectedFarm ? FARM.name : undefined) ??
@@ -507,6 +554,14 @@ export default function App() {
               </div>
             ) : selected ? (
               <div className="home-info">
+                {arrival === selected.id && (
+                  <p className="arrival-intro">
+                    {ARRIVAL_COPY.body(isFoundingPlace(selected) ? null : selected.creator)}{' '}
+                    <button className="text-button" onClick={() => setModal('guide')}>
+                      {ARRIVAL_COPY.action} <ArrowRight size={14} />
+                    </button>
+                  </p>
+                )}
                 <div className={`home-illustration ${night ? 'night' : ''}`}>
                   <BuildingPreview place={selected} size={145} night={night} />
                   <span>
@@ -559,7 +614,10 @@ export default function App() {
                       </button>
                     ) : (
                       <>
-                        <button className="text-button" onClick={share}>
+                        <button
+                          className="text-button"
+                          onClick={() => share(shareTitle(selected.name, selected.creator))}
+                        >
                           {shared ? <Check size={14} /> : <Share2 size={14} />} Share
                         </button>
                         <button
@@ -685,6 +743,13 @@ export default function App() {
                   Show plot labels
                 </label>
               </>
+            )}
+            {sharesVenue && (
+              <div className="venue-actions">
+                <button className="text-button" onClick={() => share(shareTitle(heading))}>
+                  {shared ? <Check size={14} /> : <Share2 size={14} />} Share
+                </button>
+              </div>
             )}
           </div>
         </section>

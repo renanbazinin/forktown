@@ -76,6 +76,8 @@ On your GitHub fork, click **Compare & pull request**. Target **renanbazinin/for
 
 After checks, merge, and deployment, your house appears in the [live town](https://renanbazinin.github.io/forktown/). Your first house merges automatically once every check passes, if the PR changes nothing else; anything else waits for a maintainer’s review. If changes are requested, commit and push them on the same branch to update that pull request.
 
+Once you’ve moved in, select your house and click **Share**. The link opens a page of its own, `house/YOUR_FILE_ID/`, so it shows your house’s name and story wherever you post it.
+
 ## About Forktown
 
 Forktown makes a first open-source contribution something you can visit. Each contributed house brings a neighbor, a story, and its creator’s credit into a shared pixel town.

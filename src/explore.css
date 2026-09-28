@@ -447,6 +447,27 @@ body,
 .home-actions .text-button {
   font-size: 13px;
 }
+/* Share for a venue, under whichever panel it has. */
+.venue-actions {
+  padding: 0 22px 22px;
+}
+.football-info + .venue-actions {
+  padding: 0 18px 20px;
+}
+/* One line for a newcomer who arrived by a shared house link, above the house. */
+.arrival-intro {
+  margin: 0;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--green-pale);
+  font-size: 13px;
+  line-height: 1.6;
+}
+.arrival-intro .text-button {
+  gap: 4px;
+  min-height: 0;
+  vertical-align: bottom;
+}
 .quiet-label {
   font: 10px var(--mono);
   letter-spacing: 1px;
@@ -603,6 +624,8 @@ body,
 }
 .town-app .toast {
   bottom: 90px;
+  /* A house page's address, when there is no clipboard, wraps instead of running off a phone. */
+  overflow-wrap: anywhere;
 }
 /* Inside an open dialog, at its foot. A dialog as tall as the screen has no room below it, so
    there the note covers its last lines for the few seconds it shows. */
@@ -708,6 +731,9 @@ body,
   }
   .home-info-body {
     padding: 16px;
+  }
+  .arrival-intro {
+    padding: 10px 16px;
   }
   .town-app .follow-status {
     top: 125px;
@@ -1461,6 +1487,9 @@ body,
 @media (max-width: 600px) {
   .football-info {
     padding: 12px 14px 16px;
+  }
+  .football-info + .venue-actions {
+    padding: 0 14px 16px;
   }
   .football-info > .quiet-label {
     display: none;

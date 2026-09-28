@@ -33,7 +33,7 @@ Starter places use `creator: "forktown"` as a project credit, not a real communi
 - Optional original music: day and night themes, three concert arrangements, and a midnight dance track, with a volume control, soft transitions, and automatic pause when the tab is hidden. See [Forktown FM](MUSIC.md) for the listening preview and score guide.
 - Exterior signs: simple text or a restricted HTML/CSS artwork language, drawn as noninteractive canvas textures.
 - A full-screen town with compact controls. Explore opens searchable places and open plots; the neighbor and music buttons reveal residents and events. All directories work with a keyboard.
-- Place stories, contributor credit, and shareable `#place=id` links without server routing.
+- Place stories, contributor credit, and shareable links without server routing: `#place=id` and `#venue=name` in town, and a link-preview page for every house, `house/<id>/`.
 - A live building editor, local preview, direct saves to your local checkout, JSON export, and browser-based contribution instructions.
 - A shared schema used by the editor, build, and contribution validator.
 - Friendly errors for occupied plots, duplicate ids, invalid names, unsupported fields, and malformed JSON.

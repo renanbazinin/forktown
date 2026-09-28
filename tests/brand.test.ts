@@ -4,6 +4,7 @@ import { inflateSync } from 'node:zlib';
 import { touchIconScanlines } from '../scripts/touch-icon';
 import { describe, expect, it } from 'vitest';
 import {
+  ARRIVAL_COPY,
   BRAND,
   CSS_TOKENS,
   MARK_PIXELS,
@@ -13,6 +14,8 @@ import {
   WELCOME_KEY,
   contrast,
   markSvg,
+  shareTitle,
+  shouldIntroduce,
   shouldWelcome,
   type BrandColor,
 } from '../src/lib/brand';
@@ -132,5 +135,51 @@ describe('The first-visit welcome', () => {
     };
     expect(shouldWelcome('', broken)).toBe(true);
     expect(shouldWelcome('', null)).toBe(true);
+  });
+});
+
+describe('A newcomer who follows a shared house link', () => {
+  const broken = {
+    getItem: () => {
+      throw new Error('blocked');
+    },
+  };
+
+  it('is introduced in the house panel once, instead of the welcome card', () => {
+    expect(shouldIntroduce('#place=arts', storage())).toBe(true);
+    expect(shouldIntroduce('#other=1&place=arts', storage())).toBe(true);
+    expect(shouldIntroduce('#place=arts', storage({ [WELCOME_KEY]: '1' }))).toBe(false);
+    // Venues and plain visits have the welcome card's own rules.
+    expect(shouldIntroduce('#venue=stage', storage())).toBe(false);
+    expect(shouldIntroduce('', storage())).toBe(false);
+    // Blocked storage introduces the town once per page load, like the welcome.
+    expect(shouldIntroduce('#place=arts', broken)).toBe(true);
+    expect(shouldIntroduce('#place=arts', null)).toBe(true);
+  });
+
+  it('credits the neighbor, or says a founding house was here first', () => {
+    expect(ARRIVAL_COPY.body('someone')).toBe(
+      'Forktown is built by first-time contributors. @someone added this house with one JSON file.',
+    );
+    expect(ARRIVAL_COPY.body(null)).not.toContain('@');
+    expect(ARRIVAL_COPY.body(null)).toContain('founding house');
+    for (const line of [ARRIVAL_COPY.body('someone'), ARRIVAL_COPY.body(null), ARRIVAL_COPY.action])
+      expect(line).not.toMatch(/!|\b(?:repo|commit|branch|SHA)\b/);
+  });
+
+  it('shows the line where the house opens, and stores the welcome flag once it does', () => {
+    const app = readFileSync('src/App.tsx', 'utf8');
+    expect(app).toContain('shouldIntroduce(window.location.hash, welcomeStorage())');
+    expect(app).toContain('if (arrival) rememberWelcome();');
+    expect(app).toMatch(/arrival === selected\.id && \(\s*<p className="arrival-intro">/);
+    expect(app).toMatch(/onClick=\{\(\) => setModal\('guide'\)\}>\s*\{ARRIVAL_COPY\.action\}/);
+  });
+});
+
+describe('Share titles', () => {
+  it('name the neighbor, but never the founding houses’ starter credit', () => {
+    expect(shareTitle('Moss Nook', 'someone')).toBe('Moss Nook by @someone · Forktown');
+    expect(shareTitle('Moonbeam Café', 'forktown')).toBe('Moonbeam Café · Forktown');
+    expect(shareTitle('The Little Stage')).toBe('The Little Stage · Forktown');
   });
 });

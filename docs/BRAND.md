@@ -119,7 +119,7 @@ Lines to use:
 - "At nightfall the lanterns come on, oldest first."
 - "Every house here started as a fork. Yours could hang here next."
 
-Interface strings owned by the identity (the welcome, the guide steps, and the empty-plot lines) live in `src/lib/brand.ts`.
+Interface strings owned by the identity (the welcome, the arrival line, the guide steps, the empty-plot lines, and the share titles) live in `src/lib/brand.ts`.
 
 ## The amber budget
 
@@ -134,6 +134,8 @@ The Treeline keeps to it too: its glass stays cool at night, and only the small 
 ## The welcome card
 
 A first visit (no saved flag, and no `#place=` or `#venue=` link to a house or venue the town has) shows a quiet card above the dock: the tiled mark, **Every house here started as a fork.**, the neighbor count and the newest arrival, and when nightfall comes. It is an `aside`, not a dialog, and never takes focus. It hides while a panel is open. Any of its actions, or its close button, stores `forktown-welcomed-v1` in local storage. When storage is blocked it greets once per page load. A link to a house or venue the town doesn't have still greets the newcomer, with a note saying so beside the card. `/live` never shows it.
+
+A newcomer who follows a shared house link, `#place=` or a house's own page, skips the card. The house panel opens with one line above the house instead: **Forktown is built by first-time contributors. @neighbor added this house with one JSON file.** and an **Add yours** link to the guide. A founding house says the town is built one JSON file per house, and that this house was here to greet them. Showing the line stores the same flag, so it appears once; choosing anything else on the map puts it away. Link previews and the share sheet name a house "Name by @neighbor · Forktown", and a founding house or a venue "Name · Forktown".
 
 ## The dusk skin
 
