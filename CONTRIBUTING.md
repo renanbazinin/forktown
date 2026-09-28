@@ -116,7 +116,11 @@ After committing, run `npm run check:pr -- origin/main HEAD` to check the house 
 
 ## Other ways to help
 
-Improve the guide, report a reproducible bug, test the site with a screen reader, add translations, draw a new building style in the renderer, or help plan the next neighborhood. For a new mechanism or a large change, open an issue first so we can agree on the shape of it.
+Looking for something to pick up? Issues labeled [good first issue](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) are small, with file pointers and a clear finish line. [Help wanted](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22) issues are bigger pieces of the town, or need a particular skill. Say hello on the issue before you start, so two people don’t build the same thing.
+
+You can also improve the guide, report a reproducible bug, test the site with a screen reader, add translations, draw a new building style in the renderer, or help plan the next neighborhood. For a new mechanism or a large change, open an issue first so we can agree on the shape of it.
+
+Here for Hacktoberfest? See [what it means in Forktown](docs/CONTRIBUTION_POLICY.md#hacktoberfest).
 
 Implementation notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Please keep meaningful tests for contribution rules, geometry, and other behavior that newcomers depend on.
 

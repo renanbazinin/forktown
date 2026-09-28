@@ -26,10 +26,12 @@
 
 ## Good early community contributions
 
+Several of these have an issue labeled [good first issue](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) or [help wanted](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22), with file pointers and a clear finish line.
+
 - Try the contribution instructions with someone new to GitHub and improve confusing steps.
 - Test the directory, builder, and dialogs with assistive technology.
 - Add a new decoration or building family with an example and tests for any new data rules.
-- Add a translation framework and a first translated guide.
+- Translate a guide into another language. A translation framework for the site can follow.
 - Add a respectful neighborhood or walking route guided by place stories.
 
 ## When the first neighborhood fills up

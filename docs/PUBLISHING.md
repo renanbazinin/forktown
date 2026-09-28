@@ -6,7 +6,7 @@ The working project is local until you create a remote repository and deploy it.
 
 1. Create an empty GitHub repository named `forktown` (or a name you prefer).
 2. Push this project to its `main` branch.
-3. Add a short repository description, topics, and a website link after deployment.
+3. Add a short repository description and a website link after deployment.
 
 For local GitHub links, copy `.env.example` to `.env` and set:
 
@@ -47,9 +47,12 @@ Publish the `dist` folder. Set `VITE_BASE_PATH=/` for a root-domain site, or `/y
 
 ## Before inviting contributors
 
-- Protect `main` as [Contribution policy and merge protection](CONTRIBUTION_POLICY.md) describes: require the `check` and `Contribution policy` statuses and up-to-date branches, keep the general review count at zero (the policy asks for review where it matters), and leave merge queues off. Don’t require `Auto-merge`: it only says whether a PR merges itself.
-- Turn on private vulnerability reporting in **Settings → Code security**. [SECURITY.md](../SECURITY.md), [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) and `.github/ISSUE_TEMPLATE/config.yml` send private security and conduct reports to that form; in your own fork, point those links at your repository.
-- Test one contribution from a fork, check its build artifact, and confirm that merging updates the public town.
-- Add some `good first issue` and `help wanted` issues for documentation, accessibility, and future building designs.
+Ticked items are done for renanbazinin/forktown. In your own fork, work through all of them.
+
+- [x] Protect `main` as [Contribution policy and merge protection](CONTRIBUTION_POLICY.md) describes: require the `check` and `Contribution policy` statuses and up-to-date branches, keep the general review count at zero (the policy asks for review where it matters), and leave merge queues off. Don’t require `Auto-merge`: it only says whether a PR merges itself. Done September 21, 2026.
+- [ ] Turn on private vulnerability reporting in **Settings → Code security**. [SECURITY.md](../SECURITY.md), [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) and `.github/ISSUE_TEMPLATE/config.yml` send private security and conduct reports to that form; in your own fork, point those links at your repository.
+- [x] Test one contribution from a fork, check its build artifact, and confirm that merging updates the public town. Done with PR #41 on September 24, 2026; see the [external contributor trial](EXTERNAL_CONTRIBUTOR_TRIAL.md).
+- [ ] Add five to eight repository topics, leaving out `hacktoberfest` (see [Hacktoberfest](CONTRIBUTION_POLICY.md#hacktoberfest)), and upload `public/og-image.png` in **Settings → Social preview**, so links to the repository show the town too.
+- [ ] Open some `good first issue` and `help wanted` issues for documentation, accessibility, translations, and bigger pieces of the town, with file pointers and a clear finish line. The README and CONTRIBUTING already link to both lists.
 
 Starter JSON files credit the project as `forktown`. Real contributions should credit the actual pull request author. Keep the starter designation clear and review changes to existing places.
