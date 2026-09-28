@@ -22,7 +22,7 @@ import {
 import { HOUSE_PLOTS as PLOTS } from '../lib/events';
 import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
-import { pickDraftNames } from '../lib/draft-names';
+import { availableId, pickDraftNames } from '../lib/draft-names';
 import { restoreDraftDesign, restoreDraftPlot, storyPrompt } from '../lib/builder-nudges';
 import { BUILDER_DEFAULT_STORY } from '../lib/lanterns';
 import BuildingPreview from './BuildingPreview';
@@ -50,19 +50,6 @@ const initial = (plot: string, places: Place[]): Place => {
   });
 };
 const storageKey = 'forktown-draft-v2';
-function availableId(name: string, places: Place[]) {
-  const base =
-    name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 34)
-      .replace(/-$/, '') || 'my-place';
-  let id = base.length < 3 ? `my-${base}` : base;
-  let suffix = 2;
-  while (places.some((place) => place.id === id)) id = `${base}-${suffix++}`;
-  return id;
-}
 
 const Contribute = memo(function Contribute({
   plot,

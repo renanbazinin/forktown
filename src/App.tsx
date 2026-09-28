@@ -38,6 +38,7 @@ import ResidentPreview from './components/ResidentPreview';
 import SignPreview from './components/SignPreview';
 import Contribute from './components/Contribute';
 import HouseFiles from './components/HouseFiles';
+import StartOnGitHub from './components/StartOnGitHub';
 import Modal from './components/Modal';
 import Toast from './components/Toast';
 import FullTownNote from './components/FullTownNote';
@@ -69,6 +70,7 @@ import {
   PLOT_COPY,
   TITLE,
   WELCOME_KEY,
+  guideSteps,
   shareTitle,
   shouldIntroduce,
   shouldWelcome,
@@ -141,6 +143,8 @@ export default function App() {
   const [draft, setDraft] = useState<Place | null>(null);
   const [toast, setToast] = useState<{ text: string; note?: boolean; keep?: boolean } | null>(null);
   const [shared, setShared] = useState(false);
+  // Typed on an open plot and kept while the visitor compares plots. It goes only into the link.
+  const [githubUsername, setGithubUsername] = useState('');
   const [welcome, setWelcome] = useState(initialWelcome);
   const [arrival, setArrival] = useState(initialArrival);
   const clock = useTownClock();
@@ -203,6 +207,12 @@ export default function App() {
   );
   // No house plot is free. An unsaved preview can still be saved: it holds its own plot.
   const townFull = !available.length && !draft;
+  // The published town saves nothing, so an open plot starts its house on GitHub instead.
+  const startInBrowser = !localSaveAvailable && !!repositoryUrl && !townFull;
+  const startPlot =
+    !localSaveAvailable && repositoryUrl && available.some((plot) => plot.id === selectedPlot)
+      ? selectedPlot
+      : null;
   const liveEvent = events.find((event) => isEventLive(event, clock.minutes));
 
   const select = useCallback((plotId: string | null, focus = false) => {
@@ -282,6 +292,14 @@ export default function App() {
     setBuildPlot(plot);
     setModal('contribute');
   }
+  function showOpenPlots() {
+    setModal(null);
+    select(null);
+    setPanel('places');
+    setFilter('empty');
+    setSearch('');
+    setShowPlots(true);
+  }
   const follow = useCallback((id: string) => {
     setFollowed(id);
     setPanel(null);
@@ -342,7 +360,9 @@ export default function App() {
     (selectedFootball ? FOOTBALL_VENUE.name : undefined) ??
     selectedVenue?.name ??
     (selectedPlot
-      ? `Plot ${selectedPlot}`
+      ? startPlot
+        ? `Plot ${selectedPlot} is open`
+        : `Plot ${selectedPlot}`
       : panel === 'neighbors'
         ? 'Neighbors'
         : panel === 'events'
@@ -634,6 +654,15 @@ export default function App() {
                   </div>
                 </div>
               </div>
+            ) : startPlot && repositoryUrl ? (
+              <StartOnGitHub
+                plot={startPlot}
+                places={places}
+                repositoryUrl={repositoryUrl}
+                typed={githubUsername}
+                onTyped={setGithubUsername}
+                night={night}
+              />
             ) : selectedPlot ? (
               <div className="empty-corner">
                 <Sprout size={36} strokeWidth={1.3} />
@@ -772,7 +801,7 @@ export default function App() {
           <div className="welcome-guide">
             <p>{GUIDE_COPY.intro}</p>
             <ol>
-              {GUIDE_COPY.steps.map(([title, detail], i) => (
+              {guideSteps(startInBrowser).map(([title, detail], i) => (
                 <li key={title}>
                   <span aria-hidden="true">{i + 1}</span>
                   <div>
@@ -793,14 +822,21 @@ export default function App() {
                 Build a place <ArrowRight size={16} />
               </button>
             ) : repositoryUrl ? (
-              <a
-                className="button button-primary"
-                href={`${repositoryUrl}/fork`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Fork on GitHub <ExternalLink size={15} />
-              </a>
+              <div className="guide-actions">
+                {startInBrowser && (
+                  <button className="button button-primary" onClick={showOpenPlots}>
+                    {GUIDE_COPY.openPlots} <ArrowRight size={16} />
+                  </button>
+                )}
+                <a
+                  className={`button ${startInBrowser ? 'button-secondary' : 'button-primary'}`}
+                  href={`${repositoryUrl}/fork`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Fork on GitHub <ExternalLink size={15} />
+                </a>
+              </div>
             ) : (
               <p className="muted-copy">Run your own local copy to start building.</p>
             )}

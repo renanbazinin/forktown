@@ -8,11 +8,16 @@
 
 ## 1. Start in the live town
 
-Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find your way in**. You’ll see **Fork on GitHub**:
+Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find your way in**. You’ll see **Pick an open plot** and **Fork on GitHub**:
 
 <img src="docs/images/contribute-live.jpg" alt="Live site: Make yourself at home shows the three contribution steps and a Fork on GitHub button." width="640">
 
-**Why can’t I build here?** The published town is read-only. It can show houses and their JSON, but cannot save files to your computer’s project. Building happens in your local copy; a merged pull request brings your house to the shared town.
+**Why can’t I build here?** The published town saves nothing, so there are two ways in:
+
+- **Quick, in your browser.** Choose **Pick an open plot**, or select an open plot on the map. Type your GitHub username and choose **Create my house file on GitHub**: GitHub opens a new file in `places/` with a whole house filled in. Write your own story, change what you like, propose the file and open your pull request. No install needed; [step by step](CONTRIBUTING.md#start-in-your-browser).
+- **The full builder, with a preview.** Fork the town and run it on your computer, as below. You design every detail and see your house in town before you send it.
+
+Either way, a merged pull request brings your house to the shared town.
 
 ## 2. Fork it and run it locally
 

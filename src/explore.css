@@ -535,6 +535,164 @@ body,
   line-height: 1.6;
   text-align: center;
 }
+/* The published town's open plot: a whole house, ready to propose on GitHub. */
+.start-on-github {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+}
+.start-house {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.start-house canvas {
+  flex-shrink: 0;
+}
+.start-house > span {
+  min-width: 0;
+}
+.start-house strong {
+  display: block;
+  font: 500 20px var(--serif);
+}
+.start-house small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.start-house code {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+}
+.start-on-github code {
+  font: 11px var(--mono);
+  overflow-wrap: anywhere;
+}
+.start-username {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.start-username .input-prefix {
+  min-height: 41px;
+  font-size: 14px;
+  font-weight: 400;
+}
+.start-username input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px 9px 4px;
+  font-size: 14px;
+}
+.start-hint {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.start-hint-needed {
+  padding: 9px 11px;
+  border-radius: 8px;
+  background: var(--lantern-pale);
+  color: var(--lantern-ink);
+}
+.start-on-github .field-error {
+  font-size: 12px;
+}
+.start-on-github .button {
+  white-space: normal;
+}
+.start-on-github .button:disabled {
+  opacity: 0.55;
+  transform: none;
+  cursor: not-allowed;
+}
+.start-on-github .button-primary:disabled:hover {
+  background: var(--green);
+}
+.start-steps {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.start-steps li::marker {
+  color: var(--green);
+  font: 700 12px var(--mono);
+}
+.start-steps strong {
+  font-weight: 600;
+}
+.start-steps a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.start-fallback {
+  padding: 12px 14px;
+  border-radius: 9px;
+  background: var(--green-pale);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.start-fallback > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 18px;
+  margin-top: 4px;
+}
+.start-fallback .text-button {
+  font-size: 12px;
+}
+.start-fallback .text-button:disabled {
+  opacity: 0.55;
+  text-decoration: none;
+  cursor: not-allowed;
+}
+.start-fallback [role='status']:not(:empty) {
+  margin-top: 4px;
+  color: var(--green-deep);
+  font-weight: 600;
+}
+.start-file summary {
+  width: max-content;
+  cursor: pointer;
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 600;
+}
+.start-file pre {
+  max-height: 260px;
+  margin-top: 10px;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #f1f3ea;
+  font: 11px/1.55 var(--mono);
+}
+.start-file pre code {
+  overflow-wrap: normal;
+}
+.guide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
 .draft-chip {
   position: absolute;
   z-index: 4;
@@ -748,6 +906,13 @@ body,
   }
   .welcome-guide {
     padding: 18px 22px 25px;
+  }
+  .start-on-github {
+    padding: 16px;
+  }
+  /* Phones zoom in on a field with smaller text. */
+  .start-username input {
+    font-size: 16px;
   }
 }
 
@@ -1762,6 +1927,32 @@ body,
   color: #9fc08e;
 }
 .town-app-night .empty-corner p {
+  color: var(--dusk-ink);
+}
+.town-app-night .start-username .input-prefix {
+  background: var(--dusk);
+  border-color: var(--dusk-line);
+  color: var(--dusk-muted);
+}
+.town-app-night .start-username input {
+  color: var(--dusk-ink);
+}
+.town-app-night .start-username input::placeholder {
+  color: var(--dusk-muted);
+}
+.town-app-night .start-on-github .field-error {
+  color: #f0b3a2;
+}
+.town-app-night .start-steps li::marker,
+.town-app-night .start-steps a,
+.town-app-night .start-file summary {
+  color: var(--dusk-link);
+}
+.town-app-night .start-fallback [role='status'] {
+  color: var(--dusk-ink);
+}
+.town-app-night .start-file pre {
+  background: var(--dusk);
   color: var(--dusk-ink);
 }
 .town-app-night .map-label-setting input,

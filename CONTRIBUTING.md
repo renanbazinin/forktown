@@ -1,14 +1,26 @@
 # Welcome, neighbor
 
-New here? Start with the [visual quick start](README.md): live site → localhost → build → save → pull request, with screenshots and copyable commands.
+New here? Start with the [visual quick start](README.md): live site → localhost → build → save → pull request, with screenshots and copyable commands. Rather not install anything? [Start in your browser](#start-in-your-browser) instead.
 
 You don’t need to be an expert to contribute to Forktown. A thoughtful first contribution is a small place with your own name, style, and story.
 
 Want to learn from another house? Choose **Browse house files** in the builder, or select a house in town and click **View JSON**. In the **Find your way in** dialog, **House files** opens every house's JSON too. You can read and copy its actual JSON from `places/`, then return to your draft. After saving locally, **See my saved JSON** opens your new file. Local saves, private previews, and downloads do not publish anything to the shared town; a merged pull request is how your house gets there.
 
+## Start in your browser
+
+The published town saves nothing itself, but it can hand GitHub a whole house for an open plot. You need a GitHub account and nothing else.
+
+1. In the [live town](https://renanbazinin.github.io/forktown/), select an open plot on the map, or choose **Find your way in → Pick an open plot**.
+2. Type your GitHub username and choose **Create my house file on GitHub**. GitHub opens a new file in `places/`, named after the house's id, with every field filled in.
+3. If GitHub asks you to fork the repository first, accept.
+4. Replace the placeholder `story` with your own, so the Lantern Fork can tell it as Tonight's tale; it never tells the one filled in. Change the name and colors too, if you like; [every field](#or-write-one-file-yourself) is explained below. Keep the file name and `id` the same, and keep your own username in `creator`.
+5. Choose **Commit changes**, then **Propose changes**, then **Create pull request**.
+
+If GitHub opens an empty file, it dropped the text while it made your fork. Back in the town, choose **Copy JSON**, then **Start a blank file**, name it as the panel shows, and paste.
+
 ## Build in your own copy
 
-The published GitHub Pages town is read-only: explore houses and their JSON there, then build in your own local fork.
+The full builder, with a preview of your house in town before you send it, runs in your own local fork. Explore houses and their JSON on the published town, then build on your computer.
 
 1. On GitHub, fork the repository and clone your fork to your computer. Create a contribution branch.
 2. Follow [Develop locally](#develop-locally) below to install dependencies and start your local town.
@@ -91,7 +103,7 @@ Add your file to `places/`, and the city reloads automatically.
 
 You can also let the builder create the file: choose **Find your way in → Build a place → Continue to save → Save to my project**. It writes `places/<your-file-id>.json` into the checkout running `npm run dev`, and the local city updates. Existing files are never overwritten; choose a new id or edit an existing file yourself. Review the new file, commit it, push your branch, and open your PR. Saving does not make commits, switch branches, push, or create a PR.
 
-The builder and save button are available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy.
+The builder and save button are available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy. When it knows its GitHub repository, an open plot there also starts a house file on GitHub.
 
 Before sending a pull request, check your house:
 

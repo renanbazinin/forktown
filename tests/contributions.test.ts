@@ -403,6 +403,8 @@ describe('The buttons the guides tell newcomers to click', () => {
   const github = new Set([
     'Create fork',
     'Compare & pull request',
+    'Commit changes',
+    'Propose changes',
     'Create pull request',
     'Update branch',
   ]);

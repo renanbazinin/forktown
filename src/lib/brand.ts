@@ -172,7 +172,20 @@ export const GUIDE_COPY = {
       "Send your house back to the town. Once it's merged, you move in and your lantern joins the Fork.",
     ],
   ],
+  /** The first step where an open plot can start a house on GitHub. */
+  forkInBrowser:
+    'Make your own copy on GitHub. Start right in your browser from an open plot, or run the town on your computer for the full builder.',
+  openPlots: 'Pick an open plot',
 } as const;
+
+/**
+ * The guide's steps. Only a published town that knows its repository and has a plot free can
+ * start a house in the browser, so only there does the first step offer it.
+ */
+export const guideSteps = (inBrowser: boolean): readonly (readonly [string, string])[] =>
+  inBrowser
+    ? [[GUIDE_COPY.steps[0][0], GUIDE_COPY.forkInBrowser], ...GUIDE_COPY.steps.slice(1)]
+    : GUIDE_COPY.steps;
 
 export const PLOT_COPY = {
   title: 'Room for one more lantern.',
