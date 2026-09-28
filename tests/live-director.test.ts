@@ -363,20 +363,18 @@ describe('Live broadcast director', () => {
       [1920, 900],
       [390, 844],
     ]) {
-      for (let second = 0; second < 1440; second += 5) {
-        const camera = liveCamera(shot, width, height, second);
-        const screen = (x: number, y: number) => ({
-          x: x * camera.zoom + camera.x,
-          y: y * camera.zoom + camera.y,
-        });
-        const topLeft = screen(fork.x + FORK_BOUNDS.left, fork.y + FORK_BOUNDS.top);
-        const bottomRight = screen(fork.x + FORK_BOUNDS.right, fork.y + FORK_BOUNDS.bottom);
-        expect(topLeft.x).toBeGreaterThan(0);
-        expect(topLeft.y).toBeGreaterThan(0);
-        expect(bottomRight.x).toBeLessThan(width);
-        expect(bottomRight.y).toBeLessThan(height);
-      }
-      expect(liveCamera(shot, width, height).zoom).toBeLessThanOrEqual(1.8);
+      const camera = liveCamera(shot, width, height);
+      const screen = (x: number, y: number) => ({
+        x: x * camera.zoom + camera.x,
+        y: y * camera.zoom + camera.y,
+      });
+      const topLeft = screen(fork.x + FORK_BOUNDS.left, fork.y + FORK_BOUNDS.top);
+      const bottomRight = screen(fork.x + FORK_BOUNDS.right, fork.y + FORK_BOUNDS.bottom);
+      expect(topLeft.x).toBeGreaterThan(0);
+      expect(topLeft.y).toBeGreaterThan(0);
+      expect(bottomRight.x).toBeLessThan(width);
+      expect(bottomRight.y).toBeLessThan(height);
+      expect(camera.zoom).toBeLessThanOrEqual(1.8);
     }
   });
 
@@ -393,8 +391,7 @@ describe('Live broadcast director', () => {
           [1920, 900],
           [390, 844],
         ]) {
-          const camera = liveCamera(shot, width, height, minute);
-          expect(camera).toEqual(liveCamera(shot, width, height));
+          const camera = liveCamera(shot, width, height);
           for (const duck of ducksAt(minute)) {
             const point = project(duck.position.x, duck.position.y);
             expect(point.x * camera.zoom + camera.x).toBeGreaterThan(20);
@@ -421,7 +418,7 @@ describe('Live broadcast director', () => {
             [1920, 900],
             [390, 844],
           ]) {
-            const camera = liveCamera(shot, width, height, minute);
+            const camera = liveCamera(shot, width, height);
             expect(point.x * camera.zoom + camera.x).toBeGreaterThan(20);
             expect(point.x * camera.zoom + camera.x).toBeLessThan(width - 20);
             expect(point.y * camera.zoom + camera.y).toBeGreaterThan(20);
@@ -435,7 +432,7 @@ describe('Live broadcast director', () => {
     }
   });
 
-  it('keeps subjects framed during gentle drift and leaves people and cat tracking alone', () => {
+  it('holds each shot centered without added drift or zoom', () => {
     for (const minute of [100, 320, 650, 800, 1200]) {
       const shot = shotAt(12, minute);
       for (const [width, height] of [
@@ -443,25 +440,24 @@ describe('Live broadcast director', () => {
         [390, 844],
         [844, 390],
       ]) {
-        const base = liveCamera(shot, width, height);
-        for (let second = 0; second < 1440; second += 5) {
-          const camera = liveCamera(shot, width, height, second);
-          const x = camera.x + shot.center.x * camera.zoom,
-            y = camera.y + shot.center.y * camera.zoom;
-          expect(camera.zoom).toBeGreaterThanOrEqual(base.zoom);
-          expect(camera.zoom).toBeLessThanOrEqual(base.zoom * 1.04);
-          expect(x - (shot.width * camera.zoom) / 2).toBeGreaterThan(0);
-          expect(x + (shot.width * camera.zoom) / 2).toBeLessThan(width);
-          expect(y - (shot.height * camera.zoom) / 2).toBeGreaterThan(0);
-          expect(y + (shot.height * camera.zoom) / 2).toBeLessThan(height);
-        }
+        const camera = liveCamera(shot, width, height);
+        const x = camera.x + shot.center.x * camera.zoom,
+          y = camera.y + shot.center.y * camera.zoom;
+        expect(x).toBeCloseTo(width / 2);
+        expect(y).toBeCloseTo(height / 2);
+        expect(x - (shot.width * camera.zoom) / 2).toBeGreaterThan(0);
+        expect(x + (shot.width * camera.zoom) / 2).toBeLessThan(width);
+        expect(y - (shot.height * camera.zoom) / 2).toBeGreaterThan(0);
+        expect(y + (shot.height * camera.zoom) / 2).toBeLessThan(height);
       }
     }
-    for (const minute of [290, 510]) {
-      const shot = shotAt(12, minute);
-      expect(['cat', 'neighbor']).toContain(shot.kind);
-      expect(liveCamera(shot, 1920, 1080, 35)).toEqual(liveCamera(shot, 1920, 1080));
-    }
+    const footballDay = Array.from({ length: 30 }, (_, day) => day).find((day) =>
+      liveHighlights(day).includes('football'),
+    )!;
+    const heldMatch = [640, 700, 779.9].map((minute) => shotAt(footballDay, minute));
+    expect(heldMatch.every((shot) => shot.kind === 'event')).toBe(true);
+    const first = liveCamera(heldMatch[0], 1280, 720);
+    for (const shot of heldMatch.slice(1)) expect(liveCamera(shot, 1280, 720)).toEqual(first);
   });
 
   it('keeps a neighbor riding the tube near the centre, then settles as before', () => {
@@ -485,7 +481,7 @@ describe('Live broadcast director', () => {
         const shot = liveShotAt(program, t, residents);
         expect(shot.residentId).toBe(ride.residentId);
         const rider = residents.find((r) => r.id === ride.residentId)!;
-        const target = liveCamera(shot, width, height, t);
+        const target = liveCamera(shot, width, height);
         camera = camera ? easeLiveCamera(camera, target, 1 / 60, liveEaseSeconds(rider)) : target;
         const p = project(rider.position.x, rider.position.y);
         worst = Math.max(

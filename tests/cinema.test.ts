@@ -385,7 +385,7 @@ describe('Starlight Cinema', () => {
       [1440, 900],
       [390, 844],
     ]) {
-      const camera = liveCamera(shot, width, height, 1300);
+      const camera = liveCamera(shot, width, height);
       const x = point.x * camera.zoom + camera.x,
         y = point.y * camera.zoom + camera.y;
       expect(x).toBeGreaterThan(0);

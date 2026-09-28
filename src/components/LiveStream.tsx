@@ -87,7 +87,7 @@ export default function LiveStream() {
     const now = performance.now();
     const elapsed = lastPaint.current === null ? 0 : (now - lastPaint.current) / 1000;
     // One town minute is one real second.
-    const target = liveCamera(shot, size.width, size.height, clock.minutes);
+    const target = liveCamera(shot, size.width, size.height);
     const old = camera.current;
     const subjectX = old ? shot.center.x * old.zoom + old.x : 0;
     const subjectY = old ? shot.center.y * old.zoom + old.y : 0;

@@ -279,8 +279,8 @@ export function liveShotAt(
   };
 }
 
-export function liveCamera(shot: LiveShot, width: number, height: number, seconds = 0): Camera {
-  const baseZoom = Math.max(
+export function liveCamera(shot: LiveShot, width: number, height: number): Camera {
+  const zoom = Math.max(
     0.01,
     Math.min(
       shot.kind === 'event' || shot.kind === 'home' || shot.kind === 'lanterns' ? 1.8 : 2.4,
@@ -288,13 +288,8 @@ export function liveCamera(shot: LiveShot, width: number, height: number, second
       (height * 0.86) / shot.height,
     ),
   );
-  // Shared-clock cycles divide the town day, so the motion survives midnight and reloads.
-  const moving = shot.kind !== 'neighbor' && shot.kind !== 'cat' && shot.kind !== 'ducks';
-  const sway = moving ? Math.sin((cycle(seconds, 90) / 90) * Math.PI * 2) : 0;
-  const breath = moving ? (1 - Math.cos((cycle(seconds, 120) / 120) * Math.PI * 2)) / 2 : 0;
-  const zoom = baseZoom * (1 + breath * 0.04);
   return {
-    x: width / 2 - shot.center.x * zoom + sway * Math.min(28, width * 0.018),
+    x: width / 2 - shot.center.x * zoom,
     y: height / 2 - shot.center.y * zoom,
     zoom,
   };
