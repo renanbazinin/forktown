@@ -26,7 +26,7 @@
 
 ## Good early community contributions
 
-Several of these have an issue labeled [good first issue](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) or [help wanted](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22), with file pointers and a clear finish line.
+When one of these becomes an issue, it's labeled [good first issue](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22good%20first%20issue%22) or [help wanted](https://github.com/renanbazinin/forktown/issues?q=is%3Aissue%20is%3Aopen%20label%3A%22help%20wanted%22), with file pointers and a clear finish line.
 
 - Try the contribution instructions with someone new to GitHub and improve confusing steps.
 - Test the directory, builder, and dialogs with assistive technology.
