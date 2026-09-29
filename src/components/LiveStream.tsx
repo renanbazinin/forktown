@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { renderCity, type Camera } from '../city/render';
+import type { Camera } from '../city/render';
+import { renderTwilight } from '../city/twilight';
 import { eventsForDay } from '../lib/events';
 import { footballAt, footballListening } from '../lib/football';
 import { steadyListening } from '../lib/map-view';
@@ -102,7 +103,7 @@ export default function LiveStream() {
     lastPaint.current = now;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    renderCity({
+    renderTwilight({
       ctx,
       ...size,
       camera: camera.current,

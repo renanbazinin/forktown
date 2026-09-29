@@ -23,6 +23,11 @@
   pointer-events: none;
   filter: drop-shadow(1px 0 0 #f7f6e8) drop-shadow(-1px 0 0 #f7f6e8) drop-shadow(0 1px 0 #f7f6e8)
     drop-shadow(0 -1px 0 #f7f6e8);
+  /* The skin turns at 20:00 and 06:00 over the map chrome's 400 ms, each part below with it. */
+  transition: filter 400ms ease;
+}
+.live-watermark .brand-mark rect {
+  transition: fill 400ms ease;
 }
 .live-stream-night .live-watermark {
   filter: drop-shadow(0 2px 8px #142826);
@@ -37,6 +42,11 @@
     inset 0 1px 0 #ffffff60;
   -webkit-backdrop-filter: blur(16px) saturate(125%);
   backdrop-filter: blur(16px) saturate(125%);
+  transition:
+    color 400ms ease,
+    background-color 400ms ease,
+    border-color 400ms ease,
+    box-shadow 400ms ease;
   pointer-events: none;
 }
 .live-community {
@@ -99,12 +109,14 @@
   border-top: 1px solid #44624b20;
   margin-top: 12px;
   padding-top: 12px;
+  transition: border-color 400ms ease;
 }
 .live-avatar {
   flex-shrink: 0;
   border-radius: 11px;
   background: #698d6518;
   padding: 2px;
+  transition: background-color 400ms ease;
 }
 .live-arrival-copy {
   min-width: 0;
@@ -142,6 +154,7 @@
   background: #eff4df;
   transform: rotate(45deg);
   border-radius: 1px;
+  transition: background-color 400ms ease;
 }
 .live-follow-label .live-caption {
   display: flex;
@@ -155,6 +168,7 @@
   height: 5px;
   background: #628c51;
   border-radius: 50%;
+  transition: background-color 400ms ease;
 }
 .live-follow-label strong {
   display: block;

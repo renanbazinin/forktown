@@ -5,7 +5,8 @@ import { isTubePlot, tubeFrame, tubeStation, TUBE_LINE_NAME } from '../lib/tubes
 import { places as publishedPlaces } from '../lib/places';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Crosshair, Minus, Plus, MapPin } from 'lucide-react';
-import { cityHit, renderCity, type Camera } from '../city/render';
+import { cityHit, type Camera } from '../city/render';
+import { renderTwilight } from '../city/twilight';
 import { findPlotAt, getPlot, plotCenter, unproject } from '../lib/world';
 import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
@@ -404,7 +405,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     if (!ctx) return;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     ctx.imageSmoothingEnabled = false;
-    renderCity({
+    renderTwilight({
       ctx,
       width: size.width,
       height: size.height,

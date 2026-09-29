@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderCity } from '../src/city/render';
+import { DAY, NIGHT, renderCity } from '../src/city/render';
 import { eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
 import { placeSchema, type Place } from '../src/lib/schema';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
@@ -117,4 +117,37 @@ describe('Rendering a full town in node', () => {
             `${size} ${minutes}`,
           ).toBeGreaterThan(openingViewBudget(size));
   }, 30_000);
+});
+
+describe('Plot marks through dusk and dawn', () => {
+  // twilight.ts paints both looks with the lights' ink, so the outlines and labels of open plots
+  // never blend away into the half-dark ground.
+  it('take their ink from marksNight, not from the look', () => {
+    const inks = (night: boolean, marksNight?: boolean) => {
+      const { ctx, calls } = recordingContext(1440, 900);
+      renderCity({
+        ctx,
+        width: 1440,
+        height: 900,
+        camera: { x: 720, y: 88, zoom: 0.7 },
+        places,
+        selectedPlot: null,
+        hoveredPlot: null,
+        night,
+        marksNight,
+        showPlots: true,
+        minutes: 1215,
+        day: 3,
+      });
+      const labels = calls.filter(
+        (call) => call.name === 'fillText' && /^[A-Z]+\d+$/.test(String(call.args[0])),
+      );
+      expect(labels.length).toBeGreaterThan(10);
+      return [...new Set(labels.map((call) => call.fillStyle))];
+    };
+    expect(inks(false)).toEqual([DAY.ink]);
+    expect(inks(true)).toEqual([NIGHT.ink]);
+    expect(inks(false, true)).toEqual([NIGHT.ink]);
+    expect(inks(true, false)).toEqual([DAY.ink]);
+  });
 });

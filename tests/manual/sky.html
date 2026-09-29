@@ -82,8 +82,8 @@
     <output></output>
     <script type="module">
       // Development fixture: ?time=1165&size=390x844&view=whole opens a scene directly.
-      // It uses the real renderer and never changes the live town clock.
-      import { renderCity } from '/src/city/render.ts';
+      // It uses the real renderer, fades included, and never changes the live town clock.
+      import { renderTwilight } from '/src/city/twilight.ts';
       import { places } from '/src/lib/places.ts';
       import { VENUES } from '/src/lib/events.ts';
       import { WORLD_BOUNDS, getPlot, plotCenter } from '/src/lib/world.ts';
@@ -168,7 +168,7 @@
           whole.getAttribute('aria-pressed') === 'true'
             ? wholeTown(width, height)
             : openingView(width, height);
-        renderCity({
+        renderTwilight({
           ctx,
           width,
           height,

@@ -27,6 +27,12 @@ const layers = new WeakMap<Ctx, GroundLayer>();
 const MAX_CACHE_PIXELS = 16_777_216;
 const MAX_BANDS = 2;
 
+/** Hands a context's layer back at once, for a canvas that is being let go. */
+export function releaseGroundLayer(ctx: Ctx) {
+  for (const band of layers.get(ctx)?.bands ?? []) band.canvas.width = band.canvas.height = 0;
+  layers.delete(ctx);
+}
+
 function bandTops(width: number, height: number) {
   const rows = Math.max(1, Math.floor(MAX_CACHE_PIXELS / width));
   const tops: number[] = [];

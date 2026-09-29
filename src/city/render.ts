@@ -355,7 +355,7 @@ function diamond(ctx: Ctx, x: number, y: number, rx: number, ry: number, fill: s
     fill,
   );
 }
-type RenderOptions = {
+export type RenderOptions = {
   ctx: Ctx;
   width: number;
   height: number;
@@ -368,6 +368,11 @@ type RenderOptions = {
   selectedPlot: string | null;
   hoveredPlot: string | null;
   night: boolean;
+  /**
+   * The ink of the plot outlines and labels: `night` unless said otherwise. Through dusk and dawn
+   * both looks take the lights' 20:00 and 06:00, so the marks never blend away (twilight.ts).
+   */
+  marksNight?: boolean;
   showPlots: boolean;
   residents?: ResidentState[];
   followed?: string | null;
@@ -387,6 +392,7 @@ export function renderCity({
   selectedPlot,
   hoveredPlot,
   night,
+  marksNight = night,
   showPlots,
   residents = [],
   followed,
@@ -425,6 +431,7 @@ export function renderCity({
   const visible = within(view);
   const groundKey = [
     night,
+    marksNight,
     showPlots,
     width,
     height,
@@ -593,14 +600,15 @@ export function renderCity({
         ];
         ctx.save();
         ctx.setLineDash([4, 5]);
-        ctx.strokeStyle = active || hover ? p.ink : night ? '#ABC6B850' : '#69885A55';
+        const ink = (marksNight ? NIGHT : DAY).ink;
+        ctx.strokeStyle = active || hover ? ink : marksNight ? '#ABC6B850' : '#69885A55';
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         corners.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
         ctx.closePath();
         ctx.stroke();
         ctx.restore();
-        ctx.fillStyle = p.ink;
+        ctx.fillStyle = ink;
         ctx.font = '10px "Space Mono", monospace';
         ctx.textAlign = 'center';
         ctx.fillText(plot.id, pt.x, pt.y + 4);

@@ -240,8 +240,22 @@ function boxAround(points: Point[], margin: number): Box {
   };
 }
 const PITCH_BOX = boxAround(plate(GROUND.left, GROUND.top, GROUND.right, GROUND.bottom), 4);
-type Cached = { canvas: HTMLCanvasElement; ctx: Ctx; key: string; want: string; since: number };
+type Cached = {
+  canvas: HTMLCanvasElement;
+  ctx: Ctx;
+  key: string;
+  want: string;
+  since: number;
+  /** The device scale the copy was painted at. */
+  scale: number;
+};
 const layerCaches = new WeakMap<Ctx, Record<string, Cached>>();
+/** Hands a canvas's pitch layers back at once, for a canvas that is being let go. */
+export function releaseFootballLayers(ctx: Ctx) {
+  for (const cache of Object.values(layerCaches.get(ctx) ?? {}))
+    cache.canvas.width = cache.canvas.height = 0;
+  layerCaches.delete(ctx);
+}
 /** Where a cached layer over `box` lands in device pixels, or null to paint directly. */
 function layerFrame(ctx: Ctx, box: Box) {
   const t = typeof document === 'undefined' ? null : ctx.getTransform?.();
@@ -273,7 +287,7 @@ function cachedLayer(
     const canvas = document.createElement('canvas');
     const layer = canvas.getContext('2d');
     if (!layer) return null;
-    cache = all[name] = { canvas, ctx: layer, key: '', want: '', since: 0 };
+    cache = all[name] = { canvas, ctx: layer, key: '', want: '', since: 0, scale: 0 };
   }
   const key = `${night}:${frame.scale}:${fontReady(FONT(5))}`;
   if (cache.key !== key) {
@@ -282,7 +296,9 @@ function cachedLayer(
       cache.want = key;
       cache.since = now;
     }
-    if (cache.key && now - cache.since < 150) return null;
+    // Only a new scale waits: a new look (the end of dusk or dawn) or font is painted at once.
+    if (cache.key && cache.scale !== frame.scale && now - cache.since < 150) return null;
+    cache.scale = frame.scale;
     cache.canvas.width = frame.w;
     cache.canvas.height = frame.h;
     const s = frame.scale;
@@ -953,6 +969,15 @@ function steadyView(ctx: Ctx, id: number, f: Point, at: number): View {
       : raw;
   memo.set(id, { ...v, at });
   return v;
+}
+/**
+ * Lets `twin`, a second canvas painting the same moment as `ctx` in its other look at dusk or
+ * dawn, share ctx's memory of which way each figure faces, so the two never disagree.
+ */
+export function shareFootballFacing(twin: object, ctx: object) {
+  let memo = steadyViews.get(ctx);
+  if (!memo) steadyViews.set(ctx, (memo = new Map()));
+  steadyViews.set(twin, memo);
 }
 
 // Poses ------------------------------------------------------------------------------------------

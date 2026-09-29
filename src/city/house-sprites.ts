@@ -78,6 +78,12 @@ function release(store: Store, place: HouseAppearance, sprite: Sprite) {
   sprite.canvas.width = sprite.canvas.height = 0;
   store.sprites.delete(place);
 }
+/** Hands every sprite of a map canvas back at once, for a canvas that is being let go. */
+export function releaseHouseSprites(ctx: Ctx) {
+  const store = stores.get(ctx);
+  if (store) for (const [place, sprite] of [...store.sprites]) release(store, place, sprite);
+  stores.delete(ctx);
+}
 /**
  * Frees the sprites drawn least recently until `need` fits. Sprites drawn this frame or the last
  * are on screen and never freed: when those alone fill the budget, the rest are drawn directly

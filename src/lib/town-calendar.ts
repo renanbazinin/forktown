@@ -50,12 +50,26 @@ export function moonSlice(phase: number, y: number): [number, number] {
   return p <= 0.5 ? [terminator, edge] : [-edge, -terminator];
 }
 
+const smooth = (value: number) => {
+  const t = Math.max(0, Math.min(1, value));
+  return t * t * (3 - 2 * t);
+};
+
+/**
+ * How far the town below the sky has turned to its night colours, from 0 to 1. Dusk runs from
+ * 19:10 to 20:30, eighty real seconds, and from 19:30 the land is a little darker than the sky.
+ * It is 0.09 at the golden-hour peak, two-thirds of the way when the first lantern lights at
+ * 20:00, and fully night when the last streetlamp lights at 20:30. Dawn is its mirror, 05:30 to
+ * 06:50, so at 06:00, when every light goes out, the town is as dark as when the first lantern
+ * lit. The lights, the town's events and the page's night style keep their own 20:00 and 06:00.
+ */
+export function townNightShare(minutes: number) {
+  const time = mod(minutes, 1440);
+  return time >= 720 ? smooth((time - 1150) / 80) : 1 - smooth((time - 330) / 80);
+}
+
 export function townSkyAt(day: number, minutes: number) {
   const time = mod(minutes, 1440);
-  const smooth = (value: number) => {
-    const t = Math.max(0, Math.min(1, value));
-    return t * t * (3 - 2 * t);
-  };
   const daylight = smooth((time - 300) / 120) * (1 - smooth((time - 1140) / 120));
   const sunProgress = (time - 360) / 840;
   // The evening owns the moon's path through midnight; there is no midnight jump.

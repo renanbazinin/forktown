@@ -51,14 +51,22 @@ body,
   font: 500 27px var(--serif);
   letter-spacing: -1px;
   text-shadow: 0 1px 14px #f5f6e9;
+  /* It turns at 20:00 and 06:00 with the rest of the chrome (the dusk skin below). */
+  transition:
+    color 400ms ease,
+    text-shadow 400ms ease;
 }
 .town-wordmark .brand-mark {
   flex-shrink: 0;
+}
+.town-wordmark .brand-mark rect {
+  transition: fill 400ms ease;
 }
 /* The full stop is a small lantern resting on the baseline. */
 .town-wordmark .brand-lantern {
   align-self: flex-end;
   margin: 0 0 7px -8px;
+  transition: filter 400ms ease;
 }
 .town-app-night .town-wordmark {
   color: #f1eedc;

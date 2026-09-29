@@ -10,7 +10,7 @@ By day the lanterns are paper. One house, one neighbor, one lantern: a lantern n
 
 ## Lantern hour
 
-Nightfall is 20:00 town time, the minute the night palette begins. The town then lights itself in arrival order:
+Nightfall is 20:00 town time. The town's colours have been turning since 19:10 and are two-thirds of the way to night, and they finish as the last streetlamp lights at 20:30 (see [Nightfall below the sky](SKY_AND_CALENDAR.md#nightfall-below-the-sky)). The town then lights itself in arrival order:
 
 - **20:00:** Lantern No. 1 lights, then one more every real second. With 18 houses, the last lights at 20:17.
 - **Any size:** a larger town lights faster, so every lantern is lit by 20:20.

@@ -31,7 +31,7 @@ Do and don't:
 
 ## The wordmark
 
-Lowercase **forktown** in Fraunces 500 at 27px (23px below 600px), tracked -1px, `#334C3C` by day and `#F1EEDC` at night. The 26px mark sits before it and is hidden below 600px. The full stop is a 6 x 8 pixel lantern (`LanternDot`) resting on the baseline; after 20:00 it gets a soft static glow.
+Lowercase **forktown** in Fraunces 500 at 27px (23px below 600px), tracked -1px, `#334C3C` by day and `#F1EEDC` at night. The 26px mark sits before it and is hidden below 600px. The full stop is a 6 x 8 pixel lantern (`LanternDot`) resting on the baseline; from 20:00 it gets a soft static glow. The word, the mark's colours and the glow ease over 400ms with the dusk skin.
 
 The word appears in the world exactly once, on the timber-and-green plaque at the foot of the Lantern Fork.
 
@@ -139,4 +139,4 @@ A newcomer who follows a shared house link, `#place=` or a house's own page, ski
 
 ## The dusk skin
 
-From nightfall (20:00) to dawn (06:00) the town's chrome follows the map into dusk: the clock pill, the dock, the zoom controls, the panel and its event cards, the tooltip, the follow status, the toast, the sound popover, the almanac, and the welcome card. The rules hang off `.town-app-night` in `src/explore.css` and `src/calendar.css`, unlayered so they beat the layered base styles. Inside dusk surfaces, `--ink`, `--muted`, `--line`, and `--green-pale` point at their dusk equivalents, so venue cards and future panels follow without extra rules. Colours ease over 400ms; reduced motion removes the transition. Modals (the guide, the builder, and the house files) stay cream at night: they are documents.
+From nightfall (20:00) to dawn (06:00) the town's chrome follows the map, which has been turning since 19:10, into dusk: the wordmark, the clock pill, the dock, the zoom controls, the panel and its event cards, the tooltip, the follow status, the toast, the sound popover, the almanac, and the welcome card. The rules hang off `.town-app-night` in `src/explore.css` and `src/calendar.css`, unlayered so they beat the layered base styles. Inside dusk surfaces, `--ink`, `--muted`, `--line`, and `--green-pale` point at their dusk equivalents, so venue cards and future panels follow without extra rules. Colours ease over 400ms; reduced motion removes the transition. Modals (the guide, the builder, and the house files) stay cream at night: they are documents.

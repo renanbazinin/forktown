@@ -6,6 +6,7 @@ import {
   DAYS_PER_YEAR,
   moonSlice,
   townCalendarAt,
+  townNightShare,
   townSkyAt,
 } from '../src/lib/town-calendar';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
@@ -93,5 +94,43 @@ describe('Quiet celestial motion', () => {
         }
       }
     }
+  });
+});
+
+describe('Nightfall below the sky', () => {
+  const lights = (minutes: number) => minutes < 360 || minutes >= 1200;
+
+  it('turns the town over eighty seconds around the lights, not in one frame', () => {
+    // Plain day and plain night outside the fades, matching the lights' own hours there.
+    for (let minutes = 0; minutes < 1440; minutes += 0.5) {
+      const share = townNightShare(minutes);
+      if ((minutes > 330 && minutes < 410) || (minutes > 1150 && minutes < 1230)) {
+        expect(share).toBeGreaterThan(0);
+        expect(share).toBeLessThan(1);
+      } else expect(share).toBe(lights(minutes) ? 1 : 0);
+    }
+    // Dusk has barely begun at the golden-hour peak, is two-thirds dark as the first lantern
+    // lights and is night as the last streetlamp does. Dawn mirrors it: the lights go out at 0.68.
+    expect(townNightShare(1165)).toBeCloseTo(0.09, 2);
+    expect(townNightShare(1200)).toBeCloseTo(0.68, 2);
+    expect(townNightShare(1230)).toBe(1);
+    expect(townNightShare(360)).toBeCloseTo(townNightShare(1200), 10);
+    expect(townNightShare(410)).toBe(0);
+  });
+
+  it('never steps between two frames, through the fades and across midnight and noon', () => {
+    // The map repaints thirty times a real second, and a town minute is one real second.
+    let before = townNightShare(-1 / 30);
+    for (let frame = 0; frame <= 1440 * 30; frame++) {
+      const minutes = frame / 30;
+      const share = townNightShare(minutes);
+      expect(Math.abs(share - before)).toBeLessThan(0.001);
+      // Darker through the evening, lighter through the morning.
+      if (minutes >= 720) expect(share).toBeGreaterThanOrEqual(before);
+      else if (minutes > 0) expect(share).toBeLessThanOrEqual(before);
+      before = share;
+    }
+    expect(townNightShare(1440 + 1200)).toBe(townNightShare(1200));
+    expect(townNightShare(-240)).toBe(townNightShare(1200));
   });
 });

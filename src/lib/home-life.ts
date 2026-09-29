@@ -300,8 +300,9 @@ const HANDOVER_MINUTES = 1.5;
 /** Night mode (moonlit loops and night stays) runs from 22:00 to bedtime. */
 export const NIGHT_START = 1320;
 /**
- * The lamps are lit and the town is dark from 20:00: from then on nobody waters, sweeps or reads
- * in the garden, only sits out (the night spots), though loops and labels stay in day mode.
+ * Lantern hour starts at 20:00, with the town two-thirds dark: from then on nobody waters,
+ * sweeps or reads in the garden, only sits out (the night spots), though loops and labels stay in
+ * day mode.
  */
 export const DUSK = 1200;
 /** And it is dark until 06:00: nobody early out of the door starts a chore before then. */

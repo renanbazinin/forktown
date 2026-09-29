@@ -81,7 +81,7 @@
     <canvas id="detail" width="1440" height="900" hidden></canvas>
     <canvas id="map" width="1440" height="900"></canvas>
     <script type="module">
-      import { renderCity } from '/src/city/render.ts';
+      import { renderTwilight } from '/src/city/twilight.ts';
       import { places } from '/src/lib/places.ts';
       import { HOUSE_PLOTS } from '/src/lib/events.ts';
       import {
@@ -204,7 +204,7 @@
         const { minutes, day, zoom, roster, arrivals } = state;
         const night = minutes < 360 || minutes >= 1200;
         const center = { x: fork.x + 4, y: fork.y - 44 };
-        renderCity({
+        renderTwilight({
           ctx,
           width: canvas.width,
           height: canvas.height,

@@ -9,7 +9,7 @@ Forktown used to end at its own edges: a green diamond floating in a plain wash 
 - **Evening:** 18:30–20:20 town time, peaking at 19:25. It is still about 0.30 at 20:00, so the warmth is fading just as the lanterns begin, and it is 0 from 20:20.
 - **Dawn:** 05:30–07:00, peaking at 06:15.
 
-Golden hour tints the light, not the grass. It warms the low sky and the sun's colour, lays a one-pixel rim of light along the far ridge, nudges the far hills toward straw, and adds a wash over the finished frame. The wash is `#F2B45A` at no more than 0.05 alpha, and it is skipped entirely outside golden hour. The ground, houses and venues keep their own day and night palettes.
+Golden hour tints the light, not the grass. It warms the low sky and the sun's colour, lays a one-pixel rim of light along the far ridge, nudges the far hills toward straw, and adds a wash over the finished frame. The wash is `#F2B45A` at no more than 0.05 alpha, and it is skipped entirely outside golden hour. The ground, houses and venues keep their own day and night palettes, and turn from one to the other over dusk and dawn (see [Nightfall below the sky](SKY_AND_CALENDAR.md#nightfall-below-the-sky)).
 
 ## The horizon and the sister forks
 
