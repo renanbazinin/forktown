@@ -14,8 +14,8 @@ Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find 
 
 **Why can’t I build here?** The published town saves nothing, so there are two ways in:
 
-- **Quick, in your browser.** Choose **Pick an open plot**, or select an open plot on the map. Type your GitHub username and choose **Create my house file on GitHub**: GitHub opens a new file in `places/` with a whole house filled in. Write your own story, change what you like, propose the file and open your pull request. No install needed; [step by step](CONTRIBUTING.md#start-in-your-browser).
-- **The full builder, with a preview.** Fork the town and run it on your computer, as below. You design every detail and see your house in town before you send it.
+- **Quick, in your browser.** Choose **Pick an open plot**, or select an open plot on the map. Type your GitHub username and choose **Create my house file on GitHub**: GitHub opens a new file in `places/` with a whole house filled in. Write your own story, change what you like, propose the file and open your pull request. No install needed; [step by step](CONTRIBUTING.md#start-in-your-browser). To design every detail first, choose **Or design every detail in the builder** under that button.
+- **In your own copy.** Fork the town and run it on your computer, as below. The builder saves your house straight into your project, and you learn the whole workflow: clone, branch, commit, push.
 
 Either way, a merged pull request brings your house to the shared town.
 
@@ -37,7 +37,7 @@ Leave that terminal running. Open [localhost:5173](http://localhost:5173) and cl
 
 <img src="docs/images/contribute-local.jpg" alt="Localhost: the same welcome dialog now offers Build a place." width="640">
 
-> Still seeing **Fork on GitHub**? Check that you opened localhost and started `npm run dev`. The live site and `npm run preview` do not enable the builder.
+> Still seeing **Fork on GitHub**? Check that you opened localhost and started `npm run dev`. The live site and `npm run preview` can't save into your project, so they don't offer **Build a place**.
 
 ## 3. Make it yours
 

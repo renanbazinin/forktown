@@ -90,3 +90,17 @@ export const blankHouseFileUrl = (repositoryUrl: string) =>
 /** The same editor with the file already named after the house and filled in. */
 export const newHouseFileUrl = (repositoryUrl: string, place: Place) =>
   `${blankHouseFileUrl(repositoryUrl)}?filename=${encodeURIComponent(`${place.id}.json`)}&value=${encodeURIComponent(houseFile(place))}`;
+
+/**
+ * The longest filled-in link we hand GitHub. Signed in, GitHub turns away links past about 8,190
+ * characters; signed out, it sends the link on through its sign-in page, encoded once more, and
+ * that fails from about 7,000. Houses in town make links of 2,000–2,500; only long sign artwork
+ * gets near this.
+ */
+export const HOUSE_LINK_LIMIT = 6_000;
+
+/** The filled-in link, or null when it is too long for GitHub and the house goes by copy. */
+export function houseFileLink(repositoryUrl: string, place: Place) {
+  const url = newHouseFileUrl(repositoryUrl, place);
+  return url.length <= HOUSE_LINK_LIMIT ? url : null;
+}

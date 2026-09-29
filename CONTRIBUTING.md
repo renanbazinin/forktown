@@ -18,6 +18,8 @@ The published town saves nothing itself, but it can hand GitHub a whole house fo
 
 If GitHub opens an empty file, it dropped the text while it made your fork. Back in the town, choose **Copy JSON**, then **Start a blank file**, name it as the panel shows, and paste.
 
+Want to design every detail first? Under the green button, **Or design every detail in the builder** opens the full builder right on the live town: Home, Neighbor and Outdoor sign tabs, and a preview of your house in town. Its last step, **Create my house file on GitHub**, opens the same filled-in file. A house with very long sign artwork is too long for that link; the builder then asks you to copy the JSON into a blank file instead.
+
 ## Build in your own copy
 
 The full builder, with a preview of your house in town before you send it, runs in your own local fork. Explore houses and their JSON on the published town, then build on your computer.
@@ -103,7 +105,7 @@ Add your file to `places/`, and the city reloads automatically.
 
 You can also let the builder create the file: choose **Find your way in → Build a place → Continue to save → Save to my project**. It writes `places/<your-file-id>.json` into the checkout running `npm run dev`, and the local city updates. Existing files are never overwritten; choose a new id or edit an existing file yourself. Review the new file, commit it, push your branch, and open your PR. Saving does not make commits, switch branches, push, or create a PR.
 
-The builder and save button are available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy. When it knows its GitHub repository, an open plot there also starts a house file on GitHub.
+**Save to my project** is available only in the local development city. A hosted site or `npm run preview` offers exploration, read-only house files, and instructions for contributing from your own copy. When it knows its GitHub repository, an open plot there also starts a house file on GitHub, and a quiet link under that button opens the builder, which hands the finished house to GitHub instead of saving it.
 
 Before sending a pull request, check your house:
 

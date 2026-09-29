@@ -10,8 +10,10 @@ import { HOUSE_PLOTS } from '../src/lib/events';
 import {
   CREATOR_PLACEHOLDER,
   FIELD_GUIDE,
+  HOUSE_LINK_LIMIT,
   blankHouseFileUrl,
   houseFile,
+  houseFileLink,
   isOpenPlot,
   newHouseFileUrl,
   readUsername,
@@ -209,6 +211,33 @@ describe('Starting a house on GitHub', () => {
     }
   });
 
+  it('fits every house in town, and a sign that uses all its characters, in one link', () => {
+    for (const place of places) expect(houseFileLink(REPOSITORY, place), place.id).toBeTruthy();
+    // The longest artwork a sign may have: a title and 2,000 characters of styled spans.
+    const span =
+      '<span style="color: #FFF4D4; font-size: 12px; font-weight: bold; text-align: center"></span>';
+    let html =
+      '<div style="background-color: #35554A; color: #FFF4D4; text-align: center">' +
+      '<strong style="font-size: 24px">MOONBEAM CAFE</strong>';
+    while (html.length + span.length + '</div>'.length <= 2000) html += span;
+    html += '</div>';
+    const start = starterHouse(OPEN, town, 'new-neighbor')!;
+    const signed = placeSchema.parse({ ...start, sign: { ...start.sign, mode: 'html', html } });
+    expect(signed.sign.html.length).toBeGreaterThan(1900);
+    const link = houseFileLink(REPOSITORY, signed);
+    expect(link).toBe(newHouseFileUrl(REPOSITORY, signed));
+    expect(link!.length).toBeLessThanOrEqual(HOUSE_LINK_LIMIT);
+  });
+
+  it('hands a house too long for GitHub to copy and paste instead', () => {
+    const start = starterHouse(OPEN, town, 'new-neighbor')!;
+    const long = { ...start, sign: { ...start.sign, html: '"'.repeat(2000) } };
+    expect(newHouseFileUrl(REPOSITORY, long).length).toBeGreaterThan(HOUSE_LINK_LIMIT);
+    expect(houseFileLink(REPOSITORY, long)).toBeNull();
+    // Signed out, GitHub carries the link through its sign-in page, which fails from about 7,000.
+    expect(HOUSE_LINK_LIMIT).toBeLessThan(7_000);
+  });
+
   it('links to the part of CONTRIBUTING.md that explains every field', () => {
     const [file, anchor] = FIELD_GUIDE.split('#');
     const headings = readFileSync(file, 'utf8')
@@ -226,7 +255,7 @@ describe('Starting a house on GitHub', () => {
 });
 
 describe('The open-plot panel on the published town', () => {
-  const render = (plot: string, typed = '') =>
+  const render = (plot: string, typed = '', onBuild?: () => void) =>
     renderToStaticMarkup(
       createElement(StartOnGitHub, {
         plot,
@@ -234,6 +263,7 @@ describe('The open-plot panel on the published town', () => {
         repositoryUrl: REPOSITORY,
         typed,
         onTyped: () => {},
+        onBuild,
       }),
     );
 
@@ -279,20 +309,57 @@ describe('The open-plot panel on the published town', () => {
     expect(markup).toContain(`Try answering “${storyPrompt(start.id)}”`);
   });
 
+  it('offers the full builder quietly, under the button, when the town can open it', () => {
+    const markup = render(OPEN, '', () => {});
+    const link = 'class="start-builder-link"';
+    expect(markup).toContain(link);
+    expect(markup).toContain('Or design every detail in the builder');
+    expect(markup.indexOf(link)).toBeGreaterThan(markup.indexOf('Create my house file on GitHub'));
+    expect(markup.indexOf(link)).toBeLessThan(markup.indexOf('class="start-steps"'));
+    expect(render(OPEN)).not.toContain(link);
+  });
+
   it('shows nothing for a plot that is taken or reserved', () => {
     expect(render('A1')).toBe('');
     expect(render('D3')).toBe('');
   });
 
-  it('is what the published town shows for an open plot, never the builder', () => {
+  it('is what the published town shows for an open plot, with the builder a link away', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(app).toContain('!localSaveAvailable && repositoryUrl && available.some(');
     expect(app).toContain('`Plot ${selectedPlot} is open`');
-    // The town keeps the typed username, so comparing plots never asks for it again.
+    // The town keeps the typed username, so comparing plots never asks for it again, and the
+    // builder starts with it.
     expect(app).toContain('typed={githubUsername}');
+    expect(app).toContain('creator={githubUsername}');
+    // The builder opens wherever its house can go: into a local checkout, or to GitHub.
+    expect(app).toContain('const builderAvailable = localSaveAvailable || !!repositoryUrl;');
+    expect(app).toContain('onBuild={() => startBuilding(startPlot)}');
+    expect(app).toContain("modal === 'contribute' && builderAvailable &&");
     // After every venue's panel, before the empty-plot card that offers "Build here".
     expect(app.indexOf('<StartOnGitHub')).toBeGreaterThan(app.indexOf('<TubeInfo'));
     expect(app.indexOf('<StartOnGitHub')).toBeLessThan(app.indexOf("'Build here'"));
+  });
+});
+
+describe('The builder on the published town', () => {
+  const builder = readFileSync('src/components/Contribute.tsx', 'utf8');
+
+  it('hands its finished house to GitHub, like an open plot does', () => {
+    expect(builder).toContain('houseFileLink(repositoryUrl, parsed.data)');
+    expect(builder).toContain('Create my house file on GitHub');
+    expect(builder).toContain('blankHouseFileUrl(repositoryUrl)');
+    for (const step of ['Commit changes', 'Propose changes', 'Create pull request'])
+      expect(builder).toContain(step);
+    // No more forking by hand and uploading a downloaded file.
+    expect(builder).not.toContain('/fork`');
+    expect(builder).not.toContain('Upload <code>');
+  });
+
+  it('starts a draft with the username typed on the open plot, never over one it has', () => {
+    expect(builder).toContain(
+      'start.creator || typed.problem ? start : { ...start, creator: typed.username }',
+    );
   });
 });
 

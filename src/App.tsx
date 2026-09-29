@@ -213,6 +213,8 @@ export default function App() {
     !localSaveAvailable && repositoryUrl && available.some((plot) => plot.id === selectedPlot)
       ? selectedPlot
       : null;
+  // The builder runs wherever its house can go somewhere: into this checkout, or to GitHub.
+  const builderAvailable = localSaveAvailable || !!repositoryUrl;
   const liveEvent = events.find((event) => isEventLive(event, clock.minutes));
 
   const select = useCallback((plotId: string | null, focus = false) => {
@@ -281,7 +283,7 @@ export default function App() {
     return () => clearTimeout(timer);
   }, [toast]);
   function startBuilding(plot?: string) {
-    if (!localSaveAvailable) {
+    if (!builderAvailable) {
       setModal('guide');
       return;
     }
@@ -661,6 +663,7 @@ export default function App() {
                 repositoryUrl={repositoryUrl}
                 typed={githubUsername}
                 onTyped={setGithubUsername}
+                onBuild={() => startBuilding(startPlot)}
                 night={night}
               />
             ) : selectedPlot ? (
@@ -784,8 +787,14 @@ export default function App() {
         </section>
       )}
 
-      {modal === 'contribute' && localSaveAvailable && (
-        <Contribute plot={buildPlot} places={places} onClose={closeBuilder} onPreview={preview} />
+      {modal === 'contribute' && builderAvailable && (
+        <Contribute
+          plot={buildPlot}
+          places={places}
+          creator={githubUsername}
+          onClose={closeBuilder}
+          onPreview={preview}
+        />
       )}
       {modal === 'files' && (
         <Modal title="House files" onClose={() => setModal(null)} wide>

@@ -626,6 +626,22 @@ body,
 .start-on-github .button-primary:disabled:hover {
   background: var(--green);
 }
+/* A quiet second way in, under the button: the full builder, for every detail before GitHub. */
+.start-builder-link {
+  align-self: center;
+  margin-top: -8px;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.start-builder-link:hover {
+  color: var(--ink);
+}
 .start-steps {
   display: grid;
   gap: 9px;

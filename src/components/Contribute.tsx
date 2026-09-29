@@ -22,6 +22,7 @@ import {
 import { HOUSE_PLOTS as PLOTS } from '../lib/events';
 import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
+import { blankHouseFileUrl, houseFileLink, readUsername } from '../lib/github-new-file';
 import { availableId, pickDraftNames } from '../lib/draft-names';
 import { restoreDraftDesign, restoreDraftPlot, storyPrompt } from '../lib/builder-nudges';
 import { BUILDER_DEFAULT_STORY } from '../lib/lanterns';
@@ -50,47 +51,64 @@ const initial = (plot: string, places: Place[]): Place => {
   });
 };
 const storageKey = 'forktown-draft-v2';
+/** The draft kept on this device, brought up to date with the town, or null. */
+function savedDraft(
+  plot: string | undefined,
+  places: Place[],
+  available: readonly { id: string }[],
+): Place | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+    const result = draftSchema.safeParse(saved);
+    if (result.success) {
+      const restored = result.data;
+      if (restored.name === 'My Little Place' || restored.resident.name === 'New neighbor') {
+        const { placeName, residentName } = pickDraftNames(places);
+        if (restored.name === 'My Little Place') {
+          if (/^my-little-place(?:-\d+)?$/.test(restored.id))
+            restored.id = availableId(placeName, places);
+          restored.name = placeName;
+        }
+        if (restored.resident.name === 'New neighbor')
+          restored.resident = { ...restored.resident, name: residentName };
+      }
+      return {
+        ...restored,
+        design: restoreDraftDesign(restored.design),
+        plot: restoreDraftPlot(plot ?? restored.plot, available),
+      };
+    }
+  } catch {
+    /* A stale draft should never prevent a new contribution. */
+  }
+  return null;
+}
 
 const Contribute = memo(function Contribute({
   plot,
   places,
+  creator = '',
   onClose,
   onPreview,
 }: {
   plot?: string;
   places: Place[];
+  /** A username typed on the open plot, for a draft that has none yet. */
+  creator?: string;
   onClose: () => void;
   onPreview: (place: Place) => void;
 }) {
   const form = useRef<HTMLFormElement>(null);
   const occupied = new Set(places.map((place) => place.plot));
   const available = PLOTS.filter((p) => !occupied.has(p.id));
+  // A username typed on the open plot fills in a draft that has none yet.
+  const typed = readUsername(creator);
+  const withCreator = (start: Place) =>
+    start.creator || typed.problem ? start : { ...start, creator: typed.username };
+  const fresh = () => withCreator(initial(plot ?? available[0]?.id ?? 'A1', places));
   const [draft, setDraft] = useState<Place>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
-      const result = draftSchema.safeParse(saved);
-      if (result.success) {
-        const restored = result.data;
-        if (restored.name === 'My Little Place' || restored.resident.name === 'New neighbor') {
-          const { placeName, residentName } = pickDraftNames(places);
-          if (restored.name === 'My Little Place') {
-            if (/^my-little-place(?:-\d+)?$/.test(restored.id))
-              restored.id = availableId(placeName, places);
-            restored.name = placeName;
-          }
-          if (restored.resident.name === 'New neighbor')
-            restored.resident = { ...restored.resident, name: residentName };
-        }
-        return {
-          ...restored,
-          design: restoreDraftDesign(restored.design),
-          plot: restoreDraftPlot(plot ?? restored.plot, available),
-        };
-      }
-    } catch {
-      /* A stale draft should never prevent a new contribution. */
-    }
-    return initial(plot ?? available[0]?.id ?? 'A1', places);
+    const restored = savedDraft(plot, places, available);
+    return restored ? withCreator(restored) : fresh();
   });
   const [panel, setPanel] = useState<'home' | 'neighbor' | 'sign'>('home');
   const [customId, setCustomId] = useState(() => draft.id !== availableId(draft.name, places));
@@ -122,6 +140,12 @@ const Contribute = memo(function Contribute({
   if (occupied.has(draft.plot)) errors.plot = 'This plot is occupied. Choose an empty plot.';
   const valid = Object.keys(errors).length === 0;
   const json = JSON.stringify(parsed.success ? parsed.data : draft, null, 2) + '\n';
+  // The published town saves nothing: it hands the finished house to GitHub's editor, as an open
+  // plot does. A house too long for the link goes by copy and a blank file instead.
+  const githubLink =
+    !localSaveAvailable && repositoryUrl && valid && parsed.success
+      ? houseFileLink(repositoryUrl, parsed.data)
+      : null;
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(draft));
@@ -267,7 +291,7 @@ const Contribute = memo(function Contribute({
               type="button"
               className="text-button fresh-draft"
               onClick={() => {
-                setDraft(initial(plot ?? available[0]?.id ?? 'A1', places));
+                setDraft(fresh());
                 setCustomId(false);
                 setPanel('home');
                 setAttempted(false);
@@ -513,12 +537,15 @@ const Contribute = memo(function Contribute({
           <div className="submit-guide">
             <p className="local-note">
               <strong>One house + one neighbor per PR.</strong> Review only this house's new file
-              before committing. Saving locally does not publish it.
+              before committing.{' '}
+              {localSaveAvailable
+                ? 'Saving locally does not publish it.'
+                : 'Opening it on GitHub does not publish it.'}
             </p>
             <p className="modal-intro">
               {localSaveAvailable
                 ? 'Save your place straight into the project running on this computer. Then share it with the town through your pull request.'
-                : 'Your building is ready for its first pull request. Here’s how to give it a permanent home.'}
+                : 'Your place is ready for its first pull request. GitHub opens its file with everything filled in; here’s how to give it a permanent home.'}
             </p>
             <div className="house-file-actions">
               <button
@@ -539,15 +566,25 @@ const Contribute = memo(function Contribute({
               <li>
                 <span>1</span>
                 <div>
-                  <h3>{localSaveAvailable ? 'Save your place' : 'Fork the repository'}</h3>
+                  <h3>{localSaveAvailable ? 'Save your place' : 'Open it on GitHub'}</h3>
                   <p>
                     {localSaveAvailable ? (
                       <>
                         Click <strong>Save to my project</strong> to create{' '}
                         <code>places/{draft.id}.json</code> in this local checkout.
                       </>
+                    ) : githubLink ? (
+                      <>
+                        Choose <strong>Create my house file on GitHub</strong>. GitHub opens{' '}
+                        <code>places/{draft.id}.json</code> with your house filled in. If it asks
+                        you to fork Forktown first, accept: the fork is your own copy.
+                      </>
                     ) : (
-                      'Create your own copy of Forktown on GitHub.'
+                      <>
+                        This house is too long to send in a link, so it goes by copy and paste.
+                        Choose <strong>Copy JSON</strong>, then <strong>Start a blank file</strong>,
+                        name it <code>{draft.id}.json</code> and paste.
+                      </>
                     )}
                   </p>
                 </div>
@@ -555,14 +592,14 @@ const Contribute = memo(function Contribute({
               <li>
                 <span>2</span>
                 <div>
-                  <h3>{localSaveAvailable ? 'Commit your new file' : 'Add one little file'}</h3>
+                  <h3>{localSaveAvailable ? 'Commit your new file' : 'Propose your file'}</h3>
                   <p>
                     {localSaveAvailable ? (
                       'Your local city updates as soon as the file is saved. Review it, then commit and push it on your contribution branch.'
                     ) : (
                       <>
-                        Upload <code>{draft.id}.json</code> to the <code>places/</code> folder in
-                        your fork. You can do this in your browser.
+                        Choose <strong>Commit changes</strong>, then{' '}
+                        <strong>Propose changes</strong>.
                       </>
                     )}
                   </p>
@@ -573,8 +610,14 @@ const Contribute = memo(function Contribute({
                 <div>
                   <h3>Open a pull request</h3>
                   <p>
-                    Send your file back to the original repository. Our checks will help you catch
-                    mistakes.
+                    {localSaveAvailable ? (
+                      'Send your file back to the original repository.'
+                    ) : (
+                      <>
+                        Choose <strong>Create pull request</strong>.
+                      </>
+                    )}{' '}
+                    Our checks will help you catch mistakes.
                   </p>
                 </div>
               </li>
@@ -601,14 +644,18 @@ const Contribute = memo(function Contribute({
                 )}
               </div>
             ) : repositoryUrl ? (
-              <a
-                className="button button-primary"
-                href={`${repositoryUrl}/fork`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                Fork on GitHub <ExternalLink size={15} />
-              </a>
+              <div className="local-note">
+                {githubLink ? (
+                  'Empty file on GitHub? It can drop the text while it makes your fork. Copy the JSON, start a blank file, and paste.'
+                ) : (
+                  <>
+                    Name the new file <code>{draft.id}.json</code>.
+                  </>
+                )}{' '}
+                <a href={blankHouseFileUrl(repositoryUrl)} target="_blank" rel="noreferrer">
+                  Start a blank file <ExternalLink size={12} />
+                </a>
+              </div>
             ) : (
               <div className="local-note">
                 This is the local founding edition. The owner can connect the public repository when
@@ -660,15 +707,27 @@ const Contribute = memo(function Contribute({
                 </button>
               </div>
             )}
+            {githubLink && (
+              <div className="local-save-action">
+                <a
+                  className="button button-primary full-width"
+                  href={githubLink}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Create my house file on GitHub <ExternalLink size={15} />
+                </a>
+              </div>
+            )}
             <div className="export-actions">
-              <button className="button button-secondary" onClick={copy}>
+              <button
+                className={`button ${localSaveAvailable || githubLink ? 'button-secondary' : 'button-primary'}`}
+                onClick={copy}
+              >
                 {copied ? <Check size={15} /> : <Copy size={15} />}{' '}
                 {copied ? 'Copied' : 'Copy JSON'}
               </button>
-              <button
-                className={`button ${localSaveAvailable ? 'button-secondary' : 'button-primary'}`}
-                onClick={download}
-              >
+              <button className="button button-secondary" onClick={download}>
                 <Download size={15} /> Download
               </button>
             </div>

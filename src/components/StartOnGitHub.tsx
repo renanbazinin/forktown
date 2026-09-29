@@ -24,6 +24,7 @@ export default function StartOnGitHub({
   repositoryUrl,
   typed,
   onTyped,
+  onBuild,
   night = false,
 }: {
   plot: string;
@@ -32,6 +33,8 @@ export default function StartOnGitHub({
   /** What the visitor typed as their username, kept by the town while they compare plots. */
   typed: string;
   onTyped: (typed: string) => void;
+  /** Opens the full builder on this plot, for a visitor who wants to design every detail first. */
+  onBuild?: () => void;
   night?: boolean;
 }) {
   const field = useId();
@@ -125,6 +128,11 @@ export default function StartOnGitHub({
           aria-describedby={`${field}-note`}
         >
           Create my house file on GitHub <ExternalLink size={15} />
+        </button>
+      )}
+      {onBuild && (
+        <button type="button" className="start-builder-link" onClick={onBuild}>
+          Or design every detail in the builder
         </button>
       )}
       <ol className="start-steps">
