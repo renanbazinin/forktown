@@ -121,7 +121,8 @@ describe('Rendering a full town in node', () => {
 
 describe('Plot marks through dusk and dawn', () => {
   // twilight.ts paints both looks with the lights' ink, so the outlines and labels of open plots
-  // never blend away into the half-dark ground.
+  // never blend away into the half-dark ground. An empty roster leaves every plot open, whatever
+  // the town holds (the full-town check fills them all).
   it('take their ink from marksNight, not from the look', () => {
     const inks = (night: boolean, marksNight?: boolean) => {
       const { ctx, calls } = recordingContext(1440, 900);
@@ -130,7 +131,7 @@ describe('Plot marks through dusk and dawn', () => {
         width: 1440,
         height: 900,
         camera: { x: 720, y: 88, zoom: 0.7 },
-        places,
+        places: [],
         selectedPlot: null,
         hoveredPlot: null,
         night,
