@@ -10,8 +10,8 @@ const withFloors = (data: ReturnType<typeof read>, floors: number) => ({
 
 describe('House floors', () => {
   it('keeps the third floor on homes that were built with it', () => {
-    const arts = read('arts');
-    expect(arts.design.floors).toBe(3);
+    // Built from another home, because arts.json is its creator's to take down.
+    const arts = { ...withFloors(read('moss-nook'), 3), id: 'arts' };
     expect(validatePlaces([{ file: 'arts.json', data: arts }]).errors).toEqual([]);
   });
 
