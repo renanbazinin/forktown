@@ -42,3 +42,19 @@ describe('Town sound turned off', () => {
     expect(off).toContain('return () => clearTimeout(sleep)');
   });
 });
+
+describe('Screen reader announcements across dialogs and builder (#71)', () => {
+  const modal = readFileSync('src/components/Modal.tsx', 'utf8');
+  const contribute = readFileSync('src/components/Contribute.tsx', 'utf8');
+
+  it('gives each Modal instance a unique title id so stacked dialogs do not collide', () => {
+    expect(modal).toContain('const titleId = useId()');
+    expect(modal).toContain('aria-labelledby={titleId}');
+    expect(modal).toContain('<h2 id={titleId}>{title}</h2>');
+  });
+
+  it('names preset colors in the builder design step', () => {
+    expect(contribute).toContain('COLOR_NAMES');
+    expect(contribute).toContain('aria-label={`Use color ${COLOR_NAMES[color] ?? color}`}');
+  });
+});

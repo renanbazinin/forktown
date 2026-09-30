@@ -35,6 +35,14 @@ import { HomeDetails, NeighborDetails, SignDetails } from './Customization';
 import '../stories.css';
 
 const COLORS = ['#789B76', '#C97878', '#759BAF', '#AD88AE', '#D0AA65', '#BE8E68'];
+const COLOR_NAMES: Record<string, string> = {
+  '#789B76': 'Sage green',
+  '#C97878': 'Terracotta',
+  '#759BAF': 'Sky blue',
+  '#AD88AE': 'Lavender',
+  '#D0AA65': 'Warm gold',
+  '#BE8E68': 'Cedar brown',
+};
 const initial = (plot: string, places: Place[]): Place => {
   const { placeName, residentName } = pickDraftNames(places);
   return draftSchema.parse({
@@ -406,7 +414,7 @@ const Contribute = memo(function Contribute({
                     {COLORS.map((color) => (
                       <button
                         type="button"
-                        aria-label={`Use color ${color}`}
+                        aria-label={`Use color ${COLOR_NAMES[color] ?? color}`}
                         aria-pressed={draft.color === color}
                         className={draft.color === color ? 'selected' : ''}
                         key={color}

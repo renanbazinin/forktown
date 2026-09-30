@@ -1,4 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { X } from 'lucide-react';
 
 // Open dialogs, newest last. Anything that must stay readable while one is open (a toast) goes
@@ -33,6 +40,7 @@ export default function Modal({
   wide?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
   // A layout effect cleans up while the dialog is still in the page, before React removes it.
   useLayoutEffect(() => {
     const dialog = ref.current;
@@ -59,7 +67,7 @@ export default function Modal({
     <dialog
       ref={ref}
       className={`modal ${wide ? 'modal-wide' : ''}`}
-      aria-labelledby="modal-title"
+      aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
         onClose();
@@ -80,7 +88,7 @@ export default function Modal({
       <div className="modal-header">
         <div>
           {eyebrow && <span className="eyebrow">{eyebrow}</span>}
-          <h2 id="modal-title">{title}</h2>
+          <h2 id={titleId}>{title}</h2>
         </div>
         <button className="icon-button" aria-label="Close dialog" onClick={onClose}>
           <X size={21} />
