@@ -1,0 +1,41 @@
+{
+  "id": "casino",
+  "name": "Casino",
+  "creator": "shaiyona336",
+  "plot": "F7",
+  "building": "observatory",
+  "color": "#C97878",
+  "decoration": "tree",
+  "story": "Gambling with no commission exclusive to the citizens of the village",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "flat",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Shai",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}
