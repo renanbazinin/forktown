@@ -1,0 +1,224 @@
+html,
+body,
+#root {
+  min-height: 100%;
+  height: auto;
+  overflow: auto;
+}
+body {
+  background: #f1f2e7;
+  color: #344f41;
+}
+.errand-review {
+  max-width: 1600px;
+  margin: auto;
+  padding: 24px;
+}
+.review-heading {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  margin-bottom: 22px;
+}
+.review-heading > a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: 500 27px var(--serif);
+  color: inherit;
+  text-decoration: none;
+}
+.review-heading .brand-mark {
+  width: 30px;
+  height: 34px;
+}
+.review-heading h1 {
+  font: 500 30px var(--serif);
+  margin: 0 0 5px;
+}
+.review-heading p {
+  margin: 0;
+  font-size: 12px;
+  color: #667760;
+}
+.review-date {
+  margin-left: auto;
+  font: 10px var(--mono);
+  text-align: right;
+}
+.review-date b {
+  display: block;
+  font: 24px var(--mono);
+  margin-top: 5px;
+}
+.review-seasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+.review-seasons > span {
+  flex: 1;
+}
+.review-seasons button,
+.review-controls button {
+  border: 1px solid #c6d0bc;
+  border-radius: 7px;
+  padding: 8px 14px;
+  background: #fbfcf4;
+  color: #3e5947;
+  font-size: 12px;
+  cursor: pointer;
+}
+.review-seasons button[aria-pressed='true'],
+.review-controls button[aria-pressed='true'] {
+  background: #385440;
+  color: #fff8de;
+  border-color: #385440;
+}
+.review-world {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  min-height: 460px;
+  height: min(620px, calc(100dvh - 260px));
+  border: 1px solid #c5ceba;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fdfcf7;
+}
+.review-world > .city-stage {
+  height: 100%;
+  min-height: 0;
+  border-radius: 0;
+  border: none;
+}
+.review-world > aside {
+  padding: 24px 19px;
+  overflow: auto;
+  border-left: 1px solid #d7deca;
+}
+.review-world .map-controls {
+  right: 20px;
+  bottom: 20px;
+}
+.review-world .follow-status {
+  top: auto;
+  left: 20px;
+  bottom: 76px;
+  right: auto;
+  width: fit-content;
+  max-width: calc(100% - 40px);
+  border-radius: 10px;
+  padding: 12px 16px;
+  gap: 20px;
+}
+.review-world .follow-status > span {
+  display: grid;
+  gap: 4px;
+  font-size: 11px;
+}
+.review-world .follow-status strong {
+  font-size: 13px;
+}
+.review-details {
+  border-top: 1px solid #dce2d0;
+  margin-top: 24px;
+  padding-top: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #6b7865;
+}
+.review-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+.review-controls > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.review-controls > label {
+  display: flex;
+  flex: 1;
+  min-width: 200px;
+  align-items: center;
+  gap: 12px;
+  font: 10px var(--mono);
+}
+.review-controls input {
+  flex: 1;
+}
+.review-play {
+  margin-left: auto;
+}
+.review-studio {
+  background: #e5ead8;
+  border: 1px solid #c5ceba;
+  border-radius: 16px;
+  padding: 12px;
+}
+.review-studio canvas {
+  display: block;
+  width: 100%;
+  max-width: 1100px;
+  height: auto;
+  margin: auto;
+}
+.review-studio label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px;
+  font-size: 12px;
+}
+.review-studio input[type='range'] {
+  width: 250px;
+}
+@media (max-width: 700px) {
+  .errand-review {
+    padding: 12px;
+  }
+  .review-heading {
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 15px;
+  }
+  .review-heading h1 {
+    font-size: 23px;
+  }
+  .review-heading > a {
+    font-size: 22px;
+  }
+  .review-date {
+    display: none;
+  }
+  .review-seasons {
+    gap: 5px;
+  }
+  .review-seasons > span {
+    flex-basis: 100%;
+  }
+  .review-world {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+  }
+  .review-world > .city-stage {
+    height: 430px;
+    flex: none;
+  }
+  .review-world > aside {
+    border-left: none;
+    border-top: 1px solid #d7deca;
+    padding: 18px;
+  }
+  .review-details {
+    display: none;
+  }
+  .review-controls > label {
+    flex-basis: 100%;
+  }
+}

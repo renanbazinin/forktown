@@ -22,6 +22,7 @@ import {
 } from './houses';
 import { housePainter } from './house-sprites';
 import { drawResident, drawResidentSpeech, residentReach } from './residents';
+import { drawSeasonalErrandProps, seasonalErrandProps } from './seasonal-errands';
 import { drawVenue, venueBounds } from './venues';
 import { drawBirds, drawMeadow } from './ambience';
 import { drawTownTree } from './trees';
@@ -773,6 +774,8 @@ export function renderCity({
   });
   // The line's glass, stacks and sign, pushed before the residents so walkers win ties.
   objects.push(...drawTubes(ctx, tube));
+  if (residents.length)
+    objects.push(...drawSeasonalErrandProps(ctx, seasonalErrandProps(places, minutes, day), night));
   // Neighbors walking in lockstep to or from a stack stand side by side.
   const offsets = tubeCrowdOffsets(residents);
   for (const resident of residents) {

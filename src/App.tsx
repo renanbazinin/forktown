@@ -682,6 +682,8 @@ export default function App() {
             ) : panel === 'events' ? (
               <TownEvents
                 football={football}
+                places={places}
+                onFollow={follow}
                 events={events}
                 minutes={clock.minutes}
                 day={clock.day}
