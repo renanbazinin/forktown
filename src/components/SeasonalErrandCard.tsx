@@ -1,21 +1,8 @@
-import {
-  ArrowUpRight,
-  CupSoda,
-  Footprints,
-  ShoppingBasket,
-  Sprout,
-  ThermometerSnowflake,
-} from 'lucide-react';
+import { ArrowUpRight, Footprints } from 'lucide-react';
 import { seasonalErrandCard } from '../lib/errand-copy';
 import type { Place } from '../lib/schema';
+import ErrandItemPreview from './ErrandItemPreview';
 import '../errands.css';
-
-const icons = {
-  seedlings: Sprout,
-  lemonade: CupSoda,
-  harvest: ShoppingBasket,
-  thermos: ThermometerSnowflake,
-};
 
 /** A quiet daily round beside the other Events cards, with separate keyboard actions for the
  * actual carrier and the destination. The planner supplies every name, time and live state. */
@@ -33,16 +20,13 @@ export default function SeasonalErrandCard({
   onVisit: (plot: string) => void;
 }) {
   const card = seasonalErrandCard(places, minutes, day);
-  const Icon = icons[card.ritual.kind];
   const description = `${card.ritual.name}. ${card.status}${card.time ? `, ${card.time.replace('–', ' to ')} town time` : ''}. ${card.body}`;
   return (
     <article
       className={`event-card seasonal-errand-card${card.live ? ' is-live' : ''}`}
       aria-label={card.ritual.name}
     >
-      <span className="event-symbol" aria-hidden="true">
-        <Icon size={20} />
-      </span>
+      <ErrandItemPreview kind={card.ritual.kind} />
       <div className="event-copy">
         <span className="event-time">
           {card.live && <i className="live-dot" aria-hidden="true" />} {card.status}

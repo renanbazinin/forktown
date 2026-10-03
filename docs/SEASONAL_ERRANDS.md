@@ -27,6 +27,8 @@ The Events panel has a compact seasonal card. It names the route, the actual car
 
 All names, routes, phases and actions are real DOM text and ordinary keyboard buttons. The small seasonal icon and live dot are decorative. There is no continuously announcing live region. The card uses the displayed clock, so pausing freezes the countdown and the described phase with the town.
 
+The card shows an enlarged pixel drawing of the actual carried object. The same drawing appears in the Follow caption during pickup, carrying and delivery. Each object has its own silhouette and handholds: two leafy pots, an open yellow pitcher, a pumpkin in a rounded basket and a narrow blue flask. The objects sit outside the resident's shoulders so they remain readable from behind. Following an active errand starts with a closer view; later phase changes preserve the visitor's own zoom.
+
 Errands are daytime journeys and never cross midnight. Their Events card belongs to the current calendar day: before 06:00 it previews the coming daytime round, even while the previous evening's disco is still running. The next season's errand appears with that calendar day.
 
 ## Determinism and implementation

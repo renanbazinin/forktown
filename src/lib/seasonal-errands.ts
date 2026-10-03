@@ -94,7 +94,7 @@ const RITUALS: readonly SeasonalRitual[] = [
     kind: 'lemonade',
     seasonIndex: 1,
     name: 'Lemonade for the stage',
-    description: 'A covered jug from the Lunch Green to the Little Stage.',
+    description: 'A jug of lemonade from the Lunch Green to the Little Stage.',
     pickup: GREEN,
     delivery: STAGE,
   },

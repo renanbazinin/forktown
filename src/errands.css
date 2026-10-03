@@ -1,9 +1,30 @@
 /* The round belongs with the event cards; its two actions are ordinary keyboard buttons. */
+.errand-item-preview {
+  display: block;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 8px;
+  background: #f2f0e3;
+  image-rendering: pixelated;
+}
+.follow-status > .follow-caption {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.follow-status > button {
+  flex-shrink: 0;
+}
+.town-app .follow-status:has(> .errand-item-preview),
+.review-world .follow-status:has(> .errand-item-preview) {
+  gap: 10px;
+  width: max-content;
+}
 .seasonal-errand-card {
   align-items: flex-start;
   cursor: default;
 }
-.seasonal-errand-card .event-symbol {
+.seasonal-errand-card > .errand-item-preview {
   margin-top: 3px;
 }
 .seasonal-errand-card .errand-route,
