@@ -23,6 +23,8 @@ export type ErrandVisual = { kind: ErrandKind; phase: ErrandPhase; progress: num
 export type ErrandStop = {
   name: string;
   plot: string;
+  /** The road tile's centre the walk leaves from, and the handoff spot on its north kerb. */
+  road: Point;
   point: Point;
   facing: ResidentState['facing'];
 };
@@ -67,15 +69,26 @@ export const ERRAND_MAX_MINUTES = 300;
 export const ERRAND_TURN = 0.4;
 
 const KERB = 0.45;
-const stop = (name: string, plot: string, road = plotEntrance(getPlot(plot)!)): ErrandStop => ({
+/** `shift` moves the spot along the kerb, for a stop that must stand off its road's centre. */
+const stop = (
+  name: string,
+  plot: string,
+  road = plotEntrance(getPlot(plot)!),
+  shift = 0,
+): ErrandStop => ({
   name,
   plot,
-  point: { x: road.x, y: road.y - KERB },
+  road,
+  point: { x: road.x + shift, y: road.y - KERB },
   facing: 'ne',
 });
 const GREEN = stop('The Lunch Green', 'C5');
 const FORK = stop('The Lantern Fork', 'D3');
-const STAGE = stop('The Little Stage', 'B5');
+// The stage's own kerb is its front row: evening audiences stand and sit there until 20:00.
+// The jug waits on the stage's east corner instead, half a tile in from the junction beside it,
+// clear of both rows, their lanes and the junction's own walking lines.
+const stageRoad = plotEntrance(getPlot('B5')!);
+const STAGE = stop('The Little Stage', 'B5', { x: stageRoad.x + 2, y: stageRoad.y }, -0.5);
 const halt = tubeStation('C1');
 // The waiting basket has its own kerb spot beside the station; it never stands on a tube pad.
 const DEPOT = stop('Hedgerow Halt', halt.plot, { x: halt.door.x + 1, y: halt.door.y });
@@ -136,16 +149,34 @@ function freeWindows(home: Place, trips: readonly Commitment[]) {
   return windows;
 }
 
-const roadAt = ({ point }: ErrandStop): Point => ({ x: point.x, y: point.y + KERB });
+/** From the road's centre onto the kerb: along the road first if the spot is shifted. */
+const toKerb = ({ road, point }: ErrandStop): Point[] =>
+  point.x === road.x ? [point] : [{ x: point.x, y: road.y }, point];
+const fromKerb = (stop: ErrandStop): Point[] => toKerb(stop).reverse();
+/** A shifted spot lies between two road centres: never walk on to the far one and back. */
+function straight(route: Point[]): Point[] {
+  const out: Point[] = [];
+  for (const point of route) {
+    const [a, b] = out.slice(-2);
+    const back = (p: number, q: number, r: number) => (q - p) * (r - q) < 0;
+    if (
+      b &&
+      ((a.y === b.y && b.y === point.y && back(a.x, b.x, point.x)) ||
+        (a.x === b.x && b.x === point.x && back(a.y, b.y, point.y)))
+    )
+      out.pop();
+    out.push(point);
+  }
+  return out;
+}
 /** Three physical walks, with each handoff off the street's walking line. */
 function routes(home: Place, ritual: SeasonalRitual): [Point[], Point[], Point[]] {
   const entrance = plotEntrance(getPlot(home.plot)!);
-  const from = roadAt(ritual.pickup),
-    to = roadAt(ritual.delivery);
+  const { pickup, delivery } = ritual;
   return [
-    [...roadPath(entrance, from), ritual.pickup.point],
-    [ritual.pickup.point, ...roadPath(from, to), ritual.delivery.point],
-    [ritual.delivery.point, ...roadPath(to, entrance)],
+    straight([...roadPath(entrance, pickup.road), ...toKerb(pickup)]),
+    straight([...fromKerb(pickup), ...roadPath(pickup.road, delivery.road), ...toKerb(delivery)]),
+    straight([...fromKerb(delivery), ...roadPath(delivery.road, entrance)]),
   ];
 }
 

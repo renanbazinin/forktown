@@ -1,10 +1,10 @@
 import { useEffect, useRef } from 'react';
-import { drawErrandItem } from '../city/errand-items';
+import { drawErrandItem, errandItemHeight } from '../city/errand-items';
 import type { ErrandKind, ErrandVisual } from '../lib/seasonal-errands';
 import '../errands.css';
 
-/** The actual world object, enlarged two times on a quiet paper tile. The fixed backing scale
- * keeps its original pixels crisp; the neighboring activity text supplies its accessible name. */
+/** The actual world object, enlarged three times and centred on a quiet paper tile. The fixed
+ * backing scale keeps its pixels crisp; the neighboring activity text supplies its name. */
 export default function ErrandItemPreview({ kind }: { kind: ErrandKind }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -15,9 +15,10 @@ export default function ErrandItemPreview({ kind }: { kind: ErrandKind }) {
     ctx.clearRect(0, 0, 88, 88);
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.scale(2, 2); // Two backing pixels for each CSS pixel.
-    ctx.translate(22, 39);
-    ctx.scale(2, 2); // Each original art pixel occupies exactly two CSS pixels.
+    // Each art pixel is three CSS pixels, six backing pixels. The object's 66-pixel width runs
+    // from 11 to 77 and its base sits half its height below the middle, on whole pixels.
+    ctx.translate(41, 44 + 3 * errandItemHeight(kind));
+    ctx.scale(6, 6);
     drawErrandItem(ctx, kind, 0, 0);
     ctx.restore();
   }, [kind]);

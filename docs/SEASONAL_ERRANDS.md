@@ -9,7 +9,7 @@ A neighbor sometimes gives their walk a purpose: a tray of seedlings, a jug of l
 | Autumn | A basket for the green | Hedgerow Halt → Lunch Green       |
 | Winter | Warm cups by the pond  | Lunch Green → Millpond south gate |
 
-The autumn basket is waiting at Hedgerow Halt's depot. It is not one of the tube's simulated parcels, and its pickup is not synchronized with a parcel arrival. The winter round stays on land beside the gate, throughout winter: it never needs skating ice or sends a neighbor onto thawing water.
+The summer jug is set down on the Little Stage's east corner, not on its front kerb, where evening audiences stand and sit until 20:00. The autumn basket is waiting at Hedgerow Halt's depot. It is not one of the tube's simulated parcels, and its pickup is not synchronized with a parcel arrival. The winter round stays on land beside the gate, throughout winter: it never needs skating ice or sends a neighbor onto thawing water.
 
 ## A round that fits
 
@@ -27,7 +27,7 @@ The Events panel has a compact seasonal card. It names the route, the actual car
 
 All names, routes, phases and actions are real DOM text and ordinary keyboard buttons. The small seasonal icon and live dot are decorative. There is no continuously announcing live region. The card uses the displayed clock, so pausing freezes the countdown and the described phase with the town.
 
-The card shows an enlarged pixel drawing of the actual carried object. The same drawing appears in the Follow caption during pickup, carrying and delivery. Each object has its own silhouette and handholds: two leafy pots, an open yellow pitcher, a pumpkin in a rounded basket and a narrow blue flask. The objects sit outside the resident's shoulders so they remain readable from behind. Following an active errand starts with a closer view; later phase changes preserve the visitor's own zoom.
+The card shows the actual carried object enlarged three times. The same drawing appears in the Follow caption during pickup, carrying and delivery. Each object is a small pixel map, about as wide as the resident's shoulders, with its own handholds: a wooden seed tray of three seedlings, a glass pitcher of lemonade with a lemon wheel on the rim, a wicker harvest basket of a pumpkin, apples and greens, and a steaming enamel mug of cocoa beside a red flask. A carrier walking toward the viewer holds it in front at the waist, below their eyes. Walking away, they hold it out past the near shoulder by its inner edge, so neither their back nor their arm hides it. Following an active errand starts with a closer view; later phase changes preserve the visitor's own zoom.
 
 Errands are daytime journeys and never cross midnight. Their Events card belongs to the current calendar day: before 06:00 it previews the coming daytime round, even while the previous evening's disco is still running. The next season's errand appears with that calendar day.
 

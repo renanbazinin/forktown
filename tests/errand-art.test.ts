@@ -190,6 +190,40 @@ describe('Seasonal errand figures', () => {
               }
   }, 30_000);
 
+  it('keeps the carrier’s eyes clear, and the load past the near shoulder walking away', () => {
+    for (const kind of KINDS) {
+      const ground = matrixContext();
+      drawGroundErrandItem(ground.ctx, kind, 0, 0, false, 1);
+      const colors = new Set(boxes(ground).map((box) => box.color));
+      for (const figure of ['male', 'female'] as const)
+        for (const facing of FACINGS)
+          for (const walkPhase of [0, 0.25, 0.5, 0.75]) {
+            const errand = sample(kind, 'carrying', 0.5);
+            const r = matrixContext();
+            drawResident(r.ctx, { ...person, figure }, 0, 0, 1, state(errand, facing, walkPhase));
+            const { bodyBob } = errandItemPose(errand, facing, walkPhase, true)!;
+            const mirror = facing === 'sw' || facing === 'nw' ? -1 : 1;
+            const load = boxes(r).filter((box) => colors.has(box.color));
+            const where = `${kind} ${figure} ${facing} ${walkPhase}`;
+            if (facing === 'se' || facing === 'sw')
+              // The eyes are the pixels at x = 1 and 3, 18px up, riding the body's bob.
+              for (const eye of [1.5, 3.5]) {
+                const x = eye * mirror,
+                  y = -17.5 + bodyBob;
+                const covered = load.some(
+                  (box) => box.x0 <= x && box.x1 >= x && box.y0 <= y && box.y1 >= y,
+                );
+                expect(covered, where).toBe(false);
+              }
+            else {
+              // The body ends at x = 4: at least eight of the object's 11 columns show beyond it.
+              const reach = Math.max(...load.map((box) => (mirror > 0 ? box.x1 : -box.x0)));
+              expect(reach, where).toBeGreaterThanOrEqual(12);
+            }
+          }
+    }
+  });
+
   it('darkens every carried material at night with unchanged geometry', () => {
     for (const kind of KINDS)
       for (const facing of FACINGS) {

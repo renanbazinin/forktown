@@ -3,7 +3,7 @@ import { drawSeasonalErrandProps, seasonalErrandProps } from '../src/city/season
 import { errandGroundOffset } from '../src/city/errand-items';
 import { residentErrands } from '../src/lib/seasonal-errands';
 import { withPreview } from '../src/lib/resident-trips';
-import { HOUSE_PLOTS } from '../src/lib/events';
+import { EVENT_SPOTS, eventSpot, HOUSE_PLOTS, VENUES } from '../src/lib/events';
 import type { Place } from '../src/lib/schema';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { unproject } from '../src/lib/world';
@@ -48,6 +48,24 @@ describe('The same item through a seasonal handoff', () => {
       expect(seasonalErrandProps([], 720, day)).toEqual([]);
     },
   );
+
+  it('sets every item down clear of the audience at the venues it visits', () => {
+    // Evening audiences stand and sit at the Little Stage until 20:00, when the item goes.
+    const offset = errandGroundOffset();
+    const ground = unproject(offset.x, offset.y);
+    for (const { trip } of scenes)
+      for (const stop of [trip.ritual.pickup, trip.ritual.delivery]) {
+        const item = { x: stop.point.x + ground.x, y: stop.point.y + ground.y };
+        for (const venue of VENUES)
+          EVENT_SPOTS[venue.kind].forEach((_, seat) => {
+            const { position } = eventSpot(venue, seat);
+            expect(
+              Math.hypot(position.x - item.x, position.y - item.y),
+              `${stop.name} by ${venue.kind} seat ${seat}`,
+            ).toBeGreaterThan(0.5);
+          });
+      }
+  });
 
   it('keeps the published prop identical in a private house preview', () => {
     // A full-town fixture has no vacancy: make one in this test's base roster only.
