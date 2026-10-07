@@ -942,7 +942,7 @@ export type PlanPoint = { indoors: true; door?: number } | ({ indoors: false } &
 export const loopKey = (plan: Pick<HomePlan, 'key'>, t0: number) => `${plan.key}#${t0}`;
 
 /** Round a loop at `t`, eased into this neighbor's lane away from its ends. */
-function loopMotion(seg: LoopSeg, lane: LanePath, t: number): HomeMotion {
+function loopMotion(seg: LoopSeg, lane: number, t: number): HomeMotion {
   const { points, ends, length } = seg.loop;
   const d = Math.max(0, Math.min(length, (t - seg.t0) * WALK_SPEED));
   let i = 0;
@@ -950,7 +950,7 @@ function loopMotion(seg: LoopSeg, lane: LanePath, t: number): HomeMotion {
   const a = points[i],
     b = points[i + 1];
   const f = (d - ends[i]) / (ends[i + 1] - ends[i]);
-  const side = walkLane(laneAt(lane, t), d, length);
+  const side = walkLane(lane, d, length);
   return {
     position: { x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f },
     moving: true,
@@ -987,7 +987,8 @@ export function planAt(
   let motion: HomeMotion;
   if (seg.kind === 'loop') {
     const lane = lanes?.(loopKey(plan, seg.t0)) ?? plan.lane;
-    const sample = (at: number) => loopMotion(seg, lane, at);
+    // A duck stop freezes the whole figure; catch-up uses lanes planned against town time.
+    const sample = (at: number, laneTime = at) => loopMotion(seg, laneAt(lane, laneTime), at);
     motion = seg.loop.ducks
       ? (duckAwareWalk(`${plan.key}#${seg.t0}`, t, seg.t0, seg.t1, sample) as HomeMotion)
       : sample(t);
