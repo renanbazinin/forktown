@@ -113,8 +113,16 @@ describe('Life at home: the front door, the garden and loops round the block', (
           const where = `${state.id} d${day - DAY} m${minute.toFixed(1)}`;
           const onRoad = isRoad(Math.floor(state.position.x), Math.floor(state.position.y));
           // Standing or sitting on a road tile only at the road handoff, or up on the kerb in
-          // front of the lot between two outings, and only for a moment.
-          if (visible(state) && !state.event && !state.duckLove && !state.moving && onRoad) {
+          // front of the lot between two outings, and only for a moment. Errand handoffs have
+          // their own public kerb stops, checked with their routes in seasonal-errands.test.ts.
+          if (
+            visible(state) &&
+            !state.event &&
+            !state.errand &&
+            !state.duckLove &&
+            !state.moving &&
+            onRoad
+          ) {
             const stands = [plotEntrance(plotOf(state))];
             if (state.lot?.spot === 'kerb') stands.push(offset(state, KERB_OFFSET));
             if (stands.every((point) => distance(state.position, point) > 1e-9))

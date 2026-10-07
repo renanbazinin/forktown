@@ -6,6 +6,8 @@ import { FootballIcon } from './FootballMatch';
 import EveningNote, { type Evening } from './EveningNote';
 import MillpondEventCard from './MillpondEventCard';
 import { skatingCard } from '../lib/millpond-copy';
+import SeasonalErrandCard from './SeasonalErrandCard';
+import type { Place } from '../lib/schema';
 
 export default function TownEvents({
   events,
@@ -15,6 +17,8 @@ export default function TownEvents({
   evening,
   day,
   skaters,
+  places,
+  onFollow,
 }: {
   events: TownEvent[];
   minutes: number;
@@ -23,6 +27,8 @@ export default function TownEvents({
   evening?: Evening;
   day?: number;
   skaters?: number;
+  places?: Place[];
+  onFollow?: (id: string) => void;
 }) {
   const minute = Math.min(10, Number(football.clock.slice(0, 2)) + 1);
   const phase =
@@ -56,6 +62,15 @@ export default function TownEvents({
           <EveningNote {...evening} onVisit={onVisit} />
           <p className="eyebrow evening-eyebrow">AROUND TOWN TODAY</p>
         </>
+      )}
+      {places && day !== undefined && onFollow && (
+        <SeasonalErrandCard
+          places={places}
+          minutes={minutes}
+          day={day}
+          onFollow={onFollow}
+          onVisit={(plot) => onVisit(plot, 'seasonal-errand')}
+        />
       )}
       <button
         className={`event-card football-event ${football.live ? 'is-live' : ''}`}

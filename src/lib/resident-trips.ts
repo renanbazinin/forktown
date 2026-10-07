@@ -210,6 +210,9 @@ export function withPreview(places: Place[], draft: Place): Place[] {
 export const previewNewcomers = (places: Place[]): ReadonlySet<string> =>
   new Set((previews.get(places)?.newcomers ?? []).map((home) => home.id));
 
+/** Published neighbors only: town-owned rounds never select a builder's private preview. */
+export const publishedRoster = (places: Place[]): Place[] => previews.get(places)?.roster ?? places;
+
 /**
  * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
  * neighbor in line whenever someone ahead can't make it (too far to get there, on foot or by tube,

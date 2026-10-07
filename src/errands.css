@@ -1,0 +1,57 @@
+/* The round belongs with the event cards; its two actions are ordinary keyboard buttons. */
+.errand-item-preview {
+  display: block;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 44px;
+  border-radius: 8px;
+  background: #f2f0e3;
+  image-rendering: pixelated;
+}
+.follow-status > .follow-caption {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.follow-status > button {
+  flex-shrink: 0;
+}
+.town-app .follow-status:has(> .errand-item-preview),
+.review-world .follow-status:has(> .errand-item-preview) {
+  gap: 10px;
+  width: max-content;
+}
+.seasonal-errand-card {
+  align-items: flex-start;
+  cursor: default;
+}
+.seasonal-errand-card > .errand-item-preview {
+  margin-top: 3px;
+}
+.seasonal-errand-card .errand-route,
+.seasonal-errand-card .errand-body {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.seasonal-errand-card .errand-route {
+  color: var(--muted);
+}
+.seasonal-errand-card .errand-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin-top: 2px;
+}
+.seasonal-errand-card .errand-actions .text-button {
+  min-height: 32px;
+  padding: 4px 0;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: left;
+  white-space: normal;
+}
+.seasonal-errand-card .errand-actions svg {
+  flex-shrink: 0;
+}

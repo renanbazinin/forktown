@@ -1,0 +1,41 @@
+{
+  "id": "strange-people",
+  "name": "strange people",
+  "creator": "SaritNerya",
+  "plot": "I7",
+  "building": "greenhouse",
+  "color": "#ff0a0a",
+  "decoration": "tree",
+  "story": "strange people live",
+  "design": {
+    "wall": "#09c888",
+    "trim": "#a69108",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "shutters",
+    "garden": "vegetables",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "strong",
+    "figure": "male",
+    "skin": "#c9924f",
+    "hair": "#fb185c",
+    "outfit": "#ffec1a",
+    "accessory": "hat",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "Goodbye",
+    "color": "#0ff5b0",
+    "background": "#174f03",
+    "html": ""
+  }
+}

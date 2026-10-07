@@ -1,6 +1,7 @@
 import type { Resident } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { tint } from './houses';
+import { drawErrandItem, errandItemPose } from './errand-items';
 
 const GREETING_FONT = '10px "Space Mono", monospace';
 /** How much lower, in a figure's own px, a neighbour perches on the porch chair than the bench. */
@@ -49,7 +50,7 @@ export function drawResident(
     ResidentState,
     'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove' | 'event'
   > &
-    Partial<Pick<ResidentState, 'lot'>>,
+    Partial<Pick<ResidentState, 'lot' | 'errand'>>,
   /**
    * `shadow: false` leaves out the ground shadow, for a figure lifted off the ground.
    * `speech: false` leaves out the greeting or heart, for drawResidentSpeech to add on top.
@@ -61,6 +62,8 @@ export function drawResident(
   const facing = state?.facing ?? 'se';
   const back = facing === 'ne' || facing === 'nw';
   const left = facing === 'sw' || facing === 'nw';
+  const errand = errandItemPose(state?.errand, facing, state?.walkPhase, state?.moving);
+  const errandBehind = back || !!errand?.grounded;
   const female = resident.figure === 'female';
   const seated = !!state?.pose && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
   // Skating on the Millpond: a forward lean, arms out for balance, one foot pushing back on a blade.
@@ -73,7 +76,7 @@ export function drawResident(
   const perched = state?.pose === 'perch' || state?.pose === 'tea';
   // The porch chair is lower than the bench, so its sitter's head stays under the porch roof.
   const sink = perched && state?.lot?.spot === 'porch' ? PORCH_SINK : 0;
-  const crouching = state?.pose === 'crouch';
+  const crouching = state?.pose === 'crouch' || (errand?.bend ?? 0) >= 2;
   const stretching = state?.pose === 'stretch';
   const watering = state?.pose === 'water';
   const sweeping = state?.pose === 'sweep';
@@ -81,17 +84,19 @@ export function drawResident(
   const stride =
     state?.moving || dancing || skating ? Math.sin((state.walkPhase ?? 0) * Math.PI * 2) : 0;
   const swing = Math.round(stride * 2);
-  const bob = seated
-    ? 5
-    : skating
-      ? 1
-      : state?.moving || dancing
-        ? -Math.round(Math.abs(stride) * 0.8)
-        : perched
-          ? -2 + sink
-          : crouching
-            ? 2
-            : 0;
+  const bob =
+    errand?.bodyBob ??
+    (seated
+      ? 5
+      : skating
+        ? 1
+        : state?.moving || dancing
+          ? -Math.round(Math.abs(stride) * 0.8)
+          : perched
+            ? -2 + sink
+            : crouching
+              ? 2
+              : 0);
   // A walker lifts the foot swinging forward; a skater lifts the one pushing back.
   const push = skating ? -1 : 1;
   const nearLift = stepping ? Math.max(0, Math.round(push * stride * 2)) : 0;
@@ -104,6 +109,49 @@ export function drawResident(
     outfit = ink(resident.outfit),
     hair = ink(resident.hair);
   const outfitShadow = ink(tint(resident.outfit, -24));
+  // The object and its hands use one geometry. Elbows flex around a held load instead of
+  // swinging through it; only the feet keep the walking stride.
+  const grip = (near: boolean) => {
+    const at = near ? errand!.nearGrip : errand!.farGrip;
+    const rest = { x: near ? 4 : -4, y: -5 + bob };
+    return {
+      x: Math.round(rest.x + (at.x - rest.x) * errand!.armReach),
+      y: Math.round(rest.y + (at.y - rest.y) * errand!.armReach),
+    };
+  };
+  const carryingArm = (near: boolean) => {
+    const hand = grip(near);
+    const shoulder = { x: near ? 3 : -4, y: -11 + bob };
+    const elbow = { x: Math.round((shoulder.x + hand.x) / 2), y: -8 + bob };
+    ctx.fillStyle = near ? outfit : outfitShadow;
+    for (const [a, b] of [
+      [shoulder, elbow],
+      [elbow, hand],
+    ]) {
+      const steps = Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y), 1);
+      for (let i = 0; i <= steps; i++)
+        ctx.fillRect(
+          Math.round(a.x + ((b.x - a.x) * i) / steps) - 1,
+          Math.round(a.y + ((b.y - a.y) * i) / steps),
+          2,
+          2,
+        );
+    }
+  };
+  const carryingHand = (near: boolean) => {
+    const hand = grip(near);
+    ctx.fillStyle = skin;
+    ctx.fillRect(hand.x - 1, hand.y - 1, 2, 2);
+  };
+  const errandItem = () => {
+    if (!errand || !state?.errand) return;
+    ctx.save();
+    ctx.translate(errand.anchor.x, errand.anchor.y);
+    // A grounded item does not turn when the resident turns toward or away from it.
+    if (errand.grounded && left) ctx.scale(-1, 1);
+    drawErrandItem(ctx, state.errand.kind, 0, 0, !!options.night);
+    ctx.restore();
+  };
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(scale, scale);
@@ -119,9 +167,13 @@ export function drawResident(
   if (skating) ctx.transform(1, 0, -0.16, 1, 0, 0);
   // A sitter's body sits back over the seat, behind the feet at the anchor.
   if (perched) ctx.translate(-3, 0);
+  if (errandBehind) errandItem();
   // The far arm and foot sit behind the body; feet lift rather than stretch.
   ctx.fillStyle = outfitShadow;
-  if (cheering || (disco && stride > 0)) {
+  if (errand && errand.armReach > 0) {
+    carryingArm(false);
+    if (back) carryingHand(false);
+  } else if (cheering || (disco && stride > 0)) {
     ctx.fillRect(-6, -15 + bob, 4, 4);
     ctx.fillRect(-7, -22 + bob - Math.max(0, swing), 3, 10);
     ctx.fillStyle = skin;
@@ -215,7 +267,9 @@ export function drawResident(
     ctx.fillRect(-2, -8 + sink, 8, 2);
   }
   ctx.fillStyle = outfit;
-  if (cheering || (disco && stride <= 0)) {
+  if (errand && errand.armReach > 0) {
+    carryingArm(true);
+  } else if (cheering || (disco && stride <= 0)) {
     ctx.fillRect(3, -15 + bob, 4, 4);
     ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);
     ctx.fillStyle = skin;
@@ -292,6 +346,11 @@ export function drawResident(
       ctx.fillRect(4, -18 + bob, 1, 2);
       ctx.fillRect(0, -16 + bob, 5, 1);
     }
+  }
+  if (!errandBehind) errandItem();
+  if (errand && errand.armReach > 0) {
+    if (!back) carryingHand(false);
+    carryingHand(true);
   }
   if (state?.pose === 'read') {
     ctx.fillStyle = ink('#567F79');

@@ -12,6 +12,7 @@ import type { Place } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { residentActivityLabel } from '../lib/simulation';
 import { PLOT_COPY } from '../lib/brand';
+import { FollowErrandItem } from './ErrandItemPreview';
 import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
 import { project, WORLD_BOUNDS } from '../lib/world';
@@ -277,7 +278,10 @@ const City = forwardRef<CityHandle, Props>(function City(
       framing.current = null;
       setHover(null);
       canvas.current?.focus({ preventScroll: true });
-      setCamera((old) => ({ ...old, zoom: Math.max(old.zoom, 0.6, fit.current * 1.8) }));
+      // Choose a readable first view of a seasonal carrier. Keep this effect tied to the
+      // selected neighbor, so later phase changes never override the visitor's own zoom.
+      const minimum = tracked?.errand ? 0.95 : 0.6;
+      setCamera((old) => ({ ...old, zoom: Math.max(old.zoom, minimum, fit.current * 1.8) }));
     }
   }, [followed]);
   const reset = useCallback(() => {
@@ -593,7 +597,8 @@ const City = forwardRef<CityHandle, Props>(function City(
       />
       {tracked && (
         <div className="follow-status">
-          <span>
+          <FollowErrandItem errand={tracked.errand} />
+          <span className="follow-caption">
             <strong>{tracked.resident.name}</strong>
             {residentActivityLabel(tracked)}
           </span>

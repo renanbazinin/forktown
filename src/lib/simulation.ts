@@ -20,10 +20,19 @@ import {
   type FreeWindow,
   type HomeLife,
   type HomePlan,
+  type HomeMotion,
   type PlanPoint,
 } from './home-life';
 import { laneWalk, planLaneWalks, residentGround, type LanePath, type LaneWalk } from './lanes';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, WALK_SPEED } from './walking';
+import {
+  errandState,
+  errandWalkPieces,
+  residentErrands,
+  type ErrandTrip,
+  type ErrandVisual,
+} from './seasonal-errands';
+import { errandAction } from './errand-copy';
 export { roadPath, facingAlong } from './walking';
 
 export type ResidentState = {
@@ -40,6 +49,8 @@ export type ResidentState = {
   nightWalk?: boolean;
   nightPorch?: boolean;
   pose?: EventPose;
+  /** A published neighbor's seasonal round, with the carried object and handoff progress. */
+  errand?: ErrandVisual;
   /** `waiting` is at their spot, early for a show that hasn't started. */
   event?: { name: string; id: string; phase: 'going' | 'waiting' | 'attending' | 'returning' };
   /** Only while boarding, riding or stepping off the tube on the way to or from an event. */
@@ -93,6 +104,7 @@ function tubeLabel(transit: ResidentTransit, event: NonNullable<ResidentState['e
     : `${verb} the tube to ${to}`;
 }
 export function residentActivityLabel(state: ResidentState): string {
+  if (state.errand) return errandAction(state.errand.kind, state.errand.phase);
   if (state.duckLove) return 'Stopped to admire the ducklings';
   if (state.transit && state.event) return tubeLabel(state.transit, state.event);
   if (state.event?.phase === 'waiting')
@@ -183,10 +195,16 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
   const time = townClock(minutes);
   const eventDay = time < 360 ? day - 1 : day;
   const itinerary = residentTrips(places, eventDay);
+  const errands = residentErrands(places, eventDay);
+  const commitments = dayCommitments(itinerary, errands);
   const tripTime = time < 360 ? time + 1440 : time;
   // Tomorrow's plan, read only in the minutes before 06:00 when someone steps out for it.
-  let tomorrow: Map<string, ResidentTrip[]> | undefined;
-  const nextDay = () => (tomorrow ??= residentTrips(places, eventDay + 1));
+  let tomorrow: ReadonlyMap<string, readonly Commitment[]> | undefined;
+  const nextDay = () =>
+    (tomorrow ??= dayCommitments(
+      residentTrips(places, eventDay + 1),
+      residentErrands(places, eventDay + 1),
+    ));
   // The loops' lanes, planned once a day around everyone's walks, when a loop first asks.
   let loops: ReadonlyMap<string, LanePath> | undefined;
   const lanes = (key: string) => (loops ??= loopLanes(places, eventDay, itinerary)).get(key);
@@ -207,7 +225,21 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         greeting: false,
         ...(chainTurn(home.id, trips, at) ?? tripState(home, trip, at, day)),
       };
-    return homeState(home, plot, at, eventDay, trips, nextDay, lanes);
+    const errand = errands.get(home.id)?.find((trip) => at >= trip.depart && at < trip.homeBy);
+    if (errand)
+      return {
+        id: home.id,
+        resident: home.resident,
+        home,
+        position: plotEntrance(plot),
+        activity: 'stroll',
+        moving: false,
+        facing: 'se',
+        walkPhase: 0,
+        greeting: false,
+        ...errandState(errand, at, lanes),
+      };
+    return homeState(home, plot, at, eventDay, commitments.get(home.id) ?? [], nextDay, lanes);
   };
   const states = places.flatMap((home): ResidentState[] => {
     const plot = getPlot(home.plot);
@@ -225,6 +257,27 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
 
 /** A run of consecutive stroll periods: out and about from `start` until `end`. */
 type Run = { start: number; end: number };
+/** Event journeys and seasonal rounds reserve the same road-to-road part of a free window. */
+type Commitment = { depart: number; homeBy: number };
+const commitmentPlans = new WeakMap<
+  ReadonlyMap<string, readonly ResidentTrip[]>,
+  ReadonlyMap<string, readonly Commitment[]>
+>();
+function dayCommitments(
+  trips: ReadonlyMap<string, readonly ResidentTrip[]>,
+  errands: ReadonlyMap<string, readonly ErrandTrip[]>,
+): ReadonlyMap<string, readonly Commitment[]> {
+  const found = commitmentPlans.get(trips);
+  if (found) return found;
+  const plan = new Map<string, readonly Commitment[]>(trips);
+  for (const [id, rounds] of errands)
+    plan.set(
+      id,
+      [...(trips.get(id) ?? []), ...rounds].sort((a, b) => a.depart - b.depart),
+    );
+  commitmentPlans.set(trips, plan);
+  return plan;
+}
 /**
  * Per home object: its runs, and the window plan it used last, so a steady frame builds no cache
  * key. Only a speed-up: every entry is derived from the home object alone (or checked against
@@ -260,7 +313,7 @@ function planFor(home: Place, plot: Plot, day: number, window: FreeWindow): Home
   return plan;
 }
 /** The free window of a run around `t`, between the trips either side of it. */
-function windowAround(run: Run, trips: ResidentTrip[], t: number): FreeWindow {
+function windowAround(run: Run, trips: readonly Commitment[], t: number): FreeWindow {
   const window: FreeWindow = { ws: run.start, we: run.end, start: 'door', end: 'door' };
   for (const trip of trips) {
     if (trip.homeBy <= t && trip.homeBy >= window.ws) {
@@ -275,11 +328,11 @@ function windowAround(run: Run, trips: ResidentTrip[], t: number): FreeWindow {
   return window;
 }
 /** Every free window of a run with time in it: between the trips that fall within the run. */
-function runWindows(run: Run, trips: readonly ResidentTrip[]): FreeWindow[] {
+function runWindows(run: Run, trips: readonly Commitment[]): FreeWindow[] {
   const windows: FreeWindow[] = [];
   let at = run.start;
   const free = (end: number) => {
-    if (end > at) windows.push(windowAround(run, trips as ResidentTrip[], (at + end) / 2));
+    if (end > at) windows.push(windowAround(run, trips, (at + end) / 2));
   };
   for (const trip of [...trips].sort((a, b) => a.depart - b.depart)) {
     if (trip.homeBy <= run.start || trip.depart >= run.end) continue;
@@ -312,10 +365,26 @@ function loopLanes(
   }));
   const keys = new Map<LaneWalk, string>();
   const newcomers = previewNewcomers(places);
+  const errands = residentErrands(places, planDay);
+  const commitments = dayCommitments(itinerary, errands);
+  for (const [id, rounds] of errands)
+    for (const trip of rounds)
+      for (const { key, piece } of errandWalkPieces(trip)) {
+        const walk = laneWalk(
+          id,
+          walks.length,
+          false,
+          [piece],
+          piece.start,
+          piece.start + piece.minutes,
+        );
+        walks.push(walk);
+        keys.set(walk, key);
+      }
   for (const home of places) {
     const plot = getPlot(home.plot);
     if (!plot) continue;
-    const trips = itinerary.get(home.id) ?? [];
+    const trips = commitments.get(home.id) ?? [];
     for (const run of memoFor(home).runs)
       for (const window of runWindows(run, trips)) {
         const plan = windowPlan(home, plot, planDay, window);
@@ -325,7 +394,17 @@ function loopLanes(
             home.id,
             walks.length,
             newcomers.has(home.id),
-            [{ route: seg.loop.points, start: seg.t0, minutes: seg.t1 - seg.t0 }],
+            [
+              {
+                route: seg.loop.points,
+                start: seg.t0,
+                minutes: seg.t1 - seg.t0,
+                // Plan the same duck pauses and catch-up motion that the town draws.
+                ...(seg.loop.ducks
+                  ? { sample: (minute: number) => planAt(plan, minute, () => 1) as HomeMotion }
+                  : {}),
+              },
+            ],
             seg.t0,
             seg.t1,
           );
@@ -353,7 +432,7 @@ export function planTownDay(places: Place[], planDay: number) {
 }
 
 /** A run's first free window, which may be empty when a trip leaves the moment it begins. */
-function firstWindow(run: Run, trips: ResidentTrip[]): FreeWindow {
+function firstWindow(run: Run, trips: readonly Commitment[]): FreeWindow {
   const window: FreeWindow = { ws: run.start, we: run.end, start: 'door', end: 'door' };
   for (const trip of trips)
     if (trip.depart >= run.start && trip.depart < window.we) {
@@ -363,7 +442,7 @@ function firstWindow(run: Run, trips: ResidentTrip[]): FreeWindow {
   return window;
 }
 /** A run's last free window, which may be empty when a trip gets home the moment it ends. */
-function lastWindow(run: Run, trips: ResidentTrip[]): FreeWindow {
+function lastWindow(run: Run, trips: readonly Commitment[]): FreeWindow {
   const window: FreeWindow = { ws: run.start, we: run.end, start: 'door', end: 'door' };
   for (const trip of trips)
     if (trip.homeBy <= run.end && trip.homeBy >= window.ws && trip.depart >= run.start) {
@@ -393,8 +472,8 @@ function homeState(
   plot: Plot,
   tripTime: number,
   planDay: number,
-  trips: ResidentTrip[],
-  nextDay: () => Map<string, ResidentTrip[]>,
+  trips: readonly Commitment[],
+  nextDay: () => ReadonlyMap<string, readonly Commitment[]>,
   lanes: (key: string) => LanePath | undefined,
 ): ResidentState {
   const { runs } = memoFor(home);
@@ -469,7 +548,11 @@ function talksFor(places: Place[]) {
 }
 /** Free to greet: out and about, not on an outing, not watching the ducklings, not in a doorway. */
 const freeToTalk = (state: ResidentState) =>
-  state.activity === 'stroll' && !state.event && !state.duckLove && state.fade === undefined;
+  state.activity === 'stroll' &&
+  !state.event &&
+  !state.errand &&
+  !state.duckLove &&
+  state.fade === undefined;
 /** Within `reach` tiles (1.4, greeting range): this runs for every pair of walkers, every frame. */
 const inRange = (a: ResidentState, b: ResidentState, reach = 1.4) => {
   const dx = a.position.x - b.position.x,
@@ -506,12 +589,18 @@ function beatSpells(
     const steps = Math.round(5 / TALK_SAMPLE);
     for (let k = 0; k <= steps; k++) {
       const minute = beat * 5 + k * TALK_SAMPLE;
-      const a = k < steps ? at(first, minute) : undefined,
-        b = k < steps ? at(second, minute) : undefined;
-      const talking = !!a && !!b && freeToTalk(a) && freeToTalk(b) && inRange(a, b);
-      if (talking && from < 0) from = minute;
-      if (!talking && from >= 0) {
-        spells.push(from, minute);
+      // A beat ends by itself; check just before its boundary to preserve a whole-beat spell.
+      const endOfBeat = k === steps;
+      const sample = endOfBeat ? minute - 1e-9 : minute;
+      const a = at(first, sample),
+        b = at(second, sample);
+      const talking = freeToTalk(a) && freeToTalk(b) && inRange(a, b);
+      if (talking && !endOfBeat && from < 0) from = minute;
+      if ((!talking || endOfBeat) && from >= 0) {
+        // The first unavailable sample can be almost TALK_SAMPLE minutes after an event or
+        // doorway has already ended the meeting. Only promise the time confirmed in range,
+        // otherwise a seemingly long-enough greeting disappears before GREETING_MINUTES.
+        spells.push(from, talking ? minute : minute - TALK_SAMPLE);
         from = -1;
       }
     }

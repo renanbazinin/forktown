@@ -27,6 +27,8 @@ import {
   LANE_TURN,
   laneAt,
   laneOffset,
+  laneWalk,
+  planLaneWalks,
   residentGround,
   routeLane,
 } from '../src/lib/lanes';
@@ -37,7 +39,7 @@ import {
   type ResidentState,
 } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
-import { laneSide, LANE_RAMP, legsMinutes, walkLane } from '../src/lib/tube-journeys';
+import { laneSide, LANE_RAMP, legsMinutes, walkAlong, walkLane } from '../src/lib/tube-journeys';
 import { TUBE_MIN_SAVING } from '../src/lib/tubes';
 import { roadPath, routeLength, MAX_TRAVEL_SPEED_MULTIPLIER, WALK_SPEED } from '../src/lib/walking';
 import { getPlot, plotEntrance, type Point } from '../src/lib/world';
@@ -187,6 +189,95 @@ describe('Walking routes to the venues', () => {
 });
 
 describe('Lanes on the road', () => {
+  it('keeps a paused walker in the same lane through the first step after the stop', () => {
+    const route = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+    ];
+    const sample = (time: number, side = 1) => ({
+      ...walkAlong(route, (time < 5 ? time : time < 9 ? 5 : time - 4) / 20, side),
+      moving: time < 5 || time >= 9,
+    });
+    const paused = laneWalk('a', 0, false, [{ route, start: 0, minutes: 24, sample }], 0, 24);
+    // Opposite fixed lanes before and after the stop tempt the planner to swap sides during it.
+    const before = laneWalk('b', 0, false, [{ route, start: 0, minutes: 20 }], 0, 5, -1);
+    const after = laneWalk('c', 0, false, [{ route, start: 4, minutes: 20 }], 9, 24, 1);
+    planLaneWalks([paused, before, after]);
+    const ground = (time: number) => residentGround(sample(time, laneAt(paused.path!, time)));
+    for (let time = 5; time <= 9; time += 0.05) expect(ground(time)).toEqual(ground(5));
+    const a = ground(9 - 1e-6),
+      b = ground(9 + 1e-6);
+    expect(Math.hypot(b.x - a.x, b.y - a.y)).toBeLessThan(1e-5);
+  });
+
+  it('plans lanes from actual motion when a walk slows down and catches up', () => {
+    const route = [
+      { x: 0, y: 0 },
+      { x: 20, y: 0 },
+    ];
+    const sample = (time: number, side = 1) =>
+      walkAlong(route, (time < 10 ? time / 2 : 5 + (time - 10) * 1.5) / 20, side);
+    const slower = laneWalk('a', 0, false, [{ route, start: 0, minutes: 20, sample }], 0, 20);
+    const steady = laneWalk('b', 0, false, [{ route, start: 0, minutes: 40 }], 0, 40);
+    planLaneWalks([slower, steady]);
+    // The first walk's average pace is twice the other's, but they actually walk together here.
+    for (let time = 2; time <= 8; time += 0.2) {
+      const a = residentGround(sample(time, laneAt(slower.path!, time)));
+      const b = residentGround(walkAlong(route, time / 40, laneAt(steady.path!, time)));
+      expect(Math.abs((a.x - a.y - b.x + b.y) * 38)).toBeGreaterThanOrEqual(7);
+    }
+  });
+
+  it('moves overtaking walkers apart without lingering one head over the other', () => {
+    // Two picnic return walks, fixed independently of the growing roster. A flat penalty for
+    // every stacked position left them directly above one another for over three minutes.
+    const routes = [
+      [
+        { x: 20.6, y: 12.75 },
+        { x: 18.15, y: 12.75 },
+        { x: 18.15, y: 13.5 },
+        { x: 17.5, y: 13.5 },
+        { x: 17.5, y: 17.5 },
+        { x: 7.5, y: 17.5 },
+      ],
+      [
+        { x: 19.95, y: 12.4 },
+        { x: 18.15, y: 12.4 },
+        { x: 18.15, y: 13.5 },
+        { x: 17.5, y: 13.5 },
+        { x: 17.5, y: 17.5 },
+        { x: 15.5, y: 17.5 },
+      ],
+    ];
+    const starts = [966.5, 963.9];
+    const durations = [48.5, 29.84375];
+    const walks = ['evergreen', 'stargazer'].map((id, i) =>
+      laneWalk(
+        id,
+        0,
+        false,
+        [{ route: routes[i], start: starts[i], minutes: durations[i] }],
+        starts[i],
+        starts[i] + durations[i],
+      ),
+    );
+    planLaneWalks(walks);
+    let run = 0,
+      longest = 0;
+    for (let time = starts[0]; time < starts[1] + durations[1]; time += 0.05) {
+      const [a, b] = walks.map((walk, i) =>
+        residentGround(
+          walkAlong(routes[i], (time - starts[i]) / durations[i], laneAt(walk.path!, time)),
+        ),
+      );
+      const across = Math.abs((a.x - a.y - b.x + b.y) * 38);
+      const down = Math.abs((a.x + a.y - b.x - b.y) * 19);
+      run = across < 7 && down < 22 ? run + 0.05 : 0;
+      longest = Math.max(longest, run);
+    }
+    expect(longest).toBeLessThan(3);
+  });
+
   it('gives each neighbor a steady side of their own, eased in and out of every walk', () => {
     const sides = real.map((home) => laneSide(home.id));
     for (const side of sides) expect(Math.abs(side)).toBeLessThanOrEqual(1);
@@ -279,6 +370,7 @@ describe('Lanes on the road', () => {
     let together = 0,
       close = 0;
     const longest = { fused: 0, stacked: 0 };
+    const longestAt = { fused: '', stacked: '' };
     for (const [town, days] of [
       [real, [...DAYS(3), DAYS(43)[42]]],
       [everyone, DAYS(1)],
@@ -321,7 +413,11 @@ describe('Lanes on the road', () => {
                 now[kind].add(key);
                 const run = (runs[kind].get(key) ?? 0) + STEP;
                 runs[kind].set(key, run);
-                longest[kind] = Math.max(longest[kind], run);
+                if (run > longest[kind]) {
+                  longest[kind] = run;
+                  longestAt[kind] =
+                    `${town === real ? 'published' : 'full'} town: ${key}, day ${day}, ending at ${minute.toFixed(2)}`;
+                }
               }
             }
           for (const kind of ['fused', 'stacked'] as const)
@@ -334,8 +430,8 @@ describe('Lanes on the road', () => {
     // seat, or one walker overtakes another), and never draw two neighbors as one figure for
     // long: under two minutes as one, under three one head over the other.
     expect(close / together).toBeLessThan(0.1);
-    expect(longest.fused).toBeLessThan(2);
-    expect(longest.stacked).toBeLessThan(3);
+    expect(longest.fused, longestAt.fused).toBeLessThan(2);
+    expect(longest.stacked, longestAt.stacked).toBeLessThan(3);
   }, 60_000);
 
   it('gives lanes that stay put on a straight and turn smoothly round a corner', () => {
@@ -645,6 +741,32 @@ describe('At the venue', () => {
 });
 
 describe('Stopping for the ducklings', () => {
+  it('freezes the drawn figure during a stop and uses the current lane while catching up', () => {
+    const crossingX = ducksAt(540)[0].position.x;
+    const walk = (routeTime: number, laneTime: number) => ({
+      position: { x: crossingX + (routeTime - 540) * 0.15, y: DUCK_STREET_Y },
+      laneOffset: { x: 0, y: laneTime / 1000 },
+      moving: true,
+      facing: 'se' as const,
+      walkPhase: (routeTime * 0.45) % 1,
+    });
+    const at = (time: number) => duckAwareWalk('test:lane-clock', time, 360, 720, walk);
+    let stops = 0;
+    for (let start = DUCK_WALK_START; start < 720; start += 0.5) {
+      if (!at(start).duckLove || at(start - 0.5).duckLove) continue;
+      const ground = residentGround(at(start));
+      for (let t = start; t < start + DUCK_LOVE_SECONDS; t += 0.05)
+        expect(residentGround(at(t))).toEqual(ground);
+      const time = start + DUCK_LOVE_SECONDS + 1;
+      const recovering = at(time);
+      expect(recovering.moving).toBe(true);
+      expect(residentGround(recovering).y).toBeCloseTo(DUCK_STREET_Y + time / 1000, 12);
+      expect(recovering.position.x).toBeLessThan(walk(time, time).position.x);
+      stops++;
+    }
+    expect(stops).toBeGreaterThan(0);
+  });
+
   it('keeps looking at the duck that caught their eye for the whole stop', () => {
     const crossingX = ducksAt(540)[0].position.x;
     const walk = (time: number) => ({
