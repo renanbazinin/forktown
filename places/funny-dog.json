@@ -1,0 +1,41 @@
+{
+  "id": "funny-dog",
+  "name": "funny dog",
+  "creator": "yehudit-123",
+  "plot": "A4",
+  "building": "studio",
+  "color": "#C97878",
+  "decoration": "mailbox",
+  "story": "A wood rocker",
+  "design": {
+    "wall": "#e4cf95",
+    "trim": "#7b5b3d",
+    "floors": 2,
+    "roof": "flat",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Vera",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

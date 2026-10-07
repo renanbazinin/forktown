@@ -1,0 +1,41 @@
+{
+  "id": "observatory-house",
+  "name": "observatory-house",
+  "creator": "yehudit-123",
+  "plot": "J5",
+  "building": "cottage",
+  "color": "#ff4d4d",
+  "decoration": "mailbox",
+  "story": "never at home",
+  "design": {
+    "wall": "#fedf8b",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "yuda",
+    "figure": "female",
+    "skin": "#8f714d",
+    "hair": "#ff9500",
+    "outfit": "#ff0000",
+    "accessory": "hat",
+    "greeting": "holla!",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "stroll",
+      "evening": "stroll",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HOLLA",
+    "color": "#ffffff",
+    "background": "#659a88",
+    "html": ""
+  }
+}
