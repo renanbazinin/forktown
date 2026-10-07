@@ -1,0 +1,41 @@
+{
+  "id": "sunny-cottage",
+  "name": "Sunny Cottage",
+  "creator": "sarabrie",
+  "plot": "F8",
+  "building": "studio",
+  "color": "#BE8E68",
+  "decoration": "flowers",
+  "story": "deck chair",
+  "design": {
+    "wall": "#ac9c72",
+    "trim": "#0d0a08",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Aiko",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}
