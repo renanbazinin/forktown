@@ -1,0 +1,41 @@
+{
+  "id": "clover-house",
+  "name": "Clover House",
+  "creator": "s0583232209",
+  "plot": "A4",
+  "building": "bookshop",
+  "color": "#D0AA65",
+  "decoration": "flowers",
+  "story": "Teh bookshop for all who loves old, yellow and falling apart books.",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Remy",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}
