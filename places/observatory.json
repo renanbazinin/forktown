@@ -1,0 +1,41 @@
+{
+  "id": "observatory",
+  "name": "observatory",
+  "creator": "yehudit-123",
+  "plot": "I7",
+  "building": "greenhouse",
+  "color": "#C97878",
+  "decoration": "mailbox",
+  "story": "a wood rocker",
+  "design": {
+    "wall": "#ded3b5",
+    "trim": "#c4884f",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "yuda",
+    "figure": "male",
+    "skin": "#f7d0a1",
+    "hair": "#794b0c",
+    "outfit": "#ff0000",
+    "accessory": "hat",
+    "greeting": "Hi!",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "work",
+      "evening": "stroll",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "holla!"
+  }
+}
