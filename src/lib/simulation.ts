@@ -20,6 +20,7 @@ import {
   type FreeWindow,
   type HomeLife,
   type HomePlan,
+  type HomeMotion,
   type PlanPoint,
 } from './home-life';
 import { laneWalk, planLaneWalks, residentGround, type LanePath, type LaneWalk } from './lanes';
@@ -393,7 +394,17 @@ function loopLanes(
             home.id,
             walks.length,
             newcomers.has(home.id),
-            [{ route: seg.loop.points, start: seg.t0, minutes: seg.t1 - seg.t0 }],
+            [
+              {
+                route: seg.loop.points,
+                start: seg.t0,
+                minutes: seg.t1 - seg.t0,
+                // Plan the same duck pauses and catch-up motion that the town draws.
+                ...(seg.loop.ducks
+                  ? { sample: (minute: number) => planAt(plan, minute, () => 1) as HomeMotion }
+                  : {}),
+              },
+            ],
             seg.t0,
             seg.t1,
           );
@@ -578,12 +589,18 @@ function beatSpells(
     const steps = Math.round(5 / TALK_SAMPLE);
     for (let k = 0; k <= steps; k++) {
       const minute = beat * 5 + k * TALK_SAMPLE;
-      const a = k < steps ? at(first, minute) : undefined,
-        b = k < steps ? at(second, minute) : undefined;
-      const talking = !!a && !!b && freeToTalk(a) && freeToTalk(b) && inRange(a, b);
-      if (talking && from < 0) from = minute;
-      if (!talking && from >= 0) {
-        spells.push(from, minute);
+      // A beat ends by itself; check just before its boundary to preserve a whole-beat spell.
+      const endOfBeat = k === steps;
+      const sample = endOfBeat ? minute - 1e-9 : minute;
+      const a = at(first, sample),
+        b = at(second, sample);
+      const talking = freeToTalk(a) && freeToTalk(b) && inRange(a, b);
+      if (talking && !endOfBeat && from < 0) from = minute;
+      if ((!talking || endOfBeat) && from >= 0) {
+        // The first unavailable sample can be almost TALK_SAMPLE minutes after an event or
+        // doorway has already ended the meeting. Only promise the time confirmed in range,
+        // otherwise a seemingly long-enough greeting disappears before GREETING_MINUTES.
+        spells.push(from, talking ? minute : minute - TALK_SAMPLE);
         from = -1;
       }
     }
