@@ -1,0 +1,41 @@
+{
+  "id": "clover-nest",
+  "name": "Clover Nest",
+  "creator": "tehila7929-tech",
+  "plot": "Q1",
+  "building": "cottage",
+  "color": "#789B76",
+  "decoration": "tree",
+  "story": "I love the view.",
+  "design": {
+    "wall": "#dbc895",
+    "trim": "#a76e39",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "vegetables",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "it's me",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "hat",
+    "greeting": "SHALOM!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "I am here!!"
+  }
+}
