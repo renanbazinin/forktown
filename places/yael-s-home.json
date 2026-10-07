@@ -1,0 +1,41 @@
+{
+  "id": "yael-s-home",
+  "name": "Yael's Home",
+  "creator": "YaelTamari",
+  "plot": "J6",
+  "building": "cottage",
+  "color": "#e12349",
+  "decoration": "mailbox",
+  "story": "Lots of love and warmth",
+  "design": {
+    "wall": "#f5e7c2",
+    "trim": "#72563b",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Gemma",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}
