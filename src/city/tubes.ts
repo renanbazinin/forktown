@@ -461,19 +461,9 @@ function pieceVisible(piece: TubePiece, visible: Visible) {
 // ---------------------------------------------------------------------------------------------
 // Glass
 
-/** One straight run of glass as a vertical-slice parallelogram: consecutive runs share their end
- * edges exactly, so the translucent glass never doubles up. 6 calls, 7 when selected. */
-function slice(ctx: Ctx, a: Point, b: Point, emphasis: TubeEmphasis, night: boolean) {
-  const dx = b.x - a.x;
-  if (Math.abs(dx) < 0.01) return;
-  ctx.save();
-  ctx.transform(1, (b.y - a.y) / dx, 0, 1, a.x, a.y);
-  if (emphasis === 'selected') box(ctx, 0, -4, dx, 8, pick(GLASS.halo, night));
-  box(ctx, 0, -2.5, dx, 5, pick(GLASS.body, night));
-  box(ctx, 0, -2.5, dx, 1, highlight(emphasis, night));
-  box(ctx, 0, 1.5, dx, 1, pick(GLASS.rim, night));
-  ctx.restore();
-}
+/** Glass as vertical-slice parallelograms: consecutive runs share their end edges exactly, so
+ * the translucent glass never doubles up. Keep one canvas save for the whole piece, moving
+ * between each run's origin and slope with relative transforms. */
 function paintGlass(
   ctx: Ctx,
   piece: TubePiece,
@@ -482,10 +472,26 @@ function paintGlass(
   lod: number,
 ) {
   const points = screenOf(piece.points);
-  const alpha = ctx.globalAlpha;
-  ctx.globalAlpha = alpha * lod;
-  for (let k = 1; k < points.length; k++) slice(ctx, points[k - 1], points[k], emphasis, night);
-  ctx.globalAlpha = alpha;
+  ctx.save();
+  ctx.globalAlpha *= lod;
+  let origin = { x: 0, y: 0 },
+    slope = 0;
+  for (let k = 1; k < points.length; k++) {
+    const a = points[k - 1],
+      b = points[k];
+    const dx = b.x - a.x;
+    if (Math.abs(dx) < 0.01) continue;
+    const nextSlope = (b.y - a.y) / dx,
+      shiftX = a.x - origin.x;
+    ctx.transform(1, nextSlope - slope, 0, 1, shiftX, a.y - origin.y - slope * shiftX);
+    origin = a;
+    slope = nextSlope;
+    if (emphasis === 'selected') box(ctx, 0, -4, dx, 8, pick(GLASS.halo, night));
+    box(ctx, 0, -2.5, dx, 5, pick(GLASS.body, night));
+    box(ctx, 0, -2.5, dx, 1, highlight(emphasis, night));
+    box(ctx, 0, 1.5, dx, 1, pick(GLASS.rim, night));
+  }
+  ctx.restore();
 }
 /** The glass ball where a spur's leg turns west, or where a middle station's elbows meet the
  * trunk. It hides the joint of the runs. */
