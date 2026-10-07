@@ -1,0 +1,41 @@
+{
+  "id": "olive-lodge",
+  "name": "Olive Lodge",
+  "creator": "yehudit-123",
+  "plot": "J5",
+  "building": "cottage",
+  "color": "#C97878",
+  "decoration": "flowers",
+  "story": "welcome everyone!",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "yuda",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#ff00ea",
+    "accessory": "hat",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "stroll",
+      "afternoon": "stroll",
+      "evening": "stroll",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}
