@@ -150,10 +150,15 @@ export type LanePiece = {
 /** Minutes between the samples that find who walks with whom, and between a planned lane's steps. */
 export const LANE_SAMPLE = 0.25;
 /**
- * Tiles apart, heading the same way, within which two lanes could draw two figures as one: two
- * whole lanes apart (2 · LANE_SHIFT) and a figure's width along the street, with a little over.
+ * How far apart, heading the same way, lanes could still draw two figures over each other at all,
+ * in world tiles along the screen's two diagonals (x + y down it, x − y across it): as far as
+ * overlapWeight reaches (22 px down, 10 across, at zoom 1), plus two whole lanes turned any way
+ * (2 · LANE_SHIFT · √2). So neighbors on two lines a few steps apart (a path beside a road) are
+ * planned side by side too, not only those on one street. NEAR bounds both, for a quick box test.
  */
-const NEAR = 0.75;
+const NEAR_DOWN = 22 / 19 + 2 * LANE_SHIFT * Math.SQRT2;
+const NEAR_ACROSS = 10 / 38 + 2 * LANE_SHIFT * Math.SQRT2;
+const NEAR = Math.hypot(NEAR_DOWN, NEAR_ACROSS) / Math.SQRT2;
 /** A planned lane moves in eighths of a lane, an eighth a sample at most. */
 const LANE_STEPS = 8;
 const STATES = 2 * LANE_STEPS + 1;
@@ -325,7 +330,7 @@ function nearness(a: LaneWalk, b: LaneWalk): Near | undefined {
     if (a.faces[i] < 0 || a.faces[i] !== b.faces[j]) continue;
     const dx = b.xs[j] - a.xs[i],
       dy = b.ys[j] - a.ys[i];
-    if (dx * dx + dy * dy >= NEAR * NEAR) continue;
+    if (Math.abs(dx + dy) >= NEAR_DOWN || Math.abs(dx - dy) >= NEAR_ACROSS) continue;
     const oa = unitOffset(a, i),
       ob = unitOffset(b, j);
     near.d.push(k, dx, dy, oa.x, oa.y, ob.x, ob.y);
@@ -413,10 +418,11 @@ const byId = (a: LaneWalk, b: LaneWalk) => (a.id < b.id ? -1 : a.id > b.id ? 1 :
 
 /**
  * Give every walk its lanes. Anyone who walks alone keeps their own side all the way. Walkers who
- * walk near others the same way (within NEAR tiles, for half a minute or more) take, in time
+ * walk near others the same way (close enough to overlap, for half a minute or more) take, in time
  * order, the lanes that draw them over those already placed least (choosePath), then a few times
  * over the best beside everyone's latest, so a column settles side by side. Fixed walks keep
- * theirs. The town is placed before a previewed draft and never looks at it. Pure: the order of
+ * theirs; a walk that is not fixed but comes with lanes (a first guess) is seen in them until its
+ * own turn. The town is placed before a previewed draft and never looks at it. Pure: the order of
  * `walks` does not matter.
  */
 export function planLaneWalks(walks: readonly LaneWalk[]) {
