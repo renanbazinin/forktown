@@ -25,6 +25,7 @@ import {
   drawTubeTraffic,
   drawTubes,
   glassLod,
+  tubeGlassEdges,
   tubeMarkArea,
   tubePainterFor,
   type TubeObject,
@@ -66,6 +67,7 @@ import {
   getPlot,
   plotCenter,
   project,
+  unproject,
   type Point,
 } from '../src/lib/world';
 import { VENUES } from '../src/lib/events';
@@ -271,7 +273,14 @@ const parcelAt = (
 // ---------------------------------------------------------------------------------------------
 // Painting, with every call's fill, alpha and font, and its world-pixel points.
 
-type Logged = { name: string; args: unknown[]; fill: string; alpha: number; font: string };
+type Logged = {
+  name: string;
+  args: unknown[];
+  fill: string;
+  stroke: string;
+  alpha: number;
+  font: string;
+};
 function tracked() {
   const matrix = matrixContext();
   const log: Logged[] = [];
@@ -285,6 +294,7 @@ function tracked() {
           name: key,
           args,
           fill: String(object.fillStyle),
+          stroke: String(object.strokeStyle),
           alpha: Number(object.globalAlpha),
           font: String(object.font),
         });
@@ -532,8 +542,10 @@ describe('The Treeline’s parts', () => {
         expect(glass).toBeLessThanOrEqual(emphasis === 'none' ? 90 : 110);
         for (const bubble of parts(painted, 'bubble', station.id))
           expect(bubble.calls.length).toBeLessThanOrEqual(8);
+        // A post is a shadow and two sides; a bank pier, two sides on a two-sided foot with a
+        // dry top (its ring and reflection lie in the ground).
         for (const post of parts(painted, 'post', station.id))
-          expect(post.calls.length).toBeLessThanOrEqual(3);
+          expect(post.calls.length).toBeLessThanOrEqual(station.edge === 'bank' ? 5 : 3);
       }
     // A winter night with the lamp lit: snow on the hood, the sign and the bucket.
     const winterNight = sceneOf({ day: WINTER, minutes: 1290 });
@@ -710,6 +722,120 @@ describe('The Treeline’s parts', () => {
     );
     expect(washes.length).toBe(3);
     for (const call of washes) expect(call.alpha).toBeCloseTo(0.4, 9);
+  });
+});
+
+describe('The Treeline close up', () => {
+  it('keeps the glass its width round every bend, where slices would pinch it', () => {
+    // From zoom 1 a piece that runs more than 2:1 down the screen (the river head's corner and
+    // every elbow turning toward the viewer) is drawn as one outline; the rest in slices, whose
+    // thickness across the glass is 2h / √(1 + slope²).
+    const across = (p: Point, line: readonly Point[]) => offLine(p, line);
+    let bent = 0;
+    for (const piece of TUBE_PIECES) {
+      const screen = piece.points.map((p) => {
+        const g = project(p.x, p.y);
+        return { x: g.x, y: g.y - p.h };
+      });
+      const edges = tubeGlassEdges(piece, 3);
+      expect(tubeGlassEdges(piece, 0.7)).toBeUndefined();
+      if (edges) {
+        bent++;
+        for (const p of screen) {
+          expect(across(p, edges[0]), `${piece.station}`).toBeGreaterThanOrEqual(1.4);
+          expect(across(p, edges[1]), `${piece.station}`).toBeGreaterThanOrEqual(1.4);
+          expect(across(p, edges[0]), `${piece.station}`).toBeLessThanOrEqual(2.6);
+          expect(across(p, edges[1]), `${piece.station}`).toBeLessThanOrEqual(2.6);
+        }
+        continue;
+      }
+      for (let k = 1; k < screen.length; k++) {
+        const dx = screen[k].x - screen[k - 1].x,
+          dy = screen[k].y - screen[k - 1].y;
+        if (Math.hypot(dx, dy) < 0.01) continue;
+        const half =
+          piece.points[k].x === TUBE_BANK_X && piece.points[k - 1].x === TUBE_BANK_X
+            ? TUBE_ALTITUDE.bankRadius
+            : TUBE_ALTITUDE.radius;
+        expect(Math.abs(dy), `${piece.station} ${k}`).toBeLessThanOrEqual(2 * Math.abs(dx));
+        expect((2 * half) / Math.hypot(1, dy / dx), `${piece.station} ${k}`).toBeGreaterThan(2.8);
+      }
+    }
+    // The corner round the river's head, and the two bank elbows that turn south toward the
+    // viewer as they drop to the far bank (C15's and L15's). The west and north elbows drop as
+    // they turn, so on screen they never run steeper than about 1.3:1.
+    expect(bent).toBe(1 + 2);
+  });
+
+  it('lays reflections and rings only on the river, and only close up', () => {
+    const marks = new Set([
+      ...TUBE_PALETTE['REFLECTION.glass'],
+      ...TUBE_PALETTE['REFLECTION.post'],
+      ...TUBE_PALETTE.RIPPLE,
+    ]);
+    const onWater = (p: Point) => {
+      const w = unproject(p.x, p.y);
+      const tx = Math.floor(w.x),
+        ty = Math.floor(w.y);
+      return tx === WORLD_WIDTH - 2 || (tx === WORLD_WIDTH - 1 && ty < 8);
+    };
+    for (const minutes of [720, 1290]) {
+      const t = tracked();
+      drawTubeGround(t.ctx, sceneOf({ minutes }));
+      // Every reflection lands on the water, and so does every ring and the pool's line: each
+      // fillRect in their colours, and each path filled or stroked in them.
+      const byCall = new Map<number, Point[]>();
+      for (const p of t.points) byCall.set(p.index, [...(byCall.get(p.index) ?? []), p]);
+      const water: Point[] = [];
+      let path: number[] = [];
+      t.log.forEach((call, i) => {
+        if (call.name === 'beginPath') path = [];
+        else if (['moveTo', 'lineTo', 'ellipse', 'arc'].includes(call.name)) path.push(i);
+        else if (
+          (call.name === 'stroke' && marks.has(call.stroke)) ||
+          (call.name === 'fill' && marks.has(call.fill))
+        )
+          water.push(...path.flatMap((k) => byCall.get(k) ?? []));
+        else if (call.name === 'fillRect' && marks.has(call.fill))
+          water.push(...(byCall.get(i) ?? []));
+      });
+      expect(water.length).toBeGreaterThan(0);
+      for (const p of water) expect(onWater(p), `${p.x},${p.y}`).toBe(true);
+      // The reflection down the head pool, two pilings and three piers.
+      const reflections = t.log.filter(
+        (call) => call.name === 'fillRect' && TUBE_PALETTE['REFLECTION.post'].includes(call.fill),
+      );
+      expect(reflections.length).toBe(2 + 3 * 2);
+      expect(t.log.filter((call) => call.name === 'setLineDash').length).toBe(2);
+      expect(t.log.filter((call) => call.name === 'ellipse').length).toBe(2 + 3 + 7 * 2);
+    }
+    // Zoomed out the river keeps only the piers' plain ripples, and from FAR nothing at all.
+    const near = tracked();
+    drawTubeGround(near.ctx, sceneOf({ zoom: 0.7 }));
+    expect(near.log.some((call) => call.name === 'setLineDash')).toBe(false);
+    expect(
+      near.log.filter((call) => call.name === 'fillRect' && call.fill === TUBE_PALETTE.RIPPLE[0]),
+    ).toHaveLength(3 + 2);
+    const far = tracked();
+    drawTubeGround(far.ctx, sceneOf({ zoom: 0.3 }));
+    expect(far.log.some((call) => TUBE_PALETTE.RIPPLE.includes(call.fill))).toBe(false);
+  });
+
+  it('hangs each lamp under its hood, with a hot middle only while it is lit', () => {
+    const CORE = TUBE_PALETTE['LAMP.core'][0];
+    for (const minutes of [720, 1205, 1290])
+      for (const zoom of [3, 0.7, 0.3]) {
+        const painted = paint(sceneOf({ minutes, zoom }));
+        for (const stack of parts(painted, 'stack')) {
+          const lit = stack.log.some((call) => call.fill === AMBER);
+          const core = stack.log.filter((call) => call.name === 'fillRect' && call.fill === CORE);
+          expect(core.length, `${stack.object.station} ${minutes} ${zoom}`).toBe(
+            lit && zoom >= 0.5 ? 1 : 0,
+          );
+          // The lamp hangs under the hood's lip, never above the 48-px hood.
+          expect(heightOf(stack)).toBeLessThanOrEqual(48);
+        }
+      }
   });
 });
 
@@ -1244,9 +1370,14 @@ describe('Marking one halt', () => {
     ] as const) {
       const marked = frame(selected, hovered);
       expect(marked.marks.key.trim().split(' ')).toContain(`tube:${id}`);
+      // The halt's own plot, as render.ts repaints any plot, widened over its own glass in the
+      // ground (see "lights the marked halt’s own glass").
       const area = tubeMarkArea(id);
       const c = plotCenter(getPlot(id)!);
-      expect(area).toEqual({ left: c.x - 112, right: c.x + 112, top: c.y - 58, bottom: c.y + 58 });
+      expect(area.left).toBeLessThanOrEqual(c.x - 112);
+      expect(area.right).toBeGreaterThanOrEqual(c.x + 112);
+      expect(area.top).toBeLessThanOrEqual(c.y - 58);
+      expect(area.bottom).toBeGreaterThanOrEqual(c.y + 58);
       expect(marked.marks.areas(marked.marks.key)).toContainEqual(area);
       // The ground differs from the quiet one only inside the marked rectangles.
       const areas = marked.marks.areas(marked.marks.key)!;
@@ -1271,16 +1402,37 @@ describe('Marking one halt', () => {
   });
 
   it('lights the marked halt’s own glass and stack, never another’s', () => {
+    const HALO = TUBE_PALETTE['GLASS.halo'][0];
+    for (const zoom of [3, 0.7, 0.3])
+      for (const station of TUBE_STATIONS) {
+        const painted = paint(sceneOf({ zoom, emphasis: 'selected', station: station.id }));
+        const halo = (o: Painted) => o.log.some((call) => call.fill === HALO);
+        expect(painted.objects.filter(halo).every((o) => o.object.station === station.id)).toBe(
+          true,
+        );
+        expect(parts(painted, 'spur', station.id).some(halo)).toBe(true);
+        expect(parts(painted, 'stack', station.id).some(halo)).toBe(true);
+        // Of the cached ground, only the halt's own elbows and T light, all inside the rectangle
+        // the ground repaints for it; never a run of trunk.
+        const area = tubeMarkArea(station.id);
+        const lit = painted.ground.points.filter(
+          (p) => painted.ground.calls[p.index]?.fillStyle === HALO,
+        );
+        expect(lit.length, `${station.id} ${zoom}`).toBeGreaterThan(0);
+        for (const p of lit) {
+          expect(p.x, station.id).toBeGreaterThanOrEqual(area.left);
+          expect(p.x, station.id).toBeLessThanOrEqual(area.right);
+          expect(p.y, station.id).toBeGreaterThanOrEqual(area.top);
+          expect(p.y, station.id).toBeLessThanOrEqual(area.bottom);
+        }
+        const hovered = paint(sceneOf({ zoom, emphasis: 'hover', station: station.id }));
+        expect(hovered.ground.calls.length).toBe(paint(sceneOf({ zoom })).ground.calls.length);
+      }
+    // The rectangle is no larger than it needs to be: its own plot, glass and T, and a margin.
     for (const station of TUBE_STATIONS) {
-      const painted = paint(sceneOf({ emphasis: 'selected', station: station.id }));
-      const halo = (o: Painted) =>
-        o.log.some((call) => call.fill === TUBE_PALETTE['GLASS.halo'][0]);
-      expect(painted.objects.filter(halo).every((o) => o.object.station === station.id)).toBe(true);
-      expect(parts(painted, 'spur', station.id).some(halo)).toBe(true);
-      // The cached ground never lights: it repaints only inside the halt's rectangle.
-      expect(painted.ground.log.some((call) => call.fill === TUBE_PALETTE['GLASS.halo'][0])).toBe(
-        false,
-      );
+      const area = tubeMarkArea(station.id);
+      expect(area.right - area.left, station.id).toBeLessThanOrEqual(400);
+      expect(area.bottom - area.top, station.id).toBeLessThanOrEqual(220);
     }
   });
 });

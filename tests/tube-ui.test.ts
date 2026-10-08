@@ -8,7 +8,9 @@ import { places } from '../src/lib/places';
 import {
   onTheLine,
   tubeCopy,
+  TUBE_HALT_NOTES,
   TUBE_LABEL,
+  TUBE_LOOP_LINE,
   TUBE_SIGN_CAPTION,
   type TubeCopy,
 } from '../src/lib/tube-copy';
@@ -136,14 +138,24 @@ const texts = (copy: TubeCopy) => [
   ...copy.blocks.flatMap((block) => [block.eyebrow, block.heading, block.body, block.note ?? '']),
 ];
 const escape = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-/** The brand's copy rules plus the line's own: quiet, honest, and only today's riders named. */
-function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly string[]) {
+/** The block about who is on the line now. */
+const lineNow = (copy: TubeCopy) => copy.blocks.find((block) => /ON THE LINE/.test(block.eyebrow))!;
+/** The brand's copy rules plus the line's own: quiet, honest, and only today's riders named. With a
+ * halt chosen on the map, its own block comes first. */
+function voiceProblems(
+  copy: TubeCopy,
+  status: TubeStatus,
+  roster: readonly string[],
+  chosen?: string,
+) {
   const problems: string[] = [];
   // The sign is the user's own words; the voice rules are for the town's.
   const text = texts(copy).join(' ');
   if (copy.label !== TUBE_LABEL) problems.push(`label ${copy.label}`);
   if (copy.sign.text !== TUBE_SIGN) problems.push(`sign ${copy.sign.text}`);
-  if (copy.blocks.length !== 2) problems.push(`${copy.blocks.length} blocks`);
+  if (copy.blocks.length !== (chosen ? 3 : 2)) problems.push(`${copy.blocks.length} blocks`);
+  if (!lineNow(copy)) return [...problems, 'no line-now block'];
+  if (!/^RIDES TO(DAY|NIGHT)$/.test(copy.blocks.at(-1)!.eyebrow)) problems.push('rides last');
   // Two neighbors can share a name; the heading never says it twice ("Jon and Jon", whatever the
   // case). Whole names only: "New neighbor and Neighbor L3" names two different neighbors.
   const riders = [...new Set(status.now.map((ride) => ride.name.trim()).filter(Boolean))];
@@ -174,14 +186,22 @@ function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly stri
       if (pattern.test(text)) problems.push(`names ${name}, who is not on the line`);
       continue;
     }
-    const others = texts({ ...copy, blocks: copy.blocks.slice(1) }).join(' ');
-    if (pattern.test(others) || pattern.test(copy.blocks[0].body + (copy.blocks[0].note ?? '')))
+    const now = lineNow(copy);
+    const others = texts({ ...copy, blocks: copy.blocks.filter((block) => block !== now) }).join(
+      ' ',
+    );
+    if (pattern.test(others) || pattern.test(now.body + (now.note ?? '')))
       problems.push(`names ${name} outside the line-now heading`);
   }
+  // The loop in one line, and the oldest stretch timed once: in the line-now block, or in the
+  // chosen halt's own block when it is Hedgerow or Willow Halt.
+  if (!lineNow(copy).body.startsWith(TUBE_LOOP_LINE)) problems.push('loop line');
   const { tube, walk } = tubeLineMinutes(FIRST, LAST);
-  if (!copy.blocks[0].body.includes(`about ${Math.round(tube)} minutes`))
-    problems.push('tube minutes');
-  if (!copy.blocks[0].body.includes(`about ${Math.round(walk)}.`)) problems.push('walk minutes');
+  const stretch = [FIRST, LAST].includes(chosen ?? '') ? copy.blocks[0].body : lineNow(copy).body;
+  const minutes = (n: number) => new RegExp(`\\b${Math.round(n)}\\b`, 'g');
+  if (!minutes(tube).test(stretch)) problems.push('tube minutes');
+  if (!minutes(walk).test(stretch)) problems.push('walk minutes');
+  if ((text.match(minutes(walk)) ?? []).length !== 1) problems.push('stretch timed twice');
   return problems;
 }
 
@@ -230,9 +250,10 @@ describe('Treeline panel copy', () => {
     expect(quiet.blocks[0]).toEqual({
       eyebrow: 'QUIET ON THE LINE',
       heading: 'Nobody in the glass right now.',
-      body: 'Glass runs round the edge of town, from Barley Halt to Bulrush Halt. Hedgerow Halt to Willow Halt takes about 9 minutes; on foot it takes about 150.',
+      body: 'Seven halts round the edge of town, one bore. Hedgerow Halt to Willow Halt takes about 9 minutes; on foot it takes about 150.',
       note: undefined,
     });
+    expect(TUBE_LOOP_LINE).toBe('Seven halts round the edge of town, one bore.');
     expect(quiet.blocks[1]).toEqual({
       eyebrow: 'RIDES TODAY',
       heading: 'No rides today.',
@@ -295,6 +316,64 @@ describe('Treeline panel copy', () => {
       const problems = voiceProblems(tubeCopy(s), s, NAMES);
       checked++;
       if (problems.length) wrong.push(`${JSON.stringify(s)}: ${problems}`);
+    }
+    expect(checked).toBeGreaterThan(10_000);
+    expect(wrong.slice(0, 5)).toEqual([]);
+  });
+
+  it('opens with the chosen halt: where it stands, and its minutes either side', () => {
+    const quiet = status();
+    expect(Object.keys(TUBE_HALT_NOTES)).toEqual(TUBE_STATIONS.map((s) => s.id));
+    const first = Object.fromEntries(
+      TUBE_STATIONS.map((s) => [s.id, tubeCopy(quiet, s.id).blocks[0]]),
+    );
+    expect(first.L15).toEqual({
+      eyebrow: 'KINGFISHER HALT · L15',
+      heading: 'Its bridge spans the regatta course.',
+      body: 'Watercress Halt is about 9 minutes away by glass, Bulrush Halt about 7. On foot they take about 125 and 88.',
+    });
+    expect(first.R1).toEqual({
+      eyebrow: 'BARLEY HALT · R1',
+      heading: 'The south-west end of the line.',
+      body: 'Willow Halt is about 7 minutes away by glass. On foot it takes about 63.',
+    });
+    expect(first.C1.body).toBe(
+      'Willow Halt is about 9 minutes away by glass, Hawthorn Halt about 10. On foot they take about 150 and 125.',
+    );
+    // Hedgerow and Willow Halt time the oldest stretch themselves, so the line-now block keeps
+    // only the loop; every other halt leaves it there.
+    expect(tubeCopy(quiet, 'C1').blocks[1].body).toBe(TUBE_LOOP_LINE);
+    expect(tubeCopy(quiet, 'N1').blocks[1].body).toBe(TUBE_LOOP_LINE);
+    expect(tubeCopy(quiet, 'A9').blocks[1].body).toBe(tubeCopy(quiet).blocks[0].body);
+    TUBE_STATIONS.forEach((here, i) => {
+      const copy = tubeCopy(quiet, here.id);
+      expect(copy.blocks).toHaveLength(3);
+      const either = [TUBE_STATIONS[i - 1], TUBE_STATIONS[i + 1]].filter(Boolean);
+      for (const other of either) {
+        const { tube, walk } = tubeLineMinutes(here.id, other.id);
+        expect(copy.blocks[0].body).toContain(other.name);
+        expect(copy.blocks[0].body).toMatch(new RegExp(`about ${Math.round(tube)}\\b`));
+        expect(copy.blocks[0].body).toMatch(new RegExp(`\\b${Math.round(walk)}[ .]`));
+      }
+      expect(voiceProblems(copy, quiet, NAMES, here.id)).toEqual([]);
+    });
+    // A plot that is not a halt, or nothing chosen, opens with the line as before.
+    expect(tubeCopy(quiet, 'B1')).toEqual(tubeCopy(quiet));
+    expect(tubeCopy(quiet, null)).toEqual(tubeCopy(quiet));
+  });
+
+  it('keeps the brand voice for every status with every halt chosen', () => {
+    const wrong: string[] = [];
+    let checked = 0;
+    let n = 0;
+    for (const s of statuses()) {
+      // Every ninth status, with each halt in turn.
+      if (n++ % 9) continue;
+      for (const halt of TUBE_STATIONS) {
+        const problems = voiceProblems(tubeCopy(s, halt.id), s, NAMES, halt.id);
+        checked++;
+        if (problems.length) wrong.push(`${halt.id} ${JSON.stringify(s)}: ${problems}`);
+      }
     }
     expect(checked).toBeGreaterThan(10_000);
     expect(wrong.slice(0, 5)).toEqual([]);
@@ -379,6 +458,16 @@ describe('Treeline panel', () => {
     expect(markup).toContain('PUBLIC SPACE · R1 / N1 / C1 / A9 / C15 / L15 / R15');
     expect(markup).toContain('STATION SIGN · C1');
     expect(markup.split('People &amp; parcels. Please remove umbrella.')).toHaveLength(2);
+    // The halt chosen on the map opens the panel.
+    const chosen = renderToStaticMarkup(
+      createElement(TubeInfo, { status: status(), station: 'L15' }),
+    );
+    expect(chosen.indexOf('KINGFISHER HALT · L15')).toBeGreaterThan(-1);
+    expect(chosen.indexOf('KINGFISHER HALT · L15')).toBeLessThan(
+      chosen.indexOf('QUIET ON THE LINE'),
+    );
+    expect(chosen).toContain('Its bridge spans the regatta course.');
+    expect(chosen).toContain('Seven halts round the edge of town, one bore.');
   });
 
   it('is wired into the app, the map and the live view', () => {
