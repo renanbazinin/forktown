@@ -462,6 +462,80 @@ export function marketWindow(home: Place): { start: number; end: number } {
   return result;
 }
 
+// ---- The disco's tickets ------------------------------------------------------------------------
+
+/** Nights a disco ticket that the film wasted carries forward, looking for a night off the film. */
+export const DISCO_CARRY_NIGHTS = 7;
+
+/**
+ * Whether `before` (an evening outing) costs a night owl the dance: their night has room for the
+ * disco with nothing else on (seat 0, by tube or on foot), but not once they've been to `before`.
+ * Only the owl's own day decides it, never anyone else's.
+ */
+export function costsTheDance(home: Place, before: Candidate, party: VisitEvent): boolean {
+  const dance: Candidate = { event: party, seat: 0, period: 'night' };
+  const alone = [dance];
+  if (!planHome(home, alone, tubeJourneys(home, alone)).length) return false;
+  const both = [before, dance];
+  return !planHome(home, both, tubeJourneys(home, both)).some((trip) => trip.event === party);
+}
+
+type FilmNight = { film: readonly string[]; wastes: Map<Place, boolean> };
+/** Each roster's film nights so far (a few weeks of them): only a speed-up. */
+const filmNights = new WeakMap<readonly Place[], Map<number, FilmNight>>();
+/**
+ * Whether the film wastes `home`'s disco ticket on `night`: they're one of the roster's film guests
+ * (cinemaGuests), and the film leaves no room for the dance.
+ */
+function filmWastes(roster: readonly Place[], night: number, home: Place): boolean {
+  let nights = filmNights.get(roster);
+  if (!nights) filmNights.set(roster, (nights = new Map()));
+  let known = nights.get(night);
+  if (!known) {
+    if (nights.size >= 32) nights.delete(nights.keys().next().value!);
+    nights.set(night, (known = { film: cinemaGuests(roster, night), wastes: new Map() }));
+  }
+  let wastes = known.wastes.get(home);
+  if (wastes === undefined) {
+    const seat = known.film.indexOf(home.id);
+    const program = seat < 0 ? [] : eventsForDay(night);
+    const cinema = program.find((event) => event.id === 'cinema'),
+      party = program.find((event) => event.id === 'night-party');
+    wastes =
+      !!cinema && !!party && costsTheDance(home, { event: cinema, seat, period: 'evening' }, party);
+    known.wastes.set(home, wastes);
+  }
+  return wastes;
+}
+
+/**
+ * Tonight's disco ticket holders among the roster's night owls, each with the night their ticket
+ * was issued. Every house plot's own ticket night comes round once a block (ticketRank), but a
+ * night the film would waste (its guest could dance with nothing else on, but not after the film)
+ * holds no ticket: it carries on to the holder's next night, and the next, until a night off the
+ * film, for at most DISCO_CARRY_NIGHTS nights. Only the roster's own film draws decide it, so a
+ * previewed draft never moves anyone's ticket, and holds none.
+ */
+export function discoTickets(roster: readonly Place[], day: number): Map<Place, number> {
+  const cap = EVENT_SPOTS.stage.length;
+  const owls = roster.filter(
+    (home) => home.resident.routine.night === 'stroll' && getPlot(home.plot),
+  );
+  let carried = new Map<Place, number>();
+  for (let night = day - DISCO_CARRY_NIGHTS; ; night++) {
+    const held = new Map(carried);
+    for (const home of owls)
+      if (ticketRank('night-party', cap, night, home.plot) !== undefined) held.set(home, night);
+    carried = new Map();
+    for (const [home, issued] of held)
+      if (filmWastes(roster, night, home)) {
+        held.delete(home);
+        if (night + 1 - issued <= DISCO_CARRY_NIGHTS) carried.set(home, issued);
+      }
+    if (night === day) return held;
+  }
+}
+
 /**
  * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
  * neighbor in line whenever someone ahead can't make it (too far to get there, on foot or by tube,
@@ -484,7 +558,10 @@ export function marketWindow(home: Place): { start: number; end: number } {
  * period's festival first (the regatta and the Harvest Fair in the afternoon, the Long Table in
  * the evening, stargazing at night); today's daily outings on their own hash lines; the
  * Riverside's daily outings last of all, so on a day without a festival they never change who
- * goes to anything else. Every Riverside outing and the disco seat on turn tickets.
+ * goes to anything else. Every Riverside outing and the disco seat on turn tickets. A disco ticket
+ * the film would waste carries on to its holder's next night off the film, and a holder turns the
+ * concert down when it would cost them the dance (discoTickets): a night owl who can dance gets
+ * their turn, whatever the roster.
  * `outings: false` plans the town without any Riverside outing, `festivals: false` without the
  * four festivals (for tests).
  */
@@ -530,7 +607,8 @@ export function planResidentTrips(
     );
   /**
    * A line on turn tickets: today's ticket holders among the town's homes first, in rank order,
-   * then everyone else on the hash line. A previewed draft never holds a ticket.
+   * then everyone else on the hash line. A previewed draft never holds a ticket. With `held` (the
+   * disco's), its holders instead, by the night each ticket was issued, latest first, then rank.
    */
   const ticketed = (
     kind: string,
@@ -538,25 +616,38 @@ export function planResidentTrips(
     period: Period,
     key: string,
     excluded: readonly string[] = [],
+    held?: ReadonlyMap<Place, number>,
   ) => {
     const [line, late] = sorted(period, key, excluded);
-    const ranks = new Map(line.map((home) => [home, ticketRank(kind, cap, day, home.plot)]));
+    const issued = new Map(
+      line.flatMap((home) => {
+        const night = held ? held.get(home) : day;
+        const rank = night === undefined ? undefined : ticketRank(kind, cap, night, home.plot);
+        return rank === undefined ? [] : [[home, { night: night!, rank }] as const];
+      }),
+    );
     const holders = line
-      .filter((home) => ranks.get(home) !== undefined)
-      .sort((a, b) => ranks.get(a)! - ranks.get(b)! || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    return [[...holders, ...line.filter((home) => ranks.get(home) === undefined)], late];
+      .filter((home) => issued.has(home))
+      .sort((a, b) => {
+        const x = issued.get(a)!,
+          y = issued.get(b)!;
+        return y.night - x.night || x.rank - y.rank || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+      });
+    return [[...holders, ...line.filter((home) => !issued.has(home))], late];
   };
   /**
    * Seat guests in line order until the seats are full or nobody else can make it. `seats` counts
    * the spots for a line of that many; newcomers get only the spots the town's line leaves. With
    * `personal`, each guest goes to their own version of the event (the market's own hour, the
-   * regatta's launch for that seat).
+   * regatta's launch for that seat). A neighbor for whom `passes` is true turns their seat down,
+   * and it goes on down the line.
    */
   const seat = (
     event: VisitEvent,
     [line, late]: Place[][],
     seats: (entrants: number) => number,
     personal?: (home: Place, seat: number) => VisitEvent,
+    passes?: (home: Place, candidate: Candidate) => boolean,
   ) => {
     const guests: string[] = [];
     for (const [homes, spots] of [
@@ -566,8 +657,8 @@ export function planResidentTrips(
       for (const home of homes) {
         if (guests.length >= spots) break;
         const own = personal ? personal(home, guests.length) : event;
-        if (invite(home, { event: own, seat: guests.length, period: event.period }))
-          guests.push(home.id);
+        const candidate: Candidate = { event: own, seat: guests.length, period: event.period };
+        if (!passes?.(home, candidate) && invite(home, candidate)) guests.push(home.id);
       }
     return guests;
   };
@@ -661,18 +752,23 @@ export function planResidentTrips(
     );
   outing('long-table');
   const concert = program[1];
+  // Tonight's disco tickets: a holder turns the concert down when it would cost them the dance.
+  const party = program.find((e) => e.id === 'night-party')!;
+  const tickets = discoTickets(roster, day);
   seated.set(
     'concert',
     seat(
       concert,
       sorted('evening', `${day}:${concert.id}`, excluded('concert')),
       all(EVENT_SPOTS.stage.length),
+      undefined,
+      (home, candidate) => tickets.has(home) && costsTheDance(home, candidate, party),
     ),
   );
   // On a new-moon night the stars come first; their guests don't dance as well.
   outing('stargazing');
-  // The disco takes turns: every home's ticket night comes round once a month or so.
-  const party = program.find((e) => e.id === 'night-party')!;
+  // The disco takes turns: every home's ticket night comes round once a month or so, and a ticket
+  // the film wasted comes round again on the holder's next night off the film.
   seated.set(
     'night-party',
     seat(
@@ -683,6 +779,7 @@ export function planResidentTrips(
         'night',
         `${day}:${party.id}`,
         excluded('night-party'),
+        tickets,
       ),
       all(EVENT_SPOTS.stage.length),
     ),
