@@ -26,8 +26,10 @@ import {
   drawTubes,
   glassLod,
   tubeGlassEdges,
+  tubeGlassRuns,
   tubeMarkArea,
   tubePainterFor,
+  tubeStem,
   type TubeObject,
   type TubePainter,
   type TubeScene,
@@ -600,7 +602,10 @@ describe('The Treeline’s parts', () => {
     // The trunk's glass, between its two elbows, above its own footprint.
     const start = project(TUBE_TRUNK_X, C1.dock.y + 0.5),
       end = project(TUBE_TRUNK_X, N1.dock.y - 0.5);
-    const trunk = winter.ground.points.filter((p) => p.x < start.x - 1 && p.x > end.x + 1);
+    // (A junction's clip rectangle paints nothing.)
+    const trunk = winter.ground.points.filter(
+      (p) => p.call !== 'rect' && p.x < start.x - 1 && p.x > end.x + 1,
+    );
     expect(trunk.length).toBeGreaterThan(0);
     for (const p of trunk) expect(start.y - 0.5 * (p.x - start.x) - p.y).toBeLessThanOrEqual(11);
     // Every glass fillRect is the 5-px tube (4 px down the far bank), or its 8-px halo when
@@ -726,45 +731,164 @@ describe('The Treeline’s parts', () => {
 });
 
 describe('The Treeline close up', () => {
-  it('keeps the glass its width round every bend, where slices would pinch it', () => {
-    // From zoom 1 a piece that runs more than 2:1 down the screen (the river head's corner and
-    // every elbow turning toward the viewer) is drawn as one outline; the rest in slices, whose
-    // thickness across the glass is 2h / √(1 + slope²).
+  /** Which of a piece's points lies at a screen point of its glass. */
+  const screenIndex = (piece: (typeof TUBE_PIECES)[number], p: Point) =>
+    piece.points.findIndex((q) => {
+      const g = project(q.x, q.y);
+      return g.x === p.x && g.y - q.h === p.y;
+    });
+  it('keeps the glass its width round every bend, and never lets it cross itself', () => {
+    // From zoom 1 a piece that runs more than 2:1 down the screen (the river head's corner and the
+    // two bank elbows turning toward the viewer) is drawn as one outline. A piece that folds back
+    // across the screen (the west halts' north elbows and Hawthorn's west one) is drawn as its two
+    // legs, the nearer first, each in slices. The rest are slices, whose thickness across the glass
+    // is 2h / √(1 + slope²). No sliced run ever turns back across the screen.
     const across = (p: Point, line: readonly Point[]) => offLine(p, line);
-    let bent = 0;
+    let bent = 0,
+      folded = 0;
     for (const piece of TUBE_PIECES) {
-      const screen = piece.points.map((p) => {
-        const g = project(p.x, p.y);
-        return { x: g.x, y: g.y - p.h };
-      });
-      const edges = tubeGlassEdges(piece, 3);
       expect(tubeGlassEdges(piece, 0.7)).toBeUndefined();
-      if (edges) {
-        bent++;
-        for (const p of screen) {
-          expect(across(p, edges[0]), `${piece.station}`).toBeGreaterThanOrEqual(1.4);
-          expect(across(p, edges[1]), `${piece.station}`).toBeGreaterThanOrEqual(1.4);
-          expect(across(p, edges[0]), `${piece.station}`).toBeLessThanOrEqual(2.6);
-          expect(across(p, edges[1]), `${piece.station}`).toBeLessThanOrEqual(2.6);
-        }
-        continue;
+      const runs = tubeGlassRuns(piece);
+      expect(runs.length).toBeGreaterThan(0);
+      expect(runs.length).toBeLessThanOrEqual(2);
+      if (runs.length === 2) {
+        folded++;
+        // The legs meet at the fold, and the nearer one goes first.
+        const [near, far] = runs;
+        const tip = near.points.find((p) => far.points.some((q) => q.x === p.x && q.y === p.y));
+        expect(tip, piece.station).toBeDefined();
+        expect(near.points.length + far.points.length).toBe(piece.points.length + 1);
+        // The nearer leg by the mean x + y of its own ground points.
+        const depth = (run: (typeof runs)[number]) =>
+          run.points.reduce((sum, p) => {
+            const at = piece.points[screenIndex(piece, p)];
+            return sum + at.x + at.y;
+          }, 0) / run.points.length;
+        expect(depth(near), piece.station).toBeGreaterThan(depth(far));
       }
-      for (let k = 1; k < screen.length; k++) {
-        const dx = screen[k].x - screen[k - 1].x,
-          dy = screen[k].y - screen[k - 1].y;
-        if (Math.hypot(dx, dy) < 0.01) continue;
-        const half =
-          piece.points[k].x === TUBE_BANK_X && piece.points[k - 1].x === TUBE_BANK_X
-            ? TUBE_ALTITUDE.bankRadius
-            : TUBE_ALTITUDE.radius;
-        expect(Math.abs(dy), `${piece.station} ${k}`).toBeLessThanOrEqual(2 * Math.abs(dx));
-        expect((2 * half) / Math.hypot(1, dy / dx), `${piece.station} ${k}`).toBeGreaterThan(2.8);
+      for (const run of runs) {
+        if (run.edges) {
+          bent++;
+          expect(tubeGlassEdges(piece, 3)).toBe(run.edges);
+          for (const p of run.points)
+            for (const edge of run.edges) {
+              expect(across(p, edge), piece.station).toBeGreaterThanOrEqual(1.4);
+              expect(across(p, edge), piece.station).toBeLessThanOrEqual(2.6);
+            }
+          continue;
+        }
+        let way = 0;
+        for (let k = 1; k < run.points.length; k++) {
+          const dx = run.points[k].x - run.points[k - 1].x,
+            dy = run.points[k].y - run.points[k - 1].y;
+          if (Math.hypot(dx, dy) < 0.01) continue;
+          if (Math.abs(dx) >= 0.05) {
+            if (way) expect(Math.sign(dx), `${piece.station} ${k} turns back`).toBe(way);
+            way = Math.sign(dx);
+          }
+          const i = screenIndex(piece, run.points[k]);
+          const half =
+            piece.points[i].x === TUBE_BANK_X && piece.points[i - 1]?.x === TUBE_BANK_X
+              ? TUBE_ALTITUDE.bankRadius
+              : TUBE_ALTITUDE.radius;
+          expect(Math.abs(dy), `${piece.station} ${k}`).toBeLessThanOrEqual(2 * Math.abs(dx));
+          expect((2 * half) / Math.hypot(1, dy / dx), `${piece.station} ${k}`).toBeGreaterThan(2.8);
+        }
       }
     }
     // The corner round the river's head, and the two bank elbows that turn south toward the
-    // viewer as they drop to the far bank (C15's and L15's). The west and north elbows drop as
-    // they turn, so on screen they never run steeper than about 1.3:1.
+    // viewer as they drop to the far bank (C15's and L15's).
     expect(bent).toBe(1 + 2);
+    // R1's, N1's and C1's north elbows and A9's west elbow.
+    expect(folded).toBe(4);
+  });
+
+  it('runs each middle halt’s dip on into its T, and keeps its own glass off the trunk', () => {
+    const BODY = TUBE_PALETTE['GLASS.body'][0];
+    const t = tracked();
+    drawTubeGround(t.ctx, sceneOf({ zoom: 3 }));
+    const quads = new Map<number, MatrixPoint[]>();
+    t.points.forEach((p) => {
+      if (t.log[p.index]?.name === 'fillRect' && t.log[p.index].fill === BODY)
+        quads.set(p.index, [...(quads.get(p.index) ?? []), p]);
+    });
+    /** Whether a point lies in a fillRect's parallelogram (its corners: TL, TR, BL, BR). */
+    const inside = (p: Point, [o, u, v]: MatrixPoint[]) => {
+      const ux = u.x - o.x,
+        uy = u.y - o.y,
+        vx = v.x - o.x,
+        vy = v.y - o.y;
+      const det = ux * vy - uy * vx;
+      const s = ((p.x - o.x) * vy - (p.y - o.y) * vx) / det,
+        r = (ux * (p.y - o.y) - uy * (p.x - o.x)) / det;
+      return s >= -1e-6 && s <= 1 + 1e-6 && r >= -1e-6 && r <= 1 + 1e-6;
+    };
+    for (const station of TUBE_STATIONS) {
+      const stem = tubeStem(station.id);
+      const middle = station !== TUBE_STATIONS[0] && station !== TUBE_STATIONS.at(-1);
+      // A stem where the elbows open round the T on screen (the bank halts'); at the west and
+      // north halts the elbow toward the viewer already runs the dip past the bubble.
+      expect(!!stem, station.id).toBe(middle && station.edge === 'bank');
+      if (!middle) continue;
+      // From where its dip splits (the last point both spurs share) to its tap on the trunk.
+      const on = loopSpur(station, 1),
+        back = loopSpur(station, -1);
+      let shared = 0;
+      while (on[shared].x === back[shared].x && on[shared].y === back[shared].y) shared++;
+      const split = on[shared - 1],
+        tap = trunkPoint(stationTap(station.id));
+      if (stem) expect(stem).toEqual([split, tap]);
+      const a = project(split.x, split.y),
+        b = project(tap.x, tap.y);
+      const middlePoint = { x: (a.x + b.x) / 2, y: (a.y - split.h + b.y - tap.h) / 2 };
+      expect(
+        [...quads.values()].some((quad) => inside(middlePoint, quad)),
+        station.id,
+      ).toBe(true);
+    }
+    // Each middle halt's glass is clipped clear of the trunk between its elbows, and of every run
+    // of its own already painted; the canvas state comes back as it was.
+    const clips = t.log.filter((call) => call.name === 'clip');
+    expect(clips.length).toBeGreaterThanOrEqual(5);
+    for (const clip of clips) expect(clip.args[0]).toBe('evenodd');
+    expect(t.log.filter((call) => call.name === 'save').length).toBe(
+      t.log.filter((call) => call.name === 'restore').length,
+    );
+    expect(t.ctx.globalAlpha).toBe(1);
+    expect(t.matrix()).toEqual([1, 0, 0, 1, 0, 0]);
+    // A halt's junction is painted once into the ground cache: at most 150 calls, selected too,
+    // counted inside its own canvas states, with only its own rectangle in view.
+    for (const station of TUBE_STATIONS) {
+      const area = tubeMarkArea(station.id);
+      const marked = tracked();
+      drawTubeGround(
+        marked.ctx,
+        sceneOf({
+          zoom: 3,
+          emphasis: 'selected',
+          station: station.id,
+          visible: (p, rx, above, below) =>
+            p.x + rx >= area.left &&
+            p.x - rx <= area.right &&
+            p.y + below >= area.top &&
+            p.y - above <= area.bottom,
+        }),
+      );
+      let depth = 0,
+        start = 0,
+        calls = 0;
+      marked.log.forEach((call, i) => {
+        if (call.name === 'save' && depth++ === 0) start = i;
+        if (call.name === 'restore' && --depth === 0) calls += i - start + 1;
+      });
+      expect(calls, station.id).toBeLessThanOrEqual(150);
+    }
+    // Below zoom 1 the halts keep the plain art: no stems and no clips.
+    for (const zoom of [0.7, 0.3]) {
+      const plain = tracked();
+      drawTubeGround(plain.ctx, sceneOf({ zoom }));
+      expect(plain.log.some((call) => call.name === 'clip')).toBe(false);
+    }
   });
 
   it('lays reflections and rings only on the river, and only close up', () => {
@@ -806,13 +930,27 @@ describe('The Treeline close up', () => {
         (call) => call.name === 'fillRect' && TUBE_PALETTE['REFLECTION.post'].includes(call.fill),
       );
       expect(reflections.length).toBe(2 + 3 * 2);
-      expect(t.log.filter((call) => call.name === 'setLineDash').length).toBe(2);
+      // The bank glass's own, in the river's hand: short flat ticks, 1 px high and 3–9 long,
+      // broken at the pilings.
+      const ticks = t.log.filter(
+        (call) => call.name === 'fillRect' && TUBE_PALETTE['REFLECTION.glass'].includes(call.fill),
+      );
+      expect(ticks.length).toBeGreaterThanOrEqual(20);
+      for (const tick of ticks) {
+        const [, , w, h] = tick.args as number[];
+        expect(h).toBe(1);
+        expect(w).toBeGreaterThanOrEqual(3);
+        expect(w).toBeLessThanOrEqual(9);
+      }
+      expect(t.log.some((call) => call.name === 'setLineDash')).toBe(false);
       expect(t.log.filter((call) => call.name === 'ellipse').length).toBe(2 + 3 + 7 * 2);
     }
     // Zoomed out the river keeps only the piers' plain ripples, and from FAR nothing at all.
     const near = tracked();
     drawTubeGround(near.ctx, sceneOf({ zoom: 0.7 }));
-    expect(near.log.some((call) => call.name === 'setLineDash')).toBe(false);
+    expect(near.log.some((call) => TUBE_PALETTE['REFLECTION.glass'].includes(call.fill))).toBe(
+      false,
+    );
     expect(
       near.log.filter((call) => call.name === 'fillRect' && call.fill === TUBE_PALETTE.RIPPLE[0]),
     ).toHaveLength(3 + 2);
