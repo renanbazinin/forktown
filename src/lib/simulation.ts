@@ -1,5 +1,16 @@
 import type { Place } from './schema';
-import { getPlot, hash, plotEntrance, project, type Plot, type Point } from './world';
+import {
+  getPlot,
+  hash,
+  plotEntrance,
+  project,
+  TILE_H,
+  TILE_W,
+  type Plot,
+  type Point,
+} from './world';
+import { DUCK_STREET_Y, DUCK_WALK_END, DUCK_WALK_START } from './ducks';
+import { DUCK_NOTICE_RADIUS } from './duck-reactions';
 import type { EventPose } from './events';
 import type { CarryKind } from './outings';
 import { OUTING_IDS, type OutingId } from './district-calendar';
@@ -648,6 +659,22 @@ function talkSpell(
 /** Tiles two walkers can draw apart in a minute, walking away from each other at their briskest. */
 const PARTING_SPEED = 2 * WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER;
 /**
+ * Where a neighbor was, as far as a look back within the beat goes: where they stand, or for one
+ * on the tube, the door they boarded at (a journey rides once, and walks to that door first).
+ * Within a beat nobody covers more ground than a brisk walk but in the glass, so whoever was free
+ * to talk at an earlier look of it is within a brisk walk of here.
+ */
+const footing = (state: ResidentState): Point =>
+  state.transit ? tubeStation(state.transit.from).door : state.position;
+const within = (p: Point, q: Point, reach: number) => {
+  const dx = p.x - q.x,
+    dy = p.y - q.y;
+  return dx * dx + dy * dy < reach * reach;
+};
+/** Within `reach` tiles of each other, by footing. */
+const near = (a: ResidentState, b: ResidentState, reach: number) =>
+  within(footing(a), footing(b), reach);
+/**
  * Whether a pair's spell began with neither of them already in a conversation (a spell long
  * enough to greet in, begun before theirs) with someone else. Only such a spell has a bubble:
  * one that begins among others stays quiet to its end, so no bubble starts late, when an earlier
@@ -673,7 +700,7 @@ function freshSpell(
     for (const member of [first, second])
       for (const other of states) {
         if (!fresh || other.id === first.id || other.id === second.id) continue;
-        if (!other.transit && !inRange(member, other, reach)) continue;
+        if (!near(member, other, reach)) continue;
         const [a, b] = member.id < other.id ? [member, other] : [other, member];
         const key = `${a.id}:${b.id}`;
         if (hash(`${key}:${beat}`) % 3) continue;
@@ -695,8 +722,177 @@ function freshSpell(
   return verdict[0] === 1;
 }
 
-/** A bubble said this frame: whose, how wide, and the spell it is said for. */
+/** A pair's spell in greeting range: the two of them (as drawn this frame), by id, and its minutes. */
+type Spell = {
+  key: string;
+  first: ResidentState;
+  second: ResidentState;
+  since: number;
+  until: number;
+};
+/** A bubble said for a spell: whose, how wide, and the spell's minutes. */
 type Said = { state: ResidentState; width: number; since: number; until: number };
+/** Tiles a figure can be drawn off where it stands, for its lane (residentGround), and some over. */
+const LANE_ROOM = 0.5;
+/**
+ * Tiles apart two figures may stand while a bubble `width` pixels wide over one and a bubble (or
+ * heart) `other` pixels wide over the other could still cover each other: within half their
+ * widths across the screen and a bubble's height up it.
+ */
+const coverReach = (width: number, other: number) =>
+  Math.hypot((width + other) / TILE_W, (2 * BUBBLE_HEIGHT) / TILE_H) / Math.SQRT2 + 2 * LANE_ROOM;
+
+/**
+ * Who says a spell's greeting, or nobody, settled once for the whole spell as its beat stood when
+ * it began: so a bubble is never cut short, nor begun late, as other bubbles or hearts come and
+ * go. The speaker takes the beat's turn, or leaves it to the other when their bubble would at any
+ * look of the spell cover a heart for the ducklings or a bubble said for a spell before it (begun
+ * earlier, or at the same minute by pair) that is still up when this one begins. With both
+ * covered, the spell passes without a word. Pure, looked at once per spell.
+ */
+function spellSpeaker(
+  spell: Spell,
+  beat: number,
+  time: number,
+  states: readonly ResidentState[],
+  talks: Talks,
+): ResidentState | undefined {
+  const id = `say:${talks.key}:${spell.key}:${spell.since}`;
+  let verdict = talks.talks.get(id);
+  if (!verdict) {
+    const said = saidBefore(spell, beat, time, states, talks);
+    const { first, second, since, until } = spell;
+    let turn = 0;
+    for (const which of beat % 2 ? [2, 1] : [1, 2]) {
+      const speaker = which === 1 ? first : second;
+      const width = bubbleWidth(speaker.resident.greeting);
+      if (
+        coversHeart(speaker, width, since, until, time, states, talks) ||
+        said.some((other) => clash(speaker, width, since, until, other, talks))
+      )
+        continue;
+      turn = which;
+      break;
+    }
+    if (talks.talks.size >= TALK_CACHE) talks.talks.delete(talks.talks.keys().next().value!);
+    talks.talks.set(id, (verdict = [turn]));
+  }
+  return verdict[0] === 1 ? spell.first : verdict[0] === 2 ? spell.second : undefined;
+}
+
+/**
+ * The bubbles said for spells before this one (begun earlier, or at the same minute by pair) that
+ * are still up when it begins, among everyone who could speak over either of its pair: they, and
+ * whoever could have been in greeting range of them, are asked where they were when it began, and
+ * each spell found there has its own speaker settled first.
+ */
+function saidBefore(
+  spell: Spell,
+  beat: number,
+  time: number,
+  states: readonly ResidentState[],
+  talks: Talks,
+): Said[] {
+  const { key, first, second, since, until } = spell;
+  // How far two walkers can draw apart or close in between this frame and any look of the spell:
+  // both fall within its beat.
+  const drift = PARTING_SPEED * (Math.max(time - since, until - time) + TALK_SAMPLE);
+  const widest = Math.max(
+    bubbleWidth(first.resident.greeting),
+    bubbleWidth(second.resident.greeting),
+  );
+  const others = states.filter((other) => other.id !== first.id && other.id !== second.id);
+  const speakers = others.filter((other) => {
+    const reach = coverReach(widest, bubbleWidth(other.resident.greeting)) + drift;
+    return near(first, other, reach) || near(second, other, reach);
+  });
+  if (!speakers.length) return [];
+  // In greeting range of one of them when the spell began.
+  const partners = others.filter(
+    (other) =>
+      !speakers.includes(other) &&
+      speakers.some((speaker) => near(speaker, other, 1.4 + drift + 0.05)),
+  );
+  const everyone = [...speakers, ...partners];
+  const then = new Map<ResidentState, ResidentState>();
+  const thenOf = (state: ResidentState) => {
+    let found = then.get(state);
+    if (!found) then.set(state, (found = talks.at(state, since)));
+    return found;
+  };
+  const said: Said[] = [];
+  for (let i = 0; i < speakers.length; i++)
+    for (let j = i + 1; j < everyone.length; j++) {
+      const [a, b] =
+        speakers[i].id < everyone[j].id ? [speakers[i], everyone[j]] : [everyone[j], speakers[i]];
+      const pair = `${a.id}:${b.id}`;
+      if (hash(`${pair}:${beat}`) % 3) continue;
+      // Talking when this spell began: the very look that began it.
+      const thenA = thenOf(a),
+        thenB = thenOf(b);
+      if (!freeToTalk(thenA) || !freeToTalk(thenB) || !inRange(thenA, thenB)) continue;
+      const other = talkSpell(a, b, pair, beat, since, talks);
+      if (!other || !(other.since < since || (other.since === since && pair < key))) continue;
+      if (!freshSpell(a, b, pair, other.since, beat, time, states, talks)) continue;
+      const speaker = spellSpeaker(
+        { key: pair, first: a, second: b, ...other },
+        beat,
+        time,
+        states,
+        talks,
+      );
+      if (speaker)
+        said.push({ state: speaker, width: bubbleWidth(speaker.resident.greeting), ...other });
+    }
+  return said;
+}
+
+/**
+ * Whether a bubble said by `speaker` over the spell [since, until) would at any look cover a heart
+ * for the ducklings, which only walkers stopped on the duck street show, in the ducks' hours.
+ */
+function coversHeart(
+  speaker: ResidentState,
+  width: number,
+  since: number,
+  until: number,
+  time: number,
+  states: readonly ResidentState[],
+  { at }: Talks,
+) {
+  if (until <= DUCK_WALK_START || since >= DUCK_WALK_END) return false;
+  const walked = (PARTING_SPEED / 2) * (Math.max(time - since, until - time) + TALK_SAMPLE);
+  const reach = coverReach(width, HEART_WIDTH) + 2 * walked;
+  // A walker who stops for the ducklings walks on round the same loop for a while after, so is
+  // on foot within a brisk walk of where they stop from a look before it; one on the tube now
+  // can only have stepped off at its far door and walked there by a later look.
+  const lovers = states.filter((other) => {
+    if (other.id === speaker.id) return false;
+    const place = other.transit ? tubeStation(other.transit.to).door : other.position;
+    return (
+      Math.abs(place.y - DUCK_STREET_Y) < DUCK_NOTICE_RADIUS + walked + 0.05 &&
+      within(footing(speaker), place, reach)
+    );
+  });
+  for (let k = 0; lovers.length && since + k * TALK_SAMPLE < until - 1e-9; k++) {
+    const minute = since + k * TALK_SAMPLE;
+    if (minute < DUCK_WALK_START || minute >= DUCK_WALK_END) continue;
+    let bubble: Point | undefined;
+    for (const lover of lovers) {
+      const then = at(lover, minute);
+      if (!then.duckLove) continue;
+      bubble ??= projectGround(at(speaker, minute));
+      const heart = projectGround(then);
+      if (
+        Math.abs(heart.x - bubble.x) < (HEART_WIDTH + width) / 2 &&
+        Math.abs(heart.y - bubble.y) < BUBBLE_HEIGHT
+      )
+        return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Whether a bubble said by `state` over the spell [since, until) would ever cover `other` while
  * both are up, looked at every TALK_SAMPLE minutes: settled once per pair of spells.
@@ -731,22 +927,15 @@ function clash(
  * Occasional greetings between free strollers who pass close by, with no named meetings or
  * shared mutable state. One of each pair speaks, taking turns every five-minute beat, only when
  * they stay close long enough to say it and neither was already talking with someone else when
- * they met (so the other listens, and a pair never shows two bubbles). A bubble that would at
- * any point of its spell cover one said before it is left unsaid, settled once for the spell, so
- * a greeting is never dropped halfway as another speaker drifts close; so is one that would cover
- * a heart for the ducklings.
+ * they met (so the other listens, and a pair never shows two bubbles). Who speaks, if anyone, is
+ * settled once for the spell (spellSpeaker): a bubble that would at any point cover a heart for
+ * the ducklings, or one said before it, is left to the other or unsaid, so a greeting is never
+ * dropped halfway as another speaker drifts close, nor begun late as one moves on.
  */
 function greet(states: ResidentState[], time: number, talks: Talks) {
   const beat = Math.floor(time / 5);
   // Nobody greets while half through their own front door.
   const walkers = states.filter(freeToTalk);
-  const pairs: {
-    key: string;
-    first: ResidentState;
-    second: ResidentState;
-    since: number;
-    until: number;
-  }[] = [];
   for (let i = 0; i < walkers.length; i++)
     for (let j = i + 1; j < walkers.length; j++) {
       const a = walkers[i],
@@ -757,34 +946,10 @@ function greet(states: ResidentState[], time: number, talks: Talks) {
       const key = `${first.id}:${second.id}`;
       if (hash(`${key}:${beat}`) % 3) continue;
       const spell = talkSpell(first, second, key, beat, time, talks);
-      if (spell && freshSpell(first, second, key, spell.since, beat, time, states, talks))
-        pairs.push({ key, first, second, ...spell });
-    }
-  if (!pairs.length) return;
-  const hearts = states
-    .filter((state) => state.duckLove)
-    .map((state) => ({ at: projectGround(state), width: HEART_WIDTH }));
-  const said: Said[] = [];
-  // A conversation already under way carries on before one just starting. (Two pairs talking
-  // at once never share a walker: the later one would not be fresh.)
-  pairs.sort((a, b) => a.since - b.since || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
-  for (const { first, second, since, until } of pairs) {
-    if (first.greeting || second.greeting) continue;
-    for (const speaker of beat % 2 ? [second, first] : [first, second]) {
-      const width = bubbleWidth(speaker.resident.greeting);
-      const at = projectGround(speaker);
-      if (
-        hearts.some(
-          (heart) =>
-            Math.abs(heart.at.x - at.x) < (heart.width + width) / 2 &&
-            Math.abs(heart.at.y - at.y) < BUBBLE_HEIGHT,
-        ) ||
-        said.some((other) => clash(speaker, width, since, until, other, talks))
-      )
+      if (!spell || !freshSpell(first, second, key, spell.since, beat, time, states, talks))
         continue;
-      speaker.greeting = true;
-      said.push({ state: speaker, width, since, until });
-      break;
+      // Two pairs talking at once never share a walker: the later one would not be fresh.
+      const speaker = spellSpeaker({ key, first, second, ...spell }, beat, time, states, talks);
+      if (speaker) speaker.greeting = true;
     }
-  }
 }
