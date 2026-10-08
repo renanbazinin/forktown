@@ -368,7 +368,7 @@ async function main() {
     }
 
     console.log(
-      `\nNewcomer check: ${plots.length} plots in ${(seconds(started) / 60).toFixed(1)} min`,
+      `\nNewcomer check: ${plots.length} plot${plots.length === 1 ? '' : 's'} in ${(seconds(started) / 60).toFixed(1)} min`,
     );
     for (const result of results.sort((a, b) => plots.indexOf(a.plot) - plots.indexOf(b.plot))) {
       for (const error of result.errors) console.log(`  ${result.plot}  ! ${error}`);
