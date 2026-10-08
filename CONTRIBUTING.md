@@ -90,6 +90,8 @@ The town follows a shared UTC-based day: one real minute equals one town hour. T
 
 Choosing a plot in the builder does **not** reserve it. The first accepted contribution gets the plot. If it is occupied before yours is merged, choose another open plot and update only your file’s `plot` field. The automatic check will explain the conflict.
 
+A plot can also become a public place as the town grows: the Treeline's halts took R1 and A9. The check then names what stands there and suggests the nearest open plots, for example "Plot R1 is reserved for Barley Halt on the Treeline, a public place. Pick an open plot such as Q1, R2 or S1." A plot that isn't on the map gets the rows and columns the town has. A draft the builder saved on such a plot keeps its design and moves to the nearest open plot. Save your file as UTF-8; a byte-order mark from a Windows editor is fine.
+
 ## Develop locally
 
 Fork and clone the project, then create your contribution branch before designing your place.
@@ -138,4 +140,6 @@ Here for Hacktoberfest? See [what it means in Forktown](docs/CONTRIBUTION_POLICY
 
 Implementation notes live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Please keep meaningful tests for contribution rules, geometry, and other behavior that newcomers depend on.
 
-`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Tests read the town with `readPlaces()` from `tests/full-town.ts`, which hands out the made-up houses first, so a test that leans on "the first house" in `places/` will most likely fail there; a test that needs a particular home takes it from `tests/fixtures.ts`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy.
+`npm run check:full-town` runs the validator and every test in a temporary copy with a made-up house on every free plot, so you can check that a change still holds when the town is full; it never touches `places/`. Tests read the town with `readPlaces()` from `tests/full-town.ts`, which hands out the made-up houses first, so a test that leans on "the first house" in `places/` will most likely fail there; a test that needs a particular home takes it from `tests/fixtures.ts`. Add `-- tests/some.test.ts` to run only some tests, or `-- --keep` to keep the copy. The copy has a Git history like a pull request's checkout: the real houses arrive first, the made-up ones after, and a house that keeps the builder's defaults is the newest arrival. A few of the made-up houses keep the builder's defaults and a few use every character the schema allows, apostrophes included.
+
+`npm run check:newcomers` is what one newcomer's pull request meets in CI, on a sample of eight free plots spread over the map: for each, it commits one house with the builder's defaults as the town's newest arrival in a temporary clone and runs every test that reads the town. `-- --plots C7,K12` picks the plots, `-- --all` takes every free plot, and `-- --house my-house.json` checks your own file on each plot instead. It takes a few minutes a plot, so CI doesn't run it; run it before merging a change to the simulation, the map or the venues.

@@ -15,6 +15,8 @@ export const isReaderOnly = (path) =>
   );
 // Git tree modes for an ordinary file. Links (120000) and submodules (160000) are not files.
 const FILE_MODES = ['100644', '100755'];
+/** A file without the byte-order mark some Windows editors write first, which JSON.parse refuses. */
+export const withoutBom = (text) => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
 // GitHub's limit for a status description, counted in characters so an emoji stays whole.
 export const clip = (text) => {
   const characters = [...text];
@@ -191,7 +193,7 @@ async function evaluatePullRequest({ api, root, repo, pr, modes, permissionFor }
   const decode = (blob) => {
     if (blob.encoding !== 'base64' || blob.size > 16384 || !blob.content)
       throw new Error('House JSON must be a readable file under 16 KB.');
-    return JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
+    return JSON.parse(withoutBom(Buffer.from(blob.content, 'base64').toString('utf8')));
   };
   return evaluatePolicy({
     files,

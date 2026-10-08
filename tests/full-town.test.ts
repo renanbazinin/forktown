@@ -71,7 +71,11 @@ describe('A full town', () => {
         { ...AFTER_HOURS, id: '0-first' },
         fullTownHouse('A4'),
       ])
-        writeFileSync(join(folder, `${place.id}.json`), JSON.stringify(place));
+        writeFileSync(
+          join(folder, `${place.id}.json`),
+          // One saved as "UTF-8 with BOM", as some Windows editors do, reads like any other.
+          `${place.id === '0-first' ? String.fromCharCode(0xfeff) : ''}${JSON.stringify(place)}`,
+        );
       expect(readPlaces(folder).map((place) => place.id)).toEqual([
         fullTownId('A4'),
         fullTownId('Q10'),

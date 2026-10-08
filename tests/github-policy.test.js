@@ -465,6 +465,11 @@ function fakeGitHub({ pulls, mode = '100644', creator = 'alice', permissions = {
 }
 
 describe('One commit status for every PR that shares a head commit', () => {
+  it('reads a house saved as UTF-8 with a byte-order mark, as some Windows editors save it', async () => {
+    const text = `\uFEFF${JSON.stringify({ creator: 'alice', resident: { name: 'Al' } })}`;
+    const github = fakeGitHub({ pulls: [pull(1, 'alice')], text });
+    expect(await github.run({ number: '1' })).toBe('success');
+  });
   it('passes a single house PR and reports on its head commit', async () => {
     const github = fakeGitHub({ pulls: [pull(1, 'alice')] });
     expect(await github.run({ number: '1' })).toBe('success');

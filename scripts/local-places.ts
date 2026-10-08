@@ -5,6 +5,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { dirname, join } from 'node:path';
 import type { Connect, Plugin } from 'vite';
 import { placeSchema, validatePlaces } from '../src/lib/schema.ts';
+import { withoutBom } from './place-files.ts';
 
 const endpoint = '/__forktown/places';
 const revealEndpoint = '/__forktown/reveal-place';
@@ -99,7 +100,10 @@ async function savePlace(root: string, data: unknown) {
   const entries = [];
   for (const file of files) {
     try {
-      entries.push({ file, data: JSON.parse(await readFile(join(directory, file), 'utf8')) });
+      entries.push({
+        file,
+        data: JSON.parse(withoutBom(await readFile(join(directory, file), 'utf8'))),
+      });
     } catch {
       throw new SaveError(
         409,

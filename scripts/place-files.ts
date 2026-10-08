@@ -4,6 +4,12 @@ import { fileURLToPath } from 'node:url';
 import type { Plugin } from 'vite';
 import type { PlaceEntry } from '../src/lib/schema.ts';
 
+/**
+ * A house file without the byte-order mark some Windows editors put first ("UTF-8 with BOM").
+ * JSON.parse refuses it though the file is fine, so every reader of house files drops it first.
+ */
+export const withoutBom = (text: string) => (text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
+
 /** What the validator says about a house file that is not valid JSON. */
 export const invalidJson = (name: string, error: unknown) =>
   `${name}: This is not valid JSON. Check quotation marks, commas, and brackets. ${error instanceof Error ? error.message : ''}`;
@@ -19,11 +25,14 @@ export function placeJsonErrors(): Plugin {
     transform: {
       filter: { id: /[\\/]places[\\/][^\\/?]+\.json$/ },
       handler(code, id) {
+        const text = withoutBom(code);
         try {
-          JSON.parse(code);
+          JSON.parse(text);
         } catch (error) {
           this.error(invalidJson(id.split(/[\\/]/).at(-1)!, error));
         }
+        // Vite's JSON loader gets the file without its byte-order mark, as the validator reads it.
+        return text === code ? undefined : { code: text, map: null };
       },
     },
   };
@@ -51,7 +60,7 @@ export async function readPlaceFiles(directory: URL) {
     if (!name.endsWith('.json')) continue;
     files++;
     try {
-      entries.push({ file: name, data: JSON.parse(await readFile(file, 'utf8')) });
+      entries.push({ file: name, data: JSON.parse(withoutBom(await readFile(file, 'utf8'))) });
     } catch (error) {
       errors.push(invalidJson(name, error));
     }
