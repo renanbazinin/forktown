@@ -21,7 +21,7 @@ describe('The film library', () => {
   beforeAll(() => loadReel());
 
   it('gives every film its own module and end-card dedication', () => {
-    expect(reel).toHaveLength(22);
+    expect(reel).toHaveLength(27);
     expect(Object.keys(REEL).sort()).toEqual(reel.map((film) => film.artwork).sort());
     expect(Object.keys(REEL_SCORES).sort()).toEqual(Object.keys(REEL).sort());
     for (const film of reel) {
