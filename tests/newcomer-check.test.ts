@@ -125,7 +125,7 @@ describe('The tests the newcomer check runs', () => {
     expect(tests.every((file) => /^tests\/[^/]+\.test\.(ts|tsx|js)$/.test(file))).toBe(true);
   });
 
-  it('report each failed test by file, and a file that never ran', () => {
+  it('report each failed test by file, a file that never ran, and a test that ran out of time', () => {
     const folder = mkdtempSync(join(tmpdir(), 'forktown-newcomer-report-'));
     try {
       const report = join(folder, 'report.json');
@@ -137,7 +137,12 @@ describe('The tests the newcomer check runs', () => {
               name: 'C:/town/tests/a.test.ts',
               assertionResults: [
                 { fullName: 'passes', status: 'passed' },
-                { fullName: 'fails', status: 'failed' },
+                { fullName: 'fails', status: 'failed', failureMessages: ['AssertionError'] },
+                {
+                  fullName: 'is slow',
+                  status: 'failed',
+                  failureMessages: ['Error: Test timed out in 20000ms.'],
+                },
               ],
             },
             { name: '/town/tests/b.test.ts', assertionResults: [] },
@@ -145,11 +150,12 @@ describe('The tests the newcomer check runs', () => {
         }),
       );
       expect(reportFailures(report)).toEqual([
-        { file: 'tests/a.test.ts', test: 'fails' },
-        { file: 'tests/b.test.ts', test: '(the file did not run)' },
+        { file: 'tests/a.test.ts', test: 'fails', timedOut: false },
+        { file: 'tests/a.test.ts', test: 'is slow', timedOut: true },
+        { file: 'tests/b.test.ts', test: '(the file did not run)', timedOut: false },
       ]);
       expect(reportFailures(join(folder, 'missing.json'))).toEqual([
-        { file: '-', test: 'Vitest wrote no report' },
+        { file: '-', test: 'Vitest wrote no report', timedOut: false },
       ]);
     } finally {
       rmSync(folder, { recursive: true, force: true });

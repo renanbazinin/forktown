@@ -7,9 +7,10 @@
 // carries over any uncommitted changes as one commit, and links node_modules there (a junction on
 // Windows, a symlink elsewhere). For every plot it writes the house and commits it, so the town's
 // arrival order (read from Git history, as check.yml's checkout reads it) sees the house as the
-// newest neighbor. Then it validates the town, runs the tests, and resets the commit away. A test
-// file that fails is run once more on its own, to tell a timeout on a busy machine from a real
-// failure.
+// newest neighbor. Then it validates the town, runs the tests, and resets the commit away. Once
+// every plot has run, each plot's failing test files run once more, one plot at a time with every
+// worker, to tell a timeout on a busy machine from a real failure; a test that only ran out of
+// time is marked "(timed out)".
 //
 // The house keeps the builder's defaults ("My Little Place", "New neighbor", the examples' story,
 // the HELLO sign), with a resident who strolls every period and walks at night, the busiest a
@@ -21,10 +22,12 @@
 // The tests: every test file that reads places/ or the arrival order, itself or through its
 // imports; `--tests` names them instead.
 //
-// Too slow for CI: a few minutes a plot, with several plots at once. Run it before merging a change
-// to the simulation, the map or the venues, and with `--all` before the town grows. It prints a
-// line per plot and a summary, and exits non-zero if any plot failed validation or a test that
-// also failed its retry. `--keep` leaves the temporary clones in place and prints where they are.
+// Too slow for CI: a few minutes a plot on a quiet machine, with several plots at once (by default
+// a quarter as many as there are processors, each with its share of workers). Run it before
+// merging a change to the simulation, the map or the venues, and with `--all` before the town
+// grows; with other test runs going on the same machine, use fewer `--shards`. It prints a line
+// per plot and a summary, and exits non-zero if any plot failed validation or a test that also
+// failed its retry. `--keep` leaves the temporary clones in place and prints where they are.
 import { spawn, spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import {
   copyFileSync,
@@ -143,12 +146,18 @@ export function rosterTests(root: string): string[] {
     .sort();
 }
 
-type Failure = { file: string; test: string };
+type Failure = { file: string; test: string; timedOut: boolean };
 type VitestReport = {
-  testResults?: { name: string; assertionResults?: { fullName: string; status: string }[] }[];
+  testResults?: {
+    name: string;
+    assertionResults?: { fullName: string; status: string; failureMessages?: string[] }[];
+  }[];
 };
 
-/** The failed tests in a Vitest JSON report, by file; a file with no results failed to run. */
+/**
+ * The failed tests in a Vitest JSON report, by file; a file with no results failed to run. A test
+ * that only ran out of time is marked, since a busy machine can do that on its own.
+ */
 export function reportFailures(report: string): Failure[] {
   try {
     const results: VitestReport = JSON.parse(readFileSync(report, 'utf8'));
@@ -157,11 +166,17 @@ export function reportFailures(report: string): Failure[] {
       file.assertionResults?.length
         ? file.assertionResults
             .filter((test) => test.status === 'failed')
-            .map((test) => ({ file: name(file.name), test: test.fullName }))
-        : [{ file: name(file.name), test: '(the file did not run)' }],
+            .map((test) => ({
+              file: name(file.name),
+              test: test.fullName,
+              timedOut: (test.failureMessages ?? []).some((message) =>
+                /Test timed out in/.test(message),
+              ),
+            }))
+        : [{ file: name(file.name), test: '(the file did not run)', timedOut: false }],
     );
   } catch {
-    return [{ file: '-', test: 'Vitest wrote no report' }];
+    return [{ file: '-', test: 'Vitest wrote no report', timedOut: false }];
   }
 }
 
@@ -264,7 +279,7 @@ async function main() {
       clones.push({ dir: clone, base: git(clone, ['rev-parse', 'HEAD']) });
     }
 
-    const vitest = (clone: string, files: string[], report: string) =>
+    const vitest = (clone: string, files: string[], report: string, maxWorkers: number) =>
       new Promise<void>((done) => {
         const child = spawn(
           process.execPath,
@@ -272,7 +287,7 @@ async function main() {
             join(clone, 'node_modules', 'vitest', 'vitest.mjs'),
             'run',
             ...files,
-            `--maxWorkers=${workers}`,
+            `--maxWorkers=${maxWorkers}`,
             '--reporter=json',
             `--outputFile=${report}`,
           ],
@@ -281,78 +296,100 @@ async function main() {
         child.on('exit', () => done());
         child.on('error', () => done());
       });
+    const seconds = (since: number) => Math.round((Date.now() - since) / 1000);
+
+    /** Moves the newcomer in on `plot` as the newest arrival, runs `files`, and moves it out. */
+    const withNewcomer = async (
+      { dir: clone, base }: (typeof clones)[number],
+      plot: string,
+      files: string[],
+      report: string,
+      maxWorkers: number,
+    ): Promise<{ errors: string[]; failed: Failure[] }> => {
+      const place = house(plot);
+      const file = `${place.id}.json`;
+      try {
+        writeFileSync(join(clone, 'places', file), `${JSON.stringify(place, null, 2)}\n`);
+        git(clone, ['add', `places/${file}`]);
+        git(clone, ['commit', '-q', '--no-verify', '-m', `Add ${place.id} on ${plot}`]);
+        const read = await readPlaceFiles(pathToFileURL(join(clone, 'places') + sep));
+        const errors = [...read.errors, ...validatePlaces(read.entries).errors];
+        await vitest(clone, files, report, maxWorkers);
+        return { errors, failed: reportFailures(report) };
+      } catch (error) {
+        // A step of the check itself failed, not a test: say so, and go on with the next plot.
+        return { errors: [`The check could not run here: ${String(error)}`], failed: [] };
+      } finally {
+        git(clone, ['reset', '-q', '--hard', base]);
+      }
+    };
 
     type Result = { plot: string; errors: string[]; failed: Failure[]; flaky: Failure[] };
     const results: Result[] = [];
-    let next = 0;
     const started = Date.now();
-    const runShard = async ({ dir: clone, base }: (typeof clones)[number]) => {
-      while (next < plots.length) {
-        const plot = plots[next++];
-        const at = Date.now();
-        let result: Result;
-        try {
-          const place = house(plot);
-          const file = `${place.id}.json`;
-          writeFileSync(join(clone, 'places', file), `${JSON.stringify(place, null, 2)}\n`);
-          git(clone, ['add', `places/${file}`]);
-          git(clone, ['commit', '-q', '--no-verify', '-m', `Add ${place.id} on ${plot}`]);
-          const read = await readPlaceFiles(pathToFileURL(join(clone, 'places') + sep));
-          const errors = [...read.errors, ...validatePlaces(read.entries).errors];
+    // First every plot with every test, several plots at once.
+    let next = 0;
+    await Promise.all(
+      clones.map(async (clone) => {
+        while (next < plots.length) {
+          const plot = plots[next++];
+          const at = Date.now();
           const report = join(temp, `report-${plot}.json`);
-          await vitest(clone, tests, report);
-          const first = reportFailures(report);
-          const again = [...new Set(first.map((failure) => failure.file))].filter((name) =>
-            name.startsWith('tests/'),
-          );
-          let failed = first;
-          if (first.length && again.length) {
-            const retry = join(temp, `report-${plot}-retry.json`);
-            await vitest(clone, again, retry);
-            failed = reportFailures(retry);
-          }
-          const flaky = first.filter(
-            (one) => !failed.some((other) => other.file === one.file && other.test === one.test),
-          );
-          result = { plot, errors, failed, flaky };
-        } catch (error) {
-          // A step of the check itself failed, not a test: say so, and go on with the next plot.
-          result = {
-            plot,
-            errors: [`The check could not run here: ${String(error)}`],
-            failed: [],
-            flaky: [],
-          };
-        } finally {
-          git(clone, ['reset', '-q', '--hard', base]);
-        }
-        results.push(result);
-        const { errors, failed, flaky } = result;
-        const verdict =
-          errors.length || failed.length
-            ? `needs a look (${errors.length} validation, ${failed.length} tests)`
-            : flaky.length
-              ? `ok (${flaky.length} passed on retry)`
+          const { errors, failed } = await withNewcomer(clone, plot, tests, report, workers);
+          results.push({ plot, errors, failed, flaky: [] });
+          const verdict =
+            errors.length || failed.length
+              ? `${errors.length} validation problems, ${failed.length} tests to retry`
               : 'ok';
-        const seconds = Math.round((Date.now() - at) / 1000);
-        console.log(
-          `  ${plot.padEnd(4)} ${verdict}  ${seconds}s  [${results.length}/${plots.length}]`,
-        );
-      }
-    };
-    await Promise.all(clones.map(runShard));
+          console.log(
+            `  ${plot.padEnd(4)} ${verdict}  ${seconds(at)}s  [${results.length}/${plots.length}]`,
+          );
+        }
+      }),
+    );
+    // Then each plot's failing test files again, one plot at a time with every worker, so a test
+    // that only ran out of time while the other plots ran gets a fair second run.
+    for (const result of results) {
+      const files = [...new Set(result.failed.map((failure) => failure.file))].filter((name) =>
+        name.startsWith('tests/'),
+      );
+      if (!files.length) continue;
+      const at = Date.now();
+      const report = join(temp, `report-${result.plot}-retry.json`);
+      const again = await withNewcomer(clones[0], result.plot, files, report, cpus);
+      result.flaky = result.failed.filter(
+        (one) => !again.failed.some((other) => other.file === one.file && other.test === one.test),
+      );
+      result.failed = again.failed;
+      console.log(
+        `  ${result.plot.padEnd(4)} retried ${files.length} test files: ` +
+          `${result.failed.length ? `${result.failed.length} tests fail again` : 'all pass'}  ${seconds(at)}s`,
+      );
+    }
 
-    const minutes = ((Date.now() - started) / 60000).toFixed(1);
-    console.log(`\nNewcomer check: ${plots.length} plots in ${minutes} min`);
+    console.log(
+      `\nNewcomer check: ${plots.length} plots in ${(seconds(started) / 60).toFixed(1)} min`,
+    );
     for (const result of results.sort((a, b) => plots.indexOf(a.plot) - plots.indexOf(b.plot))) {
       for (const error of result.errors) console.log(`  ${result.plot}  ! ${error}`);
       for (const failure of result.failed)
-        console.log(`  ${result.plot}  x ${failure.file} > ${failure.test}`);
+        console.log(
+          `  ${result.plot}  x ${failure.file} > ${failure.test}${failure.timedOut ? ' (timed out)' : ''}`,
+        );
       for (const failure of result.flaky)
         console.log(`  ${result.plot}  ~ ${failure.file} > ${failure.test} (passed on retry)`);
     }
     passed = results.every((result) => !result.errors.length && !result.failed.length);
-    console.log(passed ? '\nEvery newcomer settles in.' : '\nA newcomer needs a look.');
+    const slowOnly = results.every(
+      (result) => !result.errors.length && result.failed.every((failure) => failure.timedOut),
+    );
+    console.log(
+      passed
+        ? '\nEvery newcomer settles in.'
+        : slowOnly
+          ? '\nOnly timeouts: run those plots again with --plots and --shards 1 on a quieter machine.'
+          : '\nA newcomer needs a look.',
+    );
   } catch (error) {
     console.error(error);
   } finally {
