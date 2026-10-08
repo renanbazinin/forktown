@@ -414,16 +414,271 @@ function choosePath(walk: LaneWalk, { cost, from }: Tables): LanePath {
 /** choosePath's tables, a row of STATES a sample: made once per plan, for its longest walk. */
 type Tables = { cost: Float64Array; from: Int8Array };
 
+// ---- Planning two walkers at once ----------------------------------------------------------
+
+/**
+ * Samples two walkers may stay drawn one head over the other in their planned lanes before both
+ * are planned at once: a minute.
+ */
+const PAIR_RUN = 4;
+/**
+ * Samples either side of the time a pair walks near each other that its joint plan may use, to
+ * edge over beforehand and back after: six minutes, time to cross from one side to the other.
+ */
+const PAIR_ROOM = 24;
+/** Rounds of planning stuck pairs together: a second for any a first round's moves leave. */
+const PAIR_ROUNDS = 2;
+const PAIR_STATES = STATES * STATES;
+
+/** The walk's index for sample `k`, or -1 when it is not out then. */
+const sampleOf = (walk: LaneWalk, k: number) => {
+  const i = k - walk.k0;
+  return i >= 0 && i < walk.faces.length ? i : -1;
+};
+/** The state nearest the lane `path` has at sample `k`. */
+const stateAt = (path: LanePath, k: number) => Math.round((laneAtSample(path, k) + 1) * LANE_STEPS);
+
+/** The longest run of samples `near` draws its two walkers one head over the other (or as one). */
+function stackedRun(walk: LaneWalk, { other, d }: Near) {
+  let longest = 0,
+    run = 0,
+    last = -Infinity;
+  for (let t = 0; t < d.length; t += NEAR_STRIDE) {
+    const k = d[t];
+    const mine = laneAtSample(walk.path!, k),
+      theirs = laneAtSample(other.path!, k);
+    // overlapWeight weighs a stacked or fused pair 3 or more, and one only just apart 0.5.
+    const over =
+      overlapWeight(
+        d[t + 1] + theirs * d[t + 5] - mine * d[t + 3],
+        d[t + 2] + theirs * d[t + 6] - mine * d[t + 4],
+      ) >= 3;
+    run = over ? (k === last + 1 ? run + 1 : 1) : 0;
+    last = k;
+    longest = Math.max(longest, run);
+  }
+  return longest;
+}
+
+/**
+ * What each lane costs `walk` at each of the `n` samples from `lo`, a row of STATES a sample:
+ * the pull of its own side and its overlaps with every neighbor but `partner`, in the lanes they
+ * have now. Rows where it is not out stay 0.
+ */
+function aloneCost(walk: LaneWalk, partner: LaneWalk, lo: number, n: number, cost: Float64Array) {
+  cost.fill(0, 0, n * STATES);
+  const own = laneSide(walk.id);
+  const first = Math.max(lo, walk.k0),
+    end = Math.min(lo + n, walk.k0 + walk.faces.length);
+  for (let k = first; k < end; k++)
+    for (let s = 0; s < STATES; s++)
+      cost[(k - lo) * STATES + s] = SIDE_COST * Math.abs(stateLane(s) - own);
+  for (const { other, d } of walk.near) {
+    if (other === partner || other.path === undefined) continue;
+    for (let t = 0; t < d.length; t += NEAR_STRIDE) {
+      const k = d[t];
+      if (k < lo || k >= lo + n) continue;
+      const lane = laneAtSample(other.path, k);
+      const x = d[t + 1] + lane * d[t + 5],
+        y = d[t + 2] + lane * d[t + 6];
+      const row = (k - lo) * STATES;
+      for (let s = 0; s < STATES; s++) {
+        const mine = stateLane(s);
+        cost[row + s] += overlapWeight(x - mine * d[t + 3], y - mine * d[t + 4]);
+      }
+    }
+  }
+}
+
+/**
+ * How `walk`'s lane may change from sample k − 1 to k: 0 not at all (paused), 1 an eighth
+ * either way, 2 any way (it is not out at one of the two, so they are not joined).
+ */
+function stepRule(walk: LaneWalk, k: number) {
+  const i = sampleOf(walk, k),
+    h = sampleOf(walk, k - 1);
+  if (i < 0 || h < 0) return 2;
+  return walk.paused?.[h] || walk.paused?.[i] ? 0 : 1;
+}
+
+/**
+ * One walker's move in a joint step (min-plus, by `rule`): for each lane of the other, the least
+ * cost of each lane of this one from the lanes it may come from, and which it came from. In the
+ * tables this walker's lanes are `stride` apart and the other's `other` apart.
+ */
+function stepOne(
+  rule: number,
+  before: Float64Array,
+  after: Float64Array,
+  came: Int8Array,
+  row: number,
+  stride: number,
+  other: number,
+) {
+  for (let o = 0; o < STATES; o++) {
+    const base = o * other;
+    if (rule === 2) {
+      let best = Infinity,
+        from = 0;
+      for (let s = 0; s < STATES; s++)
+        if (before[base + s * stride] < best) {
+          best = before[base + s * stride];
+          from = s;
+        }
+      for (let s = 0; s < STATES; s++) {
+        after[base + s * stride] = best;
+        came[row + base + s * stride] = from;
+      }
+      continue;
+    }
+    for (let s = 0; s < STATES; s++) {
+      const here = base + s * stride;
+      let best = before[here],
+        from = s;
+      if (rule === 1 && s > 0 && before[here - stride] + DRIFT_COST < best) {
+        best = before[here - stride] + DRIFT_COST;
+        from = s - 1;
+      }
+      if (rule === 1 && s < STATES - 1 && before[here + stride] + DRIFT_COST < best) {
+        best = before[here + stride] + DRIFT_COST;
+        from = s + 1;
+      }
+      after[here] = best;
+      came[row + here] = from;
+    }
+  }
+}
+
+/** choosePair's tables: rows of STATES (alone) and STATES² (together) a sample, grown as needed. */
+type PairTables = { costA: Float64Array; costB: Float64Array; fromA: Int8Array; fromB: Int8Array };
+function pairTables(tables: PairTables | undefined, n: number): PairTables {
+  if (tables && tables.costA.length >= n * STATES) return tables;
+  return {
+    costA: new Float64Array(n * STATES),
+    costB: new Float64Array(n * STATES),
+    fromA: new Int8Array(n * PAIR_STATES),
+    fromB: new Int8Array(n * PAIR_STATES),
+  };
+}
+
+/** A copy of `walk`'s lanes, one a sample. */
+function lanesOf(walk: LaneWalk) {
+  const lanes = new Float32Array(walk.faces.length);
+  for (let i = 0; i < lanes.length; i++) lanes[i] = laneAtSample(walk.path!, walk.k0 + i);
+  return lanes;
+}
+
+/**
+ * Both walkers' lanes from sample `lo` to `hi`, planned at once: the pair of lanes, sample by
+ * sample, that makes least their overlaps with each other and with everyone else (in the lanes
+ * they have now), their pulls to their own sides and their drifts (Viterbi over every pair of
+ * lanes). Where the window cuts into a walk, its lanes join those either side within a drift.
+ * For two walkers stuck one over the other where getting clear takes both moving at once: one
+ * slowly overtaking the other, each in the lane worst for the other, where each one's best
+ * answer to the other alone holds them there.
+ */
+function choosePair(
+  a: LaneWalk,
+  b: LaneWalk,
+  ab: Near,
+  lo: number,
+  hi: number,
+  tables: PairTables,
+) {
+  const n = hi - lo + 1;
+  const { costA, costB, fromA, fromB } = tables;
+  aloneCost(a, b, lo, n, costA);
+  aloneCost(b, a, lo, n, costB);
+  // Where each sample's numbers start in the pair's own nearness, or -1.
+  const { d } = ab;
+  const pairAt = new Int32Array(n).fill(-1);
+  for (let t = 0; t < d.length; t += NEAR_STRIDE)
+    if (d[t] >= lo && d[t] <= hi) pairAt[d[t] - lo] = t;
+  const addSample = (row: Float64Array, i: number) => {
+    const t = pairAt[i];
+    for (let sa = 0; sa < STATES; sa++) {
+      const la = stateLane(sa),
+        ca = costA[i * STATES + sa];
+      for (let sb = 0; sb < STATES; sb++) {
+        let c = ca + costB[i * STATES + sb];
+        if (t >= 0) {
+          const lb = stateLane(sb);
+          c += overlapWeight(
+            d[t + 1] + lb * d[t + 5] - la * d[t + 3],
+            d[t + 2] + lb * d[t + 6] - la * d[t + 4],
+          );
+        }
+        row[sa * STATES + sb] += c;
+      }
+    }
+  };
+  // A walk the window cuts into keeps within a drift of its lane just outside it.
+  const join = (walk: LaneWalk, outside: number, inside: number) => {
+    if (sampleOf(walk, outside) < 0 || sampleOf(walk, inside) < 0) return () => 0;
+    const state = stateAt(walk.path!, outside),
+      reach = stepRule(walk, Math.max(outside, inside)) ? 1 : 0;
+    return (s: number) => {
+      const steps = Math.abs(s - state);
+      return steps > reach ? Infinity : steps * DRIFT_COST;
+    };
+  };
+  let before = new Float64Array(PAIR_STATES),
+    now = new Float64Array(PAIR_STATES);
+  const middle = new Float64Array(PAIR_STATES);
+  const startA = join(a, lo - 1, lo),
+    startB = join(b, lo - 1, lo);
+  for (let sa = 0; sa < STATES; sa++)
+    for (let sb = 0; sb < STATES; sb++) before[sa * STATES + sb] = startA(sa) + startB(sb);
+  addSample(before, 0);
+  for (let i = 1; i < n; i++) {
+    // a's move first, for each lane b had; then b's, for each lane a moved to.
+    const row = i * PAIR_STATES;
+    stepOne(stepRule(a, lo + i), before, middle, fromA, row, STATES, 1);
+    stepOne(stepRule(b, lo + i), middle, now, fromB, row, 1, STATES);
+    addSample(now, i);
+    [before, now] = [now, before];
+  }
+  const endA = join(a, hi + 1, hi),
+    endB = join(b, hi + 1, hi);
+  let state = -1,
+    least = Infinity;
+  for (let sa = 0; sa < STATES; sa++)
+    for (let sb = 0; sb < STATES; sb++) {
+      const total = before[sa * STATES + sb] + endA(sa) + endB(sb);
+      if (total < least) {
+        least = total;
+        state = sa * STATES + sb;
+      }
+    }
+  if (state < 0) return;
+  const lanesA = lanesOf(a),
+    lanesB = lanesOf(b);
+  for (let i = n - 1; ; i--) {
+    let sa = Math.floor(state / STATES),
+      sb = state % STATES;
+    const k = lo + i;
+    if (sampleOf(a, k) >= 0) lanesA[k - a.k0] = stateLane(sa);
+    if (sampleOf(b, k) >= 0) lanesB[k - b.k0] = stateLane(sb);
+    if (!i) break;
+    sb = fromB[i * PAIR_STATES + sa * STATES + sb];
+    sa = fromA[i * PAIR_STATES + sa * STATES + sb];
+    state = sa * STATES + sb;
+  }
+  a.path = { k0: a.k0, lanes: lanesA };
+  b.path = { k0: b.k0, lanes: lanesB };
+}
+
 const byId = (a: LaneWalk, b: LaneWalk) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 /**
  * Give every walk its lanes. Anyone who walks alone keeps their own side all the way. Walkers who
  * walk near others the same way (close enough to overlap, for half a minute or more) take, in time
  * order, the lanes that draw them over those already placed least (choosePath), then a few times
- * over the best beside everyone's latest, so a column settles side by side. Fixed walks keep
- * theirs; a walk that is not fixed but comes with lanes (a first guess) is seen in them until its
- * own turn. The town is placed before a previewed draft and never looks at it. Pure: the order of
- * `walks` does not matter.
+ * over the best beside everyone's latest, so a column settles side by side. Two still drawn one
+ * over the other for a minute or more then get both their lanes at once (choosePair), as getting
+ * clear can take both edging over together. Fixed walks keep theirs; a walk that is not fixed but
+ * comes with lanes (a first guess) is seen in them until its own turn. The town is placed before a
+ * previewed draft and never looks at it. Pure: the order of `walks` does not matter.
  */
 export function planLaneWalks(walks: readonly LaneWalk[]) {
   const ordered = [...walks].sort(
@@ -462,4 +717,29 @@ export function planLaneWalks(walks: readonly LaneWalk[]) {
   for (let pass = 0; pass < LANE_PASSES; pass++)
     for (const walk of ordered)
       if (!walk.fixed && walk.near.length) walk.path = choosePath(walk, tables);
+  // Pairs still drawn one over the other for a minute or more, planned both at once: each pair
+  // once, from its first walk in planning order, when each can make room for the other.
+  const rank = new Map(ordered.map((walk, index) => [walk, index]));
+  let pairs: PairTables | undefined;
+  for (let round = 0; round < PAIR_ROUNDS; round++) {
+    let planned = false;
+    for (const walk of ordered) {
+      if (walk.fixed) continue;
+      for (const near of walk.near) {
+        const { other, d } = near;
+        if (other.fixed || rank.get(other)! < rank.get(walk)!) continue;
+        if (!other.near.some((back) => back.other === walk)) continue;
+        if (stackedRun(walk, near) < PAIR_RUN) continue;
+        const lo = Math.max(Math.min(walk.k0, other.k0), d[0] - PAIR_ROOM),
+          hi = Math.min(
+            Math.max(walk.k0 + walk.faces.length, other.k0 + other.faces.length) - 1,
+            d[d.length - NEAR_STRIDE] + PAIR_ROOM,
+          );
+        pairs = pairTables(pairs, hi - lo + 1);
+        choosePair(walk, other, near, lo, hi, pairs);
+        planned = true;
+      }
+    }
+    if (!planned) break;
+  }
 }

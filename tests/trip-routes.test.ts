@@ -373,7 +373,10 @@ describe('Lanes on the road', () => {
       // zoom 1 (figures about 12 px wide and 27 tall): within 6 px across and 12 up or down they
       // read as one; within 7 across and 22 up or down, one head over the other, as a two-headed
       // one. The published town for four days (one of them a busy one, with the stage's night owls
-      // out late), and a full town for a day.
+      // out late), and a full town for a day. Measured with the branch's 30 houses: fused 0.8 and
+      // stacked 1.6 at worst, in either town. A newcomer on K14 once walked one head over a
+      // neighbor for 4 minutes on the way to the zoo, each in the lane worst for the other, until
+      // the planner learned to move both at once.
       const STEP = 0.2;
       let together = 0,
         close = 0;

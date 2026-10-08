@@ -355,15 +355,15 @@ The Meadow Ground loses most of its afternoon supporters on the ten festival aft
 
 | Day                          | Close/together | Fused | Stacked |
 | ---------------------------- | -------------- | ----- | ------- |
-| Spring 1 (new moon)          | 0.025          | 1.2   | 1.6     |
-| Spring 2                     | 0.020          | 1.2   | 1.6     |
-| Spring 3                     | 0.070          | 1.4   | 1.6     |
-| Summer 15                    | 0.019          | 1.2   | 1.6     |
-| Summer 10 (regatta)          | 0.063          | 1.2   | 1.6     |
-| Autumn 23 (harvest)          | 0.036          | 1.0   | 1.6     |
-| Winter 11 (skating, snowmen) | 0.026          | 1.2   | 1.4     |
+| Spring 1 (new moon)          | 0.004          | 0.8   | 1.6     |
+| Spring 2                     | 0.001          | 0.6   | 1.6     |
+| Spring 3                     | 0.039          | 1.2   | 1.8     |
+| Summer 15                    | 0.009          | 1.2   | 1.4     |
+| Summer 10 (regatta)          | 0.005          | 1.0   | 1.6     |
+| Autumn 23 (harvest)          | 0.019          | 1.0   | 1.4     |
+| Winter 11 (skating, snowmen) | 0.016          | 1.2   | 1.8     |
 
-The outings' walks, the seasonal rounds and the loops round the blocks get their lanes in one plan, so a guest on the way to an outing and a neighbor out on their own loop each make room for the other. Over a whole year the full town has one day with a pair over a limit (Autumn 26: a zoo guest turning into a street just behind a neighbor on a loop, stacked 3.6 minutes; worst fused 1.6), and close/together is 0.041. When the outings were planned first and the loops around them, it had 16 such days (worst fused 4.6, stacked 4.8; close/together 0.067), every one an outing walker beside a loop walker that could not make room alone; the 20 × 10 town had 20 days, worst 11.6 and 35.8. The published town, alone or with one newcomer out all day on any of ten plots across the map, has none (it had one or two a year).
+The outings' walks, the seasonal rounds and the loops round the blocks get their lanes in one plan, so a guest on the way to an outing and a neighbor out on their own loop each make room for the other. Two walkers still drawn one over the other for a minute or more are then planned both at once, since getting clear can take both edging over together: one slowly overtaking the other, each in the lane worst for the other. Over a whole year the full town has no day with a pair over a limit (worst fused 1.4, stacked 1.8), and close/together is 0.021. Moving one walker at a time it had one such day (Autumn 26: a zoo guest turning into a street just behind a neighbor on a loop, stacked 3.6 minutes) and close/together 0.041. When the outings were planned first and the loops around them, it had 16 such days (worst fused 4.6, stacked 4.8; close/together 0.067), every one an outing walker beside a loop walker that could not make room alone; the 20 × 10 town had 20 days, worst 11.6 and 35.8. The published town, alone or with one newcomer out all day on any of ten plots across the map, has none (it had one or two a year).
 
 **Cost.** Planning takes 9.4 ms a day in the full town, 12.8 in the mixed and 14.8 in the eager town, and 4.0 in the real town. Simulating the full town takes 0.67 ms a frame on average, with up to 114 neighbors out at once.
 

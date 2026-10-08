@@ -26,10 +26,11 @@ const dayOf = (season: string, date: number) => {
   }
 };
 /**
- * The days (re-measured with this planner): a new-moon night, the regatta's first
- * day, the Harvest Fair's, a skating and snowmen day, and Spring 3, where a fan and a stroller
- * once walked as one figure at the pitch gate. Measured: fused 1.6, 1.6, 1.4, 1.8, 1.4;
- * stacked 2.0, 2.0, 2.0, 2.2, 1.8; close/together 0.063 over the five.
+ * The days: a new-moon night, the regatta's first day, the Harvest Fair's, a skating and
+ * snowmen day, and Spring 3, where a fan and a stroller once walked as one figure at the pitch
+ * gate. Measured with everyone's lanes planned together, stuck pairs both at once (the branch's
+ * 30 houses and a made-up one on every free plot): fused 0.8, 1.0, 1.0, 1.2, 1.2; stacked 1.6,
+ * 1.6, 1.4, 1.8, 1.8; close/together 0.016 over the five.
  */
 const SPRING_1 = dayOf('Spring', 1),
   SUMMER_10 = dayOf('Summer', 10),
