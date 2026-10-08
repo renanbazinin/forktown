@@ -860,12 +860,20 @@ export function renderCity({
   drawSeasonLight(ctx, width, height, season, night);
 }
 
+/** Each roster's houses, frontmost first (worked out once per list, not on every pointer move). */
+const frontToBack = new WeakMap<Place[], { place: Place; plot: Plot }[]>();
 export function buildingHit(point: Point, places: Place[]): string | undefined {
   // Frontmost buildings win when their silhouettes overlap.
-  const ordered = places
-    .map((place) => ({ place, plot: PLOTS.find((p) => p.id === place.plot)! }))
-    .filter((v) => v.plot)
-    .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
+  let ordered = frontToBack.get(places);
+  if (!ordered) {
+    ordered = places
+      .flatMap((place) => {
+        const plot = getPlot(place.plot);
+        return plot ? [{ place, plot }] : [];
+      })
+      .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
+    frontToBack.set(places, ordered);
+  }
   for (const { place, plot } of ordered) {
     const p = plotCenter(plot);
     // Only the painted house counts: a walker seen beside its walls or roof stays clickable.
@@ -883,7 +891,7 @@ export function cityHit(
   cinemaScreenReveal = 1,
 ): CityHit | undefined {
   const plotId = buildingHit(point, places);
-  const plot = PLOTS.find((plot) => plot.id === plotId);
+  const plot = plotId ? getPlot(plotId) : undefined;
   let depth = plot ? houseDepth(plot) : -Infinity;
   let target: CityHit | undefined = plot ? { kind: 'place', id: plot.id } : undefined;
   if (insideFarm(unproject(point.x, point.y)) && depth < 0) {

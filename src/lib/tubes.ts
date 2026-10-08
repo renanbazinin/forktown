@@ -92,6 +92,11 @@ export const TUBE_ALIGHT = 2;
  * never fails where the walking plan would succeed.
  */
 export const TUBE_MIN_SAVING = 10;
+/**
+ * Within one day's plan, two riders never reach a boarding door, or leave a stepping-off door,
+ * within this many minutes of each other (the planner's headways, resident-trips.ts).
+ */
+export const TUBE_DOOR_HEADWAY = 2;
 /** Minutes into boarding: the walk to the stack ends, the turn ends, the crouch ends (fwoomp to TUBE_BOARD). */
 export const TUBE_BOARD_STEPS = { walk: 1.6, turn: 1.8, crouch: 1.88 } as const;
 /** Minutes into stepping off: the drop ends, the settle ends (then the walk out to TUBE_ALIGHT). */

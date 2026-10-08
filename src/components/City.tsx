@@ -312,8 +312,11 @@ const City = forwardRef<CityHandle, Props>(function City(
       const right = Math.max(...points.map((point) => point.x)) + 110;
       const top = Math.min(...points.map((point) => point.y)) - 145;
       const bottom = Math.max(...points.map((point) => point.y)) + 80;
+      // A town with every plot taken would open at whole-town fit, every house tiny: frame the
+      // middle of it no further out than 0.35 (0.15 on a phone). Reset still shows it all.
       const zoom = Math.max(
         overview.zoom,
+        width < 600 ? 0.15 : 0.35,
         Math.min(
           0.85,
           (width < 600 ? width * 1.6 : width - 150) / (right - left),

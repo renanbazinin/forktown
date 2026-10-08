@@ -235,10 +235,13 @@ export function liveShotAt(
   if (features(program, 'football', time) && football.live && time >= 640 && time < 780)
     return matchShot();
 
-  const outdoors = followable(program, residents, time);
+  // By id, so the cast's lookup stays linear in a full town.
+  const outdoors = new Map<string, ResidentState>();
+  for (const resident of followable(program, residents, time))
+    if (!outdoors.has(resident.id)) outdoors.set(resident.id, resident);
   const chapter = Math.floor(time / FOLLOW_SECONDS);
   const neighbor = program.cast[chapter]
-    .map((id) => outdoors.find((resident) => resident.id === id))
+    .map((id) => outdoors.get(id))
     .find((resident) => resident !== undefined);
   if (neighbor) {
     const point = project(neighbor.position.x, neighbor.position.y);

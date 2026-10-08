@@ -48,18 +48,14 @@ const nightOwls = (prefix: string, where: (plot: (typeof HOUSE_PLOTS)[number]) =
     },
   }));
 const rides = (trip: ResidentTrip) => !!(trip.legs || trip.returnLegs);
-/** Everything the walking planner decides, in comparable form. */
-const plan = (trip: ResidentTrip) => ({
+/**
+ * What the walking planner decides apart from the times, which the town's headways move. Times
+ * decide whether a party guest hops straight over from the film, so a hop's way there may differ.
+ */
+const plan = (trip: ResidentTrip, hop = false) => ({
   event: trip.event.id,
   seat: trip.seat,
-  depart: trip.depart,
-  arrive: trip.arrive,
-  leave: trip.leave,
-  homeBy: trip.homeBy,
-  duration: trip.duration,
-  returnDuration: trip.returnDuration,
-  continuesTo: trip.continuesTo,
-  route: trip.route,
+  ...(hop ? {} : { route: trip.route }),
   returnRoute: trip.returnRoute,
   availableFrom: trip.availableFrom,
   availableUntil: trip.availableUntil,
@@ -82,7 +78,7 @@ const allowed = (trip: ResidentTrip, state: ReturnType<typeof tripState>) => {
 };
 
 describe('Riding the Treeline over a whole year', () => {
-  it('plans every trip before a ride exactly as on foot', () => {
+  it('plans every trip before a ride as on foot, moved only in time', () => {
     // Synthetic full town for a week, then the real roster for a year.
     const crowd = HOUSE_PLOTS.map((plot, i) => ({
       ...sample,
@@ -97,8 +93,10 @@ describe('Riding the Treeline over a whole year', () => {
         ][i % 3] as Place['resident']['routine'],
       },
     }));
+    const key = (trip: ResidentTrip) => `${trip.event.id}@${trip.event.start}`;
     let identical = 0,
-      withRides = 0;
+      withRides = 0,
+      lost = 0;
     for (const [homes, days] of [
       [crowd, [0, 1, 2, 3, 4, 5, 6, 7]],
       [places, YEAR],
@@ -111,27 +109,31 @@ describe('Riding the Treeline over a whole year', () => {
             old = walking.get(home.id)!;
           // On foot nobody has legs.
           for (const trip of old) expect('legs' in trip || 'returnLegs' in trip).toBe(false);
+          // Every outing on foot is one of the town's. A day on foot can lose one the headways
+          // made room for (a leave moved earlier, so the next outing fits).
+          for (const trip of old) expect(trips.map(key)).toContain(key(trip));
           const first = trips.findIndex(rides);
-          if (first < 0) {
-            identical++;
-            expect(trips.map(plan)).toEqual(old.map(plan));
-            for (const trip of trips) expect('legs' in trip || 'returnLegs' in trip).toBe(false);
-            continue;
+          // The same outings in the same seats, walked the same way, up to the first ride.
+          for (let i = 0; i < (first < 0 ? trips.length : first); i++) {
+            const j = old.findIndex((trip) => key(trip) === key(trips[i]));
+            if (j < 0) {
+              lost++;
+              continue;
+            }
+            const hop = !!(trips[i - 1]?.continuesTo || old[j - 1]?.continuesTo);
+            expect(plan(trips[i], hop)).toEqual(plan(old[j], hop));
           }
-          withRides++;
-          for (let i = 0; i < first; i++) {
-            // A cinema trip that now hands over to a party with a tube ride home keeps its
-            // own plan; only its end becomes the handover.
-            const handover = i === first - 1 && trips[i].continuesTo === 'night-party';
-            const { homeBy: _a, continuesTo: _b, ...mine } = plan(trips[i]);
-            const { homeBy: _c, continuesTo: _d, ...theirs } = plan(old[i]);
-            if (handover) expect(mine).toEqual(theirs);
-            else expect(plan(trips[i])).toEqual(plan(old[i]));
+          if (first >= 0) withRides++;
+          else {
+            identical++;
+            for (const trip of trips) expect('legs' in trip || 'returnLegs' in trip).toBe(false);
           }
         }
       }
     expect(identical).toBeGreaterThan(2000);
     expect(withRides).toBeGreaterThan(300);
+    // Rare: measured 1 in the real town's year and 2 in the full town's (230 houses).
+    expect(lost).toBeLessThan(identical / 100);
   }, 60_000);
 
   it('never loses a trip the walking plan keeps, even for far night owls', () => {

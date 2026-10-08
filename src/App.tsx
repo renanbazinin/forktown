@@ -194,14 +194,19 @@ export default function App() {
         ),
       ]
     : [];
-  const available = HOUSE_PLOTS.filter(
-    (plot) => !displayPlaces.some((place) => place.plot === plot.id),
-  );
-  const filteredPlaces = displayPlaces.filter((place) =>
-    `${place.name} ${place.creator} ${place.resident.name} ${place.plot}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  // Worked out once per roster and search, not on every clock tick: a full town has hundreds.
+  const available = useMemo(() => {
+    const taken = new Set(displayPlaces.map((place) => place.plot));
+    return HOUSE_PLOTS.filter((plot) => !taken.has(plot.id));
+  }, [displayPlaces]);
+  const filteredPlaces = useMemo(() => {
+    const query = search.toLowerCase();
+    return displayPlaces.filter((place) =>
+      `${place.name} ${place.creator} ${place.resident.name} ${place.plot}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [displayPlaces, search]);
   const filteredPlots = available.filter((plot) =>
     plot.id.toLowerCase().includes(search.toLowerCase()),
   );

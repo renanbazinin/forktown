@@ -16,12 +16,14 @@ import { MILLPOND_GATE, MILLPOND_VENUE } from '../src/lib/millpond';
 import { ZOO_ENTRANCE } from '../src/lib/zoo';
 import {
   alongRoute,
+  facingAlong,
   MAX_TRAVEL_SPEED_MULTIPLIER,
   planJourney,
   planTravel,
   roadPath,
   routeLength,
   WALK_SPEED,
+  WORTH_THE_WALK,
 } from '../src/lib/walking';
 import {
   isTubePlot,
@@ -319,6 +321,19 @@ describe('Tube or walk', () => {
     expect(easy.speedMultiplier).toBe(1);
     expect(easy.duration).toBeCloseTo(20 / WALK_SPEED + fixed, 9);
   });
+  it('turns down a trip not worth the walk, and staggers and caps the leave on its own', () => {
+    // 100 unhurried minutes each way to a forty-minute show.
+    const show = (worth?: number) => planJourney(32, 0, 840, 880, 600, 1320, 720, 0, worth);
+    expect(show()).toMatchObject({ duration: 100, arrive: 835, leave: 880 });
+    expect(show(WORTH_THE_WALK)).toEqual(show());
+    expect(show(2)).toBeUndefined();
+    // The leave waits its own stagger past the end, and never passes its cap.
+    const trip = (...rest: number[]) => planJourney(10, 0, 840, 1020, 720, 1320, 720, 5, ...rest);
+    expect(trip()!.leave).toBe(1025);
+    expect(trip(0, 2)).toMatchObject({ arrive: 830, leave: 1022 });
+    expect(trip(0, 2, 1021)!.leave).toBe(1021);
+    expect(trip(0, 5, 1021)!.homeBy).toBeCloseTo(1021 + 10 / WALK_SPEED, 9);
+  });
   it(
     'walks to the stack, fwoomps, rides, drops and walks out without a jump',
     { timeout: 20_000 },
@@ -394,6 +409,15 @@ describe('Tube or walk', () => {
       expect(home[3].route).toEqual([c1.stack, c1.door]);
       expect(legsMinutes(home)).toBeCloseTo(total, 9);
       expect(reverseLegs(home)).toEqual(legs);
+      // At the end of the last walk (summed leg minutes can reach it a hair before the arrival)
+      // the walker keeps the facing of the last stretch, never the default of a figure at rest.
+      for (const journey of [legs, home]) {
+        const route = journey.at(-1)!.route;
+        const along = facingAlong(route.at(-2)!, route.at(-1)!);
+        expect(along).not.toBe('ne');
+        for (const t of [legsMinutes(journey) - 1e-13, legsMinutes(journey), total + 1])
+          expect(journeyAt(journey, 0, t).facing).toBe(along);
+      }
     },
   );
   it('tells a figure in the stack from one walking to or from it', () => {

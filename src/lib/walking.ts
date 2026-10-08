@@ -148,9 +148,18 @@ export const routeLength = (route: readonly Point[]) =>
       0,
     );
 /**
+ * Worth the walk: one way to an outing may take at most this many times the minutes spent there
+ * while it is on. Every outing uses it, the film's hop to the stage included.
+ */
+export const WORTH_THE_WALK = 3;
+/**
  * Plan a journey of `walkTiles` walked tiles plus `fixed` minutes that never speed up (boarding,
  * riding and stepping off the tube). Only the walking picks up the pace, up to 1.4×. With
  * `fixed = 0` every number is bit-identical to the walking-only planner.
+ *
+ * With `worth` set, a plan whose one-way minutes exceed `worth` times the visit is turned down.
+ * The leave waits `leaveStagger` minutes past the end (the arrival's `stagger` unless given) and
+ * never passes `leaveCap`. The defaults keep every older call exactly as it was.
  */
 export function planJourney(
   walkTiles: number,
@@ -161,6 +170,9 @@ export function planJourney(
   availableUntil: number,
   preferredDepart: number,
   stagger = 0,
+  worth = 0,
+  leaveStagger = stagger,
+  leaveCap = Infinity,
 ) {
   const normalDuration = walkTiles / WALK_SPEED;
   const targetArrival = start - 5 - stagger;
@@ -173,9 +185,11 @@ export function planJourney(
   const duration = normalDuration / speedMultiplier + fixed;
   const depart = Math.max(availableFrom, targetArrival - duration);
   const arrive = depart + duration;
-  const leave = Math.min(end + stagger, availableUntil - duration);
+  const leave = Math.min(end + leaveStagger, availableUntil - duration, leaveCap);
   // Count only time while the event is open, excluding early arrival and lingering.
-  if (Math.min(end, leave) - Math.max(start, arrive) < MIN_VISIT_MINUTES) return undefined;
+  const visit = Math.min(end, leave) - Math.max(start, arrive);
+  if (visit < MIN_VISIT_MINUTES) return undefined;
+  if (worth && duration > worth * visit) return undefined;
   return { duration, depart, arrive, leave, homeBy: leave + duration, speedMultiplier };
 }
 export function planTravel(

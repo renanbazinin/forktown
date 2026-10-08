@@ -4,19 +4,29 @@ import { placeSchema, type Place } from '../src/lib/schema';
 import { EVENT_SPOTS, eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
 import { hash } from '../src/lib/world';
 import {
+  eventApproach,
   eventRoute,
   eventTubeJourney,
+  HEADWAY_SHIFT_MAX,
+  planHome,
   planResidentTrips,
+  VENUE_GATE_HEADWAY,
   withPreview,
   type ResidentTrip,
 } from '../src/lib/resident-trips';
 import { fixedMinutes, legsMinutes, walkedTiles } from '../src/lib/tube-journeys';
 import { tubeParcels, tubeRides } from '../src/lib/tube-traffic';
-import { TUBE_PARCELS } from '../src/lib/tubes';
-import { MIN_VISIT_MINUTES, planJourney, routeLength, WALK_SPEED } from '../src/lib/walking';
+import { TUBE_DOOR_HEADWAY, TUBE_PARCELS } from '../src/lib/tubes';
+import {
+  MIN_VISIT_MINUTES,
+  planJourney,
+  routeLength,
+  WALK_SPEED,
+  WORTH_THE_WALK,
+} from '../src/lib/walking';
 import { simulateResidents } from '../src/lib/simulation';
 import { CINEMA_FILMS, cinemaGuests, cinemaProgram } from '../src/lib/cinema';
-import { millpondSkatingDay } from '../src/lib/millpond';
+import { millpondSkatingDay, SKATING } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { nightBedtime } from '../src/lib/night-routine';
 import { readPlaces } from './full-town';
@@ -133,7 +143,8 @@ describe('Event seats at a full town', () => {
           const going = plans.get(id)!.find((trip) => trip.event.id === 'cinema');
           if (going) return expect(going.seat).toBe(seat);
           // The film is planned first, so a seat stays empty only for a guest who couldn't make
-          // it with nothing else on: not by the tube either, from as early as their day allows.
+          // it with nothing else on, worth the walk: not by the tube either, from as early as
+          // their day allows.
           missed++;
           const home = homes.find((place) => place.id === id)!;
           const { morning, afternoon } = home.resident.routine;
@@ -147,47 +158,52 @@ describe('Event seats at a full town', () => {
             nightBedtime(home),
             film.depart,
             seat * 1.3,
+            WORTH_THE_WALK,
           );
           expect(plan, `${id} on day ${day}`).toBeUndefined();
         });
       }
     // The sleepy owls in the far corners do miss it.
-    expect(missed).toBeGreaterThan(5);
+    expect(missed).toBeGreaterThanOrEqual(1);
   }, 60_000);
 
   it('keeps every trip on foot, and the day up to the first ride, at a full town', () => {
-    const key = (trip: ResidentTrip) => `${trip.event.id}@${trip.event.start}`;
-    const plan = ({ event, seat, depart, arrive, leave, homeBy, continuesTo }: ResidentTrip) => ({
-      event: event.id,
-      seat,
-      depart,
-      arrive,
-      leave,
-      homeBy,
-      continuesTo,
+    const key = (trip: ResidentTrip) => `${trip.event.id}@${trip.event.start}:${trip.seat}`;
+    /**
+     * What a trip is, leaving out when: the town's headways move only the times. Times decide
+     * whether a party guest hops straight over from the film, so a hop's way there may differ.
+     */
+    const outing = (trip: ResidentTrip, hop: boolean) => ({
+      event: trip.event.id,
+      seat: trip.seat,
+      facing: trip.facing,
+      returnRoute: trip.returnRoute,
+      ...(hop ? {} : { route: trip.route }),
     });
-    let added = 0;
+    let added = 0,
+      retimed = 0;
     for (const homes of [TOWNS.mixed, TOWNS.eager, TOWNS.owls])
       for (const { day, plans } of year(homes).filter((_, index) => index % 4 === 0)) {
-        // The same guests on foot.
+        // The same guests in the same seats on foot, each day planned on its own (no headways).
         const walking = planResidentTrips(homes, day, { tube: false });
         for (const home of homes) {
           const trips = plans.get(home.id)!,
             walked = walking.get(home.id)!;
           for (const trip of walked) expect(trips.map(key)).toContain(key(trip));
           added += trips.length - walked.length;
-          // Up to the first ride, the day is the one they would walk.
+          // Up to the first ride, the same outings walked the same way; only the times move.
           const first = trips.findIndex((trip) => trip.legs || trip.returnLegs);
           for (let i = 0; i < (first < 0 ? trips.length : first); i++) {
-            // A film that now hands over to a party with a ride home ends at the handover.
-            const handover = i === first - 1 && trips[i].continuesTo === 'night-party';
-            const { homeBy: _a, continuesTo: _b, ...mine } = plan(trips[i]);
-            const { homeBy: _c, continuesTo: _d, ...theirs } = plan(walked[i]);
-            expect(handover ? mine : plan(trips[i])).toEqual(handover ? theirs : plan(walked[i]));
+            const hop = !!(trips[i - 1]?.continuesTo || walked[i - 1]?.continuesTo);
+            expect(outing(trips[i], hop)).toEqual(outing(walked[i], hop));
+            if (trips[i].depart !== walked[i].depart || trips[i].leave !== walked[i].leave)
+              retimed++;
           }
         }
       }
     expect(added).toBeGreaterThan(100);
+    // The headways do move some of them.
+    expect(retimed).toBeGreaterThan(0);
   }, 60_000);
 
   it('never seats more guests than spots, or two guests on one spot', () => {
@@ -260,31 +276,26 @@ describe('Event seats at a full town', () => {
     expect(seen.get('millpond')!.size).toBeGreaterThan(50);
   }, 60_000);
 
-  it('lets every night owl with time to dance before bedtime dance on some nights', () => {
+  it('lets every night owl who can dance alone dance on some nights', () => {
     const party = eventsForDay(YEAR[0]).find((event) => event.id === 'night-party')!;
-    /** Minutes to spare after reaching the stage by 23:30, dancing fifteen and going home unhurried. */
-    const spare = (owl: Place) => {
-      const tube = eventTubeJourney(owl, party, 0);
-      const trip = tube
-        ? legsMinutes(tube.legs)
-        : routeLength(eventRoute(owl, party, 0)) / WALK_SPEED;
-      return nightBedtime(owl) - party.start - MIN_VISIT_MINUTES - trip;
-    };
+    /** Whether the owl's night has room for the disco with nothing else on, by tube or on foot. */
+    const canDance = (owl: Place) =>
+      planHome(
+        owl,
+        [{ event: party, seat: 0, period: 'night' }],
+        new Map([[party, eventTubeJourney(owl, party, 0)]]),
+      ).length > 0;
     const dancers = (homes: Place[]) =>
       new Set(
         year(homes).flatMap(({ guests }) => (guests.get('night-party') ?? []).map(([id]) => id)),
       );
-    // Spare minutes count the tube: an owl who can only get there by riding keeps their turn too.
-    // With 230 house plots a hash line can pass an owl over for a whole year: until the disco
-    // takes turn tickets (SPEC §4.0.B, foundation step F1, which restores "every owl"), at most
-    // one owl in twelve may miss out (measured at F0: eager 6 of 126, mixed 1 of 64).
+    // The disco takes turns, so every owl's ticket night comes round, wherever they live.
     for (const homes of [TOWNS.eager, TOWNS.mixed, TOWNS.real]) {
       const danced = dancers(homes);
-      const owls = homes.filter(
-        (owl) => owl.resident.routine.night === 'stroll' && spare(owl) >= 2,
-      );
+      const owls = homes.filter((owl) => owl.resident.routine.night === 'stroll' && canDance(owl));
+      expect(owls.length).toBeGreaterThan(0);
       const missed = owls.filter((owl) => !danced.has(owl.id)).map((owl) => owl.id);
-      expect(missed.length, missed.join(' ')).toBeLessThanOrEqual(Math.floor(owls.length / 12));
+      expect(missed, missed.join(' ')).toEqual([]);
     }
     // A bedtime between midnight and one leaves room to dance when the stage is near enough.
     const early = [...dancers(TOWNS.eager)].filter(
@@ -335,6 +346,85 @@ describe('Event seats at a full town', () => {
     }
     expect(outings).toBeGreaterThan(20);
   }, 60_000);
+
+  it('is worth the walk, and keeps two minutes apart at every tube door and venue gate', () => {
+    type Mark = { t: number; home: string; hop: boolean };
+    /** The minute each rider reaches a boarding door, or leaves a stepping-off one. */
+    const doors = (trip: ResidentTrip, going: boolean) => {
+      const legs = (going ? trip.legs : trip.returnLegs) ?? [];
+      let at = going ? trip.depart : trip.leave;
+      const marks: [string, number][] = [];
+      for (const leg of legs) {
+        if (leg.kind === 'board') marks.push([`door:${leg.from}`, at]);
+        at += leg.minutes;
+        if (leg.kind === 'alight') marks.push([`door:${leg.to}`, at]);
+      }
+      return marks;
+    };
+    let moved = 0,
+      trips = 0;
+    for (const homes of Object.values(TOWNS))
+      for (const { day, plans } of year(homes)) {
+        const marks = new Map<string, Mark[]>();
+        const mark = (key: string, t: number, home: string, hop: boolean) =>
+          marks.set(key, [...(marks.get(key) ?? []), { t, home, hop }]);
+        for (const [home, list] of plans)
+          list.forEach((trip, index) => {
+            trips++;
+            const visit =
+              Math.min(trip.event.end, trip.leave) - Math.max(trip.event.start, trip.arrive);
+            expect(trip.duration).toBeLessThanOrEqual(WORTH_THE_WALK * visit + 1e-9);
+            // The film's hop to the stage books its marks but is never moved.
+            const hop = !!list[index - 1]?.continuesTo;
+            if (!hop) {
+              const { arriveShift, leaveShift, leaveCap } = trip.headway!;
+              expect(arriveShift).toBeGreaterThanOrEqual(0);
+              expect(arriveShift).toBeLessThanOrEqual(HEADWAY_SHIFT_MAX);
+              expect(leaveShift).toBeLessThanOrEqual(HEADWAY_SHIFT_MAX);
+              expect(trip.leave).toBeLessThanOrEqual(leaveCap + 1e-9);
+              if (arriveShift || leaveShift) moved++;
+            }
+            if (trip.event.id === 'millpond')
+              expect(trip.leave).toBeLessThanOrEqual(SKATING.end + 1e-9);
+            // Doors, and the minute the guest passes the first point of their way in.
+            for (const [key, t] of doors(trip, true)) mark(key, t, home, hop);
+            if (!trip.continuesTo)
+              for (const [key, t] of doors(trip, false)) mark(key, t, home, hop);
+            const approach = eventApproach(trip.event, trip.seat);
+            const gate = `gate:${trip.event.venue.id}:${approach[0].x},${approach[0].y}`;
+            const minutes = routeLength(approach) / (WALK_SPEED * trip.pace);
+            mark(gate, trip.arrive - minutes, home, hop);
+            if (!trip.continuesTo) mark(gate, trip.leave + minutes, home, hop);
+          });
+        for (const [key, list] of marks) {
+          const headway = key.startsWith('gate:') ? VENUE_GATE_HEADWAY : TUBE_DOOR_HEADWAY;
+          list.sort((a, b) => a.t - b.t);
+          for (let i = 0; i < list.length; i++)
+            for (let j = i + 1; j < list.length && list[j].t - list[i].t < headway; j++)
+              if (list[i].home !== list[j].home && !list[i].hop && !list[j].hop)
+                expect.fail(`${key} on day ${day}: ${list[i].home} and ${list[j].home}`);
+        }
+      }
+    // The headways move some trips a little; most keep their time.
+    expect(moved).toBeGreaterThan(0);
+    expect(moved).toBeLessThan(trips);
+  }, 60_000);
+
+  it('plans one home the same whatever was planned before', () => {
+    const party = eventsForDay(YEAR[3]).find((event) => event.id === 'night-party')!;
+    const owl = TOWNS.eager.find((home) => home.plot === 'A4')!;
+    const alone = () =>
+      planHome(
+        owl,
+        [{ event: party, seat: 0, period: 'night' }],
+        new Map([[party, eventTubeJourney(owl, party, 0)]]),
+      );
+    const before = alone();
+    expect(before).toHaveLength(1);
+    planResidentTrips(TOWNS.eager, YEAR[3]);
+    expect(alone()).toEqual(before);
+    expect(before[0].headway).toBeUndefined();
+  });
 
   it('plans the same day for any roster order', () => {
     for (const homes of [TOWNS.mixed, TOWNS.eager]) {

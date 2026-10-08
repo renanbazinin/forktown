@@ -5,6 +5,7 @@ import {
   EVENT_SPOTS,
   eventSpot,
   eventsForDay,
+  HOUSE_PLOTS,
   type EventPose,
   type TownEvent,
   type Venue,
@@ -13,6 +14,7 @@ import { cinemaGuests, CINEMA_ENTRANCE } from './cinema';
 import { FOOTBALL_ENTRANCE, FOOTBALL_VENUE, spectatorSpot, footballAt } from './football';
 import { zooRoute } from './zoo';
 import { districtApproach, DISTRICT_OUTINGS } from './district-places';
+import { activeIndex } from './district-calendar';
 import { MILLPOND_VENUE, SKATING, millpondRoute, millpondSkatingDay, skateGlide } from './millpond';
 import {
   facingAlong,
@@ -23,10 +25,11 @@ import {
   sideways,
   WALK_SPEED,
   MIN_VISIT_MINUTES,
+  WORTH_THE_WALK,
   type TravelPlan,
 } from './walking';
 import { nightBedtime } from './night-routine';
-import { TUBE_MIN_SAVING } from './tubes';
+import { TUBE_DOOR_HEADWAY, TUBE_MIN_SAVING } from './tubes';
 import {
   laneAt,
   laneWalk,
@@ -51,7 +54,7 @@ import {
   type TripLeg,
 } from './tube-journeys';
 
-type VisitEvent = Omit<TownEvent, 'venue' | 'period'> & {
+export type VisitEvent = Omit<TownEvent, 'venue' | 'period'> & {
   venue: Venue | typeof FOOTBALL_VENUE | typeof MILLPOND_VENUE;
   period: 'morning' | 'afternoon' | 'evening' | 'night';
 };
@@ -69,11 +72,19 @@ export type ResidentTrip = TravelPlan & {
   legs?: TripLeg[];
   /** Timed legs of the way home, only when it rides the tube. */
   returnLegs?: TripLeg[];
+  /** The walking pace of the plan (its speed multiplier, 1 to 1.4); 1 on the film's hop. */
+  pace: number;
+  /**
+   * How the day's headways moved the trip, when it was planned with a book: minutes the arrival
+   * came earlier (0 to HEADWAY_SHIFT_MAX), minutes the leave went later (below 0 when it was cut
+   * earlier instead), and the minute the leave may never pass.
+   */
+  headway?: { arriveShift: number; leaveShift: number; leaveCap: number };
 };
 const periods = ['morning', 'afternoon', 'evening', 'night'] as const;
 type Period = (typeof periods)[number];
 /** An event a resident is invited to, with their seat and the routine period it belongs to. */
-type Candidate = { event: VisitEvent; seat: number; period: Period };
+export type Candidate = { event: VisitEvent; seat: number; period: Period };
 const boundaries = [360, 720, 1080, 1320, 1800];
 const plans = new WeakMap<Place[], Map<number, Map<string, ResidentTrip[]>>>();
 
@@ -156,6 +167,133 @@ export function eventTubeJourney(home: Place, event: VisitEvent, seat: number) {
   return { route: legsRoute(legs), legs };
 }
 
+// ---- Turn tickets ------------------------------------------------------------------------------
+
+/** Each kind's house-plot ranks for one block of active days (a few blocks kept). */
+const blockRanks = new Map<string, ReadonlyMap<string, number>>();
+function ranksOf(kind: string, block: number): ReadonlyMap<string, number> {
+  const key = `${kind}:${block}`;
+  let ranks = blockRanks.get(key);
+  if (!ranks) {
+    ranks = new Map(
+      HOUSE_PLOTS.map((plot) => ({ id: plot.id, draw: hash(`turn:${kind}:${block}:${plot.id}`) }))
+        // Plot ids break a tie by code unit, never by the browser's language.
+        .sort((a, b) => a.draw - b.draw || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+        .map(({ id }, rank) => [id, rank] as const),
+    );
+    if (blockRanks.size >= 32) blockRanks.delete(blockRanks.keys().next().value!);
+    blockRanks.set(key, ranks);
+  }
+  return ranks;
+}
+
+/**
+ * Turn tickets, fair turns that stay put when the town grows: the active days of `kind` run in
+ * blocks of ⌈house plots / cap⌉, and every house plot holds the ticket on exactly one day of each
+ * block, at most `cap` plots a day, whoever lives in town. The plot's rank in today's block when
+ * it holds today's ticket, otherwise undefined.
+ */
+export function ticketRank(
+  kind: string,
+  cap: number,
+  day: number,
+  plot: string,
+): number | undefined {
+  const plots = HOUSE_PLOTS.length,
+    perBlock = Math.ceil(plots / cap);
+  const index = activeIndex(kind, day),
+    block = Math.floor(index / perBlock);
+  const rank = ranksOf(kind, block).get(plot);
+  return rank !== undefined && Math.floor((rank * perBlock) / plots) === index - block * perBlock
+    ? rank
+    : undefined;
+}
+
+// ---- Door and gate headways ----------------------------------------------------------------------
+
+/** Minutes two guests keep apart passing the same venue gate, the first point of their approach. */
+export const VENUE_GATE_HEADWAY = 2;
+/** Minutes an arrival may move earlier, or a leave later, to keep the headways. */
+export const HEADWAY_SHIFT_MAX = 6;
+/** Half-minute steps tried before a plan that still clashes passes its seat on. */
+export const HEADWAY_STEPS = 200;
+type VenueKind = VisitEvent['venue']['kind'];
+/** Venues nobody leaves after a set minute, however the headways fall: the ice closes at 16:40. */
+export const HARD_END: Partial<Record<VenueKind, number>> = { millpond: SKATING.end };
+
+/** A door or gate passed at minute `t` by a home's neighbor; `late` for a previewed draft's. */
+export type HeadwayMark = { t: number; home: string; late: boolean };
+/**
+ * One day's marks so far, by door (`door:${station}`) or gate (`gate:${venue}:${x},${y}`), and the
+ * previewed drafts, whose marks the town never makes way for. Each `planResidentTrips` call keeps
+ * its own; it is never module state.
+ */
+export type HeadwayBook = { marks: Map<string, HeadwayMark[]>; late: ReadonlySet<string> };
+type Mark = { key: string; t: number };
+
+/** The minute a rider reaches each boarding door and leaves each stepping-off door. */
+function doorMarks(legs: readonly TripLeg[], start: number): Mark[] {
+  const marks: Mark[] = [];
+  let at = start;
+  for (const leg of legs) {
+    if (leg.kind === 'board') marks.push({ key: `door:${leg.from}`, t: at });
+    at += leg.minutes;
+    if (leg.kind === 'alight') marks.push({ key: `door:${leg.to}`, t: at });
+  }
+  return marks;
+}
+/** A seat's gate: its approach's first point, and the tiles from there to the spot. */
+function gateOf(event: Pick<VisitEvent, 'venue'>, seat: number) {
+  const approach = eventApproach(event, seat);
+  const [{ x, y }] = approach;
+  return { key: `gate:${event.venue.id}:${x},${y}`, tiles: routeLength(approach) };
+}
+/**
+ * A trip's marks: its doors, and the minute it passes its gate (going in, and coming out unless
+ * it continues to the next outing), at the trip's own pace.
+ */
+function tripMarks(trip: ResidentTrip): Mark[] {
+  const gate = gateOf(trip.event, trip.seat);
+  const minutes = gate.tiles / (WALK_SPEED * trip.pace);
+  return [
+    ...(trip.legs ? doorMarks(trip.legs, trip.depart) : []),
+    { key: gate.key, t: trip.arrive - minutes },
+    ...(trip.continuesTo
+      ? []
+      : [
+          ...(trip.returnLegs ? doorMarks(trip.returnLegs, trip.leave) : []),
+          { key: gate.key, t: trip.leave + minutes },
+        ]),
+  ];
+}
+/** Replace a home's marks in the book with those of its new day. */
+function bookTrips(book: HeadwayBook, home: string, trips: readonly ResidentTrip[]) {
+  for (const [key, marks] of book.marks)
+    if (marks.some((mark) => mark.home === home))
+      book.marks.set(
+        key,
+        marks.filter((mark) => mark.home !== home),
+      );
+  const late = book.late.has(home);
+  for (const trip of trips)
+    for (const { key, t } of tripMarks(trip)) {
+      const marks = book.marks.get(key);
+      if (marks) marks.push({ t, home, late });
+      else book.marks.set(key, [{ t, home, late }]);
+    }
+}
+/** Whether any mark comes within the headway of another home's on the same door or gate. */
+function clashes(book: HeadwayBook, home: string, marks: readonly Mark[]) {
+  // A previewed draft makes way for everyone; the town never makes way for a draft.
+  const draft = book.late.has(home);
+  return marks.some(({ key, t }) => {
+    const headway = key.startsWith('gate:') ? VENUE_GATE_HEADWAY : TUBE_DOOR_HEADWAY;
+    return (book.marks.get(key) ?? []).some(
+      (mark) => mark.home !== home && (draft || !mark.late) && Math.abs(mark.t - t) < headway,
+    );
+  });
+}
+
 /** Derive a full day's commitments together so early departures and return walks survive period changes. */
 export function residentTrips(places: Place[], day: number): Map<string, ResidentTrip[]> {
   const cached = plans.get(places)?.get(day);
@@ -228,10 +366,16 @@ export const publishedRoster = (places: Place[]): Place[] => previews.get(places
  * filled. A far neighbor who can only make it by tube keeps their turn, so the tube changes who
  * gets a seat as well as how they travel.
  *
- * With `tube: false` the same guests are seated but nobody rides. That is not the town without
- * the tube, whose lines would pass a rider's seat on. A tube plan equals it for every trip before
- * a resident's first ride, and never drops one of its trips for a trip only the tube makes
- * possible, because a guest is only seated when the tube plan keeps every one of their outings.
+ * Within the day, no two riders reach or leave the same tube door, and no two guests pass the
+ * same venue gate, within two minutes of each other (the headways): a trip that would moves a
+ * little (an arrival up to six minutes earlier, a leave up to six later, else the other way),
+ * and passes its seat on if it still can't keep them. A previewed draft makes way for the town,
+ * never the other way round.
+ *
+ * With `tube: false` the same guests are seated but nobody rides, each home's day planned on its
+ * own (no headways). That is not the town without the tube, whose lines would pass a rider's seat
+ * on. It never holds an outing the tube plan lacks, because a guest is only seated when the tube
+ * plan keeps every one of their outings.
  */
 export function planResidentTrips(
   places: Place[],
@@ -244,14 +388,17 @@ export function planResidentTrips(
   // Each home's invitations so far, and the day they make.
   const days = new Map<string, { list: Candidate[]; trips: ResidentTrip[] }>();
   const empty = { list: [], trips: [] };
+  // This plan's doors and gates, passed to every home it plans and to nothing else.
+  const book: HeadwayBook = { marks: new Map(), late: new Set(newcomers.map((home) => home.id)) };
   const invite = (home: Place, candidate: Candidate) => {
     const before = days.get(home.id) ?? empty;
     const list = [...before.list, candidate].sort((a, b) => a.event.start - b.event.start);
-    const trips = planHome(home, list, tubeJourneys(home, list));
+    const trips = planHome(home, list, tubeJourneys(home, list), book);
     // A visit that costs an outing already planned would leave that seat empty. That rule alone
     // keeps every trip the walking-only plan makes: all of them are among the outings.
     if (trips.length < list.length) return false;
     days.set(home.id, { list, trips });
+    bookTrips(book, home.id, trips);
     return true;
   };
   const sorted = (period: Period, key: string, excluded: readonly string[] = []) =>
@@ -270,6 +417,24 @@ export function planResidentTrips(
         )
         .map(({ home }) => home),
     );
+  /**
+   * A line on turn tickets: today's ticket holders among the town's homes first, in rank order,
+   * then everyone else on the hash line. A previewed draft never holds a ticket.
+   */
+  const ticketed = (
+    kind: string,
+    cap: number,
+    period: Period,
+    key: string,
+    excluded: readonly string[] = [],
+  ) => {
+    const [line, late] = sorted(period, key, excluded);
+    const ranks = new Map(line.map((home) => [home, ticketRank(kind, cap, day, home.plot)]));
+    const holders = line
+      .filter((home) => ranks.get(home) !== undefined)
+      .sort((a, b) => ranks.get(a)! - ranks.get(b)! || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    return [[...holders, ...line.filter((home) => ranks.get(home) === undefined)], late];
+  };
   /**
    * Seat guests in line order until the seats are full or nobody else can make it. `seats` counts
    * the spots for a line of that many; newcomers get only the spots the town's line leaves.
@@ -340,8 +505,13 @@ export function planResidentTrips(
     sorted('evening', `${day}:${concert.id}`, movieGuests),
     all(EVENT_SPOTS.stage.length),
   );
+  // The disco takes turns: every home's ticket night comes round once a month or so.
   const party = program.find((e) => e.id === 'night-party')!;
-  seat(party, sorted('night', `${day}:${party.id}`), all(EVENT_SPOTS.stage.length));
+  seat(
+    party,
+    ticketed('night-party', EVENT_SPOTS.stage.length, 'night', `${day}:${party.id}`),
+    all(EVENT_SPOTS.stage.length),
+  );
   const result = new Map<string, ResidentTrip[]>();
   for (const home of places) {
     if (!getPlot(home.plot)) continue;
@@ -357,12 +527,17 @@ type TubeJourney = NonNullable<ReturnType<typeof eventTubeJourney>>;
 const tubeJourneys = (home: Place, list: readonly Candidate[]) =>
   new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
 
-/** One home's day: each candidate in start order, kept when it fits after the trip before. With
- *  `journeys`, a candidate that has a tube journey rides it; without, everyone walks. */
-function planHome(
+/**
+ * One home's day: each candidate in start order, kept when it fits after the trip before and is
+ * worth the walk. With `journeys`, a candidate that has a tube journey rides it; without, everyone
+ * walks. With `book`, each trip keeps the headways to every other home's marks in it, or drops;
+ * without one (the default), nothing is moved for anyone.
+ */
+export function planHome(
   home: Place,
   list: readonly Candidate[],
   journeys?: ReadonlyMap<VisitEvent, TubeJourney | undefined>,
+  book?: HeadwayBook,
 ): ResidentTrip[] {
   const trips: ResidentTrip[] = [];
   for (const { event, seat, period } of list) {
@@ -391,7 +566,9 @@ function planHome(
       const depart = previous.leave;
       const arrive = depart + duration;
       const leave = Math.min(end, window.availableUntil - returnDuration);
-      if (leave - Math.max(event.start, arrive) >= MIN_VISIT_MINUTES) {
+      const visit = leave - Math.max(event.start, arrive);
+      // The hop books its doors and gate but never moves: the film's end sets it off.
+      if (visit >= MIN_VISIT_MINUTES && duration <= WORTH_THE_WALK * visit) {
         previous.homeBy = depart;
         previous.continuesTo = event.id;
         trips.push({
@@ -408,6 +585,7 @@ function planHome(
           seat,
           facing: eventSpot(event.venue, seat).facing,
           ...(returnLegs ? { returnLegs } : {}),
+          pace: 1,
         });
         continue;
       }
@@ -424,17 +602,94 @@ function planHome(
       ? hash(`party-arrival:${home.id}`) % (Math.min(60, Math.max(0, lateness)) + 1)
       : 0;
     // Only the walking picks up the pace; boarding, riding and stepping off keep their minutes.
-    const plan = planJourney(
+    let from = Math.max(window.availableFrom, previousReturn),
+      until = window.availableUntil;
+    const first = planJourney(
       walkTiles,
       fixed,
       event.start + arrival,
       end,
-      Math.max(window.availableFrom, previousReturn),
-      window.availableUntil,
+      from,
+      until,
       event.depart,
       seat * 1.3,
+      WORTH_THE_WALK,
     );
-    if (!plan) continue;
+    if (!first) continue;
+    let plan = first,
+      headway: ResidentTrip['headway'];
+    if (book) {
+      // Keep two minutes from every other home's mark on the same door or gate. A clash on the
+      // way there arrives half a minute earlier (at most six), else later; a clash on the way
+      // home leaves half a minute later (at most six, never past the cap), else earlier. Only a
+      // plan with no clash left is kept.
+      const hardEnd = HARD_END[event.venue.kind];
+      const leaveCap = hardEnd ?? end + seat * 1.3 + HEADWAY_SHIFT_MAX;
+      const gate = gateOf(event, seat);
+      const marks = (p: typeof first) => {
+        const paced = tube && paceLegs(tube.legs, p.speedMultiplier);
+        const minutes = gate.tiles / (WALK_SPEED * p.speedMultiplier);
+        return {
+          going: [
+            ...(paced ? doorMarks(paced, p.depart) : []),
+            { key: gate.key, t: p.arrive - minutes },
+          ],
+          home: [
+            ...(paced ? doorMarks(reverseLegs(paced), p.leave) : []),
+            { key: gate.key, t: p.leave + minutes },
+          ],
+        };
+      };
+      let arriveShift = 0,
+        leaveShift = 0,
+        later = hardEnd === undefined,
+        clear = false;
+      for (let step = 0, p: typeof first | undefined = first; p; step++) {
+        const { going, home: back } = marks(p);
+        const goingClash = clashes(book, home.id, going);
+        if (!goingClash && !clashes(book, home.id, back)) {
+          clear = true;
+          plan = p;
+          break;
+        }
+        if (step === HEADWAY_STEPS) break;
+        if (goingClash) {
+          if (arriveShift < HEADWAY_SHIFT_MAX && p.depart - 0.5 >= from) arriveShift += 0.5;
+          else from = p.depart + 0.5;
+        } else if (
+          later &&
+          leaveShift < HEADWAY_SHIFT_MAX &&
+          p.leave + 0.5 <= leaveCap &&
+          p.homeBy + 0.5 <= until
+        )
+          leaveShift += 0.5;
+        else {
+          until = p.homeBy - (later ? leaveShift : 0) - 0.5;
+          later = false;
+        }
+        // Arrival and leave shifts are separate: moving the arrival never delays the leave.
+        p = planJourney(
+          walkTiles,
+          fixed,
+          event.start + arrival,
+          end,
+          from,
+          until,
+          event.depart,
+          seat * 1.3 + arriveShift,
+          WORTH_THE_WALK,
+          seat * 1.3 + (later ? leaveShift : 0),
+          leaveCap,
+        );
+      }
+      if (!clear) continue;
+      // A leave cut earlier records how far; one that only moved with a brisker walk records 0.
+      headway = {
+        arriveShift,
+        leaveShift: later ? leaveShift : Math.min(0, plan.leave - first.leave),
+        leaveCap,
+      };
+    }
     const legs = tube && paceLegs(tube.legs, plan.speedMultiplier);
     trips.push({
       route,
@@ -453,6 +708,8 @@ function planHome(
           ? 'ne'
           : eventSpot(event.venue, seat).facing,
       ...(legs ? { legs, returnLegs: reverseLegs(legs) } : {}),
+      pace: plan.speedMultiplier,
+      ...(headway ? { headway } : {}),
     });
   }
   return trips;

@@ -201,6 +201,13 @@ type Movement = Pick<
 };
 
 export { LANE_RAMP, laneSide, walkLane } from './lanes';
+/** The facing along a route's last stretch (repeated points skipped), if it has one. */
+function lastFacing(route: readonly Point[]): ResidentState['facing'] | undefined {
+  for (let i = route.length - 1; i > 0; i--)
+    if (route[i].x !== route[i - 1].x || route[i].y !== route[i - 1].y)
+      return facingAlong(route[i - 1], route[i]);
+  return undefined;
+}
 /** alongRoute, with the walker's lane while they are on the move (none when `side` is 0). */
 export function walkAlong(route: Point[], progress: number, side = 0): Movement {
   const movement = alongRoute(route, progress);
@@ -232,7 +239,13 @@ export function journeyAt(
       continue;
     }
     const progress = time >= endAt ? 1 : Math.min(1, Math.max(0, time - startAt) / leg.minutes);
-    if (leg.kind === 'walk') return walkAlong(leg.route, progress, side);
+    if (leg.kind === 'walk') {
+      const movement = walkAlong(leg.route, progress, side);
+      // Leg minutes are summed, so the end of the last walk can come a hair before the arrival:
+      // there the walker keeps the facing of the last stretch instead of turning to the default.
+      const facing = progress < 1 ? undefined : lastFacing(leg.route);
+      return facing ? { ...movement, facing } : movement;
+    }
     const { from, to } = leg;
     if (leg.kind === 'ride') {
       const distance = progress * tubeLength(from, to);

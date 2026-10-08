@@ -279,6 +279,11 @@ body,
   padding: 10px 18px;
   border-bottom: 1px solid #e9eade;
 }
+/* A full town lists hundreds of houses: rows off screen skip their previews until scrolled to. */
+.place-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 69px;
+}
 .browse-row:hover,
 .resident-link:hover {
   background: #edf0e5;
