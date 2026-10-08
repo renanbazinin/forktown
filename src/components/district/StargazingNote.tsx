@@ -1,7 +1,9 @@
 // The stargazing note in the Bandstand's panel on new-moon nights (agent E, SPEC §4.4): the night's
 // words, its hours, who is out on the rugs (names only while they are there, never a promise of a
-// crowd), the summer meteors on their three nights, and the next new moon once the rugs are rolled.
+// crowd), the summer meteors on their three nights, and once the rugs are rolled up, when they come
+// out again, counted from the reader's own calendar day.
 import { nextOutingDay, OUTING_TIMES } from '../../lib/district-calendar';
+import { BANDSTAND_FURNITURE } from '../../lib/district-places';
 import { DISTRICT_COPY, PANEL_COPY } from '../../lib/district-copy';
 import { timeLabel, type ResidentState } from '../../lib/simulation';
 import { townCalendarAt } from '../../lib/town-calendar';
@@ -9,6 +11,8 @@ import { meteorNight } from '../../city/sky-extras';
 import type { StargazingNoteProps } from './cards';
 
 const { start, end } = OUTING_TIMES.stargazing;
+/** When the last rug is rolled up (00:35), on the evening's timeline. */
+const RUGS_UP = BANDSTAND_FURNITURE.rugs.to;
 /** Who is out on the rugs: the stargazers at their spots, waiting for the dark or looking up. */
 export const onTheRugs = (residents: readonly ResidentState[]) =>
   residents
@@ -35,19 +39,27 @@ export function stargazingLines(day: number, minutes: number, residents: readonl
   // A star night belongs to its evening, like the film: before 06:00 it is still last night's.
   const evening = minutes < 360 ? Math.floor(day) - 1 : Math.floor(day);
   const time = minutes < 360 ? minutes + 1440 : minutes;
-  const hours = `Rugs out on the lawn from ${timeLabel(start)} to ${timeLabel(end)}.`;
+  // The outing's own hours; the rugs go down a little before and come up a little after.
+  const hours = `Stargazing on the lawn from ${timeLabel(start)} to ${timeLabel(end)}.`;
   let status: string;
   if (time < start) status = `${hours} An astronomer brings a brass telescope.`;
   else if (time < end) status = rugsLine(onTheRugs(residents)) ?? `${hours} The sky is dark.`;
+  else if (time < RUGS_UP)
+    status = `Stargazing is over for tonight. The rugs come up by ${timeLabel(RUGS_UP)}.`;
   else {
+    // Past midnight, as the reader counts it: the coming evening is tonight's, the next one
+    // tomorrow night's.
+    const today = Math.floor(day);
     const next = nextOutingDay('stargazing', evening + 1);
     const when =
-      next === evening + 1
-        ? 'tomorrow night'
-        : next === undefined
-          ? 'at the next new moon'
-          : `on ${townCalendarAt(next).season} ${townCalendarAt(next).date}`;
-    status = `The rugs are rolled up for tonight. They come out again ${when}.`;
+      next === today
+        ? 'tonight'
+        : next === today + 1
+          ? 'tomorrow night'
+          : next === undefined
+            ? 'at the next new moon'
+            : `on ${townCalendarAt(next).season} ${townCalendarAt(next).date}`;
+    status = `The rugs are rolled up. They come out again ${when}.`;
   }
   return {
     eyebrow: PANEL_COPY.stars.eyebrow,

@@ -82,13 +82,20 @@ export function meteorSteps(meteor: Meteor, evening: number, width: number, heig
   const glide = (age / METEOR_MINUTES) * GLIDE * size;
   const head = { x: meteor.x * width + along.x * glide, y: meteor.y * height + along.y * glide };
   const step = (METEOR_LENGTH * size) / STEPS;
-  return Array.from({ length: STEPS }, (_, i) => ({
-    x: Math.round(head.x - along.x * step * i),
-    y: Math.round(head.y - along.y * step * i),
-    w: 2,
-    h: i < 2 ? 2 : 1,
-    alpha: PEAK * swell * (1 - i / STEPS) ** 1.6,
-  }));
+  // Whole pixels, each painted once: a 2 × 2 head, then each step of the tail a pixel tall and
+  // as wide as the gap back to the step before it, so the fade runs evenly with no doubled
+  // pixels (a step is at least 1.27 px along x, so none is ever empty).
+  const xs = Array.from({ length: STEPS }, (_, i) => Math.round(head.x - along.x * step * i));
+  return xs.map((x, i) => {
+    const y = Math.round(head.y - along.y * step * i);
+    const alpha = PEAK * swell * (1 - i / STEPS) ** 1.6;
+    if (!i) return { x: meteor.side > 0 ? x : x - 1, y, w: 2, h: 2, alpha };
+    // The columns between this step and the one ahead of it, toward the head.
+    const ahead = meteor.side > 0 ? xs[i - 1] : xs[i - 1] + 1;
+    return meteor.side > 0
+      ? { x, y, w: ahead - x, h: 1, alpha }
+      : { x: ahead, y, w: x + 1 - ahead, h: 1, alpha };
+  });
 }
 
 /** The summer meteors, in screen space over the sky. Nothing on other nights or by day. */

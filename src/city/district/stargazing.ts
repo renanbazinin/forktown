@@ -62,6 +62,51 @@ export function rugOut(k: number, evening: number) {
   return Math.max(0, Math.min(1, down, up));
 }
 
+/**
+ * On a snowy night the rugs lie on snow: a few drifts and frosted tufts on the lawn along each
+ * rug's back edges and one side, in the lawn's own tuft shapes (season-ground.ts: 4 × 2 drifts of
+ * roof snow, 2 × 2 frost), each at its own seeded place. In tiles from the rug's centre, with the
+ * share of the rug's length that must be unrolled before it shows.
+ */
+export function rugDrifts(k: number) {
+  return Array.from({ length: 4 }, (_, i) => {
+    const seed = hash(`rug-snow:${k}:${i}`);
+    const along = 0.12 + 0.76 * ((seed % 1000) / 1000);
+    const away = 0.07 + 0.04 * (((seed >>> 10) % 100) / 100);
+    const drift = (seed >>> 17) % 3 !== 0;
+    // Two along the back edge (north, the stand's side), one on the west edge, one on the east.
+    const edge = i < 2 ? 'north' : i === 2 ? 'west' : 'east';
+    const x =
+      edge === 'north'
+        ? (along - 0.5) * RUG.x
+        : edge === 'west'
+          ? -RUG.x / 2 - away
+          : RUG.x / 2 + away;
+    const y = edge === 'north' ? -RUG.y / 2 - away : (along * 0.6 - 0.5) * RUG.y;
+    // The east edge is the rug's unrolling end: its drift shows once the rug is flat.
+    const after = edge === 'east' ? 1 : edge === 'west' ? 0 : along;
+    return { x, y, drift, after };
+  });
+}
+/** The share of the unrolling over which a drift fades in: under 0.08 alpha a frame. */
+const DRIFT_FADE = 0.3;
+const unit = (value: number) => Math.max(0, Math.min(1, value));
+function paintRugSnow(ctx: Ctx, k: number, out: number, night: boolean) {
+  const spot = DISTRICT_SPOTS.bandstand[k];
+  const alpha = ctx.globalAlpha;
+  for (const { x, y, drift, after } of rugDrifts(k)) {
+    // Each shows as the rug unrolls up to it, over a third of the unrolling, never in a frame.
+    const shown = unit((out + DRIFT_FADE - after) / DRIFT_FADE) * unit(out / DRIFT_FADE);
+    if (shown <= 0) continue;
+    const at = project(spot.x + x, spot.y + y);
+    ctx.globalAlpha = alpha * shown;
+    ctx.fillStyle = pick(drift ? SNOW.top : SNOW.frost, night);
+    if (drift) ctx.fillRect(Math.round(at.x) - 2, Math.round(at.y) - 1, 4, 2);
+    else ctx.fillRect(Math.round(at.x) - 1, Math.round(at.y) - 1, 2, 2);
+  }
+  ctx.globalAlpha = alpha;
+}
+
 /** Paints rug k flat on the lawn, unrolled to `out`, from its far corner. */
 function paintRug(ctx: Ctx, k: number, out: number, night: boolean, snowy: boolean, fine: boolean) {
   const spot = DISTRICT_SPOTS.bandstand[k];
@@ -70,15 +115,9 @@ function paintRug(ctx: Ctx, k: number, out: number, night: boolean, snowy: boole
     h = RUG.y * PX;
   // A rug unrolls along its length from the end nearest the stand.
   const length = Math.max(2, w * out);
+  // Snow on the lawn round it, under the wool where they meet.
+  if (snowy) paintRugSnow(ctx, k, out, night);
   plane(ctx, spot.x - RUG.x / 2, spot.y - RUG.y / 2, 0, () => {
-    if (snowy) {
-      // Pressed into the snow: a pale rim where the snow lies round it.
-      const alpha = ctx.globalAlpha;
-      ctx.globalAlpha = alpha * 0.55;
-      ctx.fillStyle = pick(SNOW.top, night);
-      ctx.fillRect(-2, -2, length + 4, h + 4);
-      ctx.globalAlpha = alpha;
-    }
     // The wool's own thickness: a shade along the two edges toward us.
     ctx.fillStyle = pick(EDGE, night);
     ctx.fillRect(1, 1, length, h);
@@ -127,8 +166,12 @@ function paintFlask(ctx: Ctx, x: number, y: number, night: boolean) {
 
 // ---- The telescope ----
 
-/** The telescope's foot (tiles): on the lawn's river side, east of the stand. */
-export const TELESCOPE: Point = { x: 60.82, y: 42.75 };
+/**
+ * The telescope's foot (tiles): on the lawn's river side, east of the stand's front, on open
+ * lawn: south of the Bandstand's folded deckchairs (stacked at (60.82, 42.42) all night, agent C)
+ * and clear of the stand's plinth and its steps.
+ */
+export const TELESCOPE: Point = { x: 60.85, y: 43.05 };
 /** Telescope parts in world px from its foot: eyepiece, objective, mount head and three feet. */
 const SCOPE = {
   eyepiece: { x: -6, y: -16 },
@@ -202,16 +245,20 @@ export const ASTRONOMER: Resident = {
   outfit: '#4F5F7A',
   accessory: 'glasses',
 };
-/** Where the astronomer peers through the eyepiece, and where they step back to, to point. */
-const AT_EYEPIECE: Point = { x: TELESCOPE.x, y: TELESCOPE.y + 0.18 };
-const AT_POINT: Point = { x: TELESCOPE.x - 0.1, y: TELESCOPE.y + 0.32 };
+/**
+ * Where the astronomer peers through the eyepiece, and where they step back to, to point: off the
+ * scope's eyepiece end, so the raised hand shows against the lawn and the sky, never the brass.
+ */
+export const AT_EYEPIECE: Point = { x: TELESCOPE.x, y: TELESCOPE.y + 0.18 };
+export const AT_POINT: Point = { x: TELESCOPE.x - 0.12, y: TELESCOPE.y + 0.38 };
 /** Where they come and go: the riverside road, on the eyepiece's row. */
 const ROADSIDE: Point = { x: 61.55, y: AT_EYEPIECE.y };
 /** The astronomer's evening (SPEC §4.4: there 22:00–00:30), on the evening's timeline. */
 export const ASTRONOMER_HOURS = { from: 1320, to: 1470 } as const;
 const WALK_SPEED = 0.32;
 const RESIDENT_SCALE = 1.25;
-const STEP = 0.75;
+/** Minutes for the step between the two stances: at a stroll, no faster. */
+const STEP = 1.1;
 const FADE_STEPS = 0.6;
 
 type Stance = { pose: 'peer' | 'point' | 'walk'; at: Point; facing: 'ne' | 'nw' | 'se' | 'sw' };
@@ -225,7 +272,8 @@ const lerp = (a: Point, b: Point, t: number) => ({
 
 /**
  * The astronomer's night: the walk in from the road, then turns at the eyepiece (4 to 9 minutes)
- * and a step back from it, turned to the rugs and pointing up at the sky over the river (2 to 5),
+ * and a step back from it, turned to the rugs and pointing up at the sky over the river (3 to 6,
+ * each turn's first minute or so the step across),
  * seeded by the evening; the walk off at 00:30.
  */
 export function astronomerVisits(evening: number): Visit[] {
@@ -237,7 +285,7 @@ export function astronomerVisits(evening: number): Visit[] {
   for (let k = 0; t < leave; k++) {
     const peer = k % 2 === 0;
     const seed = hash(`astronomer:${evening}:${k}`);
-    let to = Math.min(leave, t + (peer ? 4 + (seed % 6) : 2 + (seed % 4)));
+    let to = Math.min(leave, t + (peer ? 4 + (seed % 6) : 3 + (seed % 4)));
     if (leave - to < 3) to = leave;
     visits.push({ from: t, to, stance: peer ? 'peer' : 'point' });
     t = to;
@@ -288,6 +336,20 @@ export function astronomerAt(day: number, minutes: number) {
     : { pose: 'peer' as const, at: spot, facing: 'ne' as const, phase: 0, alpha };
 }
 
+/**
+ * The `cheer` pose's raised near arm (residents.ts), in figure px before any mirroring: its hand
+ * and arm (x 5–8 from y −24, with half a pixel to spare away from the face) and the top of its
+ * shoulder beside the neck. Two holes that never overlap, so the even-odd clip cuts both.
+ * Pointing leaves only the far arm up.
+ */
+export const RAISED_NEAR_ARM = [
+  { x: 5, y: -24.5, w: 3.5, h: 13.5 },
+  { x: 4, y: -15, w: 1, h: 4 },
+] as const;
+/** The near arm the town's standing figures hang at their side (residents.ts), and its hand. */
+export const SIDE_ARM = { x: 3, y: -11, w: 2, h: 6 },
+  SIDE_HAND = { x: 3, y: -6, w: 2, h: 2 };
+
 function paintAstronomer(
   ctx: Ctx,
   state: NonNullable<ReturnType<typeof astronomerAt>>,
@@ -296,35 +358,50 @@ function paintAstronomer(
   const feet = project(state.at.x, state.at.y);
   const alpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha * state.alpha;
+  const pointing = state.pose === 'point';
+  const left = state.facing === 'sw' || state.facing === 'nw';
+  const s = RESIDENT_SCALE;
+  /** A rectangle in the figure's own px, on the canvas, mirrored as the figure is. */
+  const box = (r: { x: number; y: number; w: number; h: number }) =>
+    [
+      left ? feet.x - s * (r.x + r.w) : feet.x + s * r.x,
+      feet.y + s * r.y,
+      s * r.w,
+      s * r.h,
+    ] as const;
+  if (pointing) {
+    // Turned to the rugs, one arm raised to the sky over the river: the town's own cheer, with
+    // the near arm left out (clipped away) and hung at the side instead.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(feet.x - 40, feet.y - 80, 80, 90);
+    for (const r of RAISED_NEAR_ARM) ctx.rect(...box(r));
+    ctx.clip('evenodd');
+  }
   drawResident(
     ctx,
     ASTRONOMER,
     feet.x,
     feet.y,
-    RESIDENT_SCALE,
+    s,
     {
       moving: state.pose === 'walk',
       facing: state.facing,
-      walkPhase: state.phase,
+      // Arms still at the top of the cheer, where its stride is nil and no music note is shown.
+      walkPhase: pointing ? 0.5 : state.phase,
       greeting: false,
-      // Stooped to the eyepiece, halfway down.
+      // Stooped to the eyepiece, halfway down; or both arms up, one of them clipped.
       ...(state.pose === 'peer' ? { pose: 'crouch' as const } : {}),
+      ...(pointing ? { pose: 'cheer' as const } : {}),
     },
     { night },
   );
-  if (state.pose === 'point') {
-    // Turned to the rugs, the far arm raised to point up at the sky over the river: the figure's
-    // own pixels, mirrored as it faces left, so the arm reaches up and to the right.
-    ctx.save();
-    ctx.translate(feet.x, feet.y);
-    ctx.scale(-RESIDENT_SCALE, RESIDENT_SCALE);
-    ctx.fillStyle = tint(ASTRONOMER.outfit, NIGHT_DIM * +night - 24);
-    ctx.fillRect(-6, -14, 3, 3);
-    ctx.fillRect(-8, -17, 3, 3);
-    ctx.fillRect(-10, -20, 3, 3);
-    ctx.fillStyle = tint(ASTRONOMER.skin, NIGHT_DIM * +night);
-    ctx.fillRect(-12, -23, 3, 3);
+  if (pointing) {
     ctx.restore();
+    ctx.fillStyle = tint(ASTRONOMER.outfit, NIGHT_DIM * +night);
+    ctx.fillRect(...box(SIDE_ARM));
+    ctx.fillStyle = tint(ASTRONOMER.skin, NIGHT_DIM * +night);
+    ctx.fillRect(...box(SIDE_HAND));
   }
   ctx.globalAlpha = alpha;
 }
@@ -387,7 +464,7 @@ export function spriteOf(ctx: Ctx, name: string, key: string, box: Box, paint: (
 // ---- The painter ----
 
 const spots = DISTRICT_SPOTS.bandstand;
-/** The lawn the rugs cover, world px, with room for the rims. */
+/** The lawn the rugs cover, world px, with room for the drifts. */
 const RUG_BOX: Box = (() => {
   const corners = spots.flatMap((s) =>
     [
@@ -399,9 +476,10 @@ const RUG_BOX: Box = (() => {
   );
   const xs = corners.map((p) => p.x),
     ys = corners.map((p) => p.y);
-  const left = Math.min(...xs) - 4,
-    top = Math.min(...ys) - 4;
-  return { left, top, width: Math.max(...xs) + 4 - left, height: Math.max(...ys) + 4 - top };
+  // Room round the rugs for the drifts on a snowy night.
+  const left = Math.min(...xs) - 6,
+    top = Math.min(...ys) - 6;
+  return { left, top, width: Math.max(...xs) + 6 - left, height: Math.max(...ys) + 6 - top };
 })();
 const RUG_CENTER = { x: RUG_BOX.left + RUG_BOX.width / 2, y: RUG_BOX.top + RUG_BOX.height / 2 };
 const SCOPE_FOOT = project(TELESCOPE.x, TELESCOPE.y);

@@ -18,6 +18,7 @@ import { SNOWMAN_DAYS, SNOWMAN_STAGES, snowmanState } from '../src/lib/district-
 import { EVENT_SPOTS } from '../src/lib/events';
 import {
   builderSpells,
+  snowmenBuilderFacing,
   snowmenBuilderPose,
   snowmenStanding,
   snowmenWatcherPose,
@@ -118,6 +119,41 @@ describe('The builders and the watchers', () => {
         }
     }
     expect(builders).toBeGreaterThanOrEqual(BUILD_DAYS.length);
+  });
+});
+
+describe('A builder’s facing, for the planner to use', () => {
+  it('turns each builder to the day’s snowman while building, and says nothing otherwise', () => {
+    // The town's walking rule: the larger of the two steps decides, +x is se and −y is ne.
+    const facingOf = (dx: number, dy: number) =>
+      Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'nw' : 'se') : dy < 0 ? 'ne' : 'sw';
+    for (const [k, day] of BUILD_DAYS.entries())
+      for (const seat of [0, 1]) {
+        const from = EVENT_SPOTS.green[seat],
+          to = SNOWMAN_SPOTS[k];
+        expect(snowmenBuilderFacing(seat, 870, day)).toBe(facingOf(to.x - from.x, to.y - from.y));
+        expect(snowmenBuilderFacing(seat, SNOWMAN_STAGES.base - 0.1, day)).toBeUndefined();
+        expect(snowmenBuilderFacing(seat, SNOWMAN_STAGES.dressed, day)).toBeUndefined();
+        expect(snowmenBuilderFacing(seat, 870, day + 1)).toBeUndefined();
+        expect(snowmenBuilderFacing(seat, 870, day + 112)).toBe(
+          snowmenBuilderFacing(seat, 870, day),
+        );
+      }
+    expect(snowmenBuilderFacing(2, 870, BUILD_DAYS[0])).toBeUndefined();
+    // Never about in one frame: from the blanket's way and back to it, a quarter at a time.
+    const opposite = { ne: 'sw', sw: 'ne', se: 'nw', nw: 'se' } as const;
+    for (const day of BUILD_DAYS)
+      for (const seat of [0, 1]) {
+        const blanket = EVENT_SPOTS.green[seat].facing;
+        let before = blanket;
+        for (let time = 830; time < 960; time += 0.05) {
+          const now = snowmenBuilderFacing(seat, time, day) ?? blanket;
+          expect(now, `${label(day)} seat ${seat} at ${time.toFixed(2)}`).not.toBe(
+            opposite[before],
+          );
+          before = now;
+        }
+      }
   });
 });
 

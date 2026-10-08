@@ -7,6 +7,7 @@ const WINTER_3 = townDay('Winter', 3);
 export const buttons: readonly DistrictButton[] = [
   { label: 'Lunch before the build, 13:50', day: WINTER_3, minutes: 830 },
   { label: 'Rolling the base, 14:20', day: WINTER_3, minutes: 860 },
+  { label: 'The snow trail at full length, 14:35', day: WINTER_3, minutes: 875 },
   { label: 'The body, 15:00', day: WINTER_3, minutes: 900 },
   { label: 'The head goes on, 15:15', day: WINTER_3, minutes: 915.5 },
   { label: 'Head rolled, 15:40', day: WINTER_3, minutes: 940 },
@@ -15,6 +16,7 @@ export const buttons: readonly DistrictButton[] = [
   { label: 'Second snowman, Winter 7', day: townDay('Winter', 7), minutes: 946 },
   { label: 'Third, Winter 11', day: townDay('Winter', 11), minutes: 946 },
   { label: 'Fourth, Winter 15', day: townDay('Winter', 15), minutes: 946 },
+  { label: 'Fourth going up beside three, 15:15', day: townDay('Winter', 15), minutes: 915 },
   { label: 'All four, Winter 20', day: townDay('Winter', 20), minutes: 720 },
   { label: 'All four at night, Winter 20', day: townDay('Winter', 20), minutes: 1320 },
   { label: 'The thaw starts, Winter 25', day: townDay('Winter', 25), minutes: 720 },

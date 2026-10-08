@@ -4,12 +4,18 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  ASTRONOMER,
   ASTRONOMER_HOURS,
   astronomerAt,
+  RAISED_NEAR_ARM,
   rugOut,
   RUG,
+  SIDE_ARM,
+  SIDE_HAND,
   TELESCOPE,
 } from '../src/city/district/stargazing';
+import { drawResident } from '../src/city/residents';
+import { project } from '../src/lib/world';
 import {
   drawSkyExtras,
   METEOR_COLOUR,
@@ -187,6 +193,79 @@ describe('The astronomer', () => {
     }
   });
 
+  it('points with one arm raised and one at the side, the hand clear of the telescope', () => {
+    // The town's own figure, standing and cheering (arms still at the top, walk phase 0.5): the
+    // rectangles that differ are the arms. Pointing clips the cheer's raised near arm away and
+    // hangs the standing near arm at the side, so the figure keeps two hands.
+    const rects = (pose?: 'cheer') => {
+      const { ctx, calls } = recordingContext(200, 200);
+      drawResident(ctx, ASTRONOMER, 0, 0, 1, {
+        moving: false,
+        facing: 'se',
+        walkPhase: 0.5,
+        greeting: false,
+        ...(pose ? { pose } : {}),
+      });
+      return calls
+        .filter((call) => call.name === 'fillRect')
+        .map((call) => (call.args as number[]).join(','));
+    };
+    const standing = rects(),
+      cheering = rects('cheer');
+    const raised = cheering
+      .filter((r) => !standing.includes(r))
+      .map((r) => r.split(',').map(Number));
+    const lowered = standing
+      .filter((r) => !cheering.includes(r))
+      .map((r) => r.split(',').map(Number));
+    const inHoles = (x: number, y: number) =>
+      RAISED_NEAR_ARM.some((h) => x > h.x && x < h.x + h.w && y > h.y && y < h.y + h.h);
+    // Left of x 4 the head and body cover the arm's shoulder in their own colours.
+    const covered = ([x, y, w, h]: number[]) => {
+      for (let px = Math.max(4, x) + 0.5; px < x + w; px++)
+        for (let py = y + 0.5; py < y + h; py++) if (!inHoles(px, py)) return false;
+      return true;
+    };
+    // Every raised rectangle on the near side (x ≥ 3) is cut past the figure's outline; every
+    // far one is kept.
+    const near = raised.filter(([x]) => x >= 3),
+      far = raised.filter(([x]) => x < 0);
+    expect(near.length).toBeGreaterThanOrEqual(3);
+    expect(far.length).toBeGreaterThanOrEqual(3);
+    for (const r of near) expect(covered(r), `${r}`).toBe(true);
+    for (const [x, y, w, h] of far)
+      for (let px = x + 0.5; px < x + w; px++)
+        for (let py = y + 0.5; py < y + h; py++) expect(inHoles(px, py)).toBe(false);
+    // Nothing else of the figure (face, glasses, hair, body) falls in the holes.
+    for (const r of standing.map((s) => s.split(',').map(Number)))
+      if (!lowered.some((l) => l.join() === r.join()))
+        for (let px = r[0] + 0.5; px < r[0] + r[2]; px++)
+          for (let py = r[1] + 0.5; py < r[1] + r[3]; py++)
+            expect(inHoles(px, py), `${r} at ${px},${py}`).toBe(false);
+    // The arm hung at the side is the standing figure's own near arm and hand.
+    expect(lowered.filter(([x]) => x >= 3)).toEqual([
+      [SIDE_ARM.x, SIDE_ARM.y, SIDE_ARM.w, SIDE_ARM.h],
+      [SIDE_HAND.x, SIDE_HAND.y, SIDE_HAND.w, SIDE_HAND.h],
+    ]);
+    // Pointing, they face the rugs, and the raised far arm (mirrored to the right of the figure)
+    // shows against the lawn: the eyepiece end of the telescope is a few px further right.
+    const pointing = YEAR.filter(starNight)
+      .flatMap((night) =>
+        Array.from({ length: 300 }, (_, i) => 1320 + i * 0.5).map((e) =>
+          astronomerAt(e >= 1440 ? night + 1 : night, e % 1440),
+        ),
+      )
+      .filter((state) => state?.pose === 'point');
+    expect(pointing.length).toBeGreaterThan(100);
+    const scope = project(TELESCOPE.x, TELESCOPE.y);
+    for (const state of pointing) {
+      expect(state!.facing).toBe('sw');
+      const feet = project(state!.at.x, state!.at.y);
+      // The raised hand's far edge: x −4 of the figure, mirrored, at 1.25 scale.
+      expect(scope.x - 7.5 - (feet.x + 4 * 1.25 + 3 * 1.25)).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('only comes out on a star night', () => {
     const plain = YEAR.find((day) => !starNight(day) && !starNight(day - 1))!;
     for (let minutes = 0; minutes < 1440; minutes += 10)
@@ -237,6 +316,35 @@ describe('The summer meteors', () => {
               expect(step.y).toBeGreaterThanOrEqual(0);
               expect(step.x).toBeGreaterThanOrEqual(0);
               expect(step.x + step.w).toBeLessThanOrEqual(width);
+            }
+          }
+  });
+
+  it('paints each pixel of a streak once, in an unbroken line', () => {
+    for (const day of YEAR.filter(meteorNight))
+      for (const meteor of meteorsOf(day))
+        for (const [width, height] of [
+          [1280, 720],
+          [390, 440],
+          [2560, 1440],
+        ])
+          for (let age = 0.1; age < METEOR_MINUTES; age += 0.25) {
+            const steps = meteorSteps(meteor, meteor.start + age, width, height);
+            const seen = new Set<string>();
+            for (const step of steps) {
+              expect(step.w).toBeGreaterThanOrEqual(1);
+              for (let x = step.x; x < step.x + step.w; x++)
+                for (let y = step.y; y < step.y + step.h; y++) {
+                  // A pixel painted twice would stack its alpha: a bead in the fade.
+                  expect(seen.has(`${x},${y}`), `${x},${y}`).toBe(false);
+                  seen.add(`${x},${y}`);
+                }
+            }
+            // Each step touches the one before it, side by side or corner to corner.
+            for (let i = 1; i < steps.length; i++) {
+              const [a, b] = [steps[i - 1], steps[i]];
+              expect(Math.max(a.x - (b.x + b.w), b.x - (a.x + a.w), 0)).toBe(0);
+              expect(Math.max(a.y - (b.y + b.h), b.y - (a.y + a.h), 0)).toBe(0);
             }
           }
   });
@@ -318,22 +426,34 @@ describe('The note in the Bandstand’s panel', () => {
     expect(before.eyebrow).toBe('NEW MOON · THE BANDSTAND LAWN');
     expect(before.body).toBe('No moon tonight, so the sky is full. Rugs out, faces up.');
     expect(before.status).toBe(
-      'Rugs out on the lawn from 22:15 to 00:15. An astronomer brings a brass telescope.',
+      'Stargazing on the lawn from 22:15 to 00:15. An astronomer brings a brass telescope.',
     );
     expect(stargazingLines(SUMMER_27, 1380, []).status).toBe(
-      'Rugs out on the lawn from 22:15 to 00:15. The sky is dark.',
+      'Stargazing on the lawn from 22:15 to 00:15. The sky is dark.',
     );
     const out = [guest('Ada', 'attending'), guest('Sol', 'waiting'), guest('Kit', 'going')];
     expect(stargazingLines(SUMMER_27, 1380, out).status).toBe('Ada and Sol are out on the rugs.');
-    // After midnight it is still Summer 27's night; then tomorrow's rugs, then the next new moon.
+    // After midnight it is still Summer 27's night. The rugs stay out on the lawn until 00:35;
+    // then the next rugs, counted from the reader's own day: Summer 28's are tonight's.
     expect(stargazingLines(SUMMER_27 + 1, 10, out.slice(0, 1)).status).toBe(
       'Ada is out on the rugs.',
     );
-    expect(stargazingLines(SUMMER_27 + 1, 30, []).status).toBe(
-      'The rugs are rolled up for tonight. They come out again tomorrow night.',
+    expect(stargazingLines(SUMMER_27 + 1, 20, []).status).toBe(
+      'Stargazing is over for tonight. The rugs come up by 00:35.',
     );
-    expect(stargazingLines(dayOf('Autumn 1') + 1, 30, []).status).toBe(
-      'The rugs are rolled up for tonight. They come out again on Autumn 27.',
+    for (const minutes of [40, 180])
+      expect(stargazingLines(SUMMER_27 + 1, minutes, []).status).toBe(
+        'The rugs are rolled up. They come out again tonight.',
+      );
+    expect(stargazingLines(SUMMER_27 + 2, 100, []).status).toBe(
+      'The rugs are rolled up. They come out again tonight.',
+    );
+    expect(stargazingLines(dayOf('Autumn 1') + 1, 40, []).status).toBe(
+      'The rugs are rolled up. They come out again on Autumn 27.',
+    );
+    // No star night is followed by a day without one and then another, but the words are ready.
+    expect(stargazingLines(dayOf('Spring 26'), 40, []).status).toBe(
+      'The rugs are rolled up. They come out again tomorrow night.',
     );
     expect(rugsLine([])).toBeUndefined();
     expect(rugsLine(['A', 'B', 'C'])).toBe('3 neighbors are out on the rugs.');

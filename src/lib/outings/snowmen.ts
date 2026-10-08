@@ -6,6 +6,7 @@
 // district-calendar; never resident-trips, events or anything under src/city/.
 import type { EventPose } from '../events.ts';
 import { SNOWMAN_DAYS, SNOWMAN_STAGES, snowmanState } from '../district-calendar.ts';
+import { yearDayAt } from '../seasons.ts';
 import { hash } from '../world.ts';
 
 const { base, head, dressed } = SNOWMAN_STAGES;
@@ -48,6 +49,41 @@ export function snowmenBuilderPose(seat: number, time: number, day: number): Eve
   if (seat < 0 || seat > 1) return undefined;
   if (time < base || time >= dressed) return 'sit';
   return builderSpells(seat, day).find((spell) => time < spell.to)?.pose;
+}
+
+/**
+ * Which way each builder faces the day's snowman (k = 0..3, from lunch seats 0 and 1): the
+ * quarter its spot lies in from the seat (SPEC §2.3 spots; the green's seats at local (−0.55, 0)
+ * and (0.35, 0)). tests/snowmen.test.ts checks the table against both.
+ */
+type Facing = 'ne' | 'nw' | 'se' | 'sw';
+export const BUILDER_FACING: readonly (readonly [Facing, Facing])[] = [
+  ['se', 'se'],
+  ['ne', 'ne'],
+  ['se', 'se'],
+  ['ne', 'ne'],
+];
+/** The builders' blankets face these ways (the green's seats 0 and 1). */
+const BLANKET: readonly [Facing, Facing] = ['se', 'sw'];
+const OPPOSITE: Record<Facing, Facing> = { ne: 'sw', sw: 'ne', se: 'nw', nw: 'se' };
+/** A quarter round from each facing, for turning about in two steps. */
+const QUARTER: Record<Facing, Facing> = { ne: 'nw', nw: 'sw', sw: 'se', se: 'ne' };
+/** Minutes a builder spends a quarter round, turning about at the start and the end. */
+const TURN = 0.5;
+/**
+ * A builder's facing while building (14:00–15:45): turned to the snowman they are making, so the
+ * heap at their knees and the snowball in their hands are on its side. A builder whose snowman is
+ * behind their blanket turns about by a quarter first, and back the same way, never in one frame.
+ * Not called yet: the lunch is not an outing, so its facing needs a hook in the planner
+ * (REQUESTS-E.md). Undefined keeps the blanket's own facing.
+ */
+export function snowmenBuilderFacing(seat: number, time: number, day: number) {
+  if (seat < 0 || seat > 1 || time < base || time >= dressed) return undefined;
+  const k = (SNOWMAN_DAYS as readonly number[]).indexOf(yearDayAt(Math.floor(day)));
+  if (k < 0) return undefined;
+  const want = BUILDER_FACING[k][seat];
+  const about = OPPOSITE[want] === BLANKET[seat];
+  return about && (time < base + TURN || time >= dressed - TURN) ? QUARTER[want] : want;
 }
 
 /**

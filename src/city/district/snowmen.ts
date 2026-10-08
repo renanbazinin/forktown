@@ -8,7 +8,10 @@
 // each ball its cool shaded edge and the base its foothold on the lawn. A scarf, a carrot and
 // two coal eyes finish it: nine calls a snowman at full detail.
 import { SNOWMAN_DAYS, SNOWMAN_STAGES, snowmanState } from '../../lib/district-calendar';
-import { VENUES } from '../../lib/events';
+import { SNOWMEN_LUNCH } from '../../lib/district-copy';
+import { EVENT_SPOTS, VENUES } from '../../lib/events';
+import { residentGround } from '../../lib/lanes';
+import type { ResidentState } from '../../lib/simulation';
 import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../../lib/town-calendar';
 import { getPlot, hash, project, type Point } from '../../lib/world';
 import type { DepthObject, DistrictPainter, DistrictScene } from '../district-art';
@@ -238,27 +241,203 @@ function paintSnowman(
 /** World px a snowman reaches: sideways, above its feet (22 px tall) and below. */
 const REACH = { x: 12, above: 24, below: 4 };
 
+// ---- The builders at work (build days, 14:00–15:45) ----
+
+/**
+ * The trail the day's snowball leaves on the lawn, in tiles from the green's centre: started
+ * between the two builders, just behind their blankets, and rolled round to the snowman's spot,
+ * bending clear of the picnic rug (local x −0.55..0.89, y −0.08..1.08). One bend per snowman.
+ */
+export const TRACK_START: Point = { x: -0.1, y: -0.2 };
+export const TRACK_BENDS: readonly Point[] = [
+  { x: 0.55, y: -0.5 },
+  { x: -0.15, y: -0.7 },
+  { x: 1.45, y: -0.45 },
+  { x: -0.15, y: -0.75 },
+];
+/**
+ * The trail grows back from the snowball while the base is rolled, stays while the body is, and
+ * fades as the head goes on, gone before the scarf: on Winter 15 three finished snowmen stand
+ * beside it, and the four with their scarves fill the call cap.
+ */
+export const TRACK_TIMES = { grow: [840, 880], fade: [915, 935] } as const;
+/** World px across: a band of packed snow, narrower than the base that pressed it. */
+const TRACK_WIDTH = 3.5;
+const TRACK_ALPHA = 0.85;
+const TRACK_IN = 2;
+
+/** Point t (0..1) along a quadratic from a through b to c. */
+const along = (a: Point, b: Point, c: Point, t: number): Point => ({
+  x: (1 - t) * (1 - t) * a.x + 2 * t * (1 - t) * b.x + t * t * c.x,
+  y: (1 - t) * (1 - t) * a.y + 2 * t * (1 - t) * b.y + t * t * c.y,
+});
+
+/**
+ * The day's trail while it is on the lawn: snowman k's, shown `from` a point along it (0 the
+ * builders' end, 1 the snowball) to the snowball, at `alpha`. It is the end of the curve that
+ * shows, so the trail always runs into the ball and lengthens back toward the builders.
+ */
+export function snowTrack(day: number, minutes: number) {
+  const k = SNOWMAN_DAYS.findIndex((_, i) => builtDay(i, day) === Math.floor(day));
+  if (k < 0) return undefined;
+  const minute = ((minutes % 1440) + 1440) % 1440;
+  const { grow, fade } = TRACK_TIMES;
+  if (minute <= grow[0] || minute >= fade[1]) return undefined;
+  const length = clamp((minute - grow[0]) / (grow[1] - grow[0]));
+  // It comes in over the first two minutes and goes over the last twenty: never in a frame.
+  const alpha =
+    TRACK_ALPHA *
+    clamp((minute - grow[0]) / TRACK_IN) *
+    clamp((fade[1] - minute) / (fade[1] - fade[0]));
+  return { k, from: 1 - length, alpha };
+}
+
+/** The scale render.ts draws every neighbor at (its RESIDENT_SCALE). */
+export const FIGURE_SCALE = 1.25;
+/**
+ * residents.ts's `play` ball, in figure px from the feet and never mirrored: a 4-px square at
+ * x 7, bouncing up to 10 px on |sin| of the walk phase. On a build day a builder up on their feet
+ * is packing snow, so a snowball is laid over it, a device pixel wider all round so that none of
+ * the ball's gold shows at its edges.
+ */
+export const PLAY_BALL = { x: 7, y: -3, size: 4, bounce: 10 } as const;
+/** A crouching builder's heap of snow, in figure px from the feet: just past their toes. */
+export const HEAP = { x: 7, y: -2.5, w: 5, h: 2.5 } as const;
+const BUILDERS = EVENT_SPOTS.green.slice(0, 2);
+
+/**
+ * The builders at their work on a build day (14:00–15:45): the lunch's seats 0 and 1, at their
+ * spots, crouched over the snow or up on their feet packing it.
+ */
+export function buildersAt(residents: readonly ResidentState[], minutes: number) {
+  const minute = ((minutes % 1440) + 1440) % 1440;
+  if (minute < SNOWMAN_STAGES.base || minute >= SNOWMAN_STAGES.dressed) return [];
+  return residents.flatMap((resident) => {
+    if (resident.event?.name !== SNOWMEN_LUNCH.name || resident.event.phase !== 'attending')
+      return [];
+    const pose = resident.pose;
+    if (pose !== 'crouch' && pose !== 'play') return [];
+    const seat = BUILDERS.findIndex(
+      (spot) =>
+        Math.hypot(
+          GREEN_CENTER.x + spot.x - resident.position.x,
+          GREEN_CENTER.y + spot.y - resident.position.y,
+        ) < 0.1,
+    );
+    return seat < 0 ? [] : [{ resident, seat, pose, ground: residentGround(resident) }];
+  });
+}
+
+type Box = { x: number; y: number; w: number; h: number };
+/** A lump of snow: one fill, its hard shadow a world pixel down and right for the shaded edge. */
+function paintSnow(ctx: Ctx, box: Box, night: boolean, shade: number) {
+  ctx.shadowColor = pick(PALETTE.rim, night);
+  ctx.shadowOffsetX = shade;
+  ctx.shadowOffsetY = shade;
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = pick(PALETTE.snow, night);
+  ctx.fillRect(box.x, box.y, box.w, box.h);
+  ctx.shadowColor = 'transparent';
+  ctx.shadowOffsetX = 0;
+  ctx.shadowOffsetY = 0;
+}
+
+/** Where a builder's snow lies, in world px: the heap by their knees, or the snowball in hand. */
+export function builderSnow(
+  builder: ReturnType<typeof buildersAt>[number],
+  device: number,
+): Box & { depth: number } {
+  const { resident, ground, pose } = builder;
+  const feet = project(ground.x, ground.y);
+  const depth = ground.x + ground.y;
+  const s = FIGURE_SCALE;
+  if (pose === 'crouch') {
+    const left = resident.facing === 'sw' || resident.facing === 'nw';
+    const front = resident.facing === 'se' || resident.facing === 'sw';
+    return {
+      x: left ? feet.x - s * (HEAP.x + HEAP.w) : feet.x + s * HEAP.x,
+      y: feet.y + s * HEAP.y,
+      w: s * HEAP.w,
+      h: s * HEAP.h,
+      // In front of the knees: after the figure when they face us, before it when they face away.
+      depth: depth + (front ? 1e-4 : -1e-4),
+    };
+  }
+  const bounce = Math.round(Math.abs(Math.sin(resident.walkPhase * TAU)) * PLAY_BALL.bounce);
+  const edge = 1 / device;
+  return {
+    x: feet.x + s * PLAY_BALL.x - edge,
+    y: feet.y + s * (PLAY_BALL.y - bounce) - edge,
+    w: s * PLAY_BALL.size + 2 * edge,
+    h: s * PLAY_BALL.size + 2 * edge,
+    // Just after the figure, whose ball it covers.
+    depth: depth + 1e-4,
+  };
+}
+
 export const snowmenPainter: DistrictPainter = {
+  floor(ctx: Ctx, scene: DistrictScene) {
+    const track = snowTrack(scene.day, scene.minutes);
+    if (!track) return;
+    const spot = SNOWMAN_SPOTS[track.k],
+      bend = TRACK_BENDS[track.k];
+    // The end of the curve from `from`, as a quadratic of its own (de Casteljau).
+    const t = track.from;
+    const start = along(TRACK_START, bend, spot, t);
+    const control = { x: (1 - t) * bend.x + t * spot.x, y: (1 - t) * bend.y + t * spot.y };
+    const [a, b, c] = [start, control, spot].map((p) =>
+      project(GREEN_CENTER.x + p.x, GREEN_CENTER.y + p.y),
+    );
+    const left = Math.min(a.x, b.x, c.x),
+      right = Math.max(a.x, b.x, c.x),
+      top = Math.min(a.y, b.y, c.y),
+      bottom = Math.max(a.y, b.y, c.y);
+    const half = (bottom - top) / 2 + TRACK_WIDTH;
+    const middle = { x: (left + right) / 2, y: (top + bottom) / 2 };
+    if (!scene.visible(middle, (right - left) / 2 + TRACK_WIDTH, half, half)) return;
+    const alpha = ctx.globalAlpha;
+    ctx.globalAlpha = alpha * track.alpha;
+    ctx.strokeStyle = pick(PALETTE.snow, scene.night);
+    ctx.lineWidth = TRACK_WIDTH;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.quadraticCurveTo(b.x, b.y, c.x, c.y);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = alpha;
+  },
   objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
     const { day, minutes, night, visible, zoom } = scene;
     const objects: DepthObject[] = [];
     let shade: number | undefined;
+    // One look at the canvas's scale a frame, for the shadow's world pixel.
+    const device = () =>
+      (shade ??= typeof ctx.getTransform === 'function' ? Math.max(1, ctx.getTransform().a) : zoom);
     for (const [k, spot] of SNOWMAN_SPOTS.entries()) {
       const shape = snowmanShape(k, day, minutes);
       if (!shape) continue;
       const tile = { x: GREEN_CENTER.x + spot.x, y: GREEN_CENTER.y + spot.y };
       const feet = project(tile.x, tile.y);
       if (!visible(feet, REACH.x, REACH.above, REACH.below)) continue;
-      // One look at the canvas's scale a frame, for the shadow's world pixel.
-      shade ??= typeof ctx.getTransform === 'function' ? Math.max(1, ctx.getTransform().a) : zoom;
       const scarf = scarfOf(k, day);
-      const px = shade;
+      const px = device();
       objects.push({
         // Just ahead of its own ground point: the green's table and bunting (at its plot's depth)
         // stand in front of the snowman behind them.
         depth: tile.x + tile.y - 0.02,
         paint: () => paintSnowman(ctx, feet.x, feet.y, shape, scarf, night, px, zoom >= FACE_ZOOM),
       });
+    }
+    // The builders' snow: a heap at a crouching builder's knees, a snowball in the hands of one up
+    // on their feet packing it. One call each, shaded like the snowmen by a hard shadow.
+    for (const builder of buildersAt(scene.residents, minutes)) {
+      const feet = project(builder.ground.x, builder.ground.y);
+      if (!visible(feet, 16 * FIGURE_SCALE, 16 * FIGURE_SCALE, 4)) continue;
+      const px = device();
+      const snow = builderSnow(builder, px);
+      objects.push({ depth: snow.depth, paint: () => paintSnow(ctx, snow, night, px) });
     }
     return objects;
   },

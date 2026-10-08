@@ -10,19 +10,36 @@ import {
   FLASKS,
   flaskAt,
   RUG,
+  rugDrifts,
   TELESCOPE,
   TELESCOPE_HEIGHT,
 } from '../src/city/district/stargazing';
-import { GREEN_CENTER, SCARVES, SNOWMAN_SPOTS } from '../src/city/district/snowmen';
+import {
+  builderSnow,
+  buildersAt,
+  FIGURE_SCALE,
+  GREEN_CENTER,
+  SCARVES,
+  SNOWMAN_SPOTS,
+  snowTrack,
+  TRACK_BENDS,
+  TRACK_START,
+  TRACK_TIMES,
+} from '../src/city/district/snowmen';
+import { drawResident } from '../src/city/residents';
+import { pick, SNOW } from '../src/city/season-palette';
 import { METEOR_COLOUR } from '../src/city/sky-extras';
 import { BRAND } from '../src/lib/brand';
 import { SNOWMAN_DAYS, starNight } from '../src/lib/district-calendar';
 import { BANDSTAND_FURNITURE, DISTRICT_SPOTS } from '../src/lib/district-places';
-import { VENUES } from '../src/lib/events';
+import { SNOWMEN_LUNCH } from '../src/lib/district-copy';
+import { EVENT_SPOTS, VENUES } from '../src/lib/events';
+import { residentTrips, tripState } from '../src/lib/resident-trips';
+import type { ResidentState } from '../src/lib/simulation';
 import { getPlot, project } from '../src/lib/world';
 import { townSeasonAt } from '../src/lib/seasons';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
-import { YEAR } from './district';
+import { SAMPLE, TOWNS, YEAR } from './district';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
 
@@ -85,7 +102,7 @@ describe('The stargazing props', () => {
   });
 
   it('lays the rugs as floor paint and sorts the flasks, telescope and astronomer by their feet', () => {
-    const scene = evening(SUMMER_27, 1393);
+    const scene = evening(SUMMER_27, 1390);
     const { objects } = paint(STARS, scene);
     const astronomer = astronomerAt(scene.day, scene.minutes)!;
     expect(objects.map((object) => object.depth).sort()).toEqual(
@@ -197,6 +214,197 @@ describe('The snowmen', () => {
   });
 });
 
+describe('The rugs on a snowy night', () => {
+  it('lie among drifts and frosted tufts along their back edges, not in a frame', () => {
+    const winter1 = STAR_NIGHTS.find((d) => d - CALENDAR_EPOCH_DAY === 84)!;
+    const snowy = (scene: DistrictScene) =>
+      paint(STARS, scene).calls.filter(
+        (call) =>
+          call.name === 'fillRect' &&
+          [SNOW.top, SNOW.frost].some((pair) => pick(pair, true) === call.fillStyle),
+      );
+    const scene = evening(winter1, 1390);
+    expect(scene.season.snow).toBeGreaterThan(0.3);
+    const tufts = snowy(scene);
+    expect(tufts).toHaveLength(8 * 4);
+    // The lawn's own tuft shapes: 4 × 2 drifts and 2 × 2 frost, never a rug-sized rim.
+    for (const call of tufts) {
+      const [, , w, h] = call.args as number[];
+      expect([4, 2]).toContain(w);
+      expect(h).toBe(2);
+    }
+    expect(tufts.some((call) => (call.args as number[])[2] === 2)).toBe(true);
+    // Each on the lawn beside its own rug: under no rug, its own or a neighbor's.
+    const spots = DISTRICT_SPOTS.bandstand;
+    for (const [k, spot] of spots.entries())
+      for (const drift of rugDrifts(k)) {
+        const at = { x: spot.x + drift.x, y: spot.y + drift.y };
+        expect(Math.hypot(drift.x, drift.y)).toBeLessThan(0.45);
+        for (const s of spots)
+          expect(Math.abs(at.x - s.x) > RUG.x / 2 || Math.abs(at.y - s.y) > RUG.y / 2).toBe(true);
+      }
+    // None on a summer night.
+    expect(snowy(evening(SUMMER_27, 1390))).toHaveLength(0);
+  });
+});
+
+/** The six at a snowman build day's lunch, as the planner places them at a minute. */
+function lunchGuests(day: number) {
+  const plans = residentTrips(TOWNS.full, day);
+  const guests = [...plans].flatMap(([id, trips]) =>
+    trips
+      .filter((trip) => trip.event.variant === 'snowmen')
+      .map((trip) => ({ home: TOWNS.full.find((place) => place.id === id)!, trip })),
+  );
+  return (minutes: number) =>
+    guests.map(
+      ({ home, trip }) =>
+        ({
+          id: home.id,
+          home,
+          resident: home.resident,
+          ...tripState(home, trip, minutes, day),
+        }) as ResidentState,
+    );
+}
+/** Point t along the trail's whole curve, in tiles from the green's centre. */
+const trailAt = (k: number, t: number) => {
+  const [a, b, c] = [TRACK_START, TRACK_BENDS[k], SNOWMAN_SPOTS[k]];
+  return {
+    x: (1 - t) ** 2 * a.x + 2 * t * (1 - t) * b.x + t * t * c.x,
+    y: (1 - t) ** 2 * a.y + 2 * t * (1 - t) * b.y + t * t * c.y,
+  };
+};
+
+describe('A snowman build day', () => {
+  it('leaves a trail of rolled snow from the builders to the snowball, off the picnic rug', () => {
+    for (const [k, day] of BUILD_DAYS.entries()) {
+      expect(snowTrack(day, 840)).toBeUndefined();
+      expect(snowTrack(day, TRACK_TIMES.fade[1])).toBeUndefined();
+      expect(snowTrack(day + 1, 870)).toBeUndefined();
+      expect(snowTrack(day, 870)?.k).toBe(k);
+      // It lengthens back from the ball as the base is rolled, then fades as the head goes on.
+      let before = { from: 1, alpha: 0 };
+      for (let minute = 840 + 1 / 30; minute < TRACK_TIMES.fade[1]; minute += 1 / 30) {
+        const now = snowTrack(day, minute)!;
+        expect(now.from).toBeLessThanOrEqual(before.from + 1e-9);
+        expect(Math.abs(now.alpha - before.alpha), `${minute}`).toBeLessThanOrEqual(0.08);
+        before = now;
+      }
+      expect(snowTrack(day, 890)).toMatchObject({ from: 0 });
+      // From between the two builders to its snowman, never across the picnic rug (local x
+      // −0.55..0.89, y −0.08..1.08) and never through a watcher's place.
+      expect(trailAt(k, 1)).toEqual(SNOWMAN_SPOTS[k]);
+      for (let t = 0; t <= 1; t += 0.01) {
+        const p = trailAt(k, t);
+        const onRug = p.x > -0.6 && p.x < 0.94 && p.y > -0.13 && p.y < 1.13;
+        expect(onRug, `snowman ${k} at ${t}`).toBe(false);
+        for (const spot of EVENT_SPOTS.green.slice(2))
+          expect(Math.hypot(p.x - spot.x, p.y - spot.y)).toBeGreaterThan(0.3);
+      }
+    }
+    // Nothing on the lawn on any other day.
+    for (const day of YEAR.filter((d) => !BUILD_DAYS.includes(d)).slice(80, 100))
+      for (const minute of [850, 900])
+        expect(paint(SNOWMEN, sceneAt(day, minute)).calls.some((c) => c.name === 'stroke')).toBe(
+          false,
+        );
+  });
+
+  it('puts snow at the builders’ knees and in their hands, and keeps within 40 calls', () => {
+    let heaps = 0,
+      balls = 0,
+      worst = 0;
+    for (const day of BUILD_DAYS) {
+      const guests = lunchGuests(day);
+      expect(guests(900)).toHaveLength(6);
+      for (let minute = 830; minute < 960; minute += 2.5) {
+        const residents = guests(minute);
+        const builders = buildersAt(residents, minute);
+        if (minute < 840 || minute >= 945) expect(builders).toEqual([]);
+        for (const builder of builders) {
+          expect(builder.seat).toBeLessThanOrEqual(1);
+          if (builder.pose === 'crouch') heaps++;
+          else balls++;
+        }
+        for (const zoom of [1, 2.4]) {
+          const calls = paint(SNOWMEN, { ...sceneAt(day, minute, zoom), residents }).calls.length;
+          worst = Math.max(worst, calls);
+          expect(calls, `${day} at ${minute}`).toBeLessThanOrEqual(40);
+        }
+      }
+    }
+    expect(heaps).toBeGreaterThan(20);
+    expect(balls).toBeGreaterThan(20);
+    expect(worst).toBeGreaterThan(30);
+  });
+
+  it('covers the play ball with a snowball at every bounce, and heaps the snow by the toes', () => {
+    const spot = EVENT_SPOTS.green[1];
+    const builder = (pose: 'play' | 'crouch', walkPhase: number, facing: 'sw' | 'ne') =>
+      ({
+        id: 'builder',
+        resident: SAMPLE.resident,
+        position: { x: GREEN_CENTER.x + spot.x, y: GREEN_CENTER.y + spot.y },
+        facing,
+        walkPhase,
+        pose,
+        moving: false,
+        greeting: false,
+        event: { id: 'books', name: SNOWMEN_LUNCH.name, phase: 'attending' },
+      }) as ResidentState;
+    const GOLD = ['#D7AA63', '#F5DFA4'];
+    for (let phase = 0; phase < 1; phase += 0.02)
+      for (const device of [1, 2, 2.4]) {
+        const state = builder('play', phase, 'sw');
+        const [found] = buildersAt([state], 870);
+        const snow = builderSnow(found, device);
+        // The ball as residents.ts draws it, in world px.
+        const recorder = matrixContext(1280, 720);
+        const feet = project(state.position.x, state.position.y);
+        drawResident(recorder.ctx, state.resident, feet.x, feet.y, FIGURE_SCALE, state);
+        const ball = recorder.points.filter(
+          (point) =>
+            point.call === 'fillRect' &&
+            GOLD.includes(String(recorder.calls[point.index].fillStyle)),
+        );
+        expect(ball.length).toBe(8);
+        // A whole device pixel of snow beyond the gold on every side, so none of it shows.
+        for (const point of ball) {
+          expect(point.x).toBeGreaterThanOrEqual(snow.x + 1 / device - 1e-9);
+          expect(point.x).toBeLessThanOrEqual(snow.x + snow.w - 1 / device + 1e-9);
+          expect(point.y).toBeGreaterThanOrEqual(snow.y + 1 / device - 1e-9);
+          expect(point.y).toBeLessThanOrEqual(snow.y + snow.h - 1 / device + 1e-9);
+        }
+        // Painted just after the figure that holds it.
+        expect(snow.depth).toBeGreaterThan(state.position.x + state.position.y);
+        expect(snow.depth - (state.position.x + state.position.y)).toBeLessThan(1e-3);
+      }
+    // The heap lies on the lawn just past the toes, the way they face.
+    const feet = project(GREEN_CENTER.x + spot.x, GREEN_CENTER.y + spot.y);
+    for (const facing of ['sw', 'ne'] as const) {
+      const heap = builderSnow(buildersAt([builder('crouch', 0, facing)], 870)[0], 1);
+      expect(heap.y + heap.h).toBeLessThanOrEqual(feet.y + 1);
+      expect(heap.y).toBeGreaterThanOrEqual(feet.y - 4);
+      if (facing === 'sw') expect(heap.x + heap.w).toBeLessThanOrEqual(feet.x - 8);
+      else expect(heap.x).toBeGreaterThanOrEqual(feet.x + 8);
+    }
+    // Nobody else's: a watcher, or a builder on another day's lunch, gets no snow.
+    expect(buildersAt([{ ...builder('play', 0, 'sw'), event: undefined }], 870)).toEqual([]);
+    expect(
+      buildersAt(
+        [
+          {
+            ...builder('play', 0, 'sw'),
+            position: { x: GREEN_CENTER.x - 0.55, y: GREEN_CENTER.y + 0.85 },
+          },
+        ],
+        870,
+      ),
+    ).toEqual([]);
+  });
+});
+
 describe('Agent E’s colours', () => {
   /** A bright warm colour: what the eye reads as lamplight (district-render.test's rule). */
   const AMBER = new Set([BRAND.lantern, BRAND.glow, BRAND.lanternInk].map((c) => c.toUpperCase()));
@@ -229,8 +437,8 @@ describe('Agent E’s colours', () => {
     };
     for (const scene of [
       evening(SUMMER_27, 1312),
-      evening(SUMMER_27, 1388.5),
-      evening(SUMMER_27, 1393),
+      evening(SUMMER_27, 1385),
+      evening(SUMMER_27, 1390),
       evening(
         STAR_NIGHTS.find((d) => d - CALENDAR_EPOCH_DAY === 84)!,
         1390,
