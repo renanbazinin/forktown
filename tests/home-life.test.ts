@@ -41,6 +41,7 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { WINTER } from '../src/lib/seasons';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, opposite, WALK_SPEED } from '../src/lib/walking';
 import { getPlot, isRoad, plotEntrance, project, type Point } from '../src/lib/world';
+import { FROZEN_TOWN } from './district';
 import { AFTER_HOURS, BAZPLACE, FUNKY_FUN, MOONBEAM_CAFE } from './fixtures';
 import { fullTown, readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
@@ -67,7 +68,7 @@ const NIGHT_SPOTS = new Set<HomeSpotKind>(['bench', 'porch', 'step', 'gate']);
 type Frame = { minute: number; states: ResidentState[] };
 const timelines = new Map<string, Frame[]>();
 function timeline(homes: Place[], day: number, step: number): Frame[] {
-  const key = `${homes === town ? 'town' : homes === places ? 'places' : 'fine'}:${day}:${step}`;
+  const key = `${homes === town ? 'town' : homes === places ? 'places' : homes === FROZEN_TOWN ? 'frozen' : 'fine'}:${day}:${step}`;
   let frames = timelines.get(key);
   if (!frames) {
     frames = [];
@@ -402,7 +403,10 @@ describe('Life at home: the front door, the garden and loops round the block', (
   });
 
   it('opens and shuts a street’s front doors a moment apart, not all on the hour', () => {
-    for (const homes of [fine, town]) {
+    // At a tenth of a minute on the frozen town (tests/district.ts), and at a quarter on the full
+    // one: how many doors share a frame is a matter of chance among the neighbors, so the cap is
+    // held on towns whose size and stagger no newcomer moves.
+    for (const homes of [FROZEN_TOWN, town]) {
       // Every door edge of the day: when each neighbor steps out or in, to the nearest frame.
       const outs = new Map<number, number>(),
         ins = new Map<number, number>();

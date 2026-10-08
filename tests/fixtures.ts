@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { placeSchema } from '../src/lib/schema';
 
 // Homes for tests that need a particular home: the first nine files in places/ as they stood when
@@ -402,3 +403,21 @@ export const HOMES = [
   LITTLE_WORKSHOP,
   MOONBEAM_CAFE,
 ];
+
+/** Today's house files as they stood in October 2026 (tests/fixtures/town-2026-10.json), unparsed. */
+const FROZEN_FILES: { id: string }[] = JSON.parse(
+  readFileSync('tests/fixtures/town-2026-10.json', 'utf8'),
+);
+/**
+ * A house file exactly as places/ held it in October 2026, for tests that start from a real file:
+ * its owner can remodel, rename or take down the real one without changing what they check.
+ */
+export const frozenFile = (id: string) => {
+  const file = FROZEN_FILES.find((place) => place.id === id);
+  if (!file) throw new Error(`No frozen house file ${id}.`);
+  // Untyped, as JSON.parse hands a file over: a test may spread or break any field of it.
+  return structuredClone(file) as ReturnType<typeof JSON.parse>;
+};
+
+/** my-little-place, the builder's own example: a one-floor cottage with the default routine. */
+export const MY_LITTLE_PLACE = home(frozenFile('my-little-place'));

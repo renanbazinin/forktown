@@ -34,6 +34,7 @@ import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { townCalendarAt } from '../src/lib/town-calendar';
 import { project } from '../src/lib/world';
 import { TOWNS, YEAR } from './district';
+import { AFTER_HOURS } from './fixtures';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
 
@@ -375,7 +376,7 @@ describe('Market Square’s art', () => {
     const guest = (event: string | undefined, pose?: 'chat' | 'sit', extra = {}) =>
       ({
         id: 'guest',
-        resident: town[0].resident,
+        resident: AFTER_HOURS.resident,
         position: { x: 58.3, y: 15.75 },
         facing: 'ne',
         walkPhase: 0.2,

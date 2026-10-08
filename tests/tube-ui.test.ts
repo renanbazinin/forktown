@@ -36,6 +36,7 @@ import {
 } from '../src/lib/tubes';
 import type { TubeStage } from '../src/lib/tube-journeys';
 import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../src/lib/town-calendar';
+import { unescapeHtml } from './markup';
 
 const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like the fixtures
 // The panel's own stretch: the sign's halt and Willow Halt, where the parcels run.
@@ -139,6 +140,27 @@ const texts = (copy: TubeCopy) => [
   ...copy.blocks.flatMap((block) => [block.eyebrow, block.heading, block.body, block.note ?? '']),
 ];
 const escape = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/**
+ * The line's own words: every string tube-copy.ts writes (its copy draws on nothing else but the
+ * halts' names and the clock), comments left out. A neighbor named like one of them ("Nobody",
+ * "Everyone", "Two") cannot be told from the copy, so the naming rules leave that name alone;
+ * every other name is held to them.
+ */
+const COPY_WORDS = (
+  readFileSync('src/lib/tube-copy.ts', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ')
+    .match(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g) ?? []
+).join(' ');
+const copyWords = new Map<string, boolean>();
+/** Whether a name is, whole, one of the line's own words; worked out once a name. */
+const isCopyWord = (name: string) => {
+  if (!copyWords.has(name)) {
+    const whole = new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, 'u');
+    copyWords.set(name, whole.test(COPY_WORDS));
+  }
+  return copyWords.get(name)!;
+};
 /** The block about who is on the line now. */
 const lineNow = (copy: TubeCopy) => copy.blocks.find((block) => /ON THE LINE/.test(block.eyebrow))!;
 /** The brand's copy rules plus the line's own: quiet, honest, and only today's riders named. With a
@@ -175,15 +197,17 @@ function voiceProblems(
     if (!/^[A-Z0-9 ·/’&–-]+$/.test(block.eyebrow)) problems.push(`eyebrow "${block.eyebrow}"`);
     if (!block.body.trim()) problems.push(`empty body under "${block.heading}"`);
   }
-  if (text.includes('!')) problems.push('exclamation mark');
-  if (/forktown/i.test(text)) problems.push('says forktown');
-  if ((text.match(/\blittle\b/gi) ?? []).length > 1) problems.push('"little" more than once');
-  const crowd = text.match(/crowd|packed|busy|dozens|lots of/i);
-  if (crowd) problems.push(`crowd "${crowd[0]}"`);
-  if (/neighbour/i.test(text)) problems.push('British "neighbour"');
+  // The riders' own names are theirs to spell; the rules read the copy around them.
   const named = new Set(status.now.map((ride) => ride.name.trim()).filter(Boolean));
   let unnamed = text;
-  for (const name of named) unnamed = unnamed.replace(new RegExp(escape(name), 'g'), '');
+  for (const name of [...named].sort((a, b) => b.length - a.length))
+    unnamed = unnamed.replace(new RegExp(escape(name), 'g'), ' ');
+  if (unnamed.includes('!')) problems.push('exclamation mark');
+  if (/forktown/i.test(unnamed)) problems.push('says forktown');
+  if ((unnamed.match(/\blittle\b/gi) ?? []).length > 1) problems.push('"little" more than once');
+  const crowd = unnamed.match(/crowd|packed|busy|dozens|lots of/i);
+  if (crowd) problems.push(`crowd "${crowd[0]}"`);
+  if (/neighbour/i.test(unnamed)) problems.push('British "neighbour"');
   if (unnamed.includes("'")) problems.push('straight apostrophe');
   /** A whole name, never part of a longer word: Nia is not in "Niamh". */
   const whole = (name: string, flags = 'u') =>
@@ -201,6 +225,7 @@ function voiceProblems(
     );
   for (const name of roster) {
     const pattern = whole(name);
+    if (isCopyWord(name)) continue;
     if (!named.has(name)) {
       if (pattern.test(spoken(text))) problems.push(`names ${name}, who is not on the line`);
       continue;
@@ -463,6 +488,24 @@ describe('Treeline panel copy', () => {
     ).toBe('Jon and Jonas are on the line.');
   });
 
+  it('holds the line’s own words to the rules, never a neighbor’s name', () => {
+    // A neighbor may be called anything the builder takes: "!", a straight apostrophe, the
+    // town's name, a word the copy uses. On the line, their name is theirs; off it, a name that
+    // is one of the line's own words ("Nobody in the glass right now.") is not them being named.
+    const names = ["Yay! Forktown's", 'Busy Little Neighbour', 'Little Jon', "D'Arcy & Bea"];
+    for (const stage of STAGES)
+      for (const crew of [names.slice(0, 1), names.slice(1, 3), names.slice(2)]) {
+        const s = status({ now: crew.map((name) => onLine(name, stage)) });
+        expect(voiceProblems(tubeCopy(s), s, [...names, 'Nobody', 'Two']), crew.join()).toEqual([]);
+      }
+    const quiet = status();
+    expect(tubeCopy(quiet).blocks[0].heading).toContain('Nobody');
+    expect(voiceProblems(tubeCopy(quiet), quiet, ['Nobody', 'Everyone', 'Eliza'])).toEqual([]);
+    // Off the line, any other name is still caught.
+    const named = { ...tubeCopy(quiet), footer: 'Eliza rode earlier.' };
+    expect(voiceProblems(named, quiet, ['Eliza'])).toContain('names Eliza, who is not on the line');
+  });
+
   it('shows the rider in the card while they ride', () => {
     let day = YEAR;
     const daytime = (ride: TubeRide) => ride.board >= 360 && ride.off < 1440;
@@ -475,7 +518,8 @@ describe('Treeline panel copy', () => {
       first.residentId,
       'riding',
     ]);
-    const markup = renderToStaticMarkup(createElement(TubeInfo, { status: s }));
+    // Decoded, as a reader sees it: React escapes a rider named "D'Arcy & Bea".
+    const markup = unescapeHtml(renderToStaticMarkup(createElement(TubeInfo, { status: s })));
     expect(markup).toContain(s.now.length === 1 ? `${name} is riding to ` : ' are on the line.');
   });
 });

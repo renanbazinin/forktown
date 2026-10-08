@@ -8,13 +8,13 @@ import { placeSchema, type Place } from '../src/lib/schema';
 import type { SeatCall } from '../src/lib/outings';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { fullTown, readPlaces } from './full-town';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 /** A town year, from the calendar's epoch: Spring 1 to Winter 28. */
 export const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
 
-export const SAMPLE = placeSchema.parse(
-  JSON.parse(readFileSync('places/my-little-place.json', 'utf8')),
-);
+/** my-little-place, frozen (tests/fixtures.ts): the made-up towns' house, whatever its owner does. */
+export const SAMPLE = MY_LITTLE_PLACE;
 type Routine = Place['resident']['routine'];
 const ACTIVITIES = ['stroll', 'work', 'home'] as const;
 /** One of the 54 routines: morning, afternoon and evening out, working or home, then night. */

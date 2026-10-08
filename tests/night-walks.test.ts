@@ -1,6 +1,5 @@
 import { residentTrips } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { placeSchema, type Place } from '../src/lib/schema';
 import {
   eventAtVenue,
@@ -18,8 +17,9 @@ import { MAX_TRAVEL_SPEED_MULTIPLIER, routeLength, WALK_SPEED } from '../src/lib
 import { legsMinutes, walkingPace } from '../src/lib/tube-journeys';
 import { readPlaces } from './full-town';
 import { onRoadOrTube, stepBound } from './tube-riders';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const owls: Place[] = HOUSE_PLOTS.slice(0, 32).map((plot, index) => ({
   ...sample,
   id: `night-owl-${index}`,

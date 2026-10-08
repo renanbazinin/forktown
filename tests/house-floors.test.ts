@@ -1,8 +1,9 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { validatePlaces } from '../src/lib/schema';
+import { frozenFile } from './fixtures';
 
-const read = (id: string) => JSON.parse(readFileSync(`places/${id}.json`, 'utf8'));
+// Real house files, frozen in tests/fixtures/, so their owners can change the real ones freely.
+const read = frozenFile;
 const withFloors = (data: ReturnType<typeof read>, floors: number) => ({
   ...data,
   design: { ...data.design, floors },

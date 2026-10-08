@@ -32,6 +32,8 @@ import type { Place } from '../src/lib/schema';
 import type { ResidentState } from '../src/lib/simulation';
 import { BRAND } from '../src/lib/brand';
 import { TOWNS, YEAR } from './district';
+import { AFTER_HOURS, ARTS } from './fixtures';
+import { readerText, rowNames } from './markup';
 import { recordingContext } from './recording-context';
 
 const town: Place[] = TOWNS.full;
@@ -221,7 +223,8 @@ const amberLike = (colour: string) => {
 };
 
 describe('The paper bag', () => {
-  const sample = town[0].resident;
+  // A frozen carrier (tests/fixtures.ts): a newcomer whose file sorts first may dress in amber.
+  const sample = AFTER_HOURS.resident;
   const drawn = (variant: number, night = false) => {
     const { ctx, calls } = recordingContext();
     paperBagSprite.draw(ctx, 0, 0, variant, sample, night);
@@ -272,7 +275,9 @@ describe('The paper bag', () => {
 
 describe('The market’s panel', () => {
   const day = YEAR[2];
-  const home = town[0];
+  // Frozen neighbors (tests/fixtures.ts), so whoever's file sorts first in places/, and whatever
+  // they are called, these checks name the same two people.
+  const home = AFTER_HOURS;
   const at = (phase: NonNullable<ResidentState['event']>['phase'], who = home): ResidentState =>
     ({
       id: who.id,
@@ -292,9 +297,7 @@ describe('The market’s panel', () => {
     );
   /** The words a reader sees, without the markup. */
   const text = (minutes: number, residents: ResidentState[] = []) =>
-    html(minutes, residents)
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&amp;/g, '&');
+    readerText(html(minutes, residents));
 
   it('shows the eyebrow, the heading, today’s market and the hours', () => {
     const page = text(600);
@@ -307,11 +310,15 @@ describe('The market’s panel', () => {
   });
 
   it('names the browsers only while they are at the stalls, and nobody else', () => {
-    const other = town[1];
+    const other = ARTS;
     const page = html(600, [at('attending'), at('going', other)]);
-    expect(page).toContain(home.resident.name);
-    expect(page).not.toContain(other.resident.name);
+    // Exactly one row, the browser's: read from the rows, so no name is found inside the copy.
+    expect(rowNames(page)).toEqual([home.resident.name]);
+    expect(readerText(page)).not.toContain(other.resident.name);
     expect(page).toContain(DISTRICT_COPY.market.labels.attending);
+    // A name React has to escape is still the one named.
+    const escaped = { ...home, resident: { ...home.resident, name: `D'Arcy & <Bea>` } };
+    expect(rowNames(html(600, [at('attending', escaped)]))).toEqual([`D'Arcy & <Bea>`]);
     expect(browsingNow([at('returning'), at('going')])).toEqual([]);
   });
 
@@ -342,11 +349,11 @@ describe('The market’s panel', () => {
     // An early browser at 07:48 and a lingering one at 11:40 are named, under the clock's status.
     const early = text(468, [at('attending')]);
     expect(early).toContain('LATER TODAY');
-    expect(early).toContain(home.resident.name);
+    expect(rowNames(html(468, [at('attending')]))).toEqual([home.resident.name]);
     const lingering = html(700, [at('attending')]);
     expect(lingering).toContain('FINISHED TODAY');
     expect(lingering).toContain(PANEL_COPY.market.next);
-    expect(lingering).toContain(home.resident.name);
+    expect(rowNames(lingering)).toEqual([home.resident.name]);
   });
 });
 

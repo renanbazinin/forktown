@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import {
   footballAt,
   footballRecord,
@@ -40,8 +39,9 @@ import { cityHit } from '../src/city/render';
 import { footballSoundsBetween, renderFootballSound } from '../src/music/football-sound';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS, UTC_DAY_MS } from '../src/lib/town-time';
 import { onRoadOrTube } from './tube-riders';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const gameAtUtc = (timestamp: number) => footballAt(townMinutesAt(timestamp), townDayAt(timestamp));
 const townDaysPerUtcDay = UTC_DAY_MS / TOWN_DAY_MS;
 /** A match by UTC day number, match index and seconds into its 140-second cycle. */

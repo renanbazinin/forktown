@@ -3,10 +3,10 @@ import { createWorldLayout } from '../src/lib/world-layout';
 import { PLOTS, plotEntrance, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
 import { roadPath, simulateResidents } from '../src/lib/simulation';
 import { placeSchema } from '../src/lib/schema';
-import { readFileSync } from 'node:fs';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { plotDoor } from '../src/lib/home-life';
 import { TOWN_SIZE } from '../src/lib/town-config';
+import { frozenFile } from './fixtures';
 
 describe('Growing the town without moving contributions', () => {
   it('doubles the capacity while preserving every original address and coordinate', () => {
@@ -63,7 +63,7 @@ describe('Growing the town without moving contributions', () => {
   it('accepts and simulates a contribution on the new far edge', () => {
     const edge = `T${TOWN_SIZE.columns}`;
     const home = placeSchema.parse({
-      ...JSON.parse(readFileSync('places/my-little-place.json', 'utf8')),
+      ...frozenFile('my-little-place'),
       id: 'new-edge',
       plot: edge,
     });

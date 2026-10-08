@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { placeSchema, type Place } from '../src/lib/schema';
+import { type Place } from '../src/lib/schema';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { getPlot, isRoad, plotEntrance, type Point } from '../src/lib/world';
 import { roadPath } from '../src/lib/walking';
@@ -25,9 +24,10 @@ import {
 } from '../src/lib/millpond';
 import { onRoadOrTube } from './tube-riders';
 import { insideEventGround } from './event-ground';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 // A roster-proof crowd: 36 synthetic homes on rows A–E who stroll all day.
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const homes: Place[] = HOUSE_PLOTS.slice(0, 36).map((plot, index) => ({
   ...sample,
   id: `skater-${index}`,

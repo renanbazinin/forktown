@@ -25,6 +25,7 @@ import { townCalendarAt } from '../src/lib/town-calendar';
 import { BANDSTAND_TRACKS, composeBandstand } from '../src/music/bandstand-tracks';
 import { BEATS, compose, durationOf } from '../src/music/score';
 import { TOWNS, YEAR } from './district';
+import { rowNames, sortedNames } from './markup';
 import { recordingContext } from './recording-context';
 import { rosterTimeout } from './roster-timeout';
 
@@ -230,11 +231,12 @@ describe('The Bandstand’s panel', () => {
     const residents = simulateResidents(TOWNS.full, 1000, plain);
     const here = listening(residents);
     expect(here.length).toBeGreaterThan(0);
+    // Read from the rows, decoded: a name React escapes, or one that is a word of the panel's own
+    // copy (Eve in "Everyone"), is still told apart.
     const html = render(plain, 1000);
-    for (const resident of here) expect(html).toContain(resident.resident.name);
+    expect(sortedNames(rowNames(html))).toEqual(sortedNames(here.map((r) => r.resident.name)));
     // Before the chairs are out, nobody is named.
-    const morning = render(plain, 600);
-    for (const resident of here) expect(morning).not.toContain(resident.resident.name);
+    expect(rowNames(render(plain, 600))).toEqual([]);
   });
 
   it('holds the stargazing note on a new-moon night', () => {

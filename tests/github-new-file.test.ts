@@ -24,6 +24,8 @@ import { BUILDER_DEFAULT_STORY } from '../src/lib/lanterns';
 import { places } from '../src/lib/places';
 import { placeSchema, validatePlaces, type Place } from '../src/lib/schema';
 import { PLOTS } from '../src/lib/world';
+import { FROZEN_TOWN } from './district';
+import { everyShape } from './house-variety';
 
 const REPOSITORY = 'https://github.com/neighbor/forktown';
 const house = (id: string, name: string, plot: string, resident: string): Place => {
@@ -212,7 +214,19 @@ describe('Starting a house on GitHub', () => {
   });
 
   it('fits every house in town, and a sign that uses all its characters, in one link', () => {
-    for (const place of places) expect(houseFileLink(REPOSITORY, place), place.id).toBeTruthy();
+    // Every house the frozen town held, and every shape the builder makes, goes in one link.
+    for (const place of [...FROZEN_TOWN, ...everyShape])
+      expect(houseFileLink(REPOSITORY, place), place.id).toBe(newHouseFileUrl(REPOSITORY, place));
+    // Any house in town goes to GitHub whole: in one link when it fits, by copy and paste when
+    // GitHub could not take it (a long sign, deep indents or Hebrew grow it past the limit). A
+    // contributor's long sign is theirs to keep, so neither way fails their pull request.
+    for (const place of places) {
+      const url = newHouseFileUrl(REPOSITORY, place);
+      expect(readLink(url).value, place.id).toBe(houseFile(place));
+      expect(houseFileLink(REPOSITORY, place), place.id).toBe(
+        url.length <= HOUSE_LINK_LIMIT ? url : null,
+      );
+    }
     // The longest artwork a sign may have: a title and 2,000 characters of styled spans.
     const span =
       '<span style="color: #FFF4D4; font-size: 12px; font-weight: bold; text-align: center"></span>';

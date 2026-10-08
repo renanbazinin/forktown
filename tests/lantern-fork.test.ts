@@ -21,29 +21,12 @@ import {
 import type { Place } from '../src/lib/schema';
 import { getPlot, STREETLIGHTS } from '../src/lib/world';
 import { ARTS } from './fixtures';
-import { readPlaces } from './full-town';
+import { ARRIVALS, TOWN } from './lantern-town';
 import { recordingContext, type RecordedCall } from './recording-context';
 
-const places = readPlaces();
-const ARRIVALS = [
-  'rehovot-orchard',
-  'willow-lodge',
-  'vaxsius-markus',
-  'moss-nook',
-  'mulu-s',
-  'jons-arcade',
-  'arts',
-  'funky-fun',
-  'my-little-place',
-  'after-hours',
-  'evergreen',
-  'hello-world',
-  'little-workshop',
-  'moonbeam-cafe',
-  'plot-twist',
-  'stargazer',
-  'sunday-morning',
-];
+// The town as it stood when the Fork was planted (tests/lantern-town.ts), so a house leaving or
+// a newcomer arriving never moves the slots these checks expect.
+const places = TOWN;
 const register = lanternRegister(places, ARRIVALS);
 const inBounds = (x: number, y: number) =>
   x >= FORK_BOUNDS.left &&

@@ -72,8 +72,9 @@ import { eventApproach } from '../src/lib/resident-trips';
 import { schemaHousePlots } from './house-plots';
 import { readPlaces } from './full-town';
 import { onRoadOrTube, onTubeLine } from './tube-riders';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const DESTINATIONS = {
   stage: plotEntrance(getPlot('B5')!),

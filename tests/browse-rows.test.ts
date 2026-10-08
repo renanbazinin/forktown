@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { NeighborRow, PlaceRow, PlotRow } from '../src/components/BrowseRows';
 import { paintWhenNear } from '../src/components/BuildingPreview';
-import { places } from '../src/lib/places';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 describe('The directory rows', () => {
   const select = () => {};
@@ -14,7 +14,8 @@ describe('The directory rows', () => {
   });
 
   it('show a house, an open plot and a neighbor as before', () => {
-    const place = places[0];
+    // A frozen house (tests/fixtures.ts), so a neighbor's own name never changes the markup.
+    const place = MY_LITTLE_PLACE;
     expect(renderToStaticMarkup(createElement(PlaceRow, { place, onSelect: select }))).toContain(
       `<strong>${place.name}</strong>`,
     );

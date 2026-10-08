@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { placeSchema, type Place } from '../src/lib/schema';
+import { type Place } from '../src/lib/schema';
 import { EVENT_SPOTS, HOUSE_PLOTS, eventsForDay } from '../src/lib/events';
 import {
   eventRoute,
@@ -42,9 +41,10 @@ import { readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
 import { onRoadOrTube, rideLegs, rideTrip, riding, stationWalk, stepBound } from './tube-riders';
 import { insideEventGround } from './event-ground';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 const places = readPlaces().sort((a, b) => a.plot.localeCompare(b.plot, 'en', { numeric: true }));
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 /** Evening and night strollers on the chosen house plots, with ids `${prefix}-0`, `${prefix}-1`, …. */
