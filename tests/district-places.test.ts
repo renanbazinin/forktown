@@ -2,7 +2,7 @@
 // plots, the market square's roads and lamps, every district spot and way in, the harvest props
 // round the scarecrow, the regatta's boats, the bandstand's furniture and the district calendar.
 // Static: nothing here plans a day.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   activeIndex,
   BANDS,
@@ -27,6 +27,7 @@ import {
   BANDSTAND_FURNITURE,
   BANDSTAND_VENUE,
   DISTRICT_FRAMES,
+  DISTRICT_OUTINGS,
   DISTRICT_SPOTS,
   districtApproach,
   HARVEST_GATES,
@@ -54,6 +55,7 @@ import { MARKET_SITE, TOWN_SIZE } from '../src/lib/town-config';
 import { roadPath } from '../src/lib/walking';
 import {
   getPlot,
+  hash,
   isRoad,
   plotEntrance,
   PLOTS,
@@ -63,6 +65,57 @@ import {
   type Point,
 } from '../src/lib/world';
 import { schemaHousePlots } from './house-plots';
+// The registries (F0b) and every owner's file they read (SPEC §7.0, §7.3).
+import {
+  OUTINGS,
+  outingOf,
+  SEAT_EXCLUDES,
+  SEAT_ORDER,
+  snowmenBuilderPose as builderFromRegistry,
+  snowmenWatcherPose as watcherFromRegistry,
+  type OutingFacing,
+  type OutingPose,
+  type SeatCall,
+} from '../src/lib/outings';
+import { marketFacing, marketPose } from '../src/lib/outings/market';
+import { sundownPose, teaPose } from '../src/lib/outings/bandstand';
+import { regattaPose } from '../src/lib/outings/regatta';
+import { fairPose, tablePose } from '../src/lib/outings/harvest';
+import { starPose } from '../src/lib/outings/stargazing';
+import { snowmenBuilderPose, snowmenWatcherPose } from '../src/lib/outings/snowmen';
+import { DISTRICT_PAINTERS } from '../src/city/district-art';
+import { marketPainter } from '../src/city/district/market';
+import { bandstandPainter } from '../src/city/district/bandstand';
+import { landingPainter } from '../src/city/district/landing';
+import { drawScarecrowExtras, harvestPainter } from '../src/city/district/harvest';
+import { stargazingPainter } from '../src/city/district/stargazing';
+import { snowmenPainter } from '../src/city/district/snowmen';
+import { drawSkyExtras } from '../src/city/sky-extras';
+import { CARRY_SPRITES } from '../src/city/carry-items';
+import { paperBagSprite } from '../src/city/carry/paper-bag';
+import { paperBoatSprite } from '../src/city/carry/paper-boat';
+import { dishSprite } from '../src/city/carry/dish';
+import { BANDSTAND_TRACKS, composeBandstand } from '../src/music/bandstand-tracks';
+import {
+  DISTRICT_CARDS,
+  DISTRICT_PANEL_FILES,
+  DISTRICT_PANELS,
+  type DistrictPanelProps,
+  type GreenNoteProps,
+  type StargazingNoteProps,
+} from '../src/components/district/cards';
+import MarketInfo from '../src/components/district/MarketInfo';
+import BandstandInfo from '../src/components/district/BandstandInfo';
+import LandingInfo from '../src/components/district/LandingInfo';
+import StargazingNote from '../src/components/district/StargazingNote';
+import GreenNote from '../src/components/district/GreenNote';
+import FarmInfo from '../src/components/FarmInfo';
+import TubeInfo from '../src/components/TubeInfo';
+import { DISTRICT_BUTTONS } from './manual/district';
+import type { ComponentProps } from 'react';
+import type { EventPose } from '../src/lib/events';
+import type { Band } from '../src/lib/district-calendar';
+import type { Note } from '../src/music/score';
 
 /** Today's 30 homes (main at b59605d), frozen: a contributor's edit never changes this test. */
 const OCCUPIED = [
@@ -536,5 +589,232 @@ describe('The Riverside’s words', () => {
     expect(text).not.toMatch(/neighbour|lantern/i);
     // Every season's market reads its own season.
     expect(new Set(YEAR.map((day) => DISTRICT_COPY.market.description(day))).size).toBe(8);
+  });
+});
+
+describe('The Riverside’s registries', () => {
+  const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
+  /** SPEC §4.0.A: each new outing's seat call, period, venue and exclusions. */
+  const SEATS: Record<
+    OutingId,
+    { order: number; period: string; venue: DistrictKind; excludes: SeatCall[] }
+  > = {
+    regatta: { order: 3, period: 'afternoon', venue: 'landing', excludes: [] },
+    'harvest-fair': { order: 4, period: 'afternoon', venue: 'harvest', excludes: ['regatta'] },
+    'long-table': { order: 9, period: 'evening', venue: 'harvest', excludes: ['cinema'] },
+    stargazing: { order: 11, period: 'night', venue: 'bandstand', excludes: ['cinema'] },
+    market: { order: 13, period: 'morning', venue: 'market', excludes: ['football-morning'] },
+    'bandstand-tea': {
+      order: 14,
+      period: 'afternoon',
+      venue: 'bandstand',
+      excludes: ['regatta', 'harvest-fair', 'green', 'zoo', 'football-afternoon', 'millpond'],
+    },
+    'bandstand-sundown': {
+      order: 15,
+      period: 'evening',
+      venue: 'bandstand',
+      excludes: ['cinema', 'long-table', 'concert'],
+    },
+  };
+
+  it('holds all seven outings in seat order, with their frozen fields', () => {
+    expect(OUTINGS.map((outing) => outing.id)).toEqual([
+      'regatta',
+      'harvest-fair',
+      'long-table',
+      'stargazing',
+      'market',
+      'bandstand-tea',
+      'bandstand-sundown',
+    ]);
+    expect(new Set(OUTINGS.map((outing) => outing.id))).toEqual(new Set(OUTING_IDS));
+    const venues = {
+      market: MARKET_VENUE,
+      bandstand: BANDSTAND_VENUE,
+      landing: LANDING_VENUE,
+      harvest: HARVEST_VENUE,
+    };
+    for (const outing of OUTINGS) {
+      const { id } = outing,
+        row = OUTING_TABLE[id],
+        seats = SEATS[id];
+      expect(outingOf(id)).toBe(outing);
+      expect(outing.venue, id).toBe(venues[seats.venue]);
+      expect(DISTRICT_OUTINGS[outing.venue.kind]).toContain(id);
+      expect(outing.period, id).toBe(seats.period);
+      expect(outing.times, id).toBe(OUTING_TIMES[id]);
+      expect(outing.seats, id).toEqual({ rule: row.rule, spots: row.cap });
+      expect(outingSpots(id)).toHaveLength(row.cap);
+      expect([outing.underway, outing.seated], id).toEqual([row.underway, row.seated]);
+      expect(outing.order, id).toBe(seats.order);
+      expect(SEAT_ORDER[outing.order - 1]).toBe(id);
+      expect([...outing.excludes], id).toEqual(seats.excludes);
+    }
+    expect(OUTINGS.map((outing) => outing.order)).toEqual([3, 4, 9, 11, 13, 14, 15]);
+    expect(outingOf('zoo')).toBeUndefined();
+    expect(outingOf('night-party')).toBeUndefined();
+  });
+
+  it('runs each outing on its own days', () => {
+    const days = (id: OutingId) => YEAR.filter((day) => outingOf(id)!.on(day));
+    expect(days('regatta')).toEqual(YEAR.filter(regattaDay));
+    expect(days('regatta')).toHaveLength(7);
+    expect(days('harvest-fair')).toEqual(YEAR.filter(harvestDay));
+    expect(days('long-table')).toEqual(YEAR.filter(harvestDay));
+    expect(days('harvest-fair')).toHaveLength(3);
+    expect(days('stargazing')).toEqual(YEAR.filter(starNight));
+    expect(days('stargazing')).toHaveLength(12);
+    for (const id of ['market', 'bandstand-tea', 'bandstand-sundown'] as const)
+      expect(days(id)).toHaveLength(112);
+  });
+
+  it('carries a bag home from the market, a boat to the regatta and a dish to the table', () => {
+    const carried = Object.fromEntries(
+      OUTINGS.filter((outing) => outing.carry).map((o) => [o.id, [o.carry!.kind, o.carry!.leg]]),
+    );
+    expect(carried).toEqual({
+      market: ['paper-bag', 'returning'],
+      regatta: ['paper-boat', 'going'],
+      'long-table': ['dish', 'going'],
+    });
+    for (const day of YEAR) {
+      expect(outingOf('market')!.carry!.variant(day, 'home')).toBe(
+        MARKET_KINDS.indexOf(marketKind(day)),
+      );
+      expect(outingOf('regatta')!.carry!.variant(day, 'home')).toBe(0);
+      for (const id of ['full-town-a6', 'moss-nook'])
+        expect(outingOf('long-table')!.carry!.variant(day, id)).toBe(hash(`dish:${day}:${id}`) % 3);
+    }
+    expect(new Set(YEAR.map((day) => outingOf('long-table')!.carry!.variant(day, 'x')))).toEqual(
+      new Set([0, 1, 2]),
+    );
+  });
+
+  it('lists every seat call once, each excluding only calls made before it', () => {
+    expect(new Set(SEAT_ORDER).size).toBe(15);
+    expect(Object.keys(SEAT_EXCLUDES).sort()).toEqual([...SEAT_ORDER].sort());
+    for (const call of SEAT_ORDER)
+      for (const excluded of SEAT_EXCLUDES[call])
+        expect(SEAT_ORDER.indexOf(excluded), `${call} excludes ${excluded}`).toBeLessThan(
+          SEAT_ORDER.indexOf(call),
+        );
+    // SPEC §4.0.F: at most one of each set a day, so the later call of any pair excludes the
+    // earlier; a film guest has none of the evening's outings and no stargazing.
+    const ONE_OF: SeatCall[][] = [
+      ['football-morning', 'market'],
+      [
+        'green',
+        'zoo',
+        'football-afternoon',
+        'millpond',
+        'regatta',
+        'harvest-fair',
+        'bandstand-tea',
+      ],
+      ['concert', 'long-table', 'bandstand-sundown'],
+      ['night-party', 'stargazing'],
+    ];
+    for (const set of ONE_OF)
+      for (const a of set)
+        for (const b of set)
+          if (SEAT_ORDER.indexOf(a) < SEAT_ORDER.indexOf(b))
+            expect(SEAT_EXCLUDES[b], `${b} excludes ${a}`).toContain(a);
+    for (const call of ['concert', 'long-table', 'bandstand-sundown', 'stargazing'] as const)
+      expect(SEAT_EXCLUDES[call]).toContain('cinema');
+    // Today's first calls exclude nobody; the disco now leaves out the stargazers.
+    expect(SEAT_EXCLUDES.cinema).toEqual([]);
+    expect(SEAT_EXCLUDES['football-morning']).toEqual([]);
+    expect(SEAT_EXCLUDES['night-party']).toEqual(['stargazing']);
+  });
+
+  it('reads every feature function from its owner’s file', () => {
+    // SPEC §7.3: agent B the market, C the bandstand and the regatta, D the harvest, E the stars.
+    const poses: Record<OutingId, OutingPose> = {
+      market: marketPose,
+      regatta: regattaPose,
+      'harvest-fair': fairPose,
+      'bandstand-tea': teaPose,
+      'long-table': tablePose,
+      'bandstand-sundown': sundownPose,
+      stargazing: starPose,
+    };
+    for (const outing of OUTINGS) expect(outing.pose, outing.id).toBe(poses[outing.id]);
+    const facings: Partial<Record<OutingId, OutingFacing>> = { market: marketFacing };
+    for (const outing of OUTINGS) expect(outing.facing, outing.id).toBe(facings[outing.id]);
+    expect(builderFromRegistry).toBe(snowmenBuilderPose);
+    expect(watcherFromRegistry).toBe(snowmenWatcherPose);
+    expectTypeOf(snowmenBuilderPose).toEqualTypeOf<
+      (seat: number, time: number, day: number) => EventPose | undefined
+    >();
+    expectTypeOf(snowmenWatcherPose).toEqualTypeOf<
+      (seat: number, time: number, day: number) => EventPose | undefined
+    >();
+
+    const painters = {
+      market: marketPainter,
+      bandstand: bandstandPainter,
+      landing: landingPainter,
+      harvest: harvestPainter,
+      stargazing: stargazingPainter,
+      snowmen: snowmenPainter,
+    };
+    expect(Object.keys(DISTRICT_PAINTERS)).toEqual(Object.keys(painters));
+    for (const [key, painter] of Object.entries(painters))
+      expect(DISTRICT_PAINTERS[key as keyof typeof painters], key).toBe(painter);
+    expect(stargazingPainter.sky).toBe(drawSkyExtras);
+    expectTypeOf(drawScarecrowExtras).toEqualTypeOf<
+      (ctx: CanvasRenderingContext2D, x: number, y: number, day: number, night: boolean) => void
+    >();
+
+    expect(Object.keys(CARRY_SPRITES)).toEqual(['paper-bag', 'paper-boat', 'dish']);
+    expect(CARRY_SPRITES['paper-bag']).toBe(paperBagSprite);
+    expect(CARRY_SPRITES['paper-boat']).toBe(paperBoatSprite);
+    expect(CARRY_SPRITES.dish).toBe(dishSprite);
+    for (const sprite of Object.values(CARRY_SPRITES))
+      expect(sprite.height).toBeGreaterThanOrEqual(0);
+
+    expect(Object.keys(BANDSTAND_TRACKS).sort()).toEqual([...BANDS].sort());
+    for (const track of Object.values(BANDSTAND_TRACKS)) expect(track.bpm).toBeGreaterThan(0);
+    expectTypeOf(composeBandstand).toEqualTypeOf<(band: Band) => Note[] | undefined>();
+  });
+
+  it('gives every outing a card and every district venue its panel', async () => {
+    expect(Object.keys(DISTRICT_CARDS).sort()).toEqual([...OUTING_IDS].sort());
+    for (const id of OUTING_IDS)
+      expect(DISTRICT_CARDS[id].group, id).toBe(
+        id.startsWith('bandstand-') ? 'bandstand' : undefined,
+      );
+    expect(DISTRICT_CARDS['bandstand-tea'].icon).toBe(DISTRICT_CARDS['bandstand-sundown'].icon);
+    const owners = {
+      market: MarketInfo,
+      bandstand: BandstandInfo,
+      landing: LandingInfo,
+      harvest: FarmInfo,
+    };
+    expect(Object.keys(DISTRICT_PANELS)).toEqual(Object.keys(owners));
+    for (const [kind, owner] of Object.entries(owners) as [DistrictKind, unknown][]) {
+      expect(DISTRICT_PANELS[kind].$$typeof, kind).toBe(Symbol.for('react.lazy'));
+      expect((await DISTRICT_PANEL_FILES[kind]()).default, kind).toBe(owner);
+    }
+    expectTypeOf(StargazingNote).parameter(0).toEqualTypeOf<StargazingNoteProps>();
+    expectTypeOf(GreenNote).parameter(0).toEqualTypeOf<GreenNoteProps>();
+    expectTypeOf(FarmInfo).parameter(0).toEqualTypeOf<DistrictPanelProps>();
+    expectTypeOf<ComponentProps<typeof TubeInfo>['station']>().toEqualTypeOf<
+      string | null | undefined
+    >();
+  });
+
+  it('gives the district harness one button list per feature', () => {
+    expect(Object.keys(DISTRICT_BUTTONS)).toEqual([
+      'market',
+      'bandstand',
+      'landing',
+      'harvest',
+      'stars',
+      'snowmen',
+    ]);
+    for (const buttons of Object.values(DISTRICT_BUTTONS))
+      expect(Array.isArray(buttons)).toBe(true);
   });
 });

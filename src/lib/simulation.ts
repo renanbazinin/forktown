@@ -1,6 +1,7 @@
 import type { Place } from './schema';
 import { getPlot, hash, plotEntrance, project, type Plot, type Point } from './world';
 import type { EventPose } from './events';
+import type { CarryKind } from './outings';
 import {
   chainTurn,
   dayTripWalks,
@@ -51,6 +52,8 @@ export type ResidentState = {
   pose?: EventPose;
   /** A published neighbor's seasonal round, with the carried object and handoff progress. */
   errand?: ErrandVisual;
+  /** What they carry on one leg of a Riverside outing (src/lib/outings.ts), drawn in the hand. */
+  carry?: { kind: CarryKind; variant: number };
   /** `waiting` is at their spot, early for a show that hasn't started. */
   event?: { name: string; id: string; phase: 'going' | 'waiting' | 'attending' | 'returning' };
   /** Only while boarding, riding or stepping off the tube on the way to or from an event. */

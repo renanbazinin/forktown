@@ -525,11 +525,20 @@ export default function App() {
           </div>
           <div className="town-panel-content">
             {selectedFarm ? (
-              <FarmInfo />
+              <FarmInfo
+                day={clock.day}
+                minutes={clock.minutes}
+                residents={residents}
+                places={displayPlaces}
+                onFollow={follow}
+              />
             ) : selectedMillpond ? (
               <MillpondInfo minutes={clock.minutes} day={clock.day} skaters={skaters} />
             ) : selectedTube ? (
-              <TubeInfo status={tubeStatus(displayPlaces, clock.minutes, clock.day)} />
+              <TubeInfo
+                status={tubeStatus(displayPlaces, clock.minutes, clock.day)}
+                station={selectedPlot}
+              />
             ) : selectedVenue?.kind === 'zoo' ? (
               <ZooInfo
                 minutes={clock.minutes}

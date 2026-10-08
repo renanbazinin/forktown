@@ -6,6 +6,8 @@ export default function TubeInfo({
 }: {
   /** The line now, from the same plans the residents follow. */
   status: TubeStatus;
+  /** The halt selected on the map, for its own line minutes (agent A, SPEC §7.3). */
+  station?: string | null;
 }) {
   const copy = tubeCopy(status);
   return (
