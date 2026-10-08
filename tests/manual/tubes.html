@@ -206,13 +206,15 @@
       const [
         { renderCity },
         { places },
-        { eventsForDay, VENUES },
+        { eventsForDay },
         { simulateResidents, timeLabel },
         { WORLD_BOUNDS, getPlot, plotCenter, project },
         { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt },
         { tubeRides, tubeStatus, tubeParcelsAt },
         { tubeCopy },
         { TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE, TUBE_STATIONS, tubeFrame },
+        { fitView },
+        { openingView },
       ] = await Promise.all(
         [
           '/src/city/render.ts',
@@ -224,6 +226,8 @@
           '/src/lib/tube-traffic.ts',
           '/src/lib/tube-copy.ts',
           '/src/lib/tubes.ts',
+          '/src/lib/map-view.ts',
+          '/src/lib/opening-view.ts',
         ].map(load),
       ).catch((error) => {
         report(`The renderer did not load: ${error?.message ?? error}`);
@@ -393,51 +397,17 @@
       };
       syncControls();
 
-      // Cameras: the app's whole-town and opening framings (City.tsx), and close-ups: a halt's
-      // centred on the app's own frame for it (its stack, its spur and the trunk behind).
-      function wholeTown(width, height) {
-        const zoom = Math.max(
-          0.01,
-          Math.min(
-            (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
-            (height - 85) / (WORLD_BOUNDS.bottom + 98),
-          ),
+      // Cameras: the app's whole-town and opening framings, from the app's own modules (City.tsx
+      // opens on openingView: the zoom floor, the phone's framing and the Fork kept in view), and
+      // close-ups: a halt's centred on the app's own frame for it (its stack, its spur and the
+      // trunk behind).
+      const wholeTown = (width, height) => fitView(width, height, WORLD_BOUNDS);
+      const opening = (width, height) =>
+        openingView(
+          places.map((place) => place.plot),
+          width,
+          height,
         );
-        return {
-          x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
-          y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
-          zoom,
-        };
-      }
-      function openingView(width, height) {
-        const all = [
-          ...places.map((place) => place.plot),
-          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
-            (venue) => venue.plot,
-          ),
-        ].flatMap((id) => {
-          const plot = getPlot(id);
-          return plot ? [plotCenter(plot)] : [];
-        });
-        const median = (values) => values.sort((a, b) => a - b)[values.length >> 1];
-        const mid = { x: median(all.map((p) => p.x)), y: median(all.map((p) => p.y)) };
-        const distance = (p) => Math.hypot(p.x - mid.x, p.y - mid.y);
-        const typical = median(all.map(distance));
-        const points = all.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
-        const left = Math.min(...points.map((point) => point.x)) - 110;
-        const right = Math.max(...points.map((point) => point.x)) + 110;
-        const top = Math.min(...points.map((point) => point.y)) - 145;
-        const bottom = Math.max(...points.map((point) => point.y)) + 80;
-        const zoom = Math.max(
-          wholeTown(width, height).zoom,
-          Math.min(0.85, (width - 150) / (right - left), (height - 160) / (bottom - top)),
-        );
-        return {
-          x: width / 2 - ((left + right) / 2) * zoom,
-          y: height * 0.5 - ((top + bottom) / 2) * zoom,
-          zoom,
-        };
-      }
       const closeUp = (focus, zoom) => ({
         x: W / 2 - focus.x * zoom,
         y: H / 2 - (focus.y - 30) * zoom,
@@ -445,7 +415,7 @@
       });
       function camera() {
         if (state.view === 'whole') return wholeTown(W, H);
-        if (state.view === 'opening') return openingView(W, H);
+        if (state.view === 'opening') return opening(W, H);
         if (state.view === 'trunk') return closeUp(project(-0.5, 33), 3);
         const halt = haltOf(state.view) ?? FIRST;
         const focus = halt === FIRST || halt === LAST ? plotCenter(getPlot(halt)) : null;

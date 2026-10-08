@@ -9,7 +9,7 @@ import type { Place } from './schema';
 import { simulateResidents, type ResidentState } from './simulation';
 import { townCatAt, TOWN_CAT_NAME, TOWN_CAT_ID } from './town-cat';
 import { getPlot, hash, plotCenter, project, type Point } from './world';
-import { residentTrips } from './resident-trips';
+import { planResidentTrips, residentTrips, type ResidentTrip } from './resident-trips';
 import { harvestDay, OUTING_IDS, regattaDay, starNight, type OutingId } from './district-calendar';
 import { DISTRICT_COPY } from './district-copy';
 import {
@@ -52,6 +52,9 @@ export type LiveProgram = {
   previousHighlights: Highlight[];
   /** The day's district shots with someone planned there in their window (SPEC §4.7). */
   district: DistrictShot[];
+  /** When guests of the day's five away from the stage are planned to be attending, judged from
+   *  the plan as `district` is, in event and time order (districtShotAirs). */
+  attending: readonly { event: string; from: number; to: number }[];
 };
 const cycle = (value: number, length: number) => ((value % length) + length) % length;
 export const SCENERY_START = 300;
@@ -176,26 +179,104 @@ export function liveProgram(places: Place[], day: number): LiveProgram {
   return program;
 }
 
-function planLiveProgram(places: Place[], day: number): LiveProgram {
-  // Code-unit order, never the viewer's language: every visitor casts the same neighbors.
-  const homes = [...places].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+/** When a trip's guest attends, as tripState puts it: from their arrival where the event is
+ *  already underway (the zoo, the football, the Millpond), else from its start, until they leave. */
+const attendance = (trip: ResidentTrip) => {
+  const kind = trip.event.venue.kind;
+  const underway = kind === 'zoo' || kind === 'football' || kind === 'millpond';
+  return {
+    event: trip.event.id,
+    from: underway ? trip.arrive : Math.max(trip.arrive, trip.event.start),
+    to: trip.leave,
+  };
+};
+/** A day's program before its cast: the day's five, its highlights and its district shots. */
+function programOf(places: Place[], day: number, trips: readonly ResidentTrip[]): LiveProgram {
   // Only today's five: the Riverside's outings are filmed through their own district shots.
-  const program: LiveProgram = {
+  const events = eventsForDay(day).filter((event) => !event.outing);
+  const away = new Set(
+    events.filter((event) => event.venue.kind !== 'stage').map((event) => event.id),
+  );
+  return {
     day,
-    homes,
+    // Code-unit order, never the viewer's language: every visitor casts the same neighbors.
+    homes: [...places].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)),
     cast: [],
-    events: eventsForDay(day).filter((event) => !event.outing),
+    events,
     highlights: liveHighlights(day),
     previousHighlights: liveHighlights(day - 1),
-    district: [],
-  };
-  // A district shot goes on air only if someone is planned to be there in its window.
-  const plan = [...residentTrips(places, day).values()].flat();
-  program.district = liveDistrictShots(day).filter((shot) =>
-    plan.some(
-      (trip) => trip.event.id === shot.outing && trip.arrive < shot.to && trip.leave > shot.from,
+    // A district shot goes on air only if someone is planned to be there in its window.
+    district: liveDistrictShots(day).filter((shot) =>
+      trips.some(
+        (trip) => trip.event.id === shot.outing && trip.arrive < shot.to && trip.leave > shot.from,
+      ),
     ),
-  );
+    attending: trips
+      .filter((trip) => away.has(trip.event.id))
+      .map(attendance)
+      .filter(({ from, to }) => to > from)
+      .sort((a, b) =>
+        a.event < b.event ? -1 : a.event > b.event ? 1 : a.from - b.from || a.to - b.to,
+      ),
+  };
+}
+
+/** The step a district shot's window is scanned in, in town minutes. */
+const AIR_STEP = 0.25;
+/**
+ * The first minute of a district shot's window (on a quarter-minute grid) that liveShotAt gives
+ * the air, or undefined when it never does: nobody is planned there in its window (it is not in
+ * `program.district`), or for all of it something the director ranks higher holds the air. That
+ * is the postcard, lantern hour or the selected cinema; and over a daily highlight, also a
+ * selected event of the day's five that is live with its venue busy (a stage always, elsewhere
+ * someone planned to be attending), as the zoo can hold the teatime set. Judged from the day's
+ * plan, as `program.district` is, so the break cards bill a moment only when it will air, and
+ * from the minute it does.
+ */
+export function districtShotAirs(program: LiveProgram, shot: DistrictShot): number | undefined {
+  if (!program.district.some((candidate) => candidate.outing === shot.outing)) return undefined;
+  for (let k = 0; shot.from + k * AIR_STEP < shot.to; k++) {
+    const time = shot.from + k * AIR_STEP;
+    if (liveDistrictShot(program, time)?.outing !== shot.outing) continue;
+    if (time >= SCENERY_START && time < SCENERY_START + SCENERY_SECONDS) continue;
+    if (program.homes.length && time >= LANTERN_SHOT.start && time < LANTERN_SHOT.end) continue;
+    if (cinemaAt(time, program.day).live && features(program, 'cinema', time)) continue;
+    const held =
+      !shot.festival &&
+      program.events.some(
+        (event) =>
+          event.id !== 'cinema' &&
+          event.period !== 'morning' &&
+          features(program, event.period, time) &&
+          isEventLive(event, time) &&
+          (event.venue.kind === 'stage' ||
+            program.attending.some(
+              (guest) => guest.event === event.id && time >= guest.from && time < guest.to,
+            )),
+      );
+    if (!held) return time;
+  }
+  return undefined;
+}
+/**
+ * districtShotAirs for a roster's day without planning its cast or evicting a program the stream
+ * holds: the day's program when it is already planned, else one judged from the day's trips
+ * planned afresh, which touches no cache.
+ */
+export function districtAiring(
+  places: Place[],
+  day: number,
+  shot: DistrictShot,
+): number | undefined {
+  const program =
+    programs.get(places)?.get(day) ??
+    programOf(places, day, [...planResidentTrips(places, day).values()].flat());
+  return districtShotAirs(program, shot);
+}
+
+function planLiveProgram(places: Place[], day: number): LiveProgram {
+  const program = programOf(places, day, [...residentTrips(places, day).values()].flat());
+  const { homes } = program;
   const appearances = new Map<string, number>();
   let previous: string | undefined;
   // Shuffle every clip, favor less-seen people, and avoid consecutive follows when possible.

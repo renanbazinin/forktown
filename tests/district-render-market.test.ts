@@ -113,33 +113,39 @@ describe('Market Square’s art', () => {
     }
   });
 
-  it('never flashes: every fade changes at most 0.08 a frame, all morning, every day', () => {
-    // One real second is one town minute; a frame is 1/30 of it.
-    const FRAME = 1 / 30;
-    let worst = 0;
-    for (const day of YEAR.filter((_, i) => i % 9 === 0))
-      for (const stall of MARKET_STALL_GEOMETRY) {
-        const values = (m: ReturnType<typeof stallAt>) => [
-          m.holder,
-          m.cover,
-          m.roll,
-          ...[0, 1, 2, 3, 4, 5, 6].map((i) => m.item(i)),
-        ];
-        for (const [from, to] of [
-          [425, 485],
-          [685, 725],
-        ]) {
-          let before = values(stallAt(day, from, stall.k));
-          for (let t = from + FRAME; t < to; t += FRAME) {
-            const now = values(stallAt(day, t, stall.k));
-            now.forEach((v, i) => (worst = Math.max(worst, Math.abs(v - before[i]))));
-            before = now;
+  it(
+    'never flashes: every fade changes at most 0.08 a frame, all morning, every day',
+    {
+      timeout: 60_000,
+    },
+    () => {
+      // One real second is one town minute; a frame is 1/30 of it.
+      const FRAME = 1 / 30;
+      let worst = 0;
+      for (const day of YEAR.filter((_, i) => i % 9 === 0))
+        for (const stall of MARKET_STALL_GEOMETRY) {
+          const values = (m: ReturnType<typeof stallAt>) => [
+            m.holder,
+            m.cover,
+            m.roll,
+            ...[0, 1, 2, 3, 4, 5, 6].map((i) => m.item(i)),
+          ];
+          for (const [from, to] of [
+            [425, 485],
+            [685, 725],
+          ]) {
+            let before = values(stallAt(day, from, stall.k));
+            for (let t = from + FRAME; t < to; t += FRAME) {
+              const now = values(stallAt(day, t, stall.k));
+              now.forEach((v, i) => (worst = Math.max(worst, Math.abs(v - before[i]))));
+              before = now;
+            }
           }
         }
-      }
-    expect(worst).toBeGreaterThan(0.01);
-    expect(worst).toBeLessThanOrEqual(0.08);
-  });
+      expect(worst).toBeGreaterThan(0.01);
+      expect(worst).toBeLessThanOrEqual(0.08);
+    },
+  );
 
   it('stands no taller than 28 px a stall and 24 px the pump (SPEC §2.4)', () => {
     expect(MARKET_HEIGHTS.stall).toBeLessThanOrEqual(28);

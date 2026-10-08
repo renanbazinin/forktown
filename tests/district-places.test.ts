@@ -522,21 +522,31 @@ describe('The district calendar', () => {
         });
         expect(regattaBoat(k, day, 1035)).toBeUndefined();
       }
+      // Every boat every 0.05 minutes: the faults are gathered and asserted once.
+      const wrong: string[] = [];
+      let floating = 0;
       for (let t = 840; t < 1030; t += 0.05) {
         const boats = Array.from({ length: 10 }, (_, k) => regattaBoat(k, day, t));
         boats.forEach((boat, k) => {
           if (!boat || boat.state === 'ashore') return;
-          expect(boat.x).toBeGreaterThanOrEqual(62.085 - 1e-9);
-          expect(boat.x).toBeLessThanOrEqual(62.165 + 1e-9);
-          if (Math.abs(boat.y - KINGFISHER_PIER.y) < 0.3)
-            expect(Math.abs(boat.x - KINGFISHER_PIER.x)).toBeGreaterThanOrEqual(0.14);
+          floating++;
+          const where = `boat ${k} on ${day} at ${t.toFixed(2)}`;
+          if (boat.x < 62.085 - 1e-9 || boat.x > 62.165 + 1e-9)
+            wrong.push(`${where}: off the lane at x ${boat.x}`);
+          if (
+            Math.abs(boat.y - KINGFISHER_PIER.y) < 0.3 &&
+            Math.abs(boat.x - KINGFISHER_PIER.x) < 0.14
+          )
+            wrong.push(`${where}: at the pier`);
           const ahead = boats[k - 1];
-          if (ahead && ahead.state !== 'ashore')
-            expect(ahead.y - boat.y, `${k} at ${t}`).toBeGreaterThanOrEqual(0.14 - 1e-9);
+          if (ahead && ahead.state !== 'ashore' && ahead.y - boat.y < 0.14 - 1e-9)
+            wrong.push(`${where}: ${(ahead.y - boat.y).toFixed(3)} behind the boat ahead`);
         });
       }
+      expect(wrong.slice(0, 5)).toEqual([]);
+      expect(floating).toBeGreaterThan(0);
     }
-  });
+  }, 60_000);
 
   it('builds a snowman on each build day and thaws them all before spring', () => {
     for (let k = 0; k < 4; k++) {

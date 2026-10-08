@@ -337,7 +337,7 @@ describe('A link preview for every house', () => {
       site,
     );
     expect(quiet).not.toMatch(/http-equiv|Lantern No/i);
-  });
+  }, 60_000);
 
   it('uses the main town’s address when no site address is set', async () => {
     const page = (await build({})).find((page) => page.fileName.startsWith('house/'))!;

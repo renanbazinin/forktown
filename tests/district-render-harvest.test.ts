@@ -51,6 +51,7 @@ import { getPlot, project } from '../src/lib/world';
 import { TOWNS } from './district';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
+import { frameJumps } from './flash';
 import { rosterTimeout } from './roster-timeout';
 
 const town: Place[] = TOWNS.full;
@@ -486,6 +487,49 @@ describe('The Long Table', () => {
     expect(LAMPS_OUT).toBeGreaterThanOrEqual(1255.5);
   });
 
+  it('brings every lamp, table part and prop in and out a little each frame', () => {
+    // Every alpha the painter draws with, stepped a frame (1/30 of a town minute) at a time
+    // through its window: at most 0.08 a frame, and each window really moves. The painter's
+    // flash check compares whole frames, so this pins each fade on its own.
+    const FRAME = 1 / 30;
+    const jumps: string[] = [];
+    const step = (name: string, from: number, to: number, alpha: (t: number) => number) => {
+      let before = alpha(from),
+        moved = false;
+      for (let k = 1; from + k * FRAME <= to; k++) {
+        const t = from + k * FRAME,
+          now = alpha(t);
+        if (Math.abs(now - before) > 0.08 + 1e-9)
+          jumps.push(`${name} at ${t.toFixed(3)}: ${before} → ${now}`);
+        moved ||= now !== before;
+        before = now;
+      }
+      if (!moved) jumps.push(`${name} never changed over ${from}–${to}`);
+    };
+    TABLE_LAMP_LIGHTS.forEach((lights, i) => {
+      step(`lamp ${i} lighting`, lights - 1, lights + 2, (t) => lampLight(i, t, true));
+      step(`lamp ${i} going out`, LAMPS_OUT - 1, LAMPS_OUT + LAMP_FADE + 1, (t) =>
+        lampLight(i, t, true),
+      );
+    });
+    for (let k = 0; k < 8; k++)
+      for (const part of ['legs', 'board', 'cloth', 'things'] as const) {
+        step(`segment ${k}'s ${part} laid`, 1030, 1070, (t) => segmentParts(k, t)[part]);
+        step(`segment ${k}'s ${part} cleared`, 1255, 1280, (t) => segmentParts(k, t)[part]);
+      }
+    // The table's own entry is a gate for the segments above, not a fade.
+    for (const item of HARVEST_PROPS.filter((item) => item.id !== 'table')) {
+      step(`${item.id} coming`, item.from - 2, item.from + 8, (t) => propOut(item, t));
+      step(`${item.id} going`, item.to - 8, item.to + 2, (t) => propOut(item, t));
+    }
+    step('the presser', 775, 790, (t) => presserAt(t).alpha);
+    step('the presser going', 1010, 1025, (t) => presserAt(t).alpha);
+    step('the straw seats with the bales', 355, 1035, (t) => seatOut(t));
+    // A guest still on their seat after the bales have gone keeps it until they leave.
+    step('a straw seat after its guest', 1095, 1105 + SEAT_FADE, (t) => seatOut(t, 1100));
+    expect(jumps.slice(0, 5)).toEqual([]);
+  });
+
   it('keeps amber for its lit lamps: none by day, none before they light', () => {
     // No day colour of its own palette is amber.
     expect(HARVEST_PAIRS.map((pair) => pair[0]).filter(amberLike)).toEqual([]);
@@ -520,16 +564,12 @@ describe('The Long Table', () => {
         let before: Draw[] | undefined;
         for (let minutes = from; minutes < to; minutes += FRAME) {
           const { draws } = paint(sceneAt(A23 + 1, minutes));
-          if (
-            before &&
-            before.length === draws.length &&
-            before.every((d, i) => d.name === draws[i].name)
-          )
-            draws.forEach((draw, i) => {
-              compared++;
-              if (Math.abs(draw.alpha - before![i].alpha) > 0.08 + 1e-9)
-                jumps.push(`${minutes.toFixed(3)}: ${before![i].alpha} → ${draw.alpha}`);
-            });
+          // Frame by frame, and lamplight that comes or goes between frames that differ too.
+          if (before) {
+            const step = frameJumps(before, draws);
+            compared += step.compared;
+            for (const jump of step.jumps) jumps.push(`${minutes.toFixed(3)}: ${jump}`);
+          }
           before = draws;
         }
       }

@@ -44,12 +44,17 @@ import { OUTINGS, outingOf } from '../src/lib/outings';
 import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
 import { getPlot, plotCenter, type Point } from '../src/lib/world';
 import { planHome, tripState } from '../src/lib/resident-trips';
-import { residentActivityLabel, type ResidentState } from '../src/lib/simulation';
+import {
+  residentActivityLabel,
+  simulateResidents,
+  type ResidentState,
+} from '../src/lib/simulation';
 import type { ResidentTransit } from '../src/lib/tubes';
 import { linkHash, readDeepLink } from '../src/lib/deep-link';
 import { compose, durationOf, trackForTown, TRACKS } from '../src/music/score';
 import {
   DISTRICT_SHOTS,
+  districtShotAirs,
   liveDistrictHighlight,
   liveDistrictShots,
   liveProgram,
@@ -73,6 +78,7 @@ import {
 } from '../src/lib/outings/snowmen';
 import { recordingContext } from './recording-context';
 import { insideEventGround } from './event-ground';
+import { FROZEN_TOWN } from './district';
 
 // The scarecrow's festival dress is agent D's, the snowmen's builders and watchers agent E's; the
 // hooks only have to call them.
@@ -359,7 +365,8 @@ describe('The Riverside on the live stream', () => {
     const shot = liveShotAt(program(PLAIN), highlight.from, []);
     expect(shot.id).toBe(`district:${PLAIN}:${highlight.outing}`);
     expect(liveShotAt(program(PLAIN), highlight.to, []).id).not.toMatch(/^district:/);
-    // Every district window is held clear of breaks, and billed in "Coming up".
+    // Every district window is held clear of breaks, whether or not it airs: breaks never need
+    // the plan.
     for (const day of [REGATTA, HARVEST, STARS, PLAIN]) {
       const start = day * TOWN_DAY_MS;
       const moments = protectedMoments(start, start + TOWN_DAY_MS, [sample]).filter(
@@ -368,10 +375,52 @@ describe('The Riverside on the live stream', () => {
       expect(moments.map((moment) => (moment.start - start) / 1000)).toEqual(
         liveDistrictShots(day).map((shot) => shot.from),
       );
-      const first = liveDistrictShots(day)[0];
-      expect(comingUpAt(start + (first.from - 1) * 1000, [sample], 1)[0].title).toBe(first.label);
     }
   });
+
+  it('bills a Riverside moment in “Coming up” only when it airs, from the minute it first does', () => {
+    // The director films a district shot only when someone is planned there, and only while
+    // nothing it ranks higher holds the air (the cinema over a festival, a busy afternoon at
+    // the zoo over the teatime set). The card asks the same question (districtShotAirs), so it
+    // never promises a moment that never comes. Checked against the director itself, every
+    // quarter minute of each window, over a year of the frozen town.
+    const town = FROZEN_TOWN;
+    const seen = { aired: 0, late: 0, nobody: 0, held: 0 };
+    for (let day = CALENDAR_EPOCH_DAY; day < CALENDAR_EPOCH_DAY + 112; day++) {
+      const program = liveProgram(town, day);
+      for (const shot of liveDistrictShots(day)) {
+        let first: number | undefined;
+        for (let time = shot.from; time < shot.to && first === undefined; time += 0.25) {
+          const on = liveShotAt(program, time, simulateResidents(town, time, day));
+          if (on.id === `district:${day}:${shot.outing}`) first = time;
+        }
+        const where = `${townCalendarAt(day).label}, ${shot.outing}`;
+        expect(districtShotAirs(program, shot), where).toBe(first);
+        const rows = comingUpAt(day * TOWN_DAY_MS + (shot.from - 30) * 1000, town, 8);
+        const window = [shot.from, shot.to].map((minute) => day * TOWN_DAY_MS + minute * 1000);
+        const row = rows.find(
+          (candidate) =>
+            candidate.title === shot.label &&
+            candidate.startsAt >= window[0] &&
+            candidate.startsAt < window[1],
+        );
+        if (first === undefined) {
+          expect(row, where).toBeUndefined();
+          if (program.district.some((candidate) => candidate.outing === shot.outing)) seen.held++;
+          else seen.nobody++;
+          continue;
+        }
+        expect(row?.startsAt, where).toBe(day * TOWN_DAY_MS + first * 1000);
+        seen.aired++;
+        if (first > shot.from) seen.late++;
+      }
+    }
+    // The year has every case: aired from the start, aired late, nobody planned, held off.
+    expect(seen.aired).toBeGreaterThan(0);
+    expect(seen.late).toBeGreaterThan(0);
+    expect(seen.nobody).toBeGreaterThan(0);
+    expect(seen.held).toBeGreaterThan(0);
+  }, 60_000);
 });
 
 const AFTERNOONS = {

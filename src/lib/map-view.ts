@@ -56,17 +56,23 @@ export function fitView(width: number, height: number, bounds: Bounds): View {
   };
 }
 
+/** Screen px under the top of the map that the header and the clock cover. */
+export const MAP_HEADER = 96;
+
 /**
  * The map's opening view: where people live, from the centres (world px) of the homes and the
  * town's green and stage. A lone far-off house does not zoom it back out, and a town with every
  * plot taken opens no further out than 0.35 (0.15 on a phone) rather than at whole-town fit,
- * every house tiny; Reset still shows it all. With no points, the overview.
+ * every house tiny; Reset still shows it all. Then the homes no longer fit, and the view moves
+ * down far enough to keep `keep` (the Lantern Fork's crown) below the header. With no points,
+ * the overview.
  */
 export function neighborhoodView(
   points: readonly Point[],
   width: number,
   height: number,
   overview: View,
+  keep?: Point,
 ): View {
   if (!points.length) return overview;
   const median = (values: number[]) => values.sort((a, b) => a - b)[values.length >> 1];
@@ -78,18 +84,17 @@ export function neighborhoodView(
   const right = Math.max(...near.map((point) => point.x)) + 110;
   const top = Math.min(...near.map((point) => point.y)) - 145;
   const bottom = Math.max(...near.map((point) => point.y)) + 80;
-  const zoom = Math.max(
-    overview.zoom,
-    width < 600 ? 0.15 : 0.35,
-    Math.min(
-      0.85,
-      (width < 600 ? width * 1.6 : width - 150) / (right - left),
-      (height - 160) / (bottom - top),
-    ),
+  const floor = Math.max(overview.zoom, width < 600 ? 0.15 : 0.35);
+  const fitted = Math.min(
+    0.85,
+    (width < 600 ? width * 1.6 : width - 150) / (right - left),
+    (height - 160) / (bottom - top),
   );
+  const zoom = Math.max(floor, fitted);
+  const y = height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom;
   return {
     x: width / 2 - ((left + right) / 2) * zoom,
-    y: height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom,
+    y: keep && floor > fitted ? Math.max(y, MAP_HEADER - keep.y * zoom) : y,
     zoom,
   };
 }

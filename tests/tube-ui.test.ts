@@ -157,9 +157,13 @@ function voiceProblems(
   if (!lineNow(copy)) return [...problems, 'no line-now block'];
   if (!/^RIDES TO(DAY|NIGHT)$/.test(copy.blocks.at(-1)!.eyebrow)) problems.push('rides last');
   // Two neighbors can share a name; the heading never says it twice ("Jon and Jon", whatever the
-  // case). Whole names only: "New neighbor and Neighbor L3" names two different neighbors.
-  const riders = [...new Set(status.now.map((ride) => ride.name.trim()).filter(Boolean))];
-  const twice = riders.map(
+  // case). Only a name two riders share can be: "Jon and Jon Smith" names two neighbors, and so
+  // does "New neighbor and Neighbor L3". Whole names only.
+  const riders = status.now.map((ride) => ride.name.trim().toLowerCase()).filter(Boolean);
+  const shared = [...new Set(riders)].filter(
+    (name) => riders.indexOf(name) !== riders.lastIndexOf(name),
+  );
+  const twice = shared.map(
     (name) =>
       new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)} and ${escape(name)}(?![\\p{L}\\p{N}])`, 'iu'),
   );
@@ -180,17 +184,34 @@ function voiceProblems(
   let unnamed = text;
   for (const name of named) unnamed = unnamed.replace(new RegExp(escape(name), 'g'), '');
   if (unnamed.includes("'")) problems.push('straight apostrophe');
+  /** A whole name, never part of a longer word: Nia is not in "Niamh". */
+  const whole = (name: string, flags = 'u') =>
+    new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, flags);
+  // The riders' names and the halts' go first, longest first, so a neighbor named Nia is not
+  // found inside a rider named Nia Rose, nor one named Willow inside Willow Halt. The name being
+  // checked stays when it is a rider's own.
+  const longest = [...named, ...TUBE_STATIONS.map((station) => station.name)].sort(
+    (a, b) => b.length - a.length,
+  );
+  const spoken = (words: string, keep?: string) =>
+    longest.reduce(
+      (left, name) => (name === keep ? left : left.replace(whole(name, 'gu'), ' ')),
+      words,
+    );
   for (const name of roster) {
-    const pattern = new RegExp(`\\b${escape(name)}\\b`);
+    const pattern = whole(name);
     if (!named.has(name)) {
-      if (pattern.test(text)) problems.push(`names ${name}, who is not on the line`);
+      if (pattern.test(spoken(text))) problems.push(`names ${name}, who is not on the line`);
       continue;
     }
     const now = lineNow(copy);
     const others = texts({ ...copy, blocks: copy.blocks.filter((block) => block !== now) }).join(
       ' ',
     );
-    if (pattern.test(others) || pattern.test(now.body + (now.note ?? '')))
+    if (
+      pattern.test(spoken(others, name)) ||
+      pattern.test(spoken(now.body + (now.note ?? ''), name))
+    )
       problems.push(`names ${name} outside the line-now heading`);
   }
   // The loop in one line, and the oldest stretch timed once: in the line-now block, or in the
@@ -426,6 +447,14 @@ describe('Treeline panel copy', () => {
           }
         }
     expect([...headings]).toContain('Two neighbors named Jon are on the line.');
+    // A rider whose name holds another's whole name is a different neighbor, and so is a
+    // neighbor named like a halt: neither is read as said twice or named off the line.
+    for (const stage of STAGES) {
+      const s = status({ now: [onLine('Jon', 'riding'), onLine('Jon Smith', stage)] });
+      expect(voiceProblems(tubeCopy(s), s, ['Jon', 'Jon Smith', 'Willow', 'Eliza'])).toEqual([]);
+    }
+    const nia = status({ now: [onLine('Nia Rose', 'riding')] });
+    expect(voiceProblems(tubeCopy(nia), nia, ['Nia', 'Nia Rose', 'Willow'])).toEqual([]);
     // Two names that only share a stem are two neighbors.
     expect(
       tubeCopy(status({ now: [onLine('Jon', 'riding'), onLine('Jonas', 'riding')] })).blocks[0]
@@ -474,6 +503,15 @@ describe('Treeline panel', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(readDeepLink('#venue=tube', [])).toEqual({ plot: TUBE_VENUE.plot });
     expect(linkHash(TUBE_VENUE.plot, [])).toBe('#venue=tube');
+    // Each halt opens its own panel, so each shares a link back to it; an unknown halt chooses
+    // Hedgerow Halt rather than a missing venue.
+    for (const station of TUBE_STATIONS) {
+      const hash = linkHash(station.plot, []);
+      expect(hash, station.id).toMatch(/^#venue=tube(&halt=|$)/);
+      expect(readDeepLink(hash, []), station.id).toEqual({ plot: station.plot });
+    }
+    expect(linkHash('L15', [])).toBe('#venue=tube&halt=L15');
+    expect(readDeepLink('#venue=tube&halt=Z9', [])).toEqual({ plot: TUBE_VENUE.plot });
     // The app reads and writes the address through those two.
     expect(app).toContain('readDeepLink(window.location.hash, places)');
     expect(app).toContain('linkHash(plotId, places)');

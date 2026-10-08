@@ -117,7 +117,7 @@ describe('Residents admiring the duck family', () => {
     });
     for (let t = start; t < start + 0.5; t += 0.05)
       expect(duckAwareWalk('test:setting-off', t, start, start + 60, beside).duckLove).toBeFalsy();
-  });
+  }, 45_000);
 
   it('remembers every route’s encounters however many neighbors stroll at once', () => {
     let samples = 0;

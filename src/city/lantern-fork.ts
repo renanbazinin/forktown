@@ -92,8 +92,11 @@ const apart = (a: Box, b: Box) =>
  * Every slot a lantern can ever hang in; a slot never moves once a town grows past it.
  * After the placed arcs, large lanterns fill the crown, the east lobe and the upper half of
  * the founders' lobe row by row from the bottom; small ones then pack the gaps tightly. The two
- * newer boughs come after, north then north-east, each packed the same way, so the first 182
- * slots keep their places and order: 266 in all, for the founders and 258 house plots.
+ * newer boughs come after, each packed the same way on its own (they never touch), then taken
+ * turn about, north, north-east, north, ..., so a town grown past the crown lights both boughs
+ * evenly rather than one full and one dark. The first 182 slots keep their places and order:
+ * 266 in all, for the 8 founders and 258 house plots. A town whose founders still live in it
+ * fills 8 fewer, since a founder on a house plot holds a founder's slot.
  */
 export const FORK_SLOTS: readonly ForkSlot[] = (() => {
   const slots: ForkSlot[] = PLACED.map(([x, y]) => ({ x, y, size: 'large' }));
@@ -120,21 +123,27 @@ export const FORK_SLOTS: readonly ForkSlot[] = (() => {
       }
     }
   }
-  for (const lobe of [FORK_LOBES.north, FORK_LOBES.northeast])
+  const boughs = [FORK_LOBES.north, FORK_LOBES.northeast].map((lobe) => {
+    const own: ForkSlot[] = [];
+    const taken = [...boxes];
     for (const pass of passes) {
       const { w, h } = LANTERN_SIZE[pass.size];
       for (let row = 0, y = lobe.cy + lobe.ry - 7 + pass.offset[1]; y >= lobe.cy - lobe.ry; row++) {
         const first = lobe.cx - lobe.rx + pass.offset[0] + (row % 2 ? pass.stagger : 0);
         for (let x = first; x + w <= lobe.cx + lobe.rx; x += pass.step[0]) {
           const box = { x, y, w, h };
-          if (!insideLobe(lobe, box, pass.inset) || !boxes.every((other) => apart(other, box)))
+          if (!insideLobe(lobe, box, pass.inset) || !taken.every((other) => apart(other, box)))
             continue;
-          slots.push({ x, y, size: pass.size });
-          boxes.push(box);
+          own.push({ x, y, size: pass.size });
+          taken.push(box);
         }
         y -= pass.step[1];
       }
     }
+    return own;
+  });
+  for (let k = 0; k < Math.max(...boughs.map((own) => own.length)); k++)
+    for (const own of boughs) if (k < own.length) slots.push(own[k]);
   return slots;
 })();
 

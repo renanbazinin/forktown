@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   clampZoom,
   fitView,
+  MAP_HEADER,
   neighborhoodView,
   pinchView,
   resizeView,
@@ -11,6 +12,10 @@ import {
   type Point,
   type View,
 } from '../src/lib/map-view';
+import { HOUSE_PLOTS } from '../src/lib/events';
+import { FORK_CROWN, openingPoints, openingView } from '../src/lib/opening-view';
+import { WORLD_BOUNDS } from '../src/lib/world';
+import { FROZEN_TOWN } from './district';
 
 /** Where a world point lands on screen. */
 const screen = (view: View, world: Point) => ({
@@ -177,5 +182,41 @@ describe('The map’s first views', () => {
     }));
     expect(neighborhoodView(everywhere, 1120, 640, overview).zoom).toBe(0.35);
     expect(neighborhoodView(everywhere, 390, 440, fitView(390, 440, bounds)).zoom).toBe(0.15);
+  });
+
+  it('keeps the Lantern Fork below the header when a full town opens at the floor', () => {
+    const full = HOUSE_PLOTS.map((plot) => plot.id);
+    const plain = (plots: string[], width: number, height: number) =>
+      neighborhoodView(openingPoints(plots), width, height, fitView(width, height, WORLD_BOUNDS));
+    // Every plot taken, on a laptop: the floor binds, and centred on the homes the Fork's crown
+    // would sit under the clock; the view moves down just far enough, and no further across.
+    const view = openingView(full, 1120, 640),
+      centred = plain(full, 1120, 640);
+    expect(view.zoom).toBe(0.35);
+    expect(screen(centred, FORK_CROWN).y).toBeLessThan(MAP_HEADER);
+    expect(screen(view, FORK_CROWN).y).toBeCloseTo(MAP_HEADER, 9);
+    expect(view.x).toBe(centred.x);
+    // Every size keeps it in sight, and where the crown is already clear nothing moves.
+    for (const [width, height] of [
+      [1120, 640],
+      [1440, 900],
+      [1280, 720],
+      [390, 440],
+      [390, 844],
+    ]) {
+      const opening = openingView(full, width, height);
+      expect(screen(opening, FORK_CROWN).y, `${width} × ${height}`).toBeGreaterThanOrEqual(
+        MAP_HEADER - 1e-9,
+      );
+      if (screen(plain(full, width, height), FORK_CROWN).y >= MAP_HEADER)
+        expect(opening).toEqual(plain(full, width, height));
+    }
+    // Today's town fits at its own zoom, so the crown changes nothing.
+    const today = FROZEN_TOWN.map((place) => place.plot);
+    for (const [width, height] of [
+      [1120, 640],
+      [390, 440],
+    ])
+      expect(openingView(today, width, height)).toEqual(plain(today, width, height));
   });
 });

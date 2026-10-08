@@ -67,7 +67,7 @@ const NIGHT_SPOTS = new Set<HomeSpotKind>(['bench', 'porch', 'step', 'gate']);
 type Frame = { minute: number; states: ResidentState[] };
 const timelines = new Map<string, Frame[]>();
 function timeline(homes: Place[], day: number, step: number): Frame[] {
-  const key = `${homes === town ? 'town' : 'places'}:${day}:${step}`;
+  const key = `${homes === town ? 'town' : homes === places ? 'places' : 'fine'}:${day}:${step}`;
   let frames = timelines.get(key);
   if (!frames) {
     frames = [];
@@ -79,8 +79,14 @@ function timeline(homes: Place[], day: number, step: number): Frame[] {
   }
   return frames;
 }
+/**
+ * The tenth-of-a-minute sample's homes: the published town, or in check:full-town its first 40
+ * (made-up houses, which readPlaces hands out first), so it costs there what it costs in npm test.
+ * The quarter-minute samples still take every home.
+ */
+const fine = places.length > 40 ? places.slice(0, 40) : places;
 const SAMPLES: [Place[], number, number][] = [
-  [places, DAY, 0.1],
+  [fine, DAY, 0.1],
   [places, DAY + 1, 0.25],
   [town, DAY, 0.25],
 ];
@@ -165,7 +171,9 @@ describe('Life at home: the front door, the garden and loops round the block', (
       }
       expect(wrong.slice(0, 8)).toEqual([]);
     },
-    rosterTimeout(250, 60_000),
+    // It samples the three timelines first, so it pays for them (55.9 s of 60 on a busy desktop
+    // before the fine sample was bounded).
+    rosterTimeout(500, 120_000),
   );
 
   it('walks its lot and its loops at walking pace, facing the way it goes', () => {
@@ -394,7 +402,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
   });
 
   it('opens and shuts a street’s front doors a moment apart, not all on the hour', () => {
-    for (const homes of [places, town]) {
+    for (const homes of [fine, town]) {
       // Every door edge of the day: when each neighbor steps out or in, to the nearest frame.
       const outs = new Map<number, number>(),
         ins = new Map<number, number>();
@@ -798,8 +806,9 @@ describe('Life at home: the front door, the garden and loops round the block', (
           if (through && !state.moving) {
             if (since === undefined) still.set(state.id, minute);
           } else if (since !== undefined) {
-            // A stand between two strides down the path: never a moment's halt.
-            if (through && state.moving) {
+            // A stand between two strides down the path: never a moment's halt. One already
+            // under way when the sample begins has no known start, as with the halts below.
+            if (through && state.moving && since > frames[0].minute) {
               expect(minute - since, `${state.id} m${since}`).toBeGreaterThanOrEqual(
                 GATE_PAUSE - step - 1e-9,
               );

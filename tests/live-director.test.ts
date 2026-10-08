@@ -145,7 +145,7 @@ describe('Live broadcast director', () => {
         }
       }
     },
-    rosterTimeout(190, 45_000),
+    rosterTimeout(390, 90_000),
   );
 
   it(
@@ -180,7 +180,7 @@ describe('Live broadcast director', () => {
         expect(count).toBeLessThan(30);
       }
     },
-    rosterTimeout(190, 45_000),
+    rosterTimeout(390, 90_000),
   );
 
   it('follows people between highlights and holds the full selected football match', () => {

@@ -12,11 +12,13 @@ import { districtEvents, eventsForDay, VENUES } from './events';
 import { FOOTBALL_VENUE, MATCH, TEAMS } from './football';
 import { FORK_NAME, LANTERN_HOUR, lanternRegister, type LanternRegister } from './lanterns';
 import {
+  districtAiring,
   LANTERN_SHOT,
   liveDistrictShots,
   liveHighlights,
   SCENERY_SECONDS,
   SCENERY_START,
+  type DistrictShot,
   type LiveShot,
 } from './live-director';
 import type { Place } from './schema';
@@ -69,6 +71,8 @@ export type Moment = {
   announceAt: number;
   title: string;
   place: string;
+  /** A district moment's shot: billed only when the director will air it (comingUpAt). */
+  shot?: DistrictShot;
 };
 export type WelcomeStep = {
   kind: 'card' | 'hold';
@@ -241,9 +245,10 @@ function dayMoments(day: number, homes: boolean): readonly Moment[] {
   const district = districtEvents(day);
   for (const shot of homes ? liveDistrictShots(day) : []) {
     const outing = district.find((candidate) => candidate.id === shot.outing);
-    moments.push(
-      moment('district', shot.from, shot.to, shot.label, outing?.venue.name ?? '', shot.from),
-    );
+    moments.push({
+      ...moment('district', shot.from, shot.to, shot.label, outing?.venue.name ?? '', shot.from),
+      shot,
+    });
   }
   return remember(dayMomentCache, id, moments, 64);
 }
@@ -349,19 +354,51 @@ export function comingUpAt(ms: number, places: Place[], count = 3): ComingUpItem
   const homes = places.length > 0;
   const today = townDayAt(ms);
   const upcoming: Moment[] = [];
-  // Every day bills at least three moments, so a few days always fill the rows.
+  // Every day bills at least three moments, so a few days always fill the rows. A district
+  // moment whose window is still open may yet first air after `ms`.
   for (let day = today - 1; day <= today + count + 1; day++)
     for (const moment of dayMoments(day, homes))
-      if (moment.kind !== 'postcard' && moment.announceAt > ms) upcoming.push(moment);
-  return upcoming
-    .sort((a, b) => a.announceAt - b.announceAt || a.start - b.start || a.end - b.end)
-    .slice(0, count)
-    .map((moment) => ({
-      title: moment.title,
-      place: moment.place,
-      townTime: timeLabel(townMinutesAt(moment.announceAt)),
-      startsAt: moment.announceAt,
-    }));
+      if (moment.kind !== 'postcard' && (moment.shot ? moment.end : moment.announceAt) > ms)
+        upcoming.push(moment);
+  const order = (a: Moment, b: Moment) =>
+    a.announceAt - b.announceAt || a.start - b.start || a.end - b.end;
+  upcoming.sort(order);
+  // A Riverside moment is billed only if the director will air it, from the minute it first
+  // does (districtShotAirs), so the card never promises a moment that never comes. Only the
+  // moments that would make the rows are asked; breaks still hold every window clear.
+  const rows: Moment[] = [];
+  const billed = new Set<Moment>();
+  while (rows.length < count && upcoming.length) {
+    const next = upcoming.shift()!;
+    if (!next.shot || billed.has(next)) {
+      rows.push(next);
+      continue;
+    }
+    const aired = airsAt(places, next.day, next.shot);
+    if (aired === null) continue;
+    const moment = { ...next, announceAt: next.day * TOWN_DAY_MS + aired * SECOND };
+    if (moment.announceAt <= ms) continue;
+    billed.add(moment);
+    const later = upcoming.findIndex((other) => order(moment, other) < 0);
+    upcoming.splice(later < 0 ? upcoming.length : later, 0, moment);
+  }
+  return rows.map((moment) => ({
+    title: moment.title,
+    place: moment.place,
+    townTime: timeLabel(townMinutesAt(moment.announceAt)),
+    startsAt: moment.announceAt,
+  }));
+}
+
+const districtAirings = new WeakMap<Place[], Map<string, number | null>>();
+/** The minute a roster's district shot first airs on its day, or null when it never does. */
+function airsAt(places: Place[], day: number, shot: DistrictShot): number | null {
+  let byShot = districtAirings.get(places);
+  if (!byShot) districtAirings.set(places, (byShot = new Map()));
+  const key = `${day}:${shot.outing}`;
+  const cached = byShot.get(key);
+  if (cached !== undefined) return cached;
+  return remember(byShot, key, districtAiring(places, day, shot) ?? null, 64);
 }
 
 export function calendarAt(ms: number): NonNullable<BreakCardData['calendar']> {

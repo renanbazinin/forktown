@@ -21,9 +21,10 @@ import { astronomerAt, rugOut, TELESCOPE } from '../src/city/district/stargazing
 import { drawTubeGround, drawTubes, drawTubeTraffic, type TubeScene } from '../src/city/tubes';
 import { regattaBoat, REGATTA_BOATS, starNight } from '../src/lib/district-calendar';
 import { DISTRICT_FRAMES } from '../src/lib/district-places';
-import { eventsForDay, VENUES } from '../src/lib/events';
+import { eventsForDay } from '../src/lib/events';
 import { liveCamera } from '../src/lib/live-director';
-import { fitView, neighborhoodView } from '../src/lib/map-view';
+import { fitView } from '../src/lib/map-view';
+import { openingView } from '../src/lib/opening-view';
 import { residentTrips, tripState } from '../src/lib/resident-trips';
 import type { Place } from '../src/lib/schema';
 import { townSeasonAt } from '../src/lib/seasons';
@@ -31,16 +32,15 @@ import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { BRAND } from '../src/lib/brand';
 import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
 import { TUBE_PALETTE } from '../src/city/tubes';
-import { getPlot, plotCenter, project, WORLD_BOUNDS, type Point } from '../src/lib/world';
-import { TOWNS } from './district';
-import { FULL_TOWN_CREATOR, readPlaces } from './full-town';
+import { project, WORLD_BOUNDS, type Point } from '../src/lib/world';
+import { FROZEN_TOWN, LIVE_TOWN, TOWNS } from './district';
 import { matrixContext, type MatrixPoint } from './matrix-context';
 import { recordingContext } from './recording-context';
+import { frameJumps } from './flash';
 import { openingViewBudget } from './render-budget';
 import { rosterTimeout } from './roster-timeout';
 
 const town: Place[] = TOWNS.full;
-const published = readPlaces().filter((place) => place.creator !== FULL_TOWN_CREATOR);
 const dayOf = (season: string, date: number) =>
   Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i).find((day) => {
     const calendar = townCalendarAt(day);
@@ -144,8 +144,10 @@ function paintPainter(painter: DistrictPainter, scene: DistrictScene) {
 }
 
 describe('Each district painter', () => {
-  it('draws nothing off-screen, and nothing in the ground that the minute could change', () => {
-    for (const [id, painter] of Object.entries(DISTRICT_PAINTERS))
+  it(
+    'draws nothing off-screen, and nothing in the ground that the minute could change',
+    () => {
+      // One scene a moment for all six painters, so the full town is planned five times, not 30.
       for (const [day, minutes] of [
         [PLAIN, 600],
         [REGATTA, 930],
@@ -153,21 +155,27 @@ describe('Each district painter', () => {
         [STARS, 1380],
         [BUILT, 720],
       ]) {
-        const off = paintPainter(painter, sceneAt(day, minutes, nowhere));
-        expect(off.calls, `${id} on ${day} at ${minutes}`).toHaveLength(0);
-        if (!painter.ground) continue;
-        const hidden = capture();
-        painter.ground(hidden.ctx, groundOf(day, minutes, nowhere));
-        expect(hidden.calls, `${id}'s ground off-screen`).toHaveLength(0);
-        // The ground layer is cached by the day: it is painted the same whenever it is asked.
-        const [a, b] = [capture(), capture()];
-        painter.ground(a.ctx, groundOf(day, minutes));
-        painter.ground(b.ctx, groundOf(day, minutes));
-        expect(a.calls, `${id}'s ground`).toEqual(b.calls);
+        const scene = sceneAt(day, minutes, nowhere);
+        for (const [id, painter] of Object.entries(DISTRICT_PAINTERS)) {
+          const off = paintPainter(painter, scene);
+          expect(off.calls, `${id} on ${day} at ${minutes}`).toHaveLength(0);
+          if (!painter.ground) continue;
+          const hidden = capture();
+          painter.ground(hidden.ctx, groundOf(day, minutes, nowhere));
+          expect(hidden.calls, `${id}'s ground off-screen`).toHaveLength(0);
+          // The ground layer is cached by the day: it is painted the same whenever it is asked.
+          const [a, b] = [capture(), capture()];
+          painter.ground(a.ctx, groundOf(day, minutes));
+          painter.ground(b.ctx, groundOf(day, minutes));
+          expect(a.calls, `${id}'s ground`).toEqual(b.calls);
+        }
       }
-    // The ground's scene carries no minute at all.
-    expectTypeOf<DistrictGroundScene>().not.toHaveProperty('minutes');
-  });
+      // The ground's scene carries no minute at all.
+      expectTypeOf<DistrictGroundScene>().not.toHaveProperty('minutes');
+    },
+    // The file's first full-town plans are made here.
+    rosterTimeout(0.3, 60_000),
+  );
 
   it(
     'keeps each feature’s art within its call cap, at full detail and in view',
@@ -270,22 +278,22 @@ describe('Each district painter', () => {
       const jumps: string[] = [];
       for (const [id, day, from, to] of windows) {
         const painter = DISTRICT_PAINTERS[id];
-        let before: Draw[] | undefined;
+        let before: Draw[] | undefined,
+          frames = 0;
         for (let minutes = from; minutes < to; minutes += FRAME) {
           const scene = { ...sceneAt(day, minutes), residents: [] };
           const { draws } = paintPainter(painter, scene);
-          if (
-            before &&
-            before.length === draws.length &&
-            before.every((d, i) => d.name === draws[i].name)
-          )
-            draws.forEach((draw, i) => {
-              compared++;
-              if (Math.abs(draw.alpha - before![i].alpha) > 0.08 + 1e-9)
-                jumps.push(`${id} at ${minutes.toFixed(3)}: ${before![i].alpha} → ${draw.alpha}`);
-            });
+          // Frame by frame, and lamplight that comes or goes between frames that differ too.
+          if (before) {
+            const step = frameJumps(before, draws);
+            compared += step.compared;
+            if (step.compared) frames++;
+            for (const jump of step.jumps) jumps.push(`${id} at ${minutes.toFixed(3)}: ${jump}`);
+          }
           before = draws;
         }
+        // Every window is really compared, not passed on frames elsewhere.
+        expect(frames, `${id} ${from}–${to}`).toBeGreaterThan((to - from) * 15);
       }
       // The summer meteors, across a whole star night, in the sky.
       for (const painter of Object.values(DISTRICT_PAINTERS)) {
@@ -492,36 +500,35 @@ describe('The frames that matter, with every feature on', () => {
   it(
     'keeps the real opening frame within budget, on a desktop and on a phone',
     () => {
-      // The published homes, the green and the stage, framed as City.tsx frames them (§2.4).
-      const points = [
-        ...published.map((place) => place.plot),
-        ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
-          (venue) => venue.plot,
-        ),
-      ].map((id) => plotCenter(getPlot(id)!));
-      for (const [width, height] of [
-        [1120, 640],
-        [390, 440],
-      ]) {
-        const camera = neighborhoodView(
-          points,
-          width,
-          height,
-          fitView(width, height, WORLD_BOUNDS),
-        );
-        // The market live at 10:00; the hood lamps lit at 20:10.
-        for (const minutes of [600, 1210]) {
-          const where = `${width} × ${height} at ${minutes}`;
-          expect(
-            frameCalls({ width, height, camera, homes: published, day: PLAIN, minutes }),
-            where,
-          ).toBeLessThan(openingFrameBudget(published.length, camera, width, height));
-          expect(
-            tubeCalls(camera, width, height, published, PLAIN, minutes),
-            where,
-          ).toBeLessThanOrEqual(250);
+      // The homes, the green and the stage, framed by opening-view.ts as City.tsx frames them
+      // (§2.4): today's frozen 30 homes, the spec's own frame whoever moves in, and the roster as
+      // it is, which in check:full-town is every house plot taken, at the zoom floor.
+      for (const [name, homes] of [
+        ['frozen', FROZEN_TOWN],
+        ['live', LIVE_TOWN],
+      ] as const)
+        for (const [width, height] of [
+          [1120, 640],
+          [390, 440],
+        ]) {
+          const camera = openingView(
+            homes.map((place) => place.plot),
+            width,
+            height,
+          );
+          // The market live at 10:00; the hood lamps lit at 20:10.
+          for (const minutes of [600, 1210]) {
+            const where = `${name}, ${width} × ${height} at ${minutes}`;
+            expect(
+              frameCalls({ width, height, camera, homes, day: PLAIN, minutes }),
+              where,
+            ).toBeLessThan(openingFrameBudget(homes.length, camera, width, height));
+            expect(
+              tubeCalls(camera, width, height, homes, PLAIN, minutes),
+              where,
+            ).toBeLessThanOrEqual(250);
+          }
         }
-      }
     },
     rosterTimeout(0.3, 60_000),
   );

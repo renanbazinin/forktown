@@ -39,6 +39,7 @@ import { TOWNS } from './district';
 import { matrixContext } from './matrix-context';
 import { recordingContext } from './recording-context';
 import { rosterTimeout } from './roster-timeout';
+import { frameJumps, type Draw } from './flash';
 
 const town = TOWNS.full;
 const dayOf = (season: string, date: number) =>
@@ -80,7 +81,7 @@ function sceneAt(day: number, minutes: number, zoom = 1, residents = true): Dist
 /** A recorder that also notes the fill and the alpha each call is made with. */
 function capture(ctx = recordingContext(1280, 720)) {
   const target = ctx.ctx as unknown as Record<string, unknown>;
-  const draws: { name: string; fill: string; alpha: number }[] = [];
+  const draws: Draw[] = [];
   const proxy = new Proxy(target, {
     get(object, key) {
       const value = object[key as string];
@@ -89,6 +90,7 @@ function capture(ctx = recordingContext(1280, 720)) {
         draws.push({
           name: String(key),
           fill: String(object.fillStyle),
+          stroke: String(object.strokeStyle),
           alpha: Number(object.globalAlpha),
         });
         return (value as (...a: unknown[]) => unknown)(...args);
@@ -324,30 +326,43 @@ describe('The Bandstand’s art', () => {
     }
   });
 
-  it('keeps amber for its lit lamp alone, day and night, in every season', () => {
-    const LIT = new Set(['#F4D79A', '#FFF6D8']);
-    const amberLike = (colour: string) => {
-      if (!/^#[0-9A-F]{6}/i.test(colour)) return false;
-      const n = parseInt(colour.slice(1, 7), 16);
-      const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];
-      return r >= 0xe0 && g >= 0xb0 && g <= 0xea && b <= 0xb8 && r - b >= 0x40;
-    };
-    const found: string[] = [];
-    for (const day of [BAND_DAYS.brass, BAND_DAYS.folk, BAND_DAYS.strings, REGATTA, STARS, WINTER])
-      for (let minutes = 0; minutes < 1440; minutes += 30)
-        for (const [id, painter] of [
-          ['bandstand', bandstandPainter],
-          ['landing', landingPainter],
-        ] as const) {
+  it(
+    'keeps amber for its lit lamp alone, day and night, in every season',
+    () => {
+      const LIT = new Set(['#F4D79A', '#FFF6D8']);
+      const amberLike = (colour: string) => {
+        if (!/^#[0-9A-F]{6}/i.test(colour)) return false;
+        const n = parseInt(colour.slice(1, 7), 16);
+        const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];
+        return r >= 0xe0 && g >= 0xb0 && g <= 0xea && b <= 0xb8 && r - b >= 0x40;
+      };
+      const found: string[] = [];
+      for (const day of [
+        BAND_DAYS.brass,
+        BAND_DAYS.folk,
+        BAND_DAYS.strings,
+        REGATTA,
+        STARS,
+        WINTER,
+      ])
+        for (let minutes = 0; minutes < 1440; minutes += 30) {
+          // One scene a moment for both painters: the full town is simulated once, not twice.
           const scene = sceneAt(day, minutes);
-          const { draws } = paint(painter, scene);
-          const lit = id === 'bandstand' && peakLamp(day, minutes, scene.night) > 0;
-          for (const draw of draws)
-            if (amberLike(draw.fill) && !(lit && LIT.has(draw.fill.toUpperCase())))
-              found.push(`${id} on ${day} at ${minutes}: ${draw.fill}`);
+          for (const [id, painter] of [
+            ['bandstand', bandstandPainter],
+            ['landing', landingPainter],
+          ] as const) {
+            const { draws } = paint(painter, scene);
+            const lit = id === 'bandstand' && peakLamp(day, minutes, scene.night) > 0;
+            for (const draw of draws)
+              if (amberLike(draw.fill) && !(lit && LIT.has(draw.fill.toUpperCase())))
+                found.push(`${id} on ${day} at ${minutes}: ${draw.fill}`);
+          }
         }
-    expect(found.slice(0, 5)).toEqual([]);
-  });
+      expect(found.slice(0, 5)).toEqual([]);
+    },
+    rosterTimeout(0.3, 60_000),
+  );
 
   it(
     'never flashes: the chairs, the players, the lamp, the notes and the crew fade gently',
@@ -362,19 +377,15 @@ describe('The Bandstand’s art', () => {
         [landingPainter, REGATTA, 822, 832],
         [landingPainter, REGATTA, 990, 1035],
       ] as const) {
-        let before: { name: string; alpha: number }[] | undefined;
+        let before: Draw[] | undefined;
         for (let minutes = from; minutes < to; minutes += FRAME) {
           const { draws } = paint(painter, { ...sceneAt(day, minutes, 1, false) });
-          if (
-            before &&
-            before.length === draws.length &&
-            before.every((d, i) => d.name === draws[i].name)
-          )
-            draws.forEach((draw, i) => {
-              compared++;
-              if (Math.abs(draw.alpha - before![i].alpha) > 0.08 + 1e-9)
-                jumps.push(`${minutes.toFixed(3)}: ${before![i].alpha} → ${draw.alpha}`);
-            });
+          // Frame by frame, and lamplight that comes or goes between frames that differ too.
+          if (before) {
+            const step = frameJumps(before, draws);
+            compared += step.compared;
+            for (const jump of step.jumps) jumps.push(`${minutes.toFixed(3)}: ${jump}`);
+          }
           before = draws;
         }
       }

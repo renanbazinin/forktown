@@ -3,8 +3,11 @@ import { recordingContext } from './recording-context';
 // A recording context that also tracks the full canvas transform, so a test can ask where every
 // primitive actually lands in world pixels: under scale, rotate, skews and the ground cache's
 // setTransform. It wraps recordingContext(), so `calls` is exactly what that recorder logs and
-// call budgets are unchanged. Paths and clips are not evaluated: a clipped-away pixel still
-// counts, which is the conservative side for the sightline and containment tests.
+// call budgets are unchanged; getTransform returns the tracked matrix. Paths and clips are not
+// evaluated: a clipped-away pixel still counts, which is the conservative side for the sightline
+// and containment tests. With `float32` the matrix is kept in single precision, rounded after
+// every multiply as Chrome's canvas keeps it, so a test can catch transforms that are undone
+// arithmetically instead of exactly.
 
 export type Matrix = [a: number, b: number, c: number, d: number, e: number, f: number];
 export type MatrixPoint = { x: number; y: number; call: string; index: number };
@@ -47,7 +50,7 @@ const IGNORED = new Set([
   'getTransform',
 ]);
 
-export function matrixContext(width = 1440, height = 900) {
+export function matrixContext(width = 1440, height = 900, { float32 = false } = {}) {
   const base = recordingContext(width, height);
   const target = base.ctx as unknown as Record<string, unknown> & CanvasRenderingContext2D;
   let m: Matrix = [1, 0, 0, 1, 0, 0];
@@ -64,6 +67,7 @@ export function matrixContext(width = 1440, height = 900) {
       a * e2 + c * f2 + e,
       b * e2 + d * f2 + f,
     ];
+    if (float32) m = m.map(Math.fround) as Matrix;
   };
   const at = (x: number, y: number, call: string) =>
     points.push({
@@ -110,6 +114,7 @@ export function matrixContext(width = 1440, height = 900) {
           typeof o === 'object'
             ? [o.a ?? 1, o.b ?? 0, o.c ?? 0, o.d ?? 1, o.e ?? 0, o.f ?? 0]
             : (n.slice(0, 6) as Matrix);
+        if (float32) m = m.map(Math.fround) as Matrix;
         break;
       }
       case 'resetTransform':
@@ -198,7 +203,13 @@ export function matrixContext(width = 1440, height = 900) {
       if (typeof key !== 'string' || typeof value !== 'function') return value;
       return (...args: unknown[]) => {
         track(key, args);
-        return (value as (...args: unknown[]) => unknown)(...args);
+        const result = (value as (...args: unknown[]) => unknown)(...args);
+        // The tracked matrix, so code that saves the transform and sets it back keeps the camera.
+        if (key === 'getTransform') {
+          const [a, b, c, d, e, f] = m;
+          return { a, b, c, d, e, f, is2D: true };
+        }
+        return result;
       };
     },
     set(object, key, value) {

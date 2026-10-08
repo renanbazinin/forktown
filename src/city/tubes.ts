@@ -609,13 +609,18 @@ const FAR = 0.5;
  *  piers stand on their feet and the still water carries reflections. Below it the line keeps the
  *  plain art, so the opening view and the whole town cost what they did. */
 const DETAIL = 1;
+/** Below this the phone's opening view holds the whole loop, about 0.15: each halt's run of spur
+ *  glass is one stroke and a dock bubble one square. The whole town at fit (0.245) stays above. */
+const WHOLE = 0.2;
 /**
- * A ground piece's points for painting at a zoom: below zoom 1 every other corner sample goes, so
- * a corner is four slices, not eight (its centreline moves under half a pixel); below FAR every
+ * A piece's points for painting at a zoom. A spur piece below FAR is its chord: at most half a
+ * tile, a few pixels on screen. A ground piece below zoom 1 loses every other corner sample, so a
+ * corner is four slices, not eight (its centreline moves under half a pixel); below FAR every
  * other elbow sample goes too (under a pixel). The ends and the straight runs always stay.
  */
 const COARSE = new Map<string, WeakMap<TubePiece, readonly TubePoint[]>>();
 function coarse(piece: TubePiece, zoom: number): readonly TubePoint[] {
+  if (zoom < FAR && piece.layer === 'spur') return [piece.points[0], piece.points.at(-1)!];
   if (zoom >= 1 || piece.layer !== 'ground') return piece.points;
   const level = zoom < FAR ? 'far' : 'near';
   let cache = COARSE.get(level);
@@ -636,14 +641,15 @@ function coarse(piece: TubePiece, zoom: number): readonly TubePoint[] {
 /** A piece's glass: in vertical slices, or close up as the runs it is painted in (runsOf). */
 function paintGlass(
   ctx: Ctx,
+  base: DOMMatrix,
   piece: TubePiece,
   emphasis: TubeEmphasis,
   night: boolean,
   lod: number,
   zoom: number,
 ) {
-  if (zoom >= DETAIL) return paintRuns(ctx, runsOf(piece), emphasis, night, lod);
-  paintSlices(ctx, coarse(piece, zoom), emphasis, night, lod, zoom);
+  if (zoom >= DETAIL) return paintRuns(ctx, base, runsOf(piece), emphasis, night, lod);
+  paintSlices(ctx, base, coarse(piece, zoom), emphasis, night, lod, zoom);
 }
 /** Which of a run's layers to paint: its halo (when selected), its glass and lines, or both. */
 type Parts = 'all' | 'halo' | 'glass';
@@ -652,11 +658,14 @@ const halfOf = (a: TubePoint, b: TubePoint) =>
   onBank(a) && onBank(b) ? TUBE_ALTITUDE.bankRadius : TUBE_ALTITUDE.radius;
 /** Glass as vertical-slice parallelograms: consecutive runs share their end edges exactly, so
  * the translucent glass never doubles up. One canvas state for the whole run, moving between
- * each slice's origin and slope with relative transforms and undoing them with one more. 5 px,
+ * each slice's origin and slope with relative transforms, then back to `base`, the layer's own
+ * matrix, exactly: an arithmetic inverse leaves the browser's float32 matrix a hair off, and
+ * every house sprite and football cache painted after the glass would then draw directly. 5 px,
  * 4 px down the bank run. Zoomed out, the 1-px rows go first: the rim below zoom 1, the
  * highlight below FAR, where they are a fraction of a pixel. */
 function paintSlices(
   ctx: Ctx,
+  base: DOMMatrix,
   ground: readonly TubePoint[],
   emphasis: TubeEmphasis,
   night: boolean,
@@ -668,7 +677,8 @@ function paintSlices(
   const alpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha * lod;
   let origin = { x: 0, y: 0 },
-    slope = 0;
+    slope = 0,
+    moved = false;
   for (let k = 1; k < points.length; k++) {
     const a = points[k - 1],
       b = points[k];
@@ -677,6 +687,7 @@ function paintSlices(
     const nextSlope = (b.y - a.y) / dx,
       shiftX = a.x - origin.x;
     ctx.transform(1, nextSlope - slope, 0, 1, shiftX, a.y - origin.y - slope * shiftX);
+    moved = true;
     origin = a;
     slope = nextSlope;
     const half = halfOf(ground[k - 1], ground[k]);
@@ -687,9 +698,8 @@ function paintSlices(
     if (zoom >= FAR) box(ctx, 0, -half, dx, 1, highlight(emphasis, night));
     if (zoom >= 1) box(ctx, 0, half - 1, dx, 1, pick(GLASS.rim, night));
   }
-  // Back to the caller's transform: the inverse of the run's origin and slope.
-  if (origin.x || origin.y || slope)
-    ctx.transform(1, -slope, 0, 1, -origin.x, slope * origin.x - origin.y);
+  // Back to the caller's transform, bit for bit.
+  if (moved) ctx.setTransform(base);
   ctx.globalAlpha = alpha;
 }
 
@@ -953,6 +963,7 @@ function clipOut(ctx: Ctx, area: GroundArea, band: readonly Point[]) {
  */
 function paintRuns(
   ctx: Ctx,
+  base: DOMMatrix,
   runs: readonly GlassRun[],
   emphasis: TubeEmphasis,
   night: boolean,
@@ -962,7 +973,7 @@ function paintRuns(
   const paintRun = (run: GlassRun, parts: Parts) =>
     run.outline
       ? paintBentGlass(ctx, run.points, emphasis, night, lod, parts)
-      : paintSlices(ctx, run.points, emphasis, night, lod, DETAIL, parts);
+      : paintSlices(ctx, base, run.points, emphasis, night, lod, DETAIL, parts);
   if (runs.length === 1 && !under) return paintRun(runs[0], 'all');
   // Round all of them and their halo, 4 px off the centreline.
   const area = boundsOf(
@@ -991,12 +1002,21 @@ export const tubeGlassRuns = (piece: TubePiece) =>
     points: screenOf(run.points),
     edges: run.outline ? bentOf(run.points).edges : undefined,
   }));
-/** A box between two screen points along their line, from v0 to v1 px below it. */
-function slab(ctx: Ctx, a: Point, b: Point, v0: number, v1: number, colour: string) {
+/** A box between two screen points along their line, from v0 to v1 px below it, then back to
+ *  `base` exactly (paintSlices). */
+function slab(
+  ctx: Ctx,
+  base: DOMMatrix,
+  a: Point,
+  b: Point,
+  v0: number,
+  v1: number,
+  colour: string,
+) {
   const slope = (b.y - a.y) / (b.x - a.x);
   ctx.transform(1, slope, 0, 1, a.x, a.y);
   box(ctx, 0, v0, b.x - a.x, v1 - v0, colour);
-  ctx.transform(1, -slope, 0, 1, -a.x, slope * a.x - a.y);
+  ctx.setTransform(base);
 }
 /** A flat ring on the water round something standing in it. */
 function ring(ctx: Ctx, x: number, y: number, rx: number, night: boolean) {
@@ -1023,6 +1043,12 @@ function paintBubble(
     ctx.beginPath();
     ctx.arc(at.x, at.y, 5.5, 0, Math.PI * 2);
     ctx.fill();
+  }
+  // With the whole loop in view the 8-px ball is a square.
+  if (zoom < WHOLE) {
+    box(ctx, at.x - 3, at.y - 3, 6, 6, pick(GLASS.bubble, night));
+    ctx.globalAlpha = alpha;
+    return;
   }
   ctx.fillStyle = pick(GLASS.bubble, night);
   ctx.beginPath();
@@ -1192,7 +1218,9 @@ function reach(capsule: Capsule, way: 1 | -1, cap: number) {
 /** A capsule lying along its glass segment, head first, in local u (forward) and v (down); then
  * a pane of glass and the highlight row over it at the glass's own strength, so it reads as
  * inside. Every box is cut where the glass turns away (`reach`), so nothing pokes out at a
- * corner, a bend or a stack's top. A rider is at most 11 calls, a parcel 9. */
+ * corner, a bend or a stack's top. A rider is at most 11 calls, a parcel 9. Below DETAIL a
+ * rider's faint trail goes (a pixel or two); below FAR, where a rider is a few pixels long, the
+ * capsule is its body in the wash. */
 function paintCapsule(
   ctx: Ctx,
   capsule: Capsule,
@@ -1216,10 +1244,15 @@ function paintCapsule(
       b = Math.min(u1 + shift, high);
     if (b > a) box(ctx, f > 0 ? a : -b, v0, b - a, v1 - v0, color);
   };
-  if (look) {
+  if (scene.zoom < FAR) {
+    const body = look?.outfit;
+    part(-6, 4, -1, 1.5, body ? (night ? tint(body, NIGHT_DIM) : body) : pick(KRAFT.box, night));
+  } else if (look) {
     const dim = (color: string) => (night ? tint(color, NIGHT_DIM) : color);
-    part(-13, -6, 0, 1, dim(look.outfit) + '40');
-    part(-6, -3, -0.5, 1.5, dim(look.outfit) + '80');
+    if (scene.zoom >= DETAIL) {
+      part(-13, -6, 0, 1, dim(look.outfit) + '40');
+      part(-6, -3, -0.5, 1.5, dim(look.outfit) + '80');
+    }
     part(-3, -1, 0, 1.5, dim(TROUSERS));
     part(-1, 2, -1, 1.5, dim(look.outfit));
     part(2, 4, -1, 1, dim(look.skin));
@@ -1239,7 +1272,7 @@ function paintCapsule(
     2.5,
     pick(scene.followed === capsule.id ? GLASS.followWash : GLASS.wash, night),
   );
-  part(tail, head, -2.5, -1.5, highlight(emphasis, night));
+  if (scene.zoom >= FAR) part(tail, head, -2.5, -1.5, highlight(emphasis, night));
   ctx.restore();
 }
 
@@ -1324,8 +1357,17 @@ function paintStack(ctx: Ctx, station: TubeStation, scene: TubeScene, inside: In
       if (!last) ctx.save();
       const offset = (i - (figures.length - 1) / 2) * 3;
       ctx.transform(pose.sx, 0, 0, pose.sy, x + offset, y - 2 - pose.lift);
-      // Dimmed at night like the walker who stepped in.
-      drawResident(ctx, figure.resident, 0, 0, 1.25, STANDING, { shadow: false, night });
+      // Dimmed at night like the walker who stepped in. Below DETAIL, behind the glass for the
+      // quarter of a second it is in the stack: hair, face, outfit and trousers in four boxes
+      // instead of the whole drawResident, so two of the heaviest figures stepping in together
+      // keep the opening view within its budget.
+      if (scene.zoom < DETAIL) {
+        const dim = (color: string) => (night ? tint(color, NIGHT_DIM) : color);
+        box(ctx, -4, -30, 8, 3, dim(figure.resident.hair));
+        box(ctx, -4, -27, 8, 6, dim(figure.resident.skin));
+        box(ctx, -5, -21, 10, 12, dim(figure.resident.outfit));
+        box(ctx, -4, -9, 8, 9, dim(TROUSERS));
+      } else drawResident(ctx, figure.resident, 0, 0, 1.25, STANDING, { shadow: false, night });
       if (!last) ctx.restore();
     });
     ctx.restore();
@@ -1402,8 +1444,8 @@ function paintSign(ctx: Ctx, scene: TubeScene) {
 function paintStand(ctx: Ctx, scene: TubeScene) {
   const { night } = scene;
   const { x, y } = rounded(STAND_FOOT);
-  // Zoomed out, the bucket and the furled umbrella alone.
-  const far = scene.zoom < FAR;
+  // Below DETAIL, the bucket and the furled umbrella alone.
+  const far = scene.zoom < DETAIL;
   if (!far) box(ctx, x - 3, y, 7, 1, pick(SHADOW, night));
   box(ctx, x - 1, y - 15, 2, 10, pick(UMBRELLA.cloth, night));
   if (!far) {
@@ -1422,7 +1464,8 @@ function paintStand(ctx: Ctx, scene: TubeScene) {
 }
 /** A puff lasts half a minute; the one at the drop starts 0.08 min into stepping off. */
 const PUFF_TIMES = { minutes: 0.5, drop: 0.08 } as const;
-/** A soft puff of air at the stack's foot, `age` minutes old: two rings and four grass bits. */
+/** A soft puff of air at the stack's foot, `age` minutes old: two rings and four grass bits; below
+ *  DETAIL one ring between the two, and no grass. */
 function paintPuff(ctx: Ctx, station: TubeStation, age: number, night: boolean, zoom: number) {
   const c = project(station.stack.x, station.stack.y);
   const k = clamp01(age / PUFF_TIMES.minutes);
@@ -1430,14 +1473,14 @@ function paintPuff(ctx: Ctx, station: TubeStation, age: number, night: boolean, 
   ctx.globalAlpha = alpha * (1 - k);
   ctx.strokeStyle = pick(PUFF, night);
   ctx.lineWidth = 1;
-  for (const r of [9 + 12 * k, 5 + 16 * k]) {
+  for (const r of zoom < DETAIL ? [7 + 14 * k] : [9 + 12 * k, 5 + 16 * k]) {
     ctx.beginPath();
     ctx.ellipse(c.x, c.y - 1, r, r / 2, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.fillStyle = pick(PUFF_GRASS, night);
-  // Zoomed out, the rings alone: the grass bits are under a pixel.
-  if (zoom >= FAR)
+  // Below DETAIL, the ring alone: the grass bits are under a pixel.
+  if (zoom >= DETAIL)
     for (const [dx, lift] of [
       [-1, 1],
       [1, 1.3],
@@ -1612,7 +1655,13 @@ const REFLECTION_TICKS = lazy(() => {
  * down the head pool, and each bank pier's dark reflection and the ring round its foot (a plain
  * ripple from FAR). The pilings carry their own (paintPost).
  */
-function paintStillWater(ctx: Ctx, night: boolean, zoom: number, visible: Visible) {
+function paintStillWater(
+  ctx: Ctx,
+  base: DOMMatrix,
+  night: boolean,
+  zoom: number,
+  visible: Visible,
+) {
   if (zoom < FAR) return;
   if (zoom >= DETAIL) {
     const ticks = REFLECTION_TICKS();
@@ -1625,7 +1674,7 @@ function paintStillWater(ctx: Ctx, night: boolean, zoom: number, visible: Visibl
     const a = project(TUBE_BANK_X, POOL_END),
       b = project(TUBE_BANK_X, trunkPoint(TRUNK_ENDS.to).y);
     if (visible({ x: (a.x + b.x) / 2, y: b.y }, Math.abs(b.x - a.x) / 2 + 2, b.y - a.y + 2, 2))
-      slab(ctx, a, b, 0, 1, pick(GLASS_SHADE, night));
+      slab(ctx, base, a, b, 0, 1, pick(GLASS_SHADE, night));
   }
   for (const pier of SPUR_POSTS()) {
     if (!pier.water) continue;
@@ -1652,6 +1701,8 @@ export function drawTubeGround(
     Partial<Pick<TubeScene, 'emphasis' | 'station'>>,
 ) {
   const { night, visible } = scene;
+  // The layer's own matrix, which the glass's slices return to exactly.
+  const base = ctx.getTransform();
   const marked = (id: string) => (scene.station === id ? (scene.emphasis ?? 'none') : 'none');
   for (const station of TUBE_STATIONS) {
     const { x, y } = rounded(station.stack);
@@ -1668,7 +1719,7 @@ export function drawTubeGround(
     ctx.ellipse(x, y, 11, 5.5, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  paintStillWater(ctx, night, scene.zoom, visible);
+  paintStillWater(ctx, base, night, scene.zoom, visible);
   for (const post of TUBE_TRUNK_POSTS)
     if (visible(project(post.x, post.y), 6, post.height + 1, 6))
       paintPost(ctx, post, post.height, night, post.water, scene.zoom);
@@ -1678,7 +1729,7 @@ export function drawTubeGround(
       // Close up a halt's own glass is painted with the rest of its junction, below.
       if (close && !piece.trunk) continue;
       const emphasis = piece.trunk ? 'none' : marked(piece.station);
-      paintGlass(ctx, piece, emphasis, night, glassLod(scene.zoom, emphasis), scene.zoom);
+      paintGlass(ctx, base, piece, emphasis, night, glassLod(scene.zoom, emphasis), scene.zoom);
     }
   if (close)
     for (const station of TUBE_STATIONS) {
@@ -1687,7 +1738,7 @@ export function drawTubeGround(
       if (!visible({ x: (left + right) / 2, y: bottom }, (right - left) / 2, bottom - top, 0))
         continue;
       const emphasis = marked(station.id);
-      paintRuns(ctx, runs, emphasis, night, glassLod(scene.zoom, emphasis), under);
+      paintRuns(ctx, base, runs, emphasis, night, glassLod(scene.zoom, emphasis), under);
     }
   // A station between two others joins the trunk with both elbows; a bubble at its tap hides the
   // T, where a trunk post would otherwise stand.
@@ -1697,6 +1748,70 @@ export function drawTubeGround(
     if (at && visible(at, 6, 6, 6))
       paintBubble(ctx, at, emphasis, night, glassLod(scene.zoom, emphasis), scene.zoom);
   }
+}
+
+/**
+ * Below WHOLE, the spur glass in view as runs: each run is consecutive pieces of one halt's spur
+ * that meet end to end, keyed by its first piece's index. That piece paints the run as one stroke
+ * (paintSpurRun); the others paint only their riders.
+ */
+function spurRuns(visible: Visible) {
+  const runs = new Map<number, TubePiece[]>();
+  let run: number[] = [];
+  const flush = () => {
+    if (run.length)
+      runs.set(
+        run[0],
+        run.map((i) => TUBE_PIECES[i]),
+      );
+    run = [];
+  };
+  TUBE_PIECES.forEach((piece, index) => {
+    if (piece.layer !== 'spur' || !pieceVisible(piece, visible)) return flush();
+    const last = run.at(-1);
+    if (last !== undefined) {
+      const end = TUBE_PIECES[last].points.at(-1)!,
+        start = piece.points[0];
+      const joined =
+        last === index - 1 &&
+        TUBE_PIECES[last].station === piece.station &&
+        Math.hypot(end.x - start.x, end.y - start.y) <= 1e-6;
+      if (!joined) flush();
+    }
+    run.push(index);
+  });
+  flush();
+  return runs;
+}
+/** A run of spur glass zoomed right out: one stroke through its pieces' ends, the glass's width,
+ *  over its halo when selected. */
+function paintSpurRun(
+  ctx: Ctx,
+  run: readonly TubePiece[],
+  emphasis: TubeEmphasis,
+  night: boolean,
+  lod: number,
+) {
+  const alpha = ctx.globalAlpha,
+    width = ctx.lineWidth;
+  ctx.globalAlpha = alpha * lod;
+  ctx.beginPath();
+  const first = lifted(run[0].points[0]);
+  ctx.moveTo(first.x, first.y);
+  for (const piece of run) {
+    const end = lifted(piece.points.at(-1)!);
+    ctx.lineTo(end.x, end.y);
+  }
+  if (emphasis === 'selected') {
+    ctx.strokeStyle = pick(GLASS.halo, night);
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+  ctx.strokeStyle = pick(GLASS.body, night);
+  ctx.lineWidth = 2 * TUBE_ALTITUDE.radius;
+  ctx.stroke();
+  ctx.lineWidth = width;
+  ctx.globalAlpha = alpha;
 }
 
 /** Riders and parcels in the glass behind the tree lines and on the far bank, per frame, before
@@ -1714,8 +1829,11 @@ export function drawTubeTraffic(ctx: Ctx, scene: TubeScene) {
 export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
   const { night, visible } = scene;
   const out: TubeObject[] = [];
+  // The frame's matrix, which every object is painted at and the glass returns to exactly.
+  const base = ctx.getTransform();
   let traffic: Capsule[] | undefined;
   const capsules = () => (traffic ??= capsulesOf(scene));
+  const runs = scene.zoom < WHOLE ? spurRuns(visible) : undefined;
   TUBE_PIECES.forEach((piece, index) => {
     if (piece.layer !== 'spur' || !pieceVisible(piece, visible)) return;
     const riding = capsules().filter(
@@ -1737,7 +1855,11 @@ export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
       ground: { x: a.x, y: a.y },
       slope: (gb.y - ga.y) / (gb.x - ga.x),
       paint: () => {
-        paintGlass(ctx, piece, emphasis, night, lod, scene.zoom);
+        if (!runs) paintGlass(ctx, base, piece, emphasis, night, lod, scene.zoom);
+        else {
+          const run = runs.get(index);
+          if (run) paintSpurRun(ctx, run, emphasis, night, lod);
+        }
         for (const capsule of riding) paintCapsule(ctx, capsule, scene, lod, emphasis);
       },
     });

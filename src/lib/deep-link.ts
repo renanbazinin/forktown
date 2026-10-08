@@ -40,7 +40,8 @@ export type DeepLink = { plot: string } | { missing: keyof typeof MISSING_LINK_C
 
 /**
  * Where a shared link (#place=… or #venue=…) points: a plot on the map, something the town does
- * not have, or nothing at all.
+ * not have, or nothing at all. `#venue=tube` chooses Hedgerow Halt, and `#venue=tube&halt=<plot>`
+ * another halt; an unknown halt falls back to Hedgerow Halt.
  */
 export function readDeepLink(
   hash: string,
@@ -49,6 +50,10 @@ export function readDeepLink(
   const params = new URLSearchParams(hash.replace(/^#/, ''));
   const venue = params.get('venue'),
     id = params.get('place');
+  if (venue === 'tube') {
+    const halt = params.get('halt');
+    return { plot: halt !== null && isTubePlot(halt) ? halt : TUBE_VENUE.plot };
+  }
   const venuePlot = venue === null ? undefined : VENUE_LINKS.get(venue);
   if (venuePlot) return { plot: venuePlot };
   const place = id === null ? undefined : places.find((place) => place.id === id);
@@ -74,7 +79,10 @@ const VENUE_OF: [string, (plot: string) => boolean][] = [
   ['landing', (plot) => plot === LANDING_VENUE.plot],
 ];
 
-/** The shared link (#place=… or #venue=…) for a selected plot, or '' for none. */
+/**
+ * The shared link (#place=… or #venue=…) for a selected plot, or '' for none. Each halt of the
+ * Treeline opens its own panel, so a halt other than Hedgerow Halt names its plot.
+ */
 export function linkHash(
   plot: string | null,
   places: readonly { id: string; plot: string }[],
@@ -82,6 +90,8 @@ export function linkHash(
   if (!plot) return '';
   const place = places.find((place) => place.plot === plot);
   if (place) return `#place=${encodeURIComponent(place.id)}`;
+  if (isTubePlot(plot))
+    return plot === TUBE_VENUE.plot ? '#venue=tube' : `#venue=tube&halt=${plot}`;
   const venue = VENUE_OF.find(([, holds]) => holds(plot));
   return venue ? `#venue=${venue[0]}` : '';
 }

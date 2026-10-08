@@ -13,7 +13,7 @@ import type { ResidentState } from '../lib/simulation';
 import { residentActivityLabel } from '../lib/simulation';
 import { PLOT_COPY } from '../lib/brand';
 import { FollowErrandItem } from './ErrandItemPreview';
-import { VENUES, venueAt, type TownEvent } from '../lib/events';
+import { venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
 import {
   BANDSTAND_VENUE,
@@ -27,7 +27,6 @@ import { project, WORLD_BOUNDS } from '../lib/world';
 import {
   clampZoom,
   fitView,
-  neighborhoodView,
   pinchView,
   resizeView,
   steadyListening,
@@ -35,6 +34,7 @@ import {
   type Point,
   type Size,
 } from '../lib/map-view';
+import { openingView } from '../lib/opening-view';
 import {
   FOOTBALL_CENTER,
   FOOTBALL_VENUE,
@@ -331,23 +331,18 @@ const City = forwardRef<CityHandle, Props>(function City(
     framing.current = defaultCamera;
     setCamera(defaultCamera(size.width, size.height));
   }, [defaultCamera, size]);
-  // Frame where people live (map-view.ts): the homes, the green and the stage.
+  // Frame where people live (opening-view.ts): the homes, the green and the stage, with the
+  // Lantern Fork's crown kept below the header.
   const neighborhoodCamera = useCallback(
-    (width: number, height: number): Camera =>
-      neighborhoodView(
-        [
-          ...initialPlaces.current.map((place) => place.plot),
-          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
-            (venue) => venue.plot,
-          ),
-        ].flatMap((id) => {
-          const plot = getPlot(id);
-          return plot ? [plotCenter(plot)] : [];
-        }),
+    (width: number, height: number): Camera => {
+      // The whole-town fit still sets the zoom range.
+      defaultCamera(width, height);
+      return openingView(
+        initialPlaces.current.map((place) => place.plot),
         width,
         height,
-        defaultCamera(width, height),
-      ),
+      );
+    },
     [defaultCamera],
   );
   const stopFollowing = useCallback(() => {
