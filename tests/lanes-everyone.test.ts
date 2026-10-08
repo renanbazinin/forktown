@@ -71,7 +71,10 @@ describe('Planning lanes together', () => {
     // The frozen town with every free plot taken, alone and with a newcomer out all day on H14:
     // the hours where a guest on the way to or from an outing caught up with someone out on a
     // loop, and the two walked as one figure for up to 4.6 minutes when the outings' lanes were
-    // planned first and the loops' around them (neither could make room alone).
+    // planned first and the loops' around them (neither could make room alone). And Autumn 26's
+    // hour, where a zoo guest back by tube turned into x = 5.5 just behind a loop walker, each in
+    // the lane worst for the other: one head over the other for 3.6 minutes while the planner
+    // moved one walker at a time, as getting clear takes both edging over at once.
     const town = fullTown(FROZEN_TOWN);
     const newcomer = fullTown([...FROZEN_TOWN, outAllDay('H14')]);
     for (const [homes, season, date, from] of [
@@ -79,6 +82,7 @@ describe('Planning lanes together', () => {
       [town, 'Summer', 14, 12 * 60 + 55],
       [town, 'Autumn', 22, 23 * 60],
       [town, 'Spring', 23, 12 * 60 + 15],
+      [town, 'Autumn', 26, 16 * 60 + 40],
       [newcomer, 'Spring', 1, 12 * 60 + 15],
     ] as const) {
       const day = dayOf(season, date);
@@ -86,7 +90,7 @@ describe('Planning lanes together', () => {
       expect(longest.fused, at.fused).toBeLessThan(2);
       expect(longest.stacked, at.stacked).toBeLessThan(3);
     }
-    // Two full towns' day plans and five hours of frames: about 10 s alone, more beside others.
+    // Two full towns' day plans and six hours of frames: about 12 s alone, more beside others.
   }, 120_000);
 });
 
