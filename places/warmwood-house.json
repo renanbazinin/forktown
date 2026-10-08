@@ -1,0 +1,41 @@
+{
+  "id": "warmwood-house",
+  "name": "Warmwood House",
+  "creator": "tova91206",
+  "plot": "G1",
+  "building": "greenhouse",
+  "color": "#99ccb8",
+  "decoration": "flowers",
+  "story": "Warmwood House was built to be a place that always feels good to come home to. Surrounded by trees, flowers, and warm light, its door is always open—a place to pause, breathe, talk",
+  "design": {
+    "wall": "#ffffff",
+    "trim": "#794715",
+    "floors": 1,
+    "roof": "gable",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Refael",
+    "figure": "male",
+    "skin": "#eccda7",
+    "hair": "#c58326",
+    "outfit": "#85af83",
+    "accessory": "hat",
+    "greeting": "Hey! Great seeing ya! Swing by sometime!",
+    "routine": {
+      "morning": "home",
+      "afternoon": "work",
+      "evening": "stroll",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "<div style=\"background-color:#F3E7D0; color:#5B4636; font-size:20px; font-weight:bold; text-align:center;\">\n  WARMWOOD HOUSE<br>\n  <span style=\"font-size:16px; font-weight:normal;\">COME IN, STAY AWHILE</span>\n</div>"
+  }
+}
