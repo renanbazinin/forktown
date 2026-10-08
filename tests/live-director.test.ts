@@ -29,6 +29,7 @@ import { SKATING, millpondSkatingDay } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { AFTER_HOURS, HOMES } from './fixtures';
 import { readPlaces } from './full-town';
+import { rosterTimeout } from './roster-timeout';
 
 const places = readPlaces();
 const shotAt = (day: number, minute: number) =>
@@ -36,118 +37,128 @@ const shotAt = (day: number, minute: number) =>
 
 describe('Live broadcast director', () => {
   // Every minute of four days for four towns: seconds of work, so it gets a generous timeout.
-  it('keeps the scenery window and films only selected events or eligible outdoor subjects', () => {
-    const sleepers = places.map((p) => ({
-      ...p,
-      resident: {
-        ...p.resident,
-        routine: { morning: 'home', afternoon: 'home', evening: 'home', night: 'sleep' } as const,
-      },
-    }));
-    for (const homes of [places, sleepers, [], [AFTER_HOURS]]) {
-      for (let day = 0; day < 4; day++) {
-        const program = liveProgram(homes, day);
-        let scenery = 0;
-        for (let minute = 0; minute < 1440; minute++) {
-          const residents = simulateResidents(homes, minute, day);
-          const shot = liveShotAt(program, minute, residents);
-          if (shot.kind === 'home') {
-            if (shot.id.startsWith('postcard:')) {
-              scenery++;
-              expect(minute).toBeGreaterThanOrEqual(SCENERY_START);
-              expect(minute).toBeLessThan(SCENERY_START + SCENERY_SECONDS);
-            } else {
-              expect(
-                residents.some(
-                  (resident) =>
-                    resident.activity === 'stroll' && resident.event?.phase !== 'attending',
-                ),
-              ).toBe(false);
-              expect(townCatAt(homes, minute, day).outside).toBe(false);
-            }
-          } else if (shot.kind === 'neighbor') {
-            const subject = residents.find((r) => r.id === shot.residentId)!;
-            expect(subject.activity).toBe('stroll');
-            // Skaters on the Millpond are followable whatever the lineup (no show to skip).
-            if (subject.event?.phase === 'attending' && subject.event.id !== 'millpond') {
-              const highlight =
-                subject.event.id === 'football' || subject.event.id === 'cinema'
-                  ? subject.event.id
-                  : program.events.find((event) => event.id === subject.event?.id)!.period;
-              expect(
-                liveHighlights(highlight === 'night' && minute < 360 ? day - 1 : day),
-              ).toContain(highlight);
-            }
-          } else if (shot.kind === 'event') {
-            if (shot.id.startsWith('football:')) {
-              expect(program.highlights).toContain('football');
-              expect(footballAt(minute, day).live).toBe(true);
-              expect(minute).toBeGreaterThanOrEqual(640);
-              expect(minute).toBeLessThan(780);
-            } else {
-              const event = eventsForDay(day).find((event) => shot.id.endsWith(`:${event.id}`))!;
-              expect(event).toBeDefined();
-              expect(
-                liveHighlights(event.period === 'night' && minute < 360 ? day - 1 : day),
-              ).toContain(event.id === 'cinema' ? 'cinema' : event.period);
-              expect(isEventLive(event, minute)).toBe(true);
-              if (event.venue.kind === 'green')
+  it(
+    'keeps the scenery window and films only selected events or eligible outdoor subjects',
+    () => {
+      const sleepers = places.map((p) => ({
+        ...p,
+        resident: {
+          ...p.resident,
+          routine: { morning: 'home', afternoon: 'home', evening: 'home', night: 'sleep' } as const,
+        },
+      }));
+      for (const homes of [places, sleepers, [], [AFTER_HOURS]]) {
+        for (let day = 0; day < 4; day++) {
+          const program = liveProgram(homes, day);
+          let scenery = 0;
+          for (let minute = 0; minute < 1440; minute++) {
+            const residents = simulateResidents(homes, minute, day);
+            const shot = liveShotAt(program, minute, residents);
+            if (shot.kind === 'home') {
+              if (shot.id.startsWith('postcard:')) {
+                scenery++;
+                expect(minute).toBeGreaterThanOrEqual(SCENERY_START);
+                expect(minute).toBeLessThan(SCENERY_START + SCENERY_SECONDS);
+              } else {
                 expect(
                   residents.some(
-                    (r) =>
-                      r.activity === 'stroll' &&
-                      r.event?.id === event.id &&
-                      r.event.phase === 'attending',
+                    (resident) =>
+                      resident.activity === 'stroll' && resident.event?.phase !== 'attending',
                   ),
-                ).toBe(true);
+                ).toBe(false);
+                expect(townCatAt(homes, minute, day).outside).toBe(false);
+              }
+            } else if (shot.kind === 'neighbor') {
+              const subject = residents.find((r) => r.id === shot.residentId)!;
+              expect(subject.activity).toBe('stroll');
+              // Skaters on the Millpond are followable whatever the lineup (no show to skip).
+              if (subject.event?.phase === 'attending' && subject.event.id !== 'millpond') {
+                const highlight =
+                  subject.event.id === 'football' || subject.event.id === 'cinema'
+                    ? subject.event.id
+                    : program.events.find((event) => event.id === subject.event?.id)!.period;
+                expect(
+                  liveHighlights(highlight === 'night' && minute < 360 ? day - 1 : day),
+                ).toContain(highlight);
+              }
+            } else if (shot.kind === 'event') {
+              if (shot.id.startsWith('football:')) {
+                expect(program.highlights).toContain('football');
+                expect(footballAt(minute, day).live).toBe(true);
+                expect(minute).toBeGreaterThanOrEqual(640);
+                expect(minute).toBeLessThan(780);
+              } else {
+                const event = eventsForDay(day).find((event) => shot.id.endsWith(`:${event.id}`))!;
+                expect(event).toBeDefined();
+                expect(
+                  liveHighlights(event.period === 'night' && minute < 360 ? day - 1 : day),
+                ).toContain(event.id === 'cinema' ? 'cinema' : event.period);
+                expect(isEventLive(event, minute)).toBe(true);
+                if (event.venue.kind === 'green')
+                  expect(
+                    residents.some(
+                      (r) =>
+                        r.activity === 'stroll' &&
+                        r.event?.id === event.id &&
+                        r.event.phase === 'attending',
+                    ),
+                  ).toBe(true);
+              }
+            } else if (shot.kind === 'lanterns') {
+              expect(homes.length).toBeGreaterThan(0);
+              expect(minute).toBeGreaterThanOrEqual(LANTERN_SHOT.start);
+              expect(minute).toBeLessThan(LANTERN_SHOT.end);
+            } else if (shot.kind === 'ducks') {
+              expect(program.highlights).toContain('ducks');
+              expect(ducksAt(minute).length).toBeGreaterThan(0);
+              expect(minute).toBeGreaterThanOrEqual(600);
+              expect(minute).toBeLessThan(640);
+            } else {
+              expect(shot.kind).toBe('cat');
+              expect(townCatAt(homes, minute, day).outside).toBe(true);
             }
-          } else if (shot.kind === 'lanterns') {
-            expect(homes.length).toBeGreaterThan(0);
-            expect(minute).toBeGreaterThanOrEqual(LANTERN_SHOT.start);
-            expect(minute).toBeLessThan(LANTERN_SHOT.end);
-          } else if (shot.kind === 'ducks') {
-            expect(program.highlights).toContain('ducks');
-            expect(ducksAt(minute).length).toBeGreaterThan(0);
-            expect(minute).toBeGreaterThanOrEqual(600);
-            expect(minute).toBeLessThan(640);
-          } else {
-            expect(shot.kind).toBe('cat');
-            expect(townCatAt(homes, minute, day).outside).toBe(true);
           }
+          expect(scenery).toBe(60);
         }
-        expect(scenery).toBe(60);
       }
-    }
-  }, 20_000);
+    },
+    rosterTimeout(190, 45_000),
+  );
 
-  it('chooses three varied highlights each day, with no always-on ducks or disco', () => {
-    const lineups = new Set<string>();
-    for (let day = 0; day < 30; day++) {
-      const highlights = liveHighlights(day);
-      expect(new Set(highlights).size).toBe(3);
-      expect(liveHighlights(day)).toEqual(highlights);
-      lineups.add([...highlights].sort().join(','));
-      for (const [highlight, minute] of [
-        ['ducks', 620],
-        ['football', 700],
-        ['afternoon', 800],
-        ['evening', 1150],
-        // After any cinema bill has ended (see the cinema's before-midnight test).
-        ['night', 1436],
-      ] as const) {
-        const shot = shotAt(day, minute);
-        expect(shot.kind === 'event' || shot.kind === 'ducks').toBe(highlights.includes(highlight));
+  it(
+    'chooses three varied highlights each day, with no always-on ducks or disco',
+    () => {
+      const lineups = new Set<string>();
+      for (let day = 0; day < 30; day++) {
+        const highlights = liveHighlights(day);
+        expect(new Set(highlights).size).toBe(3);
+        expect(liveHighlights(day)).toEqual(highlights);
+        lineups.add([...highlights].sort().join(','));
+        for (const [highlight, minute] of [
+          ['ducks', 620],
+          ['football', 700],
+          ['afternoon', 800],
+          ['evening', 1150],
+          // After any cinema bill has ended (see the cinema's before-midnight test).
+          ['night', 1436],
+        ] as const) {
+          const shot = shotAt(day, minute);
+          expect(shot.kind === 'event' || shot.kind === 'ducks').toBe(
+            highlights.includes(highlight),
+          );
+        }
       }
-    }
-    expect(lineups.size).toBeGreaterThanOrEqual(7);
-    for (const highlight of ['ducks', 'football', 'afternoon', 'evening', 'night'] as const) {
-      const count = Array.from({ length: 30 }, (_, day) =>
-        liveHighlights(day).includes(highlight),
-      ).filter(Boolean).length;
-      expect(count).toBeGreaterThan(0);
-      expect(count).toBeLessThan(30);
-    }
-  });
+      expect(lineups.size).toBeGreaterThanOrEqual(7);
+      for (const highlight of ['ducks', 'football', 'afternoon', 'evening', 'night'] as const) {
+        const count = Array.from({ length: 30 }, (_, day) =>
+          liveHighlights(day).includes(highlight),
+        ).filter(Boolean).length;
+        expect(count).toBeGreaterThan(0);
+        expect(count).toBeLessThan(30);
+      }
+    },
+    rosterTimeout(190, 45_000),
+  );
 
   it('follows people between highlights and holds the full selected football match', () => {
     expect(shotAt(12, 420).kind).toBe('neighbor');
@@ -168,47 +179,54 @@ describe('Live broadcast director', () => {
     expect(shotAt(12, 360).kind).not.toBe('home');
   });
 
-  it('stays with a winter skater once they are out on the Millpond ice', () => {
-    // Every frozen day of two years with the published roster.
-    const skatingDays = Array.from({ length: 224 }, (_, i) => CALENDAR_EPOCH_DAY + i).filter(
-      millpondSkatingDay,
-    );
-    expect(skatingDays.length).toBe(22);
-    let followed = 0,
-      kept = 0;
-    for (const day of skatingDays) {
-      // The day's skaters first in every clip's cast, so even a crowded town follows one out.
-      const skaters = [...residentTrips(places, day)]
-        .filter(([, trips]) => trips.some((trip) => trip.event.id === 'millpond'))
-        .map(([id]) => id);
-      const planned = liveProgram(places, day);
-      const program = {
-        ...planned,
-        cast: planned.cast.map((ids) => [...skaters, ...ids.filter((id) => !skaters.includes(id))]),
-      };
-      let walkingIn: string | undefined;
-      for (let minute = SKATING.depart; minute < SKATING.end; minute += 0.5) {
-        const residents = simulateResidents(places, minute, day);
-        const shot = liveShotAt(program, minute, residents);
-        const subject = residents.find((r) => r.id === shot.residentId);
-        // A follow that walked someone to the pond is not dropped as they step onto the ice.
-        const arrived = residents.find((r) => r.id === walkingIn);
-        if (arrived?.event?.phase === 'attending' && minute % FOLLOW_SECONDS !== 0) {
-          expect(shot.residentId).toBe(arrived.id);
-          kept++;
-        }
-        walkingIn = undefined;
-        if (shot.kind !== 'neighbor' || subject?.event?.id !== 'millpond') continue;
-        if (subject.event.phase === 'going') walkingIn = subject.id;
-        if (subject.event.phase === 'attending') {
-          expect(subject.pose).toBe('skate');
-          followed++;
+  it(
+    'stays with a winter skater once they are out on the Millpond ice',
+    () => {
+      // Every frozen day of two years with the published roster.
+      const skatingDays = Array.from({ length: 224 }, (_, i) => CALENDAR_EPOCH_DAY + i).filter(
+        millpondSkatingDay,
+      );
+      expect(skatingDays.length).toBe(22);
+      let followed = 0,
+        kept = 0;
+      for (const day of skatingDays) {
+        // The day's skaters first in every clip's cast, so even a crowded town follows one out.
+        const skaters = [...residentTrips(places, day)]
+          .filter(([, trips]) => trips.some((trip) => trip.event.id === 'millpond'))
+          .map(([id]) => id);
+        const planned = liveProgram(places, day);
+        const program = {
+          ...planned,
+          cast: planned.cast.map((ids) => [
+            ...skaters,
+            ...ids.filter((id) => !skaters.includes(id)),
+          ]),
+        };
+        let walkingIn: string | undefined;
+        for (let minute = SKATING.depart; minute < SKATING.end; minute += 0.5) {
+          const residents = simulateResidents(places, minute, day);
+          const shot = liveShotAt(program, minute, residents);
+          const subject = residents.find((r) => r.id === shot.residentId);
+          // A follow that walked someone to the pond is not dropped as they step onto the ice.
+          const arrived = residents.find((r) => r.id === walkingIn);
+          if (arrived?.event?.phase === 'attending' && minute % FOLLOW_SECONDS !== 0) {
+            expect(shot.residentId).toBe(arrived.id);
+            kept++;
+          }
+          walkingIn = undefined;
+          if (shot.kind !== 'neighbor' || subject?.event?.id !== 'millpond') continue;
+          if (subject.event.phase === 'going') walkingIn = subject.id;
+          if (subject.event.phase === 'attending') {
+            expect(subject.pose).toBe('skate');
+            followed++;
+          }
         }
       }
-    }
-    expect(followed).toBeGreaterThan(0);
-    expect(kept).toBeGreaterThan(0);
-  }, 20_000);
+      expect(followed).toBeGreaterThan(0);
+      expect(kept).toBeGreaterThan(0);
+    },
+    rosterTimeout(190, 45_000),
+  );
 
   it('keeps casting deterministic and switches away from a resident who goes indoors', () => {
     const program = liveProgram(places, 12);
@@ -324,14 +342,18 @@ describe('Live broadcast director', () => {
       if (selected) expect(before).toEqual(after);
     }
     expect(shotAt(3, 160).kind).toBe('neighbor');
-    // After the last night owl's bedtime only Miso is out, until the scenery at 05:00.
+    // After the last night owl's bedtime only Miso is out, until the scenery at 05:00. In a full
+    // town an owl can still be at their door then, so the shot is one of the quiet set: the
+    // neighbor while anyone is out, and otherwise the cat (or the waking town at 05:00).
     const quiet = Math.max(
       290,
       ...places
         .filter((home) => home.resident.routine.night === 'stroll')
         .map((home) => nightBedtime(home) - 1440 + 0.5),
     );
-    expect(shotAt(3, quiet).kind).toBe(quiet < SCENERY_START ? 'cat' : 'home');
+    const settled = quiet < SCENERY_START ? 'cat' : 'home';
+    const out = simulateResidents(places, quiet, 3).some((r) => r.activity === 'stroll');
+    expect(out ? ['neighbor', settled] : [settled]).toContain(shotAt(3, quiet).kind);
   });
 
   it('films Lantern hour at the Lantern Fork every evening', () => {

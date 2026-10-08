@@ -3,9 +3,34 @@ import { duckAwareWalk, DUCK_LOVE_SECONDS, DUCK_NOTICE_RADIUS } from '../src/lib
 import { ducksAt, DUCK_STREET_Y, DUCK_WALK_START, DUCK_WALK_END } from '../src/lib/ducks';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { isRoad } from '../src/lib/world';
-import { readPlaces } from './full-town';
+import { fullTownHouse, readPlaces } from './full-town';
 
-const places = readPlaces();
+const real = readPlaces();
+/**
+ * The family walks the duck street from the river to x ≈ 21.6 and back, east of where today's
+ * homes stand. So the town is joined by morning strollers on the street's own plots, C7–C14,
+ * whose doors open onto it, wherever the roster leaves those plots free (the full town fills them).
+ */
+const places = [
+  ...real,
+  ...['C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14']
+    .filter((plot) => !real.some((place) => place.plot === plot))
+    .map((plot) => {
+      const house = fullTownHouse(plot);
+      return {
+        ...house,
+        resident: {
+          ...house.resident,
+          routine: {
+            morning: 'stroll',
+            afternoon: 'home',
+            evening: 'home',
+            night: 'sleep',
+          } as const,
+        },
+      };
+    }),
+];
 // A walker crosses the real family's route head-on at 09:00.
 const crossingX = ducksAt(540)[0].position.x;
 const walk = (time: number) => ({

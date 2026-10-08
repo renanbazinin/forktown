@@ -6,6 +6,7 @@ import { placeSchema } from '../src/lib/schema';
 import { readFileSync } from 'node:fs';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { plotDoor } from '../src/lib/home-life';
+import { TOWN_SIZE } from '../src/lib/town-config';
 
 describe('Growing the town without moving contributions', () => {
   it('doubles the capacity while preserving every original address and coordinate', () => {
@@ -18,8 +19,8 @@ describe('Growing the town without moving contributions', () => {
   });
 
   it.each([
-    { rows: 22, columns: 14 },
-    { rows: 28, columns: 12 },
+    { rows: TOWN_SIZE.rows + 2, columns: TOWN_SIZE.columns + 1 },
+    { rows: TOWN_SIZE.rows + 8, columns: TOWN_SIZE.columns + 3 },
   ])('supports later growth to $rows rows and $columns columns', (size) => {
     const future = createWorldLayout(size);
     for (const plot of PLOTS) expect(future.getPlot(plot.id)).toEqual(plot);
@@ -60,15 +61,18 @@ describe('Growing the town without moving contributions', () => {
   });
 
   it('accepts and simulates a contribution on the new far edge', () => {
+    const edge = `T${TOWN_SIZE.columns}`;
     const home = placeSchema.parse({
       ...JSON.parse(readFileSync('places/my-little-place.json', 'utf8')),
       id: 'new-edge',
-      plot: 'T10',
+      plot: edge,
     });
     const state = simulateResidents([home], 0)[0];
-    expect(state.home.plot).toBe('T10');
+    expect(state.home.plot).toBe(edge);
     // Asleep at midnight, just inside the new home's front door.
-    expect(state.position).toEqual(plotDoor(PLOTS.find((plot) => plot.id === 'T10')!));
-    expect(placeSchema.safeParse({ ...home, plot: 'T11' }).success).toBe(false);
+    expect(state.position).toEqual(plotDoor(PLOTS.find((plot) => plot.id === edge)!));
+    expect(placeSchema.safeParse({ ...home, plot: `T${TOWN_SIZE.columns + 1}` }).success).toBe(
+      false,
+    );
   });
 });

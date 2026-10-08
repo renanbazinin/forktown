@@ -12,6 +12,7 @@ import {
 import { cinemaGuests, CINEMA_ENTRANCE } from './cinema';
 import { FOOTBALL_ENTRANCE, FOOTBALL_VENUE, spectatorSpot, footballAt } from './football';
 import { zooRoute } from './zoo';
+import { districtApproach, DISTRICT_OUTINGS } from './district-places';
 import { MILLPOND_VENUE, SKATING, millpondRoute, millpondSkatingDay, skateGlide } from './millpond';
 import {
   facingAlong,
@@ -122,6 +123,13 @@ export function eventApproach(event: Pick<VisitEvent, 'venue'>, seat: number): P
   }
   if (event.venue.kind === 'zoo') return zooRoute(eventSpot(event.venue, seat).position);
   if (event.venue.kind === 'millpond') return millpondRoute(seat);
+  // The Riverside's venues have their own frozen ways in (an outing's seat k, district-places).
+  if (
+    event.venue.kind === 'market' ||
+    event.venue.kind === 'bandstand' ||
+    event.venue.kind === 'landing'
+  )
+    return districtApproach(DISTRICT_OUTINGS[event.venue.kind][0], seat);
   return venueApproach(event.venue, seat);
 }
 

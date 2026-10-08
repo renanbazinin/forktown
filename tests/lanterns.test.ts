@@ -20,6 +20,7 @@ import { eventsForDay, HOUSE_PLOTS, VENUES } from '../src/lib/events';
 import { placeSchema } from '../src/lib/schema';
 import { drawVenue, venueBounds } from '../src/city/venues';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { schemaHousePlots } from './house-plots';
 import { readPlaces } from './full-town';
 import { ARRIVALS, TOWN } from './lantern-town';
 
@@ -345,7 +346,7 @@ describe("Tonight's tale", () => {
 
 describe('The Fork reserves D3', () => {
   it('keeps D3 free of houses and the venue order intact', () => {
-    expect(HOUSE_PLOTS).toHaveLength(141);
+    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(schemaHousePlots());
     expect(HOUSE_PLOTS.some((plot) => plot.id === FORK_PLOT)).toBe(false);
     const sample = places.find((place) => place.id === 'my-little-place')!;
     const result = placeSchema.safeParse({ ...sample, plot: FORK_PLOT });

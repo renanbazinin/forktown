@@ -142,10 +142,17 @@ function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly stri
   if (copy.label !== TUBE_LABEL) problems.push(`label ${copy.label}`);
   if (copy.sign.text !== TUBE_SIGN) problems.push(`sign ${copy.sign.text}`);
   if (copy.blocks.length !== 2) problems.push(`${copy.blocks.length} blocks`);
+  // Two neighbors can share a name; the heading never says it twice ("Jon and Jon", whatever the
+  // case). Whole names only: "New neighbor and Neighbor L3" names two different neighbors.
+  const riders = [...new Set(status.now.map((ride) => ride.name.trim()).filter(Boolean))];
+  const twice = riders.map(
+    (name) =>
+      new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)} and ${escape(name)}(?![\\p{L}\\p{N}])`, 'iu'),
+  );
   for (const block of copy.blocks) {
     if (!block.heading.endsWith('.')) problems.push(`heading "${block.heading}"`);
-    // Two neighbors can share a name; the heading never says it twice ("Jon and Jon").
-    if (/\b(\w+) and \1\b/i.test(block.heading)) problems.push(`heading "${block.heading}"`);
+    if (twice.some((pattern) => pattern.test(block.heading)))
+      problems.push(`heading "${block.heading}"`);
     if (!/^[A-Z0-9 ·/’&–-]+$/.test(block.eyebrow)) problems.push(`eyebrow "${block.eyebrow}"`);
     if (!block.body.trim()) problems.push(`empty body under "${block.heading}"`);
   }

@@ -29,6 +29,7 @@ import {
 import { fixedMinutes, legsMinutes, walkingPace } from '../src/lib/tube-journeys';
 import { tubeParcels, tubeParcelsAt, tubeRides, tubeStatus } from '../src/lib/tube-traffic';
 import { readPlaces } from './full-town';
+import { rosterTimeout } from './roster-timeout';
 import { onRoadOrTube, riding, stationWalk, stepBound } from './tube-riders';
 
 const places = readPlaces().sort((a, b) => a.plot.localeCompare(b.plot, 'en', { numeric: true }));
@@ -228,71 +229,76 @@ describe('Riding the Treeline over a whole year', () => {
 
   // Every neighbor at every sampled minute of the year grows with the town, so the residents'
   // side gathers what it finds and asserts once.
-  it('shows riders only inside their ride windows, and parcels never share the tube', () => {
-    const { margin, wait } = TUBE_PARCELS;
-    const wrong: string[] = [];
-    for (const day of YEAR.filter((_, i) => i % 4 === 0)) {
-      const today = tubeRides(places, day);
-      for (let minutes = 360; minutes < 1440 + 360; minutes += 2.3) {
-        const time = minutes % 1440,
-          on = minutes < 1440 ? day : day + 1;
-        const states = simulateResidents(places, time, on);
-        for (const state of states) {
-          const ride = today.find(
-            (r) => r.residentId === state.id && minutes >= r.board && minutes < r.off,
-          );
-          const say = (what: string) => wrong.push(`${state.id} on ${day} at ${minutes}: ${what}`);
-          if (!!state.transit !== !!ride)
-            say(state.transit ? 'in the tube outside a ride' : 'missing from a ride');
-          else if (state.transit && ride) {
-            const stage =
-              minutes < ride.depart ? 'boarding' : minutes < ride.arrive ? 'riding' : 'alighting';
-            if (state.transit.from !== ride.from || state.transit.to !== ride.to)
-              say(
-                `rides ${state.transit.from} to ${state.transit.to}, not ${ride.from} to ${ride.to}`,
-              );
-            if (state.transit.stage !== stage) say(`${state.transit.stage}, not ${stage}`);
-          }
-        }
-        if (minutes < 1440) {
-          const parcels = tubeParcelsAt(places, time, day);
-          for (const parcel of parcels) {
-            // Each parcel is in exactly the stage its window says.
-            expect(parcel.stage).toBe(
-              time < parcel.depart ? 'sending' : time < parcel.arrive ? 'riding' : 'arrived',
+  it(
+    'shows riders only inside their ride windows, and parcels never share the tube',
+    () => {
+      const { margin, wait } = TUBE_PARCELS;
+      const wrong: string[] = [];
+      for (const day of YEAR.filter((_, i) => i % 4 === 0)) {
+        const today = tubeRides(places, day);
+        for (let minutes = 360; minutes < 1440 + 360; minutes += 2.3) {
+          const time = minutes % 1440,
+            on = minutes < 1440 ? day : day + 1;
+          const states = simulateResidents(places, time, on);
+          for (const state of states) {
+            const ride = today.find(
+              (r) => r.residentId === state.id && minutes >= r.board && minutes < r.off,
             );
-            expect(time).toBeGreaterThanOrEqual(parcel.depart - wait);
-            expect(time).toBeLessThan(parcel.arrive + wait);
-            expect(parcel.progress).toBeGreaterThanOrEqual(0);
-            expect(parcel.progress).toBeLessThanOrEqual(1);
-            if (parcel.stage === 'riding') {
-              const at = tubeAt(parcel.from, parcel.to, parcel.distance);
-              expect(parcel.position).toEqual(at.position);
-              expect(parcel.altitude).toBe(at.altitude);
-            } else
-              expect(parcel.position).toEqual(
-                tubeStation(parcel.stage === 'sending' ? parcel.from : parcel.to).stack,
-              );
-            expect(states.filter((state) => state.transit).map((state) => state.id)).toEqual([]);
+            const say = (what: string) =>
+              wrong.push(`${state.id} on ${day} at ${minutes}: ${what}`);
+            if (!!state.transit !== !!ride)
+              say(state.transit ? 'in the tube outside a ride' : 'missing from a ride');
+            else if (state.transit && ride) {
+              const stage =
+                minutes < ride.depart ? 'boarding' : minutes < ride.arrive ? 'riding' : 'alighting';
+              if (state.transit.from !== ride.from || state.transit.to !== ride.to)
+                say(
+                  `rides ${state.transit.from} to ${state.transit.to}, not ${ride.from} to ${ride.to}`,
+                );
+              if (state.transit.stage !== stage) say(`${state.transit.stage}, not ${stage}`);
+            }
           }
-          const expected = tubeParcels(places, day).filter(
-            (parcel) => time >= parcel.depart - wait && time < parcel.arrive + wait,
-          );
-          expect(parcels.map((parcel) => parcel.id)).toEqual(expected.map((parcel) => parcel.id));
+          if (minutes < 1440) {
+            const parcels = tubeParcelsAt(places, time, day);
+            for (const parcel of parcels) {
+              // Each parcel is in exactly the stage its window says.
+              expect(parcel.stage).toBe(
+                time < parcel.depart ? 'sending' : time < parcel.arrive ? 'riding' : 'arrived',
+              );
+              expect(time).toBeGreaterThanOrEqual(parcel.depart - wait);
+              expect(time).toBeLessThan(parcel.arrive + wait);
+              expect(parcel.progress).toBeGreaterThanOrEqual(0);
+              expect(parcel.progress).toBeLessThanOrEqual(1);
+              if (parcel.stage === 'riding') {
+                const at = tubeAt(parcel.from, parcel.to, parcel.distance);
+                expect(parcel.position).toEqual(at.position);
+                expect(parcel.altitude).toBe(at.altitude);
+              } else
+                expect(parcel.position).toEqual(
+                  tubeStation(parcel.stage === 'sending' ? parcel.from : parcel.to).stack,
+                );
+              expect(states.filter((state) => state.transit).map((state) => state.id)).toEqual([]);
+            }
+            const expected = tubeParcels(places, day).filter(
+              (parcel) => time >= parcel.depart - wait && time < parcel.arrive + wait,
+            );
+            expect(parcels.map((parcel) => parcel.id)).toEqual(expected.map((parcel) => parcel.id));
+          }
+        }
+        for (const parcel of tubeParcels(places, day)) {
+          // The whole episode (on the pad, in the glass, on the far pad) clears every ride's.
+          expect(parcel.arrive + wait).toBeLessThan(1200);
+          for (const ride of today)
+            expect(
+              ride.off + margin <= parcel.depart - wait ||
+                parcel.arrive + wait + margin <= ride.board,
+            ).toBe(true);
         }
       }
-      for (const parcel of tubeParcels(places, day)) {
-        // The whole episode (on the pad, in the glass, on the far pad) clears every ride's.
-        expect(parcel.arrive + wait).toBeLessThan(1200);
-        for (const ride of today)
-          expect(
-            ride.off + margin <= parcel.depart - wait ||
-              parcel.arrive + wait + margin <= ride.board,
-          ).toBe(true);
-      }
-    }
-    expect(wrong.slice(0, 5)).toEqual([]);
-  }, 60_000);
+      expect(wrong.slice(0, 5)).toEqual([]);
+    },
+    rosterTimeout(520, 120_000),
+  );
 
   it('gives the info card the same riders the town shows', () => {
     let early = 0;
@@ -331,37 +337,41 @@ describe('Riding the Treeline over a whole year', () => {
     expect(early).toBeGreaterThan(0);
   }, 60_000);
 
-  it('agrees with the town at the edge of every ride stage and the whole minutes near it', () => {
-    // A pinned clock (?m=) lands exactly on whole minutes, where many zoo rides change stage.
-    const owls = nightOwls('far-owl', (plot) => plot.row >= 14 && plot.col <= 2);
-    let edges = 0,
-      whole = 0,
-      midnight = 0;
-    for (const [homes, days] of [
-      [places, YEAR.filter((_, i) => i % 2 === 0)],
-      [owls, [0, 1, 2, 3, 4, 5, 6, 7]],
-    ] as const)
-      for (const day of days)
-        for (const ride of tubeRides(homes, day))
-          for (const edge of [ride.board, ride.depart, ride.arrive, ride.off]) {
-            edges++;
-            const near = [Math.floor(edge), Math.ceil(edge), Math.round(edge * 2) / 2];
-            if (near.includes(edge)) whole++;
-            for (const t of new Set([edge, ...near])) {
-              // The plan's timeline runs past midnight: 1440 + m is minute m of the next day.
-              const [minutes, on] = t >= 1440 ? [t - 1440, day + 1] : [t, day];
-              if (t >= 1440) midnight++;
-              const status = tubeStatus(homes, minutes, on);
-              const riders = simulateResidents(homes, minutes, on).filter((r) => r.transit);
-              expect(status.now.map((r) => `${r.residentId} ${r.stage}`).sort()).toEqual(
-                riders.map((r) => `${r.id} ${r.transit!.stage}`).sort(),
-              );
+  it(
+    'agrees with the town at the edge of every ride stage and the whole minutes near it',
+    () => {
+      // A pinned clock (?m=) lands exactly on whole minutes, where many zoo rides change stage.
+      const owls = nightOwls('far-owl', (plot) => plot.row >= 14 && plot.col <= 2);
+      let edges = 0,
+        whole = 0,
+        midnight = 0;
+      for (const [homes, days] of [
+        [places, YEAR.filter((_, i) => i % 2 === 0)],
+        [owls, [0, 1, 2, 3, 4, 5, 6, 7]],
+      ] as const)
+        for (const day of days)
+          for (const ride of tubeRides(homes, day))
+            for (const edge of [ride.board, ride.depart, ride.arrive, ride.off]) {
+              edges++;
+              const near = [Math.floor(edge), Math.ceil(edge), Math.round(edge * 2) / 2];
+              if (near.includes(edge)) whole++;
+              for (const t of new Set([edge, ...near])) {
+                // The plan's timeline runs past midnight: 1440 + m is minute m of the next day.
+                const [minutes, on] = t >= 1440 ? [t - 1440, day + 1] : [t, day];
+                if (t >= 1440) midnight++;
+                const status = tubeStatus(homes, minutes, on);
+                const riders = simulateResidents(homes, minutes, on).filter((r) => r.transit);
+                expect(status.now.map((r) => `${r.residentId} ${r.stage}`).sort()).toEqual(
+                  riders.map((r) => `${r.id} ${r.transit!.stage}`).sort(),
+                );
+              }
             }
-          }
-    expect(edges).toBeGreaterThan(1500);
-    expect(whole).toBeGreaterThan(100);
-    expect(midnight).toBeGreaterThan(0);
-  }, 60_000);
+      expect(edges).toBeGreaterThan(1500);
+      expect(whole).toBeGreaterThan(100);
+      expect(midnight).toBeGreaterThan(0);
+    },
+    rosterTimeout(520, 120_000),
+  );
 
   it('gets every rider home before the next commitment', () => {
     for (const day of YEAR)

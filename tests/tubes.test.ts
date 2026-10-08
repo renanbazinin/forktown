@@ -25,6 +25,7 @@ import {
 } from '../src/lib/walking';
 import {
   isTubePlot,
+  TUBE_HALT_PLOTS,
   TUBE_ALIGHT,
   TUBE_ALTITUDE,
   TUBE_BOARD,
@@ -61,6 +62,7 @@ import {
   walkingPace,
 } from '../src/lib/tube-journeys';
 import { eventApproach } from '../src/lib/resident-trips';
+import { schemaHousePlots } from './house-plots';
 import { readPlaces } from './full-town';
 import { onRoadOrTube, onTubeLine } from './tube-riders';
 
@@ -77,9 +79,16 @@ const DESTINATIONS = {
 const [FIRST, LAST] = [TUBE_STATIONS[0].id, TUBE_STATIONS.at(-1)!.id];
 
 describe('The Treeline stations', () => {
-  it('reserves C1 and N1 and leaves 141 house plots', () => {
+  it('reserves C1 and N1, and every halt of the loop, for the town', () => {
     expect(TUBE_PLOTS).toEqual(['C1', 'N1']);
-    expect(HOUSE_PLOTS).toHaveLength(141);
+    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(schemaHousePlots());
+    // The whole loop's halts are reserved already, while the line still runs C1 to N1.
+    expect(TUBE_HALT_PLOTS).toEqual(['R1', 'N1', 'C1', 'A9', 'C15', 'L15', 'R15']);
+    for (const plot of TUBE_HALT_PLOTS) {
+      expect(isTubePlot(plot)).toBe(true);
+      expect(HOUSE_PLOTS.some((p) => p.id === plot)).toBe(false);
+      expect(placeSchema.safeParse({ ...sample, plot }).success).toBe(false);
+    }
     for (const plot of TUBE_PLOTS) {
       expect(isTubePlot(plot)).toBe(true);
       expect(venueAt(plot)).toBeUndefined();
@@ -215,13 +224,34 @@ describe('Tube or walk', () => {
     { timeout: 20_000 },
     () => {
       const savings: number[] = [];
+      let riders = 0,
+        best = Infinity;
       for (const plot of HOUSE_PLOTS)
         for (const end of Object.values(DESTINATIONS)) {
-          const choice = tubeChoice(plotEntrance(plot), end);
+          const start = plotEntrance(plot);
+          const choice = tubeChoice(start, end);
           if (choice) savings.push(choice.saving);
+          // The same pairs, re-derived: the walk against the best door-to-door ride.
+          const walk = routeLength(roadPath(start, end)) / WALK_SPEED;
+          const ride = Math.min(
+            ...TUBE_STATIONS.flatMap((a) =>
+              TUBE_STATIONS.filter((b) => b !== a).map(
+                (b) =>
+                  (routeLength(roadPath(start, a.door)) + routeLength(roadPath(b.door, end))) /
+                    WALK_SPEED +
+                  tubeFixedMinutes(a.id, b.id),
+              ),
+            ),
+          );
+          if (walk - ride >= TUBE_MIN_SAVING) {
+            riders++;
+            best = Math.min(best, walk - ride);
+          }
         }
       // Savings step by 12.5 minutes (one four-tile block): 12.5 − 9.45 = 3.05 is the best that walks.
-      expect(savings.length).toBe(151);
+      expect(savings.length).toBe(riders);
+      expect(riders).toBeGreaterThan(0);
+      expect(Math.min(...savings)).toBeCloseTo(best, 9);
       expect(Math.min(...savings)).toBeCloseTo(25 - tubeFixedMinutes('C1', 'N1'), 9);
       // Nearby trips stay on foot.
       for (const [plot, end] of [

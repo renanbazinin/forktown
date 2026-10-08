@@ -50,6 +50,7 @@ import {
   tubeCrowdOffsets,
 } from './tubes';
 import { isTubePlot } from '../lib/tubes';
+import { isDistrictPlot } from '../lib/district-places';
 import { tubeParcelsAt, type TubeParcelState } from '../lib/tube-traffic';
 import { insideCinema, isCinemaPlot, CINEMA_VENUE } from '../lib/cinema';
 import { ducksAt } from '../lib/ducks';
@@ -556,7 +557,8 @@ export function renderCity({
         isCinemaPlot(plot.id) ||
         isZooPlot(plot.id) ||
         isFarmPlot(plot.id) ||
-        isMillpondPlot(plot.id)
+        isMillpondPlot(plot.id) ||
+        isDistrictPlot(plot.id)
       )
         continue;
       const pt = plotCenter(plot);
@@ -667,7 +669,8 @@ export function renderCity({
   drawMillpondSurface(ctx, pond);
   objects.push(...drawMillpond(ctx, pond));
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
+    // Only the green and the stage are drawn here; every other venue has its own painter.
+    if (venue.kind !== 'green' && venue.kind !== 'stage') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const point = plotCenter(plot);
     drawVenue(
@@ -689,7 +692,8 @@ export function renderCity({
     });
   }
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
+    // Only the green and the stage are drawn here; every other venue has its own painter.
+    if (venue.kind !== 'green' && venue.kind !== 'stage') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const pt = plotCenter(plot);
     objects.push({

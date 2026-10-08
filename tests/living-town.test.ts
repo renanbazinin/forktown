@@ -65,7 +65,8 @@ describe('A small predictable daily life', () => {
   // Roster-wide checks gather what they find and assert once: an expect per resident per minute
   // costs more than the simulation itself once every house plot is taken. They still grow
   // with the town, so each gets a roster-wide timeout.
-  // Two simulations of the whole town a sample: about 4 s alone with all 141 plots taken.
+  // Two simulations of the whole town a sample: about 4 s alone with 141 plots taken (20 × 10),
+  // and more with every one of today's 230 house plots taken.
   it('faces in the direction of movement on all four isometric road directions', () => {
     const seen = new Set<string>();
     const wrong: string[] = [];
@@ -94,7 +95,8 @@ describe('A small predictable daily life', () => {
     expect(simulateResidents([...places].reverse(), 810.25).reverse()).toEqual(before);
     expect(simulateResidents(places, 810.25 + 1440)).toEqual(before);
   });
-  // Everyone out walking all day: about 2.5 s alone with all 141 plots taken.
+  // Everyone out walking all day: about 2.5 s alone with 141 plots taken (20 × 10), and more
+  // with every one of today's 230 house plots taken.
   it('keeps residents on roads, their own lot, or their assigned public venue', () => {
     const wanderers = places.map((place) => ({
       ...place,

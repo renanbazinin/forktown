@@ -1,7 +1,8 @@
 import { ZOO_PLOTS } from '../src/lib/zoo';
 import { FARM_PLOTS } from '../src/lib/farm';
 import { MILLPOND_PLOTS } from '../src/lib/millpond';
-import { TUBE_PLOTS } from '../src/lib/tubes';
+import { TUBE_HALT_PLOTS } from '../src/lib/tubes';
+import { MARKET_PLOTS } from '../src/lib/district-places';
 import { describe, expect, it } from 'vitest';
 import {
   draftSchema,
@@ -211,8 +212,8 @@ describe('The world stays predictable as people contribute', () => {
     expect(shade('#FFFFFF', 30)).toBe('#ffffff');
     expect(shade('#000000', -30)).toBe('#000000');
   });
-  it('has 200 unique plots with public venues, football ground, cinema, zoo, farm, millpond, and tube stations reserved', () => {
-    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(200);
+  it('has 300 unique plots with public venues, football ground, cinema, zoo, farm, millpond, the Riverside and tube halts reserved', () => {
+    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(300);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
         ![
@@ -224,7 +225,10 @@ describe('The world stays predictable as people contribute', () => {
           ...ZOO_PLOTS,
           ...FARM_PLOTS,
           ...MILLPOND_PLOTS,
-          ...TUBE_PLOTS,
+          ...TUBE_HALT_PLOTS,
+          ...MARKET_PLOTS,
+          'J15',
+          'K15',
         ].includes(plot.id),
       );
   });

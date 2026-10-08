@@ -101,10 +101,15 @@ describe('Daily river-to-neighborhood duck walk', () => {
   });
 
   it('keeps the same walk, and so the same pace, however wide the town grows', () => {
-    // Today: from the river to the first homes and back, as always.
-    expect(DUCK_TURN_X).toBe(1.8);
+    // From the river along the duck street and back: the walk of the ten-column town, so in the
+    // fifteen-column town the family turns at the Lunch Green's corner, x ≈ 21.6, about 10:10.
     expect(DUCK_RIVER_X - DUCK_TURN_X).toBeCloseTo(DUCK_WALK_LENGTH, 9);
     const leader = (time: number) => ducksAt(time).find((duck) => duck.id === 0)!.position.x;
+    const times = Array.from({ length: 2600 }, (_, i) => DUCK_WALK_START + i * 0.1);
+    const turnAt = times.reduce((best, time) => (leader(time) < leader(best) ? time : best));
+    expect(Math.abs(leader(turnAt) - 21.6)).toBeLessThanOrEqual(0.1);
+    expect(turnAt).toBeGreaterThan(10 * 60);
+    expect(turnAt).toBeLessThan(10 * 60 + 20);
     // A resident's walking pace, 0.32 tiles a minute, give or take.
     expect((leader(500) - leader(560)) / 60).toBeCloseTo(0.3155, 3);
     for (let columns = 10; columns <= 20; columns++) {

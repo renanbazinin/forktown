@@ -1,7 +1,7 @@
 import { isZooPlot, ZOO_FRAME } from '../lib/zoo';
 import { FARM, FARM_FRAME, isFarmPlot } from '../lib/farm';
 import { isMillpondPlot, MILLPOND_FRAME, MILLPOND_VENUE } from '../lib/millpond';
-import { isTubePlot, tubeFrame, tubeStation, TUBE_LINE_NAME } from '../lib/tubes';
+import { isTubePlot, tubeFrame, tubeStation, TUBE_LINE_NAME, TUBE_PLOTS } from '../lib/tubes';
 import { places as publishedPlaces } from '../lib/places';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Crosshair, Minus, Plus, MapPin } from 'lucide-react';
@@ -260,7 +260,8 @@ const City = forwardRef<CityHandle, Props>(function City(
     if (isFarmPlot(id)) return farmCamera(width, height);
     if (isZooPlot(id)) return zooCamera(width, height);
     if (isMillpondPlot(id)) return millpondCamera(width, height);
-    if (isTubePlot(id)) return tubeCamera(width, height, id);
+    // A halt reserved for the loop frames like a plot until its station opens.
+    if (TUBE_PLOTS.includes(id)) return tubeCamera(width, height, id);
     if (isCinemaPlot(id)) return cinemaCamera(width, height);
     if (isFootballPlot(id)) return footballCamera(width, height);
     const plot = getPlot(id);
@@ -624,7 +625,9 @@ const City = forwardRef<CityHandle, Props>(function City(
                   : isMillpondPlot(hover)
                     ? MILLPOND_VENUE.name
                     : isTubePlot(hover)
-                      ? `${tubeStation(hover).name} · ${TUBE_LINE_NAME}`
+                      ? TUBE_PLOTS.includes(hover)
+                        ? `${tubeStation(hover).name} · ${TUBE_LINE_NAME}`
+                        : TUBE_LINE_NAME
                       : PLOT_COPY.tooltip(hover))}
           </span>
         </div>

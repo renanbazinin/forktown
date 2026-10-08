@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { rosterTimeout } from './roster-timeout';
 import { drawGroundErrandItem, errandGroundOffset, errandItemPose } from '../src/city/errand-items';
 import { drawResident, NIGHT_DIM, residentReach } from '../src/city/residents';
 import { tint } from '../src/city/houses';
@@ -161,34 +162,38 @@ describe('Seasonal errand handoffs', () => {
 });
 
 describe('Seasonal errand figures', () => {
-  it('fits existing resident culling and fade bounds in every direction and phase', () => {
-    const check = matrixContext();
-    const reach = residentReach(check.ctx, person);
-    for (const figure of ['male', 'female'] as const)
-      for (const kind of KINDS)
-        for (const facing of FACINGS)
-          for (const phase of PHASES)
-            for (const progress of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1])
-              for (const walkPhase of [0, 0.25, 0.5, 0.75]) {
-                const r = matrixContext();
-                drawResident(
-                  r.ctx,
-                  { ...person, figure },
-                  0,
-                  0,
-                  1,
-                  state(sample(kind, phase, progress), facing, walkPhase),
-                );
-                expect(r.matrix()).toEqual([1, 0, 0, 1, 0, 0]);
-                for (const box of boxes(r)) {
-                  expect(Number.isFinite(box.x0 + box.x1 + box.y0 + box.y1)).toBe(true);
-                  expect(box.x0).toBeGreaterThanOrEqual(-reach.x);
-                  expect(box.x1).toBeLessThanOrEqual(reach.x);
-                  expect(box.y0).toBeGreaterThanOrEqual(-reach.above);
-                  expect(box.y1).toBeLessThanOrEqual(reach.below);
+  it(
+    'fits existing resident culling and fade bounds in every direction and phase',
+    () => {
+      const check = matrixContext();
+      const reach = residentReach(check.ctx, person);
+      for (const figure of ['male', 'female'] as const)
+        for (const kind of KINDS)
+          for (const facing of FACINGS)
+            for (const phase of PHASES)
+              for (const progress of [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1])
+                for (const walkPhase of [0, 0.25, 0.5, 0.75]) {
+                  const r = matrixContext();
+                  drawResident(
+                    r.ctx,
+                    { ...person, figure },
+                    0,
+                    0,
+                    1,
+                    state(sample(kind, phase, progress), facing, walkPhase),
+                  );
+                  expect(r.matrix()).toEqual([1, 0, 0, 1, 0, 0]);
+                  for (const box of boxes(r)) {
+                    expect(Number.isFinite(box.x0 + box.x1 + box.y0 + box.y1)).toBe(true);
+                    expect(box.x0).toBeGreaterThanOrEqual(-reach.x);
+                    expect(box.x1).toBeLessThanOrEqual(reach.x);
+                    expect(box.y0).toBeGreaterThanOrEqual(-reach.above);
+                    expect(box.y1).toBeLessThanOrEqual(reach.below);
+                  }
                 }
-              }
-  }, 30_000);
+    },
+    rosterTimeout(190, 45_000),
+  );
 
   it('keeps the carrier’s eyes clear, and the load past the near shoulder walking away', () => {
     for (const kind of KINDS) {

@@ -6,6 +6,16 @@ import { isTubePlot } from './tubes.ts';
 import { ZOO_VENUE, ZOO_SPOTS, isZooPlot, insideZoo } from './zoo.ts';
 import { CINEMA_VENUE, CINEMA_SEATS, isCinemaPlot, insideCinema, cinemaProgram } from './cinema.ts';
 import { FORK_ID, FORK_NAME, FORK_PLOT } from './lanterns.ts';
+import {
+  BANDSTAND_VENUE,
+  DISTRICT_SPOTS,
+  insideDistrict,
+  isDistrictPlot,
+  LANDING_VENUE,
+  MARKET_PLOTS,
+  MARKET_VENUE,
+  type Spot,
+} from './district-places.ts';
 
 // Public venues belong to the town, outside the one-house contribution files.
 export const VENUES = [
@@ -13,8 +23,13 @@ export const VENUES = [
   { id: 'stage', plot: 'B5', name: 'The Little Stage', kind: 'stage' },
   CINEMA_VENUE,
   ZOO_VENUE,
+  // The Riverside: Market Square (D14–E15), the Bandstand (K15) and the Boat Landing (J15).
+  // They are defined in district-places.ts; the Harvest Fair uses the farm, so it is not here.
+  MARKET_VENUE,
+  BANDSTAND_VENUE,
+  LANDING_VENUE,
   // The heart of town: one lantern for every neighbor. Drawn by src/city/lantern-fork.ts.
-  // Append new venues; eventsForDay reads VENUES[0] and VENUES[1].
+  // Add new venues before the Fork; eventsForDay reads VENUES[0] and VENUES[1].
   { id: FORK_ID, plot: FORK_PLOT, name: FORK_NAME, kind: 'fork' },
 ] as const;
 export type Venue = (typeof VENUES)[number];
@@ -42,6 +57,11 @@ export type EventPose =
   /** Arms up for a stretch, just out of the door in the morning. */
   | 'stretch';
 type EventSpot = { x: number; y: number; facing: 'se' | 'sw' | 'ne' | 'nw' };
+/** District spots are frozen in absolute tiles; EVENT_SPOTS keeps them round the anchor's centre. */
+function relativeTo(plotId: string, spots: readonly Spot[]): EventSpot[] {
+  const plot = getPlot(plotId)!;
+  return spots.map((s) => ({ x: s.x - plot.x - 0.5, y: s.y - plot.y - 0.5, facing: s.facing }));
+}
 // Coordinates relative to the plot center. These are usable lawn spots, not a street queue.
 // Keep the stage audience in front of the platform (which ends at local y = 0.2).
 export const EVENT_SPOTS: Record<Venue['kind'], readonly EventSpot[]> = {
@@ -71,6 +91,9 @@ export const EVENT_SPOTS: Record<Venue['kind'], readonly EventSpot[]> = {
   ],
   // No gatherings at the Fork yet; its ritual is the lanterns themselves.
   fork: [],
+  market: relativeTo(MARKET_VENUE.plot, DISTRICT_SPOTS.market),
+  bandstand: relativeTo(BANDSTAND_VENUE.plot, DISTRICT_SPOTS.bandstand),
+  landing: relativeTo(LANDING_VENUE.plot, DISTRICT_SPOTS.landing),
 };
 export function eventSpot(venue: Venue, index: number) {
   const plot = getPlot(venue.plot)!;
@@ -80,6 +103,8 @@ export function eventSpot(venue: Venue, index: number) {
 export function insideVenue(venue: Venue, point: { x: number; y: number }) {
   if (venue.kind === 'zoo') return insideZoo(point);
   if (venue.kind === 'cinema') return insideCinema(point);
+  if (venue.kind === 'market' || venue.kind === 'bandstand' || venue.kind === 'landing')
+    return insideDistrict(venue.kind, point);
   const plot = getPlot(venue.plot)!;
   return Math.abs(point.x - plot.x - 0.5) <= 1.5 && Math.abs(point.y - plot.y - 0.5) <= 1.5;
 }
@@ -88,10 +113,13 @@ export const venueAt = (plot: string) =>
     ? ZOO_VENUE
     : isCinemaPlot(plot)
       ? CINEMA_VENUE
-      : VENUES.find((venue) => venue.plot === plot);
+      : (MARKET_PLOTS as readonly string[]).includes(plot)
+        ? MARKET_VENUE
+        : VENUES.find((venue) => venue.plot === plot);
 export const HOUSE_PLOTS = PLOTS.filter(
   (plot) =>
     !venueAt(plot.id) &&
+    !isDistrictPlot(plot.id) &&
     !isFootballPlot(plot.id) &&
     !isFarmPlot(plot.id) &&
     !isMillpondPlot(plot.id) &&

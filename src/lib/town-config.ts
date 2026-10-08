@@ -1,6 +1,6 @@
 // Grow these counts to add land. Existing plot IDs and coordinates stay fixed.
 // See docs/EXPANDING_THE_TOWN.md before changing a published town.
-export const TOWN_SIZE = { rows: 20, columns: 10 } as const;
+export const TOWN_SIZE = { rows: 20, columns: 15 } as const;
 // Six connected plots, with roads retained around the outside.
 export const FOOTBALL_SITE = { row: 5, col: 2, rows: 2, columns: 3 } as const;
 export const CINEMA_SITE = { row: 3, col: 5, rows: 2, columns: 2 } as const;
@@ -10,3 +10,5 @@ export const ZOO_SITE = { row: 14, col: 3, rows: 4, columns: 6 } as const;
 export const FARM_SITE = { row: 18, col: 3, rows: 2, columns: 6 } as const;
 // H3–I6: one long pond below the Meadow Ground, kept low so the pitch stays in view.
 export const MILLPOND_SITE = { row: 7, col: 2, rows: 2, columns: 4 } as const;
+// D14–E15: Market Square, on the duck street by the river. Its four plots share one square.
+export const MARKET_SITE = { row: 3, col: 13, rows: 2, columns: 2 } as const;

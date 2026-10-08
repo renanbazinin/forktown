@@ -146,7 +146,8 @@ describe('The opening view through the year', () => {
       // Measured: -998 to +232 over these moments with no houses at all (with the Millpond,
       // whose ice, boats and lily pads follow the year), and -719 to +322 with today's 18. Each
       // house adds at most 37 in deep winter, with snow on its roof and pumpkins in its beds:
-      // +5,217 with the heaviest house on all 141 plots. A season only rests on top of the town;
+      // +5,217 with the heaviest house on all 141 plots of the 20 × 10 town; the bound grows
+      // with every house in town. A season only rests on top of the town;
       // it never adds a layer, and never loses one (each house alone is ~180 calls).
       expect(calls - base, `${minutes}`).toBeLessThanOrEqual(1_000 + 40 * places.length);
       expect(calls - base, `${minutes}`).toBeGreaterThanOrEqual(-1_500);
@@ -200,7 +201,7 @@ describe('The opening view through the year', () => {
   });
 
   // A whole frame for every day of the year, so it grows with the town: about 3.5 s alone with
-  // all 141 plots taken.
+  // 141 plots taken (20 × 10), and more with all 230 of today's house plots.
   it('keeps every signature colour inside its season, all year', () => {
     // Every town day, alternating noon and 22:00, so both palettes are swept.
     const violations: string[] = [];

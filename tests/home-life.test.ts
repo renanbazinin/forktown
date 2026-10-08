@@ -43,6 +43,7 @@ import { MAX_TRAVEL_SPEED_MULTIPLIER, opposite, WALK_SPEED } from '../src/lib/wa
 import { getPlot, isRoad, plotEntrance, project, type Point } from '../src/lib/world';
 import { AFTER_HOURS, BAZPLACE, FUNKY_FUN, MOONBEAM_CAFE } from './fixtures';
 import { fullTown, readPlaces } from './full-town';
+import { rosterTimeout } from './roster-timeout';
 import { riding, stepBound } from './tube-riders';
 
 const places = readPlaces();
@@ -101,66 +102,71 @@ function runs(home: Place) {
 }
 
 describe('Life at home: the front door, the garden and loops round the block', () => {
-  it('never idles on the road, and appears and vanishes only through the front door', () => {
-    const wrong: string[] = [];
-    for (const [homes, day, step] of SAMPLES) {
-      const since = new Map<string, number>();
-      let previous: ResidentState[] | undefined;
-      let appearances = 0;
-      for (const { minute, states } of timeline(homes, day, step)) {
-        states.forEach((state, index) => {
-          const door = plotDoor(plotOf(state));
-          const where = `${state.id} d${day - DAY} m${minute.toFixed(1)}`;
-          const onRoad = isRoad(Math.floor(state.position.x), Math.floor(state.position.y));
-          // Standing or sitting on a road tile only at the road handoff, or up on the kerb in
-          // front of the lot between two outings, and only for a moment. Errand handoffs have
-          // their own public kerb stops, checked with their routes in seasonal-errands.test.ts.
-          if (
-            visible(state) &&
-            !state.event &&
-            !state.errand &&
-            !state.duckLove &&
-            !state.moving &&
-            onRoad
-          ) {
-            const stands = [plotEntrance(plotOf(state))];
-            if (state.lot?.spot === 'kerb') stands.push(offset(state, KERB_OFFSET));
-            if (stands.every((point) => distance(state.position, point) > 1e-9))
-              wrong.push(`${where}: stands on the road away from home`);
-            if (!since.has(state.id)) since.set(state.id, minute);
-            else if (minute - since.get(state.id)! > 4.5) wrong.push(`${where}: waits on the road`);
-          } else since.delete(state.id);
-          if (!visible(state)) {
-            // Indoors, just inside the door, with nothing but the door itself to show.
-            if (distance(state.position, door) > 0) wrong.push(`${where}: indoors off the door`);
-            if (state.moving || state.lot || state.fade !== undefined || state.pose)
-              wrong.push(`${where}: indoors but ${JSON.stringify(state.lot ?? state.pose)}`);
-          }
-          const before = previous?.[index];
-          if (!before) return;
-          if (!visible(before) && visible(state)) {
-            appearances++;
-            if (distance(state.position, door) > WALK_SPEED * step + 1e-9)
-              wrong.push(`${where}: appears away from the door`);
-            if (!((state.fade ?? 1) < 1 && state.lot?.stage === 'out' && state.door! > 0))
-              wrong.push(`${where}: appears without the door and a fade`);
-            if (!(before.door! > 0)) wrong.push(`${where}: the door was shut just before`);
-          }
-          if (visible(before) && !visible(state)) {
-            if (distance(before.position, door) > WALK_SPEED * step + 1e-9)
-              wrong.push(`${where}: vanishes away from the door`);
-            // Walking in, fading, never from a standstill.
-            if (!before.moving || !((before.fade ?? 1) < 1) || before.lot?.stage !== 'in')
-              wrong.push(`${where}: vanishes without walking in`);
-            if (!(state.door! > 0)) wrong.push(`${where}: the door shut on them`);
-          }
-        });
-        previous = states;
+  it(
+    'never idles on the road, and appears and vanishes only through the front door',
+    () => {
+      const wrong: string[] = [];
+      for (const [homes, day, step] of SAMPLES) {
+        const since = new Map<string, number>();
+        let previous: ResidentState[] | undefined;
+        let appearances = 0;
+        for (const { minute, states } of timeline(homes, day, step)) {
+          states.forEach((state, index) => {
+            const door = plotDoor(plotOf(state));
+            const where = `${state.id} d${day - DAY} m${minute.toFixed(1)}`;
+            const onRoad = isRoad(Math.floor(state.position.x), Math.floor(state.position.y));
+            // Standing or sitting on a road tile only at the road handoff, or up on the kerb in
+            // front of the lot between two outings, and only for a moment. Errand handoffs have
+            // their own public kerb stops, checked with their routes in seasonal-errands.test.ts.
+            if (
+              visible(state) &&
+              !state.event &&
+              !state.errand &&
+              !state.duckLove &&
+              !state.moving &&
+              onRoad
+            ) {
+              const stands = [plotEntrance(plotOf(state))];
+              if (state.lot?.spot === 'kerb') stands.push(offset(state, KERB_OFFSET));
+              if (stands.every((point) => distance(state.position, point) > 1e-9))
+                wrong.push(`${where}: stands on the road away from home`);
+              if (!since.has(state.id)) since.set(state.id, minute);
+              else if (minute - since.get(state.id)! > 4.5)
+                wrong.push(`${where}: waits on the road`);
+            } else since.delete(state.id);
+            if (!visible(state)) {
+              // Indoors, just inside the door, with nothing but the door itself to show.
+              if (distance(state.position, door) > 0) wrong.push(`${where}: indoors off the door`);
+              if (state.moving || state.lot || state.fade !== undefined || state.pose)
+                wrong.push(`${where}: indoors but ${JSON.stringify(state.lot ?? state.pose)}`);
+            }
+            const before = previous?.[index];
+            if (!before) return;
+            if (!visible(before) && visible(state)) {
+              appearances++;
+              if (distance(state.position, door) > WALK_SPEED * step + 1e-9)
+                wrong.push(`${where}: appears away from the door`);
+              if (!((state.fade ?? 1) < 1 && state.lot?.stage === 'out' && state.door! > 0))
+                wrong.push(`${where}: appears without the door and a fade`);
+              if (!(before.door! > 0)) wrong.push(`${where}: the door was shut just before`);
+            }
+            if (visible(before) && !visible(state)) {
+              if (distance(before.position, door) > WALK_SPEED * step + 1e-9)
+                wrong.push(`${where}: vanishes away from the door`);
+              // Walking in, fading, never from a standstill.
+              if (!before.moving || !((before.fade ?? 1) < 1) || before.lot?.stage !== 'in')
+                wrong.push(`${where}: vanishes without walking in`);
+              if (!(state.door! > 0)) wrong.push(`${where}: the door shut on them`);
+            }
+          });
+          previous = states;
+        }
+        expect(appearances).toBeGreaterThan(homes.length / 2);
       }
-      expect(appearances).toBeGreaterThan(homes.length / 2);
-    }
-    expect(wrong.slice(0, 8)).toEqual([]);
-  }, 30_000);
+      expect(wrong.slice(0, 8)).toEqual([]);
+    },
+    rosterTimeout(250, 60_000),
+  );
 
   it('walks its lot and its loops at walking pace, facing the way it goes', () => {
     const wrong: string[] = [];
@@ -563,64 +569,68 @@ describe('Life at home: the front door, the garden and loops round the block', (
     }
   }, 20_000);
 
-  it('labels every moment at home truthfully', () => {
-    const state: ResidentState = {
-      id: AFTER_HOURS.id,
-      resident: AFTER_HOURS.resident,
-      home: AFTER_HOURS,
-      position: { x: 0, y: 0 },
-      activity: 'stroll',
-      moving: false,
-      facing: 'sw',
-      walkPhase: 0,
-      greeting: false,
-    };
-    const cafe = MOONBEAM_CAFE;
-    const label = (lot: ResidentState['lot'], extra: Partial<ResidentState> = {}) =>
-      residentActivityLabel({ ...state, activity: 'stroll', lot, ...extra });
-    expect(label({ spot: 'door', stage: 'out' })).toBe('Stepping out the front door');
-    expect(label({ spot: 'bench', stage: 'out' })).toBe('Stepping out the front door');
-    expect(label({ spot: 'porch', stage: 'in' })).toBe('Heading inside');
-    expect(label({ spot: 'step', stage: 'from' })).toBe('Setting off');
-    const day: [HomeSpotKind, string][] = [
-      ['bench', 'Resting on the garden bench'],
-      ['porch', 'Sitting on the porch'],
-      ['step', 'Sitting on the front step'],
-      ['tree', 'Reading under the tree'],
-      ['flowers', 'Watering the flowers'],
-      ['paving', 'Sweeping the front path'],
-      ['gate', 'Looking down the street'],
-      ['kerb', 'Home for a moment between outings'],
-    ];
-    for (const [spot, text] of day) {
-      expect(label({ spot, stage: 'to' })).toBe(text);
-      expect(label({ spot, stage: 'at' })).toBe(text);
-    }
-    const garden = (garden: Place['design']['garden']) =>
-      label(
-        { spot: 'beds', stage: 'at' },
-        { home: { ...state.home, design: { ...state.home.design, garden } } },
+  it(
+    'labels every moment at home truthfully',
+    () => {
+      const state: ResidentState = {
+        id: AFTER_HOURS.id,
+        resident: AFTER_HOURS.resident,
+        home: AFTER_HOURS,
+        position: { x: 0, y: 0 },
+        activity: 'stroll',
+        moving: false,
+        facing: 'sw',
+        walkPhase: 0,
+        greeting: false,
+      };
+      const cafe = MOONBEAM_CAFE;
+      const label = (lot: ResidentState['lot'], extra: Partial<ResidentState> = {}) =>
+        residentActivityLabel({ ...state, activity: 'stroll', lot, ...extra });
+      expect(label({ spot: 'door', stage: 'out' })).toBe('Stepping out the front door');
+      expect(label({ spot: 'bench', stage: 'out' })).toBe('Stepping out the front door');
+      expect(label({ spot: 'porch', stage: 'in' })).toBe('Heading inside');
+      expect(label({ spot: 'step', stage: 'from' })).toBe('Setting off');
+      const day: [HomeSpotKind, string][] = [
+        ['bench', 'Resting on the garden bench'],
+        ['porch', 'Sitting on the porch'],
+        ['step', 'Sitting on the front step'],
+        ['tree', 'Reading under the tree'],
+        ['flowers', 'Watering the flowers'],
+        ['paving', 'Sweeping the front path'],
+        ['gate', 'Looking down the street'],
+        ['kerb', 'Home for a moment between outings'],
+      ];
+      for (const [spot, text] of day) {
+        expect(label({ spot, stage: 'to' })).toBe(text);
+        expect(label({ spot, stage: 'at' })).toBe(text);
+      }
+      const garden = (garden: Place['design']['garden']) =>
+        label(
+          { spot: 'beds', stage: 'at' },
+          { home: { ...state.home, design: { ...state.home.design, garden } } },
+        );
+      expect(garden('vegetables')).toBe('Tending the vegetable patch');
+      expect(garden('wildflowers')).toBe('Watering the wildflowers');
+      const night = (spot: HomeSpotKind, home = state.home) =>
+        label({ spot, stage: 'at' }, { nightPorch: true, home });
+      expect(night('step')).toBe('Enjoying the night on the doorstep');
+      expect(night('bench')).toBe('Enjoying the night on the bench');
+      expect(night('porch')).toBe('Enjoying the night on the porch');
+      expect(night('porch', cafe)).toBe('Sipping tea on the porch');
+      // Out on the town, the older labels still lead.
+      expect(label(undefined, { nightWalk: true })).toBe('Out for a moonlit stroll');
+      expect(label(undefined)).toBe('Out for a stroll');
+      expect(label({ spot: 'gate', stage: 'at' }, { duckLove: true })).toBe(
+        'Stopped to admire the ducklings',
       );
-    expect(garden('vegetables')).toBe('Tending the vegetable patch');
-    expect(garden('wildflowers')).toBe('Watering the wildflowers');
-    const night = (spot: HomeSpotKind, home = state.home) =>
-      label({ spot, stage: 'at' }, { nightPorch: true, home });
-    expect(night('step')).toBe('Enjoying the night on the doorstep');
-    expect(night('bench')).toBe('Enjoying the night on the bench');
-    expect(night('porch')).toBe('Enjoying the night on the porch');
-    expect(night('porch', cafe)).toBe('Sipping tea on the porch');
-    // Out on the town, the older labels still lead.
-    expect(label(undefined, { nightWalk: true })).toBe('Out for a moonlit stroll');
-    expect(label(undefined)).toBe('Out for a stroll');
-    expect(label({ spot: 'gate', stage: 'at' }, { duckLove: true })).toBe(
-      'Stopped to admire the ducklings',
-    );
-    // Every label the town actually shows is one of these, and never "indoors" while outside.
-    for (const { states } of timeline(...SAMPLES[0]))
-      for (const resident of states)
-        if (visible(resident))
-          expect(residentActivityLabel(resident)).not.toMatch(/at home|Sleeping/);
-  }, 30_000);
+      // Every label the town actually shows is one of these, and never "indoors" while outside.
+      for (const { states } of timeline(...SAMPLES[0]))
+        for (const resident of states)
+          if (visible(resident))
+            expect(residentActivityLabel(resident)).not.toMatch(/at home|Sleeping/);
+    },
+    rosterTimeout(250, 60_000),
+  );
 
   it('stretches only on the top step, stepping out on a morning', () => {
     let stretches = 0;

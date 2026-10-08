@@ -367,7 +367,9 @@ describe('The Treeline in the opening view', () => {
     const hover = paint(realScene(OPENING, 720, 3, { emphasis: 'hover' }));
     expect(hover.total).toBe(none.total);
     const whole = paint(realScene(WHOLE, 720, 3));
-    expect(WHOLE.zoom).toBeCloseTo(0.28, 2);
+    // The whole-town fit: the width term wins, 1388 / ((W + H) × 38 + 36) at 1440 × 900.
+    expect(WHOLE.zoom).toBeCloseTo(1388 / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36), 9);
+    expect(WHOLE.zoom).toBeCloseTo(0.245, 3);
     expect(parts(whole, 'stack')).toHaveLength(2);
     expect(whole.total).toBeLessThanOrEqual(420);
     expect(none.alpha).toBe(1);

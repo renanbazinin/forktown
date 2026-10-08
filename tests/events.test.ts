@@ -22,6 +22,7 @@ import { findPlotAt, getPlot, isRoad, plotEntrance } from '../src/lib/world';
 const homePoseOnly = (state: ResidentState) =>
   !state.pose || (!state.event && !!state.lot && !state.moving && state.activity === 'stroll');
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { schemaHousePlots } from './house-plots';
 import { readPlaces } from './full-town';
 import { onRoadOrTube, stepBound } from './tube-riders';
 
@@ -48,7 +49,7 @@ describe('Shared town events', () => {
     expect(eventsForDay(7)).toEqual(eventsForDay(7));
   });
   it('reserves venues in both builder options and shared save/CI validation', () => {
-    expect(HOUSE_PLOTS).toHaveLength(141);
+    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(schemaHousePlots());
     for (const venue of VENUES) {
       expect(HOUSE_PLOTS.some((plot) => plot.id === venue.plot)).toBe(false);
       expect(

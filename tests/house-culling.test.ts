@@ -290,7 +290,8 @@ describe('Culling houses and walkers', () => {
       ['a phone', 390, 844, { x: 100, y: -300, zoom: 0.85 }],
       ['one street', 1440, 900, { x: -900, y: -700, zoom: 2.4 }],
       ['a corner', 1440, 900, { x: 400, y: -1600, zoom: 2 }],
-      ['the far edge', 1440, 900, { x: -2600, y: -800, zoom: 1.2 }],
+      // The far corner, round the town's bottom tip at (-760, 2812) world px: T15 and its row.
+      ['the far edge', 1440, 900, { x: 720 + 760 * 1.2, y: 450 - 2700 * 1.2, zoom: 1.2 }],
     ];
     // Put one house's reach a pixel inside, then a pixel outside, the left side of the view.
     const edgeHouse = town.find((place) => place.plot === 'E5')!;

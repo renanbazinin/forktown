@@ -46,7 +46,14 @@ export const TUBE_STATIONS: readonly TubeStation[] = STATIONS.map(({ plot, name 
   };
 });
 export const TUBE_PLOTS: readonly string[] = TUBE_STATIONS.map((station) => station.plot);
-export const isTubePlot = (id: string) => TUBE_PLOTS.includes(id);
+/**
+ * Every plot the Treeline holds, in line order round the edge of town: Barley R1, Willow N1,
+ * Hedgerow C1, Hawthorn A9, Watercress C15, Kingfisher L15 and Bulrush R15. They are reserved
+ * now, so the house plots stay fixed while the line grows into its loop.
+ */
+export const TUBE_HALT_PLOTS = ['R1', 'N1', 'C1', 'A9', 'C15', 'L15', 'R15'] as const;
+const HALT_PLOTS: readonly string[] = TUBE_HALT_PLOTS;
+export const isTubePlot = (id: string) => HALT_PLOTS.includes(id);
 export const tubeStation = (id: string): TubeStation => {
   const station = TUBE_STATIONS.find((s) => s.id === id);
   if (!station) throw new Error(`No tube station ${id}.`);

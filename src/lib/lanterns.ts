@@ -12,7 +12,7 @@ export const FORK_NAME = 'The Lantern Fork';
 /** The founders' lobe holds eight lanterns; neighbours start after it, whatever founders remain. */
 export const FOUNDER_SLOTS = 8;
 /** Hit area around the plot centre in world px. The Fork's art stays inside it, clear of C2, C3 and D2. */
-export const FORK_BOUNDS = { left: -80, right: 86, top: -131, bottom: 44 };
+export const FORK_BOUNDS = { left: -80, right: 90, top: -140, bottom: 44 };
 export const DAWN = 360;
 export const NIGHTFALL = 1200;
 /** The Fork lights over the first 20 town minutes of the night, then the lamps over 10 more. */
