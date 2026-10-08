@@ -6,7 +6,7 @@ The venue has a large isometric screen, twelve picnic rugs, soft string lights, 
 
 ## The library
 
-Twenty-two original films. Sixteen are one-minute family shorts: the first six opened the cinema and have been remastered in the style of the ten-film **Starlight Reel** that followed them. Six more are the **late show**: longer films for 14+ that grown-ups can enjoy too, two each of drama, action and comedy. Their title cards carry a 14+ badge and their genre.
+Twenty-seven original films. Eighteen are family films: the first six opened the cinema and have been remastered in the style of the ten-film **Starlight Reel** that followed them, and two more came after, the one-minute _Tall Order_ and the ninety-second _Statues_. Nine more are the **late show**: longer films for 14+ that grown-ups can enjoy too, three each of drama, action and comedy. Their title cards carry a 14+ badge and their genre.
 
 | Film                    | Length | Story                                                                                        |
 | ----------------------- | ------ | -------------------------------------------------------------------------------------------- |
@@ -26,6 +26,8 @@ Twenty-two original films. Sixteen are one-minute family shorts: the first six o
 | The Sleeper Train       | 60 s   | A young fox fights sleep to see the sea at sunrise; the conductor wakes him just in time.    |
 | The Mitten              | 60 s   | The old winter tale: one lost mitten, five guests, and a single snowflake.                   |
 | Lanterns on the Cliff   | 60 s   | The lighthouse goes dark in a storm, so every house brings its lantern to the cliff.         |
+| Statues                 | 90 s   | June plays Statues with her snowman. Every time she turns round, there are more of them.     |
+| Tall Order              | 60 s   | Two rival fruit sellers stack their displays sky-high, until a sparrow lands on top.         |
 
 The late show (14+):
 
@@ -33,10 +35,13 @@ The late show (14+):
 | --------------------- | ------ | ------ | ---------------------------------------------------------------------------------------------------------------- |
 | The Long Table        | Drama  | 180 s  | After the funeral, three siblings can only finish Mum's unfinished loaf together. It comes out burnt, like hers. |
 | Night Bus             | Drama  | 120 s  | An old man rides the last bus to an empty seaside bench every night. A tired nurse gets off with him.            |
+| In Time               | Drama  | 120 s  | A son rows his mother, once a champion, in circles until he learns to follow her.                                |
 | Night Courier         | Action | 150 s  | A bike courier races a cold box across a rainy city and over a rising drawbridge. It's a donor heart.            |
 | Whiteout              | Action | 120 s  | A rescuer climbs alone into a storm for a stranded climber, through a crevasse fall and an avalanche.            |
+| The Return Job        | Action | 150 s  | A cat burglar slips past lasers and a sleeping guard to put something back.                                      |
 | Reply All             | Comedy | 90 s   | Dev sends the CEO karaoke review to all 400 staff and sprints for the server room. The CEO is grateful.          |
 | Mirror, Signal, Panic | Comedy | 100 s  | A nervous driver's ninth test goes wrong in every way, under an examiner who never blinks. Until he does.        |
+| The Wasp Concerto     | Comedy | 110 s  | A wasp hijacks a tyrant bandmaster's concert, and his band plays every swat.                                     |
 
 These are original canvas animations with their own title and end cards, original scores, and sound effects, all rendered locally. No video downloads, external embeds, accounts, or remote services are needed. Turn on town sound and zoom into the screen to hear a film; the soundtrack is rendered in a worker and follows the screen, so seeking, reloading, and late arrivals stay in sync.
 

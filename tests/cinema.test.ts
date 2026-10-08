@@ -81,7 +81,9 @@ describe('Starlight Cinema', () => {
       bills = new Set<string>();
     const seconds = (items: readonly { duration: number }[]) =>
       items.reduce((sum, item) => sum + item.duration, 0);
-    for (let day = 0; day < 120; day++) {
+    // A film longer than two minutes only plays when it leads the shuffle, so a 31-film library
+    // needs about two hundred nights before every title has had its turn.
+    for (let day = 0; day < 200; day++) {
       const bill = cinemaProgram(day, library);
       expect(bill.films.length).toBeGreaterThanOrEqual(1);
       expect(bill.films.length).toBeLessThanOrEqual(3);
@@ -153,7 +155,7 @@ describe('Starlight Cinema', () => {
     expect(new Set(long.ads.map((ad) => ad.id)).size).toBe(long.ads.length);
   });
   it('rotates the classics, the Starlight Reel, and the 14+ films together', () => {
-    expect(CINEMA_FILMS).toHaveLength(22);
+    expect(CINEMA_FILMS).toHaveLength(27);
     expect(CINEMA_FILMS.map((film) => film.artwork)).toEqual(
       expect.arrayContaining(['race', 'duel', 'ufo', 'orchestra', 'lanterns', 'mitten']),
     );
@@ -161,8 +163,11 @@ describe('Starlight Cinema', () => {
     expect(grownUp.map((film) => film.genre).sort()).toEqual([
       'action',
       'action',
+      'action',
       'comedy',
       'comedy',
+      'comedy',
+      'drama',
       'drama',
       'drama',
     ]);
@@ -187,7 +192,7 @@ describe('Starlight Cinema', () => {
           .join(','),
       );
     }
-    expect(seen.size).toBe(22);
+    expect(seen.size).toBe(27);
     expect(selections.size).toBeGreaterThan(40);
   });
   it('fits every possible bill into the evening, so the screen is stowed before midnight', () => {

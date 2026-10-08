@@ -81,7 +81,12 @@ export type FilmArtwork =
   | 'courier'
   | 'whiteout'
   | 'replyall'
-  | 'roadtest';
+  | 'roadtest'
+  | 'snowmen'
+  | 'towers'
+  | 'wasp'
+  | 'skiff'
+  | 'wren';
 export type FilmGenre = 'drama' | 'action' | 'comedy';
 export type CinemaFilm = {
   id: string;
@@ -290,6 +295,51 @@ export const CINEMA_FILMS: readonly CinemaFilm[] = [
     artwork: 'roadtest',
     rating: '14+',
     genre: 'comedy',
+  },
+  {
+    id: 'statues',
+    title: 'Statues',
+    description:
+      'June plays Statues with her snowman. Every time she turns round, there are more of them.',
+    duration: 90,
+    artwork: 'snowmen',
+  },
+  {
+    id: 'tall-order',
+    title: 'Tall Order',
+    description: 'Two fruit stalls, one aisle, and a display war that only goes up.',
+    duration: 60,
+    artwork: 'towers',
+  },
+  {
+    id: 'the-wasp-concerto',
+    title: 'The Wasp Concerto',
+    description:
+      'A strict bandmaster, a terrified brass band, and one wasp that takes charge of the tempo.',
+    duration: 110,
+    artwork: 'wasp',
+    rating: '14+',
+    genre: 'comedy',
+  },
+  {
+    id: 'in-time',
+    title: 'In Time',
+    description:
+      'A former champion, her eager son, and an old rowing boat that only goes round in circles.',
+    duration: 120,
+    artwork: 'skiff',
+    rating: '14+',
+    genre: 'drama',
+  },
+  {
+    id: 'the-return-job',
+    title: 'The Return Job',
+    description:
+      'A skylight, a laser grid, a sleeping guard, and a burglar who has not come to take anything.',
+    duration: 150,
+    artwork: 'wren',
+    rating: '14+',
+    genre: 'action',
   },
 ];
 /** The spots between films: short, cheerful, and all from around town. */
