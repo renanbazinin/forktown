@@ -82,7 +82,7 @@ The green's panel adds one line while any snowman stands (finished and not yet m
 | Art                                                                                | Cap       | Measured    |
 | ---------------------------------------------------------------------------------- | --------- | ----------- |
 | Stargazing props (rugs, flasks, telescope, astronomer), at full detail and in view | 300 calls | 204 at most |
-| Four snowmen, with the builders' trail and heaps on a build day                    | 40 calls  | 39 at most  |
+| Four snowmen, with the builders' trail and heaps on a build day                    | 40 calls  | 38 at most  |
 
 - **Cached.** The rugs (once all eight are flat) and the telescope do not change while they are out, so in a browser each is painted once into a sprite at the canvas's own scale, by its look (night, snow, detail), and copied after that. A new zoom is painted into the sprite only once it has held for six frames, so a pinch draws directly. Without a document (the tests) everything is drawn directly, which is what the caps measure.
 - **Off-screen**, every part is skipped by `scene.visible`, and both painters return nothing.
