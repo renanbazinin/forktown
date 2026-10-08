@@ -28,8 +28,9 @@ An automated note validation test lives in `tests/music.test.ts`.
 
 # The Bandstand
 
-The Bandstand's three bands, brass, folk and strings, each get an arrangement in
-`src/music/bandstand-tracks.ts`; until a band has its own, it plays the acoustic one.
+The Bandstand's three bands each play an arrangement of their own, in
+`src/music/bandstand-tracks.ts`: the brass "Oom-pah on the Lawn", the folk "The Riverbank Reel"
+and the strings "Deckchairs at Dusk". See [The Bandstand](BANDSTAND.md).
 The music is local, like the cinema's: a live set plays only while the camera is near
 the Bandstand, louder as it zooms in and panned by where the stand sits on screen.
 A live stage show plays first. See [Town events](TOWN_EVENTS.md#bandstand-evenings).
