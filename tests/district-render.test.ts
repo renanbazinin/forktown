@@ -2,8 +2,10 @@
 // draws nothing off-screen and keeps to its call cap, the cached ground never reads the minute,
 // nothing is amber by day, no light or awning flashes, a boat under the Kingfisher bridge stays in
 // sight, and the frames that matter (the test camera box, the real opening frame, the whole town,
-// the east live frames) stay within their budgets with every feature on. Each feature agent adds
-// its own checks in tests/district-render-<agent>.test.ts; none edits this file.
+// the east live frames) stay within their budgets with every feature on, and the Bandstand lawn's
+// two features (the bands' deckchairs, the stargazers' rugs and telescope) keep out of each other's
+// way. Each feature agent adds its own checks in tests/district-render-<agent>.test.ts; none edits
+// this file.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
@@ -14,8 +16,10 @@ import {
   type DistrictScene,
 } from '../src/city/district-art';
 import { renderCity } from '../src/city/render';
+import { chairOut, STACK as CHAIR_STACK, STAND } from '../src/city/district/bandstand';
+import { astronomerAt, rugOut, TELESCOPE } from '../src/city/district/stargazing';
 import { drawTubeGround, drawTubes, drawTubeTraffic, type TubeScene } from '../src/city/tubes';
-import { regattaBoat, REGATTA_BOATS } from '../src/lib/district-calendar';
+import { regattaBoat, REGATTA_BOATS, starNight } from '../src/lib/district-calendar';
 import { DISTRICT_FRAMES } from '../src/lib/district-places';
 import { eventsForDay, VENUES } from '../src/lib/events';
 import { liveCamera } from '../src/lib/live-director';
@@ -288,7 +292,9 @@ describe('Each district painter', () => {
         }
       }
       expect(jumps.slice(0, 5)).toEqual([]);
-      expect(compared).toBeGreaterThanOrEqual(0);
+      // With every feature's art in, these windows compare millions of draws; none would mean the
+      // check had gone quiet.
+      expect(compared).toBeGreaterThan(0);
     },
     rosterTimeout(0.3, 60_000),
   );
@@ -354,8 +360,8 @@ describe('A paper boat under the Kingfisher bridge', () => {
         });
       }
     }
-    // Until the landing's art draws its boats there is nothing to cover.
-    expect(checked).toBeGreaterThanOrEqual(0);
+    // The landing draws its boats under the bridge (122 checks in all), so some must be checked.
+    expect(checked).toBeGreaterThan(0);
   });
 });
 
@@ -530,6 +536,45 @@ describe('The frames that matter, with every feature on', () => {
     },
     rosterTimeout(0.5, 120_000),
   );
+});
+
+describe('The Bandstand lawn, shared by the bands and the stargazers', () => {
+  const nights = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i).filter(starNight);
+
+  it('keeps the telescope and the astronomer clear of the stand and the stacked deckchairs', () => {
+    expect(nights).toHaveLength(12);
+    // The stack is about 0.3 tiles across and the stand's plinth 0.72 round its centre.
+    const clear = (point: Point, what: string) => {
+      expect(
+        Math.hypot(point.x - CHAIR_STACK.x, point.y - CHAIR_STACK.y),
+        `${what}, from the stack`,
+      ).toBeGreaterThanOrEqual(0.6);
+      expect(
+        Math.hypot(point.x - STAND.x, point.y - STAND.y),
+        `${what}, from the stand`,
+      ).toBeGreaterThanOrEqual(1);
+    };
+    clear(TELESCOPE, 'the telescope');
+    let seen = 0;
+    for (const night of nights)
+      for (let evening = 1300; evening < 1500; evening += 0.1) {
+        const now = astronomerAt(evening >= 1440 ? night + 1 : night, evening % 1440);
+        if (!now) continue;
+        seen++;
+        clear(now.at, `the astronomer on ${night} at ${evening.toFixed(1)}`);
+      }
+    expect(seen).toBeGreaterThan(0);
+  });
+
+  it('never has a deckchair and a rug out on one spot at once', () => {
+    for (const night of nights)
+      for (let evening = 900; evening < 1500; evening += 0.25)
+        for (let k = 0; k < 8; k++)
+          expect(
+            chairOut(k, evening % 1440) > 0 && rugOut(k, evening) > 0,
+            `spot ${k} on ${night} at ${evening}`,
+          ).toBe(false);
+  });
 });
 
 describe('The Riverside’s code', () => {

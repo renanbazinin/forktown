@@ -1171,7 +1171,7 @@ export function sittersLow(residents: readonly ResidentState[]): number[] {
 }
 
 /** The chairs folded and stacked by the stand's east side, toward the road. */
-const STACK = { x: 60.82, y: 42.42 } as const;
+export const STACK = { x: 60.82, y: 42.42 } as const;
 function drawStack(ctx: Ctx, count: number, night: boolean, alpha: number) {
   if (count <= 0 || alpha <= 0) return;
   const base = iso(STACK.x, STACK.y);
