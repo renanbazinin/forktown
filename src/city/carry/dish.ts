@@ -1,4 +1,4 @@
-// A dish for the Long Table (agent D, SPEC §4.3), carried there only: a pie, a loaf or a jar by
+// A dish for the Long Table (docs/HARVEST_FAIR.md), carried there only: a pie, a loaf or a jar by
 // variant (hash(`dish:${day}:${id}`) % 3). The same pixels stand on the table at the guest's
 // place from the moment they arrive (district/harvest.ts).
 // No Math.random, Date.now or performance.now.

@@ -1,6 +1,6 @@
-// The Riverside in the town's UI (SPEC §4.7, §7.0): each outing's events-list card and each
-// district venue's panel. TownEvents and App read these; a feature agent fills only its own panel
-// file. The keys here are frozen.
+// The Riverside in the town's UI: each outing's events-list card and each district venue's panel
+// (docs/TOWN_EVENTS.md). TownEvents and App read these; each venue registers its own panel here.
+// The keys here are frozen.
 import type { ComponentType } from 'react';
 import {
   Music4,
@@ -30,13 +30,13 @@ export type DistrictPanelProps = {
   /** The outing the visitor chose from its event card, which the panel puts first. */
   selected?: string | null;
 };
-/** The stargazing note inside the Bandstand's panel on new-moon nights (agent E). */
+/** The stargazing note inside the Bandstand's panel on new-moon nights. */
 export type StargazingNoteProps = {
   day: number;
   minutes: number;
   residents: readonly ResidentState[];
 };
-/** The snowmen line in the Lunch Green's panel (agent E). */
+/** The snowmen line in the Lunch Green's panel. */
 export type GreenNoteProps = { day: number; minutes: number };
 
 /** Each outing's card icon; both Bandstand sets share one card. */

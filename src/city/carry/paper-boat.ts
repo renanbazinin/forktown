@@ -1,4 +1,4 @@
-// The regatta's paper boat (agent C, SPEC §4.5), carried to the Landing only: white, with a band in
+// The regatta's paper boat (docs/REGATTA.md), carried to the Landing only: white, with a band in
 // the guest's outfit colour (from `look`). Variant 0. The boatwright carries the same boat from the
 // lawn to the water (landing.ts).
 // No Math.random, Date.now or performance.now.

@@ -23,7 +23,7 @@ const VENUE_LINKS = new Map<string, string>([
   ['cinema', CINEMA_VENUE.plot],
   ['football', FOOTBALL_VENUE.plot],
   // The Riverside: Market Square, the Bandstand and the Boat Landing. Stargazing is on the
-  // Bandstand's lawn and the regatta at the Landing, so their links are aliases (SPEC §4.7).
+  // Bandstand's lawn and the regatta at the Landing, so their links are aliases.
   ['market', MARKET_VENUE.plot],
   ['bandstand', BANDSTAND_VENUE.plot],
   ['landing', LANDING_VENUE.plot],

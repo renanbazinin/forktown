@@ -1,6 +1,7 @@
-// The Harvest Fair and the Long Table (agent D, SPEC §4.3): the trodden-stubble patch over bed 1
-// (ground, keyed by groundDay, from the last of the grain to spring), the props of HARVEST_PROPS, the table, the dishes, the four table
-// lamps and the fiddler; and the scarecrow's ribboned hat. Render cap: 1,200 calls (SPEC §6.6).
+// The Harvest Fair and the Long Table (docs/HARVEST_FAIR.md): the trodden-stubble patch over bed 1
+// (ground, keyed by groundDay, from the last of the grain to spring), the props of HARVEST_PROPS,
+// the table, the dishes, the four table lamps and the fiddler; and the scarecrow's ribboned hat.
+// Render cap: 1,200 calls.
 // No Math.random, Date.now or performance.now: everything runs on the town clock.
 //
 // The day of the fair, Autumn 23–25:

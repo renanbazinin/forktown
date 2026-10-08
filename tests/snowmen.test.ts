@@ -1,4 +1,4 @@
-// Snowmen on the Lunch Green (agent E, SPEC §4.6): the builders and the watchers, the snowmen
+// Snowmen on the Lunch Green (docs/STARGAZING.md): the builders and the watchers, the snowmen
 // themselves from their first snowball to the carrot left on the grass, and the green's panel line.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

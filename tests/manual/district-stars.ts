@@ -1,4 +1,4 @@
-// Harness buttons for stargazing (agent E): the moments worth checking by eye. The meteors are in
+// Harness buttons for stargazing: the moments worth checking by eye. The meteors are in
 // the sky, which the Bandstand's frame does not reach: see them in a whole-town view at night.
 import type { DistrictButton } from './district';
 import { townDay } from './district-days';

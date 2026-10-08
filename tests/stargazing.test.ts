@@ -1,4 +1,4 @@
-// Stargazing by the river (agent E, SPEC §4.4): the stargazers' poses, the astronomer's night, the
+// Stargazing by the river (docs/STARGAZING.md): the stargazers' poses, the astronomer's night, the
 // summer meteors (never a flash) and the note in the Bandstand's panel.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

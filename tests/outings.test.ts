@@ -1,4 +1,4 @@
-// The Riverside's outings across a town year (SPEC §6.3): seats, calendars, exclusivity, worth,
+// The Riverside's outings across a town year: seats, calendars, exclusivity, worth,
 // headways, invariance, turn tickets, determinism, drafts, where guests stand and what they carry,
 // the regatta's boats, the snowmen's builders and the real town's floors. Four towns are planned
 // once for the whole year (tests/district.ts) and every year-scale check reads that plan.
@@ -54,7 +54,7 @@ import { insideEventGround } from './event-ground';
 import { rosterTimeout } from './roster-timeout';
 import { onRoadOrTube, riding } from './tube-riders';
 
-/** Each call's seats (SPEC §4.0.A): today's, then every Riverside outing's spots. */
+/** Each call's seats: today's, then every Riverside outing's spots. */
 const CAPACITY: Record<SeatCall, number> = {
   cinema: EVENT_SPOTS.cinema.length,
   'football-morning': 6,
@@ -69,7 +69,7 @@ const CAPACITY: Record<SeatCall, number> = {
     number
   >),
 };
-/** At most one of each set per neighbor and day (SPEC §4.0.F). */
+/** At most one of each set per neighbor and day. */
 const EXCLUSIVE: readonly (readonly SeatCall[])[] = [
   ['football-morning', 'market'],
   ['green', 'zoo', 'football-afternoon', 'millpond', 'regatta', 'harvest-fair', 'bandstand-tea'],
@@ -484,7 +484,7 @@ describe('The same plan for everyone', () => {
   );
 });
 
-/** The twelve sample days of SPEC §6.7, as season and date. */
+/** Twelve sample days, as season and date. */
 const SAMPLE_DAYS = (
   [
     ['Spring', 1],
@@ -649,7 +649,7 @@ describe('The real town’s Riverside', () => {
         new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
       const earlier = new Set<SeatCall>(SEAT_ORDER.slice(0, SEAT_ORDER.indexOf('stargazing')));
       // The replay below plans each owl's day without the other homes' door and gate minutes;
-      // the planner's invite plans it with them (SPEC §4.0) and drops a plan that cannot keep the
+      // the planner's invite plans it with them and drops a plan that cannot keep the
       // two-minute headways. So the seat count is replayed exactly on the frozen town, whose
       // minutes never move. On the published roster as it is (every house plot taken in
       // check:full-town), any newcomer's trips can take a minute an owl needed, so only the

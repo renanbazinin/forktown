@@ -1,4 +1,4 @@
-// Harness buttons for Market Square (agent B): the moments worth checking by eye. The morning in
+// Harness buttons for Market Square: the moments worth checking by eye. The morning in
 // order on a spring farmers' day, then each market at the live shot through the year, then the
 // square shut under canvas. The kind of a day is MARKET_KINDS[hash('market:' + day) % 3].
 import type { DistrictButton } from './district';

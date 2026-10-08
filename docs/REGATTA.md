@@ -34,7 +34,7 @@ The guests stand and watch, facing the water. For a minute and a half from the m
 - `src/city/district/landing.ts` is the painter. Ground: the lawn, the gravel edge, the stage and, on regatta days, the boom. Floor: the boats' wakes, and the lawn lit when J15 is hovered or selected. Objects: the bench, the bunting, each boat ashore or afloat at its own depth, the boatwright with the boat in hand, the boatman with his net and basket. Its hit test answers a click on the stage, which stands on the river off any plot, with J15.
 - The day's guests and the boatwright's round are read once per day's plan (`regattaGuestsOf`); every place a boat or a figure is at is pure in the guests' arrivals and the minute.
 - A boat on the water sits low: as wide as the boat in hand, its hull two rows of its band's colour, and nothing more than 4 px over its point, so a boat slipping under the Kingfisher bridge stays clear of the glass above it (the shared test in `tests/district-render.test.ts`). On the grass it is the boat in hand itself, on a little shadow.
-- Render cap: 600 calls with ten boats and the boom; measured at about 220.
+- Render cap: 600 calls with ten boats and the boom; measured at most 246 (Summer 10, 16:35, netting).
 
 ## Checking it
 

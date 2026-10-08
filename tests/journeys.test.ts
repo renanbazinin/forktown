@@ -1,8 +1,8 @@
 // How far every outing is from every house plot of the 20 × 15 town, and who can make it
-// (SPEC §4.8, §6.4): the worst door-to-seat trip to each venue, best of walk or tube, and the
-// share of house plots whose narrowest routine can make each outing under the planner's own
-// rules (worth the walk, each home's own market window, each regatta seat's own launch, night
-// owls at mid-band). No plans: seat 0 from every house plot, about a second in all.
+// (docs/TOWN_EVENTS.md#measured): the worst door-to-seat trip to each venue, best of walk or
+// tube, and the share of house plots whose narrowest routine can make each outing under the
+// planner's own rules (worth the walk, each home's own market window, each regatta seat's own
+// launch, night owls at mid-band). No plans: seat 0 from every house plot, about a second in all.
 import { describe, expect, it } from 'vitest';
 import { OUTING_TIMES, REGATTA_LAUNCH_EVERY, type OutingId } from '../src/lib/district-calendar';
 import {
@@ -125,7 +125,7 @@ const share = (plots: Set<string>) => plots.size / HOUSE_PLOTS.length;
 
 describe('Journeys across the 20 × 15 town', () => {
   it('reaches every venue from every house plot within its ceiling', () => {
-    // Unhurried minutes, door to seat, best of walk or tube (SPEC §6.4). Today's 20 × 10 worst
+    // Unhurried minutes, door to seat, best of walk or tube. Today's 20 × 10 worst
     // is 273: no venue may take longer than that.
     const ceilings: [string, VisitEvent, number][] = [
       ['football', OUTINGS.footballMorning, 209],

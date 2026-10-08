@@ -170,7 +170,7 @@ describe('Shared town events', () => {
             continue;
           }
           expect(early.event?.phase).toBe('waiting');
-          // A Riverside outing has its own words for the wait (SPEC §4.7).
+          // A Riverside outing has its own words for the wait.
           expect(residentActivityLabel(early)).toBe(
             outing
               ? DISTRICT_COPY[outing.id].labels.waiting

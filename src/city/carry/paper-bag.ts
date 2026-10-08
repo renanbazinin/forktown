@@ -1,4 +1,4 @@
-// The market's paper bag (agent B, SPEC §4.1), carried home only. Its top shows greens, stems or a
+// The market's paper bag (docs/MARKET.md), carried home only. Its top shows greens, stems or a
 // book corner by variant (MARKET_KINDS index: farmers, flowers, books).
 // No Math.random, Date.now or performance.now.
 //

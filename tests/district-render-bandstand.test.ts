@@ -1,4 +1,4 @@
-// Agent C's render checks (SPEC §6.6): the Bandstand and the Boat Landing beyond the shared ones in
+// Render checks for the Bandstand and the Boat Landing, beyond the shared ones in
 // district-render.test.ts. The stand is painted from two cached layers kept by the night and the
 // season's day; it stands 40 px at most; the caps hold for every band and every hour; deckchairs sit
 // under their guests with their backs over them; the peak lamp lights in the streetlamp wave and

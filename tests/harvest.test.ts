@@ -1,4 +1,4 @@
-// The Harvest Fair and the Long Table (SPEC §4.3), agent D: what the guests do at their spots,
+// The Harvest Fair and the Long Table (docs/HARVEST_FAIR.md): what the guests do at their spots,
 // the dish they carry to supper, and the farm panel's Harvest Fair section. The art is checked in
 // tests/district-render-harvest.test.ts.
 import { readFileSync } from 'node:fs';

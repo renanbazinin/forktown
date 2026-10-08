@@ -26,7 +26,7 @@ While the market trades, a little litter gathers on the paving in front of each 
 
 ## The stalls
 
-A stall is 1.5 tiles long and 0.9 tiles deep. From the back: two posts carry the top rail at 26 px; the striped awning reaches 0.26 tiles toward the camera from the rail and dips to 23 px at its scalloped hem; the stallholder stands in front of it; then the counter, 12 px high, with a cloth runner in the awning's stripe and a slate of prices on its front. The awning sits over the back of the stall on purpose. A figure is 31 px tall and a stall may stand only 28 px (SPEC §2.4), so an awning over the stallholder's head would hide them from the camera entirely. Over the back, it frames their head instead.
+A stall is 1.5 tiles long and 0.9 tiles deep. From the back: two posts carry the top rail at 26 px; the striped awning reaches 0.26 tiles toward the camera from the rail and dips to 23 px at its scalloped hem; the stallholder stands in front of it; then the counter, 12 px high, with a cloth runner in the awning's stripe and a slate of prices on its front. The awning sits over the back of the stall on purpose. A figure is 31 px tall and a stall may stand only 28 px (`MARKET_HEIGHTS`, checked by `tests/district-render-market.test.ts`), so an awning over the stallholder's head would hide them from the camera entirely. Over the back, it frames their head instead.
 
 - **Awnings.** Sage and cream for the farmers' market, rose and cream for flowers, slate and cream for books. Never amber. In winter `snowAt` lays snow on each awning on its own schedule, and on the covers at night.
 - **Stallholders.** Six scenery figures drawn with the residents' own figure, dressed for the day's trade, with an apron in the stripe or in cream. They face the camera and the browsers. Now and then one turns a quarter along the counter to the stock for a minute or so (more often while stocking and packing), to the other of the two ways that face the camera, so a stallholder never turns their back or about-faces. They never turn while a browser at their stall is chatting. They are never residents and never counted.
@@ -48,7 +48,7 @@ The books stalls keep the same wares all year: boxes of paperbacks spines up, st
 
 ## The browsers
 
-Up to twelve browsers stand at the twelve spots, two to a stall (SPEC §2.3). They take no new pose. Their rhythm is in `src/lib/outings/market.ts`:
+Up to twelve browsers stand at the twelve spots, two to a stall (`DISTRICT_SPOTS.market` in `src/lib/district-places.ts`). They take no new pose. Their rhythm is in `src/lib/outings/market.ts`:
 
 - They face their stall from the moment they arrive.
 - Every 6–10 minutes (`market-look:${id}:${k}`) they glance a quarter turn to the next stall along their row for 1.5 minutes: inward from the stalls at the ends of a row, either way from the middle one.
@@ -80,6 +80,6 @@ On the way home every browser carries a brown paper bag in the crook of the near
 
 **Cached art.** Everything that depends only on the market, the season's day and the night (`marketArt(day, groundDay, night)`, keyed `kind:groundDay:night`) is worked out once and kept: the colours, each stall's display, the stallholders and the snow. The paving and the shadows of the counters, the cart, the pump and the tubs are in the town's cached ground layer, which reads only the night and the season's whole day. A frame only places the art and runs the clock.
 
-**Budgets.** At 10:00 with all twelve browsers at their stalls the market paints 900–1,025 canvas calls a frame, floor and objects, depending on the market and the season, against a cap of 1,100 (SPEC §6.6); shut, about 530. Below zoom 0.6 the hems' scallops, the slates and the plank lines are left out. Off screen it paints nothing, and every piece is culled by its full painted reach, so nothing pops in or out at the edge of the screen.
+**Budgets.** At 10:00 with all twelve browsers at their stalls the market paints up to 1,039 canvas calls a frame, floor and objects (the farmers' autumn market, Autumn 1), and its busiest moment is 1,042 (Autumn 1, 11:25, packing up), against a cap of 1,100 (the call-cap check in `tests/district-render.test.ts`); shut, about 530. Below zoom 0.6 the hems' scallops, the slates and the plank lines are left out. Off screen it paints nothing, and every piece is culled by its full painted reach, so nothing pops in or out at the edge of the screen.
 
 **Harness.** `tests/manual/district.html?venue=market` has the market's moments: the morning in order on a spring farmers' day, bags on the way home, each market at the live shot through the year, and the square under canvas at night.

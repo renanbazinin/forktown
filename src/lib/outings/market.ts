@@ -1,7 +1,7 @@
-// Morning Market browsers (agent B, SPEC §4.1): what a guest does at their stall. They stand
+// Morning Market browsers (docs/MARKET.md): what a guest does at their stall. They stand
 // facing it, glance to the next stall every 6–10 min (`market-look:${id}:${k}`, written here, not
 // zooGlance) and chat one beat in three. Existing poses only.
-// Import rule (SPEC §7.3): value-import only world, town-calendar, seasons, district-places and
+// Import rule: value-import only world, town-calendar, seasons, district-places and
 // district-calendar; never resident-trips, events or anything under src/city/.
 //
 // A browser keeps one rhythm from the moment they reach their spot. Look k (k ≥ 1) starts 6–10

@@ -1,4 +1,4 @@
-// Market Square's panel (agent B, SPEC §4.1): today's market and its copy, the hours, the
+// Market Square's panel (docs/MARKET.md): today's market and its copy, the hours, the
 // neighbors browsing now (names only while they are there; nothing about a crowd when nobody is),
 // and "Next market: tomorrow, 08:00." once it has closed for the day. The status runs on the
 // clock, like the event card's (events.ts `eventStatus`); only the names follow who is there.

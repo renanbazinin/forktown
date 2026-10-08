@@ -1,6 +1,6 @@
-// The Riverside's painters: one per district feature, each in its own file under src/city/district/
-// (SPEC §7.0, §7.3). render.ts calls every painter at four points of a frame, so a feature agent
-// fills only their own painter and never edits render.ts:
+// The Riverside's painters: one per district feature, each in its own file under
+// src/city/district/. render.ts calls every painter at four points of a frame, so a feature's art
+// lives in its own painter and render.ts never changes for it:
 //   ground   the cached ground layer, after drawFarmGround and before drawTubeGround
 //   floor    floor paint (rugs, wakes, the stubble shadow), after drawTubeTraffic, before the sort
 //   objects  depth objects, pushed before the residents; culled with `visible`, [] off-screen

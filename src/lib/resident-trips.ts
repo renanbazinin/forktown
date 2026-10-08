@@ -400,7 +400,7 @@ export type PlanOptions = {
   /** false: the Riverside's daily outings only, none of the four festivals (for tests). */
   festivals?: boolean;
 };
-/** Minutes before its launch that the boatwright picks a regatta guest's boat up (SPEC §4.5). */
+/** Minutes before its launch that the boatwright picks a regatta guest's boat up. */
 export const REGATTA_HANDOVER = 1;
 /** The Riverside's outings that run on some days only: each seats first in its period. */
 const FESTIVALS: ReadonlySet<OutingId> = new Set([

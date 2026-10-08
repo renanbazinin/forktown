@@ -1,4 +1,4 @@
-// The Morning Market's browsers, their bags and the panel (agent B, SPEC §4.1): a browser faces
+// The Morning Market's browsers, their bags and the panel (docs/MARKET.md): a browser faces
 // their stall, glances a quarter turn to the next stall every 6–10 minutes and holds each look a
 // minute at least, never in the first or last minute at the spot; one beat in three they chat. On
 // the way home they carry a paper bag topped by the day's market. The panel names the browsers

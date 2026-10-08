@@ -1,4 +1,4 @@
-// The snowmen line in the Lunch Green's panel (agent E, SPEC §4.6): "Snowmen on the green: 3. They
+// The snowmen line in the Lunch Green's panel (docs/STARGAZING.md): "Snowmen on the green: 3. They
 // stand until the thaw." while any stand. History, not a score: it says how many are there, and
 // nothing at all before the first is finished or after the last has melted. On a build day the
 // panel already holds the snowmen lunch's own card, which says they stand until the thaw, so the

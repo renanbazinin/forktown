@@ -75,7 +75,7 @@ A **hash line** is today's: the eligible neighbors, sorted by ``hash(`${key}:${i
 | Bandstand sets | 8     | 29 each                              |
 | Disco          | 8     | 29                                   |
 
-Adding a house moves at most one existing guest: the newcomer either holds today's ticket or takes one place in the rest of the line. With one all-day stroller added to a half-full town, the days on which more than one existing guest loses a seat are 0 for the market, the disco and every festival, and 0–2 and 0–4 a year for the teatime and sundown sets, through the headways below. Tickets read only the published town, so a draft never moves anyone. `activeIndex` in `src/lib/district-calendar.ts` counts the active days; `ticketRank` in `src/lib/resident-trips.ts` ranks the plots.
+A ticket on its own moves at most one existing guest when a house is added: the newcomer either holds today's ticket or takes one place in the rest of the line. The door and gate headways below can then move one or two more. With one all-day stroller added on J4 to half the mixed town, more than one existing guest lost a seat on 2 of 111 days for the teatime set and 4–5 of 112 for the sundown set. It never happened at the market. For the disco and each festival it happened on at most one day, and which day, if any, depends on the newcomer's id. With F8 added to the real town it never happened. `tests/outings.test.ts` allows it on at most a tenth of an outing's days, and at least one. Tickets read only the published town, so a draft never moves anyone. `activeIndex` in `src/lib/district-calendar.ts` counts the active days; `ticketRank` in `src/lib/resident-trips.ts` ranks the plots.
 
 ### Worth the walk
 
@@ -106,11 +106,13 @@ Neighbors who would reach a tube door or a venue gate within two minutes of each
 | Mixed     | 0 / 0                         | 51%         | 4.0 / 15.5 / 24.5              | 0.26%         | 12.8               |
 | Eager     | 0 / 0                         | 60%         | 4.0 / 16.5 / 65.0              | 0.09%         | 14.8               |
 
+Move is how far the arrival or the leave moved from the first plan, arrivals pushed later included. What a trip records (`headway.arriveShift` and `leaveShift`) leaves out an arrival pushed later: 42–60% of trips, p95 6–9 minutes.
+
 No arrival moves more than six minutes earlier, no leave passes its cap, and every seat is still filled in the full, mixed and eager towns. The Bandstand's shared spots never overlap: teatime guests leave their chairs by 17:45 at the latest, and sundown guests arrive from 17:55.
 
 ### Personal windows
 
-- **The market.** Each home has its own browsing hour. It starts at 08:00 plus ten minutes times `hash('market-browse:' + id) % 13`, and lasts 60 to 90 minutes (`hash('market-stay:' + id) % 31` more than an hour), ending by 11:30. A home that can't make its own hour takes one it can make, picked by the same hash among the thirteen starts; with none, it keeps the nominal 08:00–11:30. With 230 house plots, 47 morning-only plots move to an hour they can make, and then every plot can make the hour it has. Stays run 44–90 minutes in the real town and 33–90 in a full one.
+- **The market.** Each home has its own browsing hour. It starts at 08:00 plus ten minutes times `hash('market-browse:' + id) % 13`, and lasts 60 to 90 minutes (`hash('market-stay:' + id) % 31` more than an hour), ending by 11:30. A home that can't make its own hour takes one it can make: of the n starts it can make, it takes number `hash('market-browse:' + id) % n`, counting from the earliest at 0. With none, it keeps the nominal 08:00–11:30. With 230 house plots, 47 morning-only plots move to an hour they can make, and then every plot can make the hour it has. Stays run 44–90 minutes in the real town and 33–90 in a full one.
 - **The regatta.** Seat k's own start is 14:00 plus 6k minutes, when the boatwright launches their boat. A guest arrives in time to set the boat down a minute before its launch, or the seat passes on.
 
 ### One outing at a time
@@ -172,9 +174,11 @@ Daily, 08:00–11:30 (guests leave from 06:00 and are home by 12:00), each guest
 - **Ground.** The square takes x 54–61, y 14–21. Its inner roads (x = 57 and y = 17) and their lamps are gone; the perimeter roads x = 53, x = 61, y = 21 and the duck street y = 13 stay. Six stalls stand three to an edge, their counters along y 14.9 (north) and x 54.9 (west), 1.5 tiles each, with their fronts to the two sides the camera sees. The south and east sides stay open.
 - **Guests.** Up to twelve, from morning strollers who are not at the morning match. Seats 0–5 browse the north stalls at x 55.6, 56.4, 57.5, 58.3, 59.4 and 60.2 on y 15.75, facing `ne`; they come in from (61.5, 15.5) along a lane behind the row at y 16.2, then one step forward. Seats 6–11 browse the west stalls at y 16.55, 17.25, 18.15, 18.85, 19.75 and 20.45 on x 55.75, facing `nw`; they come in from (55.5, 21.5) along x 56.4. They browse from the moment they arrive: they stand facing their stall, glance to the next stall every 6 to 10 minutes (never within a minute of arriving or leaving), and chat one beat in three. They walk home with a paper bag whose top shows greens, stems or a book corner by the day's kind. It is not drawn in the tube's stack or glass.
 - **Scenery.** Stallholders fade in 07:10–07:30. Awnings unroll one at a time 07:15–07:45, two minutes each; the market opens at 08:00 and packs up 11:30–12:00. Awning stripes are sage and cream for the farmers' market, rose and cream for flowers, slate and cream for books, never amber, and stalls with their awnings stay within 28 pixels. Crates follow the farm's calendar; a produce handcart stands in the north-west corner and a low pump (24 pixels at most) in the open corner. The six stallholders face the camera behind their counters. They are scenery: never neighbors, never counted. In winter snow lies on the awnings; at night the stalls are folded frames under pale canvas. The duck family passes behind the north stalls at 08:05–08:36 and back past the packing-up at 11:53–12:25, by Watercress Halt's door at 08:07–08:21 and 12:08–12:22.
-- **Panel.** `PUBLIC SPACE · D14–E15 · 4 PLOTS`, "Market Square.", today's kind and its words, and "Open 08:00–11:30. Browsers walk home with a paper bag." It names the neighbors browsing now, only while they are there, and says nothing about a crowd when nobody is. Out of hours it says "Next market: tomorrow, 08:00."
+- **Panel.** `PUBLIC SPACE · D14–E15 · 4 PLOTS`, "Market Square.", today's kind and its words, and "Open 08:00–11:30. Browsers walk home with a paper bag." Its eyebrow follows the clock, as the event card does: `LATER TODAY` before 08:00, `HAPPENING NOW` until 11:30, `FINISHED TODAY` after. It names the neighbors browsing now, only while they are there, and says nothing about a crowd when nobody is. From 11:30 it adds "Next market: tomorrow, 08:00."
 - **Live.** The market frame is centred on (1520, 1395) world pixels, 640 × 420. Its shot runs 09:30–10:10 on the days the district highlight picks it.
 - **The real town** (30 houses) sends 2.0 browsers a day, 9 different neighbors a year. The stallholders carry the look, and the words never promise a crowd.
+
+See [Market Square](MARKET.md).
 
 ### Bandstand Evenings
 
@@ -189,11 +193,13 @@ Every day of the year, harvest days included, the Bandstand on K15 plays two set
 - **Card.** Both sets share one card in the Events panel. It shows whichever set is live, else the next one today, else the teatime set.
 - **Guests.** Eight a set, in eight deckchairs on the south lawn, all facing `ne` toward the stand: (58.45, 44.15), (59.15, 44.15), (59.85, 44.15), (60.55, 44.15) in the front row and (58.80, 44.75), (59.50, 44.75), (60.20, 44.75), (60.90, 44.75) behind. Chairs west of x 59.6 come up from the south road at (59.5, 45.5); the rest come from the corner of the riverside and south roads, along the lawn's south edge. They sit to wait and to listen. The teatime set has its tea and perches; at sundown they perch and sip, and cheer only in each set's last five minutes. Every pose is held a minute at least. The deckchairs change hands around six.
 - **Scenery.** An octagonal platform about 1.4 tiles across on six slender posts, with a shallow green-and-cream cap, 40 pixels at most, on the plot's north half. The players are scenery, facing the camera: tuba, cornet and drum; fiddle, squeezebox and guitar; or violin, viola and cello. Music notes rise as at the stage. Players fade in at 15:45, take their interval tea on the steps 17:30–18:15 and are gone by 20:15. The deckchairs are out 15:35–20:20 and stacked beside the stand otherwise. Blossom lies on the cap in spring; snow and scarves in winter.
-- **The peak lamp.** A lamp under the cap lights in the streetlamp wave and stays lit until 06:00. It is lit light, so it may be amber, and it is a lamp, never a lantern. On star nights it is not lit at all, so the sky stays dark for the stargazers.
+- **The peak lamp.** A lamp on the cap's peak, under its own small hood, lights in the streetlamp wave and stays lit until 06:00. It is lit light, so it may be amber, and it is a lamp, never a lantern. On star nights it is not lit at all, so the sky stays dark for the stargazers.
 - **Music.** Each band has its own arrangement (`src/music/bandstand-tracks.ts`). It is local, like the cinema's: `bandstandListening` gives a gain by the camera's zoom and its distance from the Bandstand, and a pan by screen x, and a live set plays only while that gain is at least 0.005. A live stage show plays first. Sound stays opt-in and never autoplays outside `/live`.
 - **Panel.** `PUBLIC SPACE · K15`, "The Bandstand.", tonight's band, "Teatime set 16:00. Sundown set 18:15." and "Eight deckchairs face the music." On new-moon nights it also shows the stargazing note.
 - **Live.** The Bandstand frame is centred on (608, 1922), 520 × 370. Its shot runs 16:00–16:40, the teatime set, on the days the district highlight picks it: every day without a festival whose lineup does not film the afternoon (whose zoo would hold it).
 - **The real town** has 1.74 teatime guests on 99 days of 112, and no sundown guests. The words never promise a crowd.
+
+See [The Bandstand](BANDSTAND.md).
 
 ### Harvest Fair and the Long Table
 
@@ -201,12 +207,14 @@ Autumn 23–25, after the grain is cut row by row on Autumn 15–22, both at the
 
 - **Harvest fair**, 13:00–17:00, first in the afternoon, up to twelve. "The field is cut and the gate is open. Cider, bales and a cart of pumpkins." Fairgoers stand on the two footpaths at x 16.35, 17.05, 17.75, 18.45, 20.55 and 21.25, on y 75.4 facing `sw` (lane 74.9) and on y 79.6 facing `ne` (lane 80.1). They sip cider, chat and sit on a small square straw seat at their spot. The spots keep 0.75 tiles from the scarecrow's four west perches, because on three fair days in nine the scarecrow stands on one of them all day.
 - **The Long Table**, 18:30–20:30, first in the evening, up to sixteen, never a film guest. "Supper on the stubble at Moon Harvest Farm. Bring a dish and stay for the lamps." The table runs along y 77.5 from x 15.0 to 21.0, and seats k = 0–7 sit at (15.2 + 0.8k, 77.0) facing `sw` (lane 76.45), seats 8–15 at (15.2 + 0.8(k − 8), 78.0) facing `ne` (lane 78.55). They sit, sip and chat. Each guest carries a dish there, a pie, a loaf or a jar by `hash('dish:' + day + ':' + id) % 3`, and it stands on the table at their place from the moment they arrive.
-- **Props** (on fair days): a pumpkin cart (18 pixels at most, never glowing) at (14.6, 77.5) between the gates and bunting in faded cloth on the west fence, both 06:00–21:00; a cider press (24 pixels at most) at (19.5, 77.5) with a scenery presser turning it 13:00–17:00; six round bales (12 pixels at most) at (16.0, 77.1), (16.0, 77.9), (17.2, 77.5), (20.6, 77.1), (20.6, 77.9) and (21.5, 77.5). The press and the bales fade out 17:10–17:15 as two farmhands clear them and lay the trestles, the cloth and the jugs, 17:10–17:45. A scenery fiddler plays at the table's east end, (21.45, 77.5), 18:00–20:30, while the Bandstand still plays its own set. Every prop keeps 0.75 tiles from the scarecrow and clear of the guests' spots and approaches while it is out.
+- **Props** (on fair days): a pumpkin cart (18 pixels at most, never glowing) at (14.6, 77.5) between the gates and bunting in faded cloth on the west fence, both 06:00–21:00; a cider press (24 pixels at most) at (19.5, 77.5) with a scenery presser turning it 13:00–17:00; six round bales (12 pixels at most) at (16.0, 77.1), (16.0, 77.9), (17.2, 77.5), (20.6, 77.1), (20.6, 77.9) and (21.5, 77.5). Two farmhands come at 17:04 to clear the press and the bales, which fade as they work and are gone by 17:10; 17:15–17:42 they lay the trestles, the cloth and the jugs, east to west. A scenery fiddler plays at the table's east end, (21.45, 77.5), 18:00–20:30, while the Bandstand still plays its own set. Every prop keeps 0.75 tiles from the scarecrow and clear of the guests' spots and approaches while it is out.
 - **Lamps.** Four table lamps (16 pixels at most) light 20:20–20:30 in the streetlamp wave, by their distance from the Fork. They fade out over two minutes at 20:56, after the last possible leave, and the table is cleared 21:00–21:15.
-- **The stubble.** From Autumn 22, when the last of the grain is cut, a trodden-stubble patch covers the first bed (x 18.2–21.5, y 74.3–81.0), so nobody sits among full-grown greens. It stays until spring, as the grain's stubble does. On the three days the scarecrow wears a ribboned hat.
+- **The stubble.** From Autumn 22, when the last of the grain is cut, a trodden-stubble patch covers bed 1, the second bed from the west, where the greens grow (x 18.2–21.5, y 74.3–81.0), so nobody sits among full-grown greens. It stays until spring, as the grain's stubble does. On the three days the scarecrow wears a ribboned hat.
 - **Panel.** The farm's panel gains a Harvest Fair section: `HARVEST FAIR · MOON HARVEST FARM` or `THE LONG TABLE · AUTUMN 23–25`, the dates, today's program, the guests by name only while they are there, and "Next: Autumn 23." out of season. Its link stays `#venue=farm`.
 - **Live.** The harvest frame is centred on (−2261, 1785), 640 × 420. The fair's shot runs 15:00–15:40 and the Long Table's 20:24–20:44, right after lantern hour, with the table lamps lit. On a night the lineup films the cinema (whose bill starts at 20:30) the table's shot is the supper before lantern hour instead, 19:38–19:58.
 - **The real town** sends 12 fairgoers a day and 4.33 to the table: the farm's first visitors.
+
+See [The Harvest Fair and the Long Table](HARVEST_FAIR.md).
 
 ### Stargazing
 
@@ -218,6 +226,8 @@ On new-moon nights (season dates 27, 28 and 1, judged at 22:00: twelve nights a 
 - **Live.** The Bandstand frame at night, 23:00–23:45, a protected moment. On a night the lineup films the cinema, whose bill runs to 23:48–23:54, the shot runs from the end of the bill to 00:15 instead.
 - **The real town** has 2.42 stargazers a star night; on those nights the disco has 2.17 dancers (4.3 on other nights), never none.
 
+See [Stargazing and the snowmen](STARGAZING.md#stargazing-by-the-river).
+
 ### Paper-boat Regatta
 
 Summer 10–16, 14:00–16:30, first in the afternoon, up to ten guests. "Fold a boat and let the river take it. Nobody keeps the times." It reports and never ranks: no winner, no times, no order.
@@ -228,6 +238,8 @@ Summer 10–16, 14:00–16:30, first in the afternoon, up to ten guests. "Fold a
 - **Live.** The regatta frame is centred on (575, 1955), 740 × 450, and holds the landing stage, the Bandstand, the bridge and the boom. Its shot runs 14:40–15:45.
 - **The real town** sends 10 a day. Every guest is at the water to see their own boat come in: 70 of 70 seat-days.
 
+See [The Paper-boat Regatta](REGATTA.md).
+
 ### Snowmen on the Lunch Green
 
 On Winter 3, 7, 11 and 15 (year days 86, 90, 94 and 98) the lunch on the green builds snowmen. It is the day's lunch with other words and props ("Snowmen on the green", "Roll the snow into someone with a carrot nose. They stand until the thaw."), and its line keeps the hashed choice's key, so no guest list changes. The books and games props stay away whatever the hashed choice was.
@@ -236,6 +248,8 @@ On Winter 3, 7, 11 and 15 (year days 86, 90, 94 and 98) the lunch on the green b
 - **Stages.** The base 14:00–14:40, the body 14:40–15:15, the head 15:15–15:40; eyes, a carrot and a scarf at 15:45. The latest builder arrives at 13:49, so a builder is there through every stage. Snowman k stands at spot k of four, round the green and clear of its guests, its lane and the stepping stones.
 - **Until the thaw.** Each snowman is a pure function of the year day and the minute: no roster, no storage. It stands from its build day's 15:45 until it melts, which starts between Winter 24 and 26. It is about 21 pixels tall in balls of 10, 8 and 6 pixels, with snow on its head like the roofs. Melting, it leans, shrinks to 40% and loses its head at 0.7; at 1 the carrot and the scarf lie on the grass for half a day. All are gone by the end of Winter 27, so Spring 1 is always clear. The scarf's colour is muted wool, never amber.
 - **Panel.** The green's panel adds one line while they stand, for example "Snowmen on the green: 3. They stand until the thaw." (on a build day, beside the lunch's own card, only "Snowmen on the green: 2."). It is history, not a score.
+
+See [Stargazing and the snowmen](STARGAZING.md#snowmen-on-the-lunch-green).
 
 ## The Events panel, links, live and labels
 
@@ -375,7 +389,7 @@ Run `npm run check`, `npm run format:check` and `npm run check:full-town`, which
 
 - `tests/events.test.ts`, `tests/trip-routes.test.ts` and `tests/living-town.test.ts`: UTC rollover, stable selection, reserved plots, attendance limits, road paths, no route that turns back on itself, lanes that draw walkers together side by side, seat crouches, poses held a minute at least as guests settle in and get up to go, quarter turns at spots and on the doorstep, the quiet crowd and the zoo, no teleporting at arrival or departure, early guests waiting at their spots, indoor routines, and exact event boundaries.
 - `tests/event-seats.test.ts` fills synthetic towns of 230 houses for a town year: every seat is filled when enough neighbors can make it, a film seat stays empty only for a guest who can't reach the film and be home by bedtime, no spot is ever shared or over capacity, the tube never costs a trip made on foot, every trip keeps to its window and bedtime while rides and parcels never share the tube, seats go round the town, every night owl who can dance alone dances on some nights, every trip is worth the walk and keeps two minutes apart at every door and gate, a previewed draft never moves anyone, and the draw is the same in every browser language and roster order.
-- `tests/outings.test.ts`: the Riverside over a year in the four towns: every seat on each of its days and none off them, one outing a period, the Bandstand's spots, turn tickets, the headways and worth, no other guest list changed on a day without a festival, at most one guest moved by a newcomer, the same plan for any roster order or language, drafts, every guest inside their venue's ground, what they carry and when, every regatta guest at the water for their own boat, a builder at every snowman stage, and the real town's outings.
+- `tests/outings.test.ts`: the Riverside over a year in the four towns: every seat on each of its days and none off them, one outing a period, the Bandstand's spots, turn tickets, the headways and worth, no other guest list changed on a day without a festival, a newcomer moving more than one guest on at most a tenth of an outing's days, the same plan for any roster order or language, drafts, every guest inside their venue's ground, what they carry and when, every regatta guest at the water for their own boat, a builder at every snowman stage, and the real town's outings.
 - `tests/journeys.test.ts`: the worst trip from every house plot to every venue within its ceiling, and the narrowest routines' reach.
 - `tests/full-town-feel.test.ts`: side by side on the busiest days, no teleport on the festival days, greetings at the Riverside's busy gates, quarter turns at the fair and the table, and the cost of a frame.
 - `tests/district-places.test.ts`, `tests/district-hooks.test.ts` and `tests/district-render.test.ts`: the frozen grounds, spots, approaches, props, calendars and copy; the events list, cards, links, music, live shots, labels and carries; every painter's culling, caps, amber and the paper boats under the bridge.

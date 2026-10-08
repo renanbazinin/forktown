@@ -1,6 +1,6 @@
-// The foundation's shared-file hooks for the Riverside (SPEC §7.1, step F3): every place a shared
-// file calls a feature's registry, checked with the features' stubs (or spies in their place), so
-// a feature agent fills only their own files and never edits these.
+// The Riverside's shared-file hooks: every place a shared file calls a feature's registry,
+// checked with the features' own code (or spies in its place), so a feature's part lives in its
+// own files and the shared files never change for it.
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -80,8 +80,8 @@ import { recordingContext } from './recording-context';
 import { insideEventGround } from './event-ground';
 import { FROZEN_TOWN } from './district';
 
-// The scarecrow's festival dress is agent D's, the snowmen's builders and watchers agent E's; the
-// hooks only have to call them.
+// The scarecrow's festival dress is the harvest painter's, and the snowmen's builders and
+// watchers are the snowmen outing's; the hooks only have to call them.
 vi.mock('../src/city/district/harvest', async (original) => ({
   ...(await original<typeof import('../src/city/district/harvest')>()),
   drawScarecrowExtras: vi.fn(),
@@ -112,7 +112,7 @@ describe('The Riverside in the events list', () => {
       expect(ids.includes('harvest-fair')).toBe(harvestDay(day));
       expect(ids.includes('long-table')).toBe(harvestDay(day));
       expect(ids.includes('stargazing')).toBe(starNight(day));
-      // eventsForDay: today's five unchanged, then the Riverside's outings (SPEC §4.0.I).
+      // eventsForDay: today's five unchanged, then the Riverside's outings.
       for (const minutes of [100, 720]) {
         const events = eventsForDay(day, minutes);
         expect(events.slice(0, 5).every((event) => !event.outing)).toBe(true);

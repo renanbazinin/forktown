@@ -1,4 +1,4 @@
-// Harness buttons for the Harvest Fair and the Long Table (agent D): the moments worth checking.
+// Harness buttons for the Harvest Fair and the Long Table: the moments worth checking.
 import type { DistrictButton } from './district';
 import { townDay } from './district-days';
 

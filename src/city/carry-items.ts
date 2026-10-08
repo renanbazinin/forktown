@@ -1,8 +1,8 @@
-// What a guest carries on one leg of an outing (SPEC §4.1, §4.3, §4.5, §7.0): a paper bag home from
+// What a guest carries on one leg of an outing: a paper bag home from
 // the market, a paper boat to the regatta, a dish to the Long Table. The kind and the leg come from
 // the outing's spec (src/lib/outings.ts); residents.ts draws the sprite through the errand items'
 // grip pipeline and adds its height to residentReach. Never drawn in the stack or the glass.
-// The interface and this registry are frozen; each sprite is its owner's file under src/city/carry/.
+// The interface and this registry are frozen; each sprite is its own file under src/city/carry/.
 // No Math.random, Date.now or performance.now.
 import type { CarryKind } from '../lib/outings';
 import type { Resident } from '../lib/schema';

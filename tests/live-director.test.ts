@@ -594,7 +594,7 @@ describe('The Riverside on air', () => {
       );
       if (!festival(day)) picks[pick]++;
     }
-    // Still about an even split (SPEC §4.7): each gets 40–60% of the plain days.
+    // Still about an even split: each gets 40–60% of the plain days.
     const plain = picks.market + picks.bandstand;
     for (const count of Object.values(picks)) {
       expect(count / plain).toBeGreaterThan(0.4);

@@ -1,8 +1,8 @@
-// The Bandstand on K15 (agent C, SPEC §4.2): a low octagonal stand, 40 px at most with its cap and
+// The Bandstand on K15 (docs/BANDSTAND.md): a low octagonal stand, 40 px at most with its cap and
 // peak lamp, on six slender posts under a shallow green-and-cream cap; the night's three players,
 // who fade in at 15:45, take their tea on the steps 17:30–18:15 and are gone by 20:15; the eight
 // deckchairs per BANDSTAND_FURNITURE, stacked by the stand otherwise; and the peak lamp, lit in the
-// streetlamp wave and dark on star nights. Render cap: 500 calls with the players (SPEC §6.6).
+// streetlamp wave and dark on star nights. Render cap: 500 calls with the players.
 // The stand's own art is static, so it is painted once per look into two cached layers: what
 // stands behind the players, and what stands in front of them. The Landing (landing.ts) borrows
 // the cache and the scenery figures.
@@ -303,7 +303,7 @@ const DECK = 4,
   VALANCE = 32,
   EAVE = 34,
   PEAK = 36.5;
-/** The stand's height, cap and peak lamp included: the stage's rule (SPEC §2.4). */
+/** The stand's height, cap and peak lamp included: the stage's rule. */
 export const BANDSTAND_HEIGHT = 40;
 export const STAND_DEPTH = STAND.x + STAND.y;
 
@@ -744,7 +744,7 @@ export const BAND_BPM: Record<Band, number> = { brass: 96, folk: 104, strings: 8
 /** Winter scarves for the three players, in muted wool. */
 const SCARVES = ['#A9574C', '#5F84A0', '#B99A55'];
 
-/** The players' evening, in town minutes (SPEC §4.2). */
+/** The players' evening, in town minutes. */
 export const PLAYERS = {
   /** They fade in, then tune up for the teatime set. */
   in: 945,

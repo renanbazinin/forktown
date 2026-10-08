@@ -6,7 +6,7 @@ import type { DistrictPanelProps } from './district/cards';
 import NeighborList, { byNeighborName } from './district/NeighborList';
 import './harvest-panel.css';
 
-// Moon Harvest Farm's panel. Its Harvest Fair section (agent D, SPEC §4.3) reads the props: the
+// Moon Harvest Farm's panel. Its Harvest Fair section (docs/HARVEST_FAIR.md) reads the props: the
 // dates, today's program (the outing the visitor chose first, else the one on now, then the one to
 // come, then the one over), who is there by name only while they are there, and out of season one
 // forward-looking line with "Next: Autumn 23.".

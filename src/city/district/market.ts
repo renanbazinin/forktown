@@ -1,8 +1,8 @@
-// Market Square (agent B, SPEC §4.1): six stalls, three per edge, with sage, rose or slate awnings
+// Market Square (docs/MARKET.md): six stalls, three per edge, with sage, rose or slate awnings
 // by the day's market (never amber), crates on the farm's calendar, the handcart and the low pump,
 // six scenery stallholders behind the counters, snow on the awnings in winter, and folded frames
 // under roped canvas once it shuts. Render cap: 1,100 calls at 10:00 with 12 browsers, floor and
-// objects (SPEC §6.6). No Math.random, Date.now or performance.now: everything runs on the clock.
+// objects. No Math.random, Date.now or performance.now: everything runs on the clock.
 //
 // The square is paved in the cached ground layer (by night and the season's whole day), with a
 // compass rose in its middle, the stones worn along the browsers' lanes, and the shadows of
@@ -44,7 +44,7 @@ type Paint = (x: number, y: number, w: number, h: number, color: string) => void
 
 // ---------------------------------------------------------------------------------------------
 // Palette: [day, night] pairs, muted like the rest of the town. Nothing here is a light, so none
-// of it is amber; the awnings are sage, rose or slate on cream (SPEC §4.1).
+// of it is amber; the awnings are sage, rose or slate on cream.
 
 const C = {
   sett: ['#DCD5BF', '#7F8B7D'],
@@ -110,16 +110,19 @@ const Q = { back: 0.08, awning: 0.34, holder: 0.47, counter: 0.58, front: 0.9, g
 const H = { rail: 26, edge: 23, hem: 3.5, counter: 12 };
 const LEN = 1.5;
 export type MarketStall = { k: number; row: Row; s0: number; s1: number };
-/** Counter centres from the spots: two browsers to a stall (SPEC §2.3). */
+/** Counter centres from the spots (DISTRICT_SPOTS.market): two browsers to a stall. */
 export const MARKET_STALL_GEOMETRY: readonly MarketStall[] = [0, 1, 2, 3, 4, 5].map((k) => {
   const [a, b] = [DISTRICT_SPOTS.market[2 * k], DISTRICT_SPOTS.market[2 * k + 1]];
   const row: Row = k < 3 ? 'north' : 'west';
   const mid = row === 'north' ? (a.x + b.x) / 2 : (a.y + b.y) / 2;
   return { k, row, s0: mid - LEN / 2, s1: mid + LEN / 2 };
 });
-/** The counters' front line (SPEC §2.3: y 14.9 north, x 54.9 west). */
+/** The counters' front line: y 14.9 north, x 54.9 west. */
 export const COUNTER_FRONT = { north: G.top + Q.front, west: G.left + Q.front } as const;
-/** How high each piece stands, px: the stalls' awnings, the pump (SPEC §2.4). */
+/**
+ * How high each piece stands, px: the stalls' awnings and the pump, at most 28 and 24
+ * (tests/district-render-market.test.ts).
+ */
 export const MARKET_HEIGHTS = { stall: H.rail + 1.5, pump: 23 } as const;
 
 /** A point of a row's stall, `h` px up. */
@@ -186,7 +189,7 @@ function faded(ctx: Ctx, alpha: number, paint: () => void) {
 export const stallDepth = (stall: MarketStall) =>
   stall.s0 + 0.6 + (stall.row === 'north' ? COUNTER_FRONT.north : COUNTER_FRONT.west);
 
-/** The handcart in the north-west corner (SPEC §4.1): along y, its wheel to the east. */
+/** The handcart in the north-west corner: along y, its wheel to the east. */
 export const MARKET_CART = { x0: 54.18, x1: 54.74, y0: 14.3, y1: 15.12, handle: 15.82 } as const;
 /** The low pump in the open south-east corner, its trough on the camera's side. */
 export const MARKET_PUMP = { x: 59.85, y: 19.55 } as const;
@@ -603,7 +606,7 @@ const teacups = (w = 14): Item => ({
     r(u + 13, -5, 1, 2, W.china);
   },
 });
-/** The gramophone: a little box and its flared horn (SPEC §4.1). */
+/** The gramophone: a little box and its flared horn. */
 const gramophone = (w = 17): Item => ({
   w,
   paint: (r, u) => {
@@ -1412,7 +1415,7 @@ function paintGround(ctx: Ctx, night: boolean, groundDay: number) {
     r(u, j * course, PX, course, frost(h % 3 ? C.settAlt : C.settLight));
   }
   // Feet have worn the stones a shade darker in front of the counters and along the browsers'
-  // two lanes (SPEC §2.3: y 16.2 behind the north spots, x 56.4 beside the west ones), most of
+  // two lanes (y 16.2 behind the north spots, x 56.4 beside the west ones), most of
   // them near the middle of the way and fewer toward its edges.
   const worn = [
     frost(C.worn),

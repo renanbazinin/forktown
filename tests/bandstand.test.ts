@@ -1,4 +1,4 @@
-// Bandstand Evenings (SPEC §4.2), agent C: how the listeners sit, sip and applaud; when the
+// Bandstand Evenings (docs/BANDSTAND.md): how the listeners sit, sip and applaud; when the
 // players and the deckchairs are out; the panel's words; and the three bands' arrangements.
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';

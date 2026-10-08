@@ -117,7 +117,7 @@ const LENGTH = tubeLength(C1.id, N1.id);
 type Camera = { x: number; y: number; zoom: number };
 type Visible = TubeScene['visible'];
 const OPENING: Camera = { x: 720, y: 88, zoom: 0.7 };
-/** The whole town at fit: 150 calls a station (SPEC §3.7). */
+/** The whole town at fit: 150 calls a station (docs/TUBES.md#performance). */
 const WHOLE_CAP = 150 * 7;
 const WHOLE: Camera = (() => {
   const zoom = Math.min(
@@ -528,8 +528,8 @@ describe('The Treeline in the opening view', () => {
     'keeps the real opening frame within budget, on a desktop and on a phone, through the year',
     { timeout: rosterTimeout(0.4, 60_000) },
     () => {
-      // The view a visitor first sees, framed by opening-view.ts as City.tsx frames it (SPEC
-      // §2.4): today's frozen 30 homes, the spec's own frame, whoever moves in; and the roster
+      // The view a visitor first sees, framed by opening-view.ts as City.tsx frames it: today's
+      // frozen 30 homes, the same frame whoever moves in; and the roster
       // as it is, which in check:full-town is every house plot taken, opening at the zoom floor
       // (0.35 on a laptop, 0.15 on a phone with the whole loop in view). Each at every ride's
       // busiest moments on five days.
@@ -757,7 +757,7 @@ describe('The Treeline’s parts', () => {
     // never on a halt's own row (C1 11.5, N1 55.5).
     expect(run('west').every((post) => post.x === TUBE_TRUNK_X)).toBe(true);
     expect(run('west').map((post) => post.y)).toEqual(rows(3.5, 67.5, [11.5, 55.5]).reverse());
-    // The north run: every second plot column, never at Hawthorn Halt's.
+    // The north run: every second plot column, which misses Hawthorn Halt's 35.5.
     expect(run('north').every((post) => post.y === TUBE_TRUNK_Y)).toBe(true);
     expect(run('north').map((post) => post.x)).toEqual([7.5, 15.5, 23.5, 31.5, 39.5, 47.5, 55.5]);
     // The bank run: every plot row down to Bulrush Halt, the first two as pilings in the head pool.

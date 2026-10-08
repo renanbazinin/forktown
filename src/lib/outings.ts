@@ -1,6 +1,6 @@
-// The Riverside's outings: one spec for each, the planner's single registry (SPEC §4.0, §7.0).
+// The Riverside's outings: one spec for each, the planner's single registry.
 // Every field but the feature functions is frozen data from the district calendar and places;
-// the poses and glances come from src/lib/outings/*.ts, one file per feature agent. The planner
+// the poses and glances come from src/lib/outings/*.ts, one file per feature. The planner
 // (resident-trips.ts), the labels and the tests read the outings from here and nowhere else.
 // events.ts never imports this file: the events list is built from the frozen data alone.
 import type { Place } from './schema.ts';
@@ -57,10 +57,10 @@ export type OutingPose = (c: PoseContext) => EventPose | undefined;
 export type OutingFacing = (c: PoseContext) => Spot['facing'] | undefined;
 
 /**
- * Every seat call of a plan day, in the order the planner makes them (SPEC §4.0.A): festivals
+ * Every seat call of a plan day, in the order the planner makes them: festivals
  * first in their period, today's daily outings next on their own lines, new daily outings last.
  * The ids are the program's own where it has one (`cinema` is the film, `green` the lunch,
- * `concert` the evening show, `millpond` the skating).
+ * `concert` the evening show, `millpond` the skating). See docs/TOWN_EVENTS.md#the-seat-order.
  */
 export const SEAT_ORDER = [
   'cinema',
@@ -80,7 +80,7 @@ export const SEAT_ORDER = [
   'bandstand-sundown',
 ] as const;
 export type SeatCall = (typeof SEAT_ORDER)[number];
-/** The calls whose guests a call leaves out, that day (SPEC §4.0.A "Excludes"). */
+/** The calls whose guests a call leaves out, that day (the seat order's "Leaves out"). */
 export const SEAT_EXCLUDES: Record<SeatCall, readonly SeatCall[]> = {
   cinema: [],
   'football-morning': [],
@@ -107,7 +107,7 @@ export type OutingSpec = {
   times: OutingTimes;
   seats: { rule: 'all' | 'half'; spots: number };
   excludes: readonly string[];
-  /** Its place in SEAT_ORDER, from 1 (SPEC §4.0.A's #). */
+  /** Its place in SEAT_ORDER, from 1 (the seat order's #). */
   order: number;
   underway: boolean;
   seated: boolean;

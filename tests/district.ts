@@ -1,4 +1,4 @@
-// The towns and the year the Riverside's checks share (SPEC §6.3, §6.7): four towns planned once
+// The towns and the year the Riverside's checks share: four towns planned once
 // for all 112 days of a town year, and each day's guests by seat call. tests/outings.test.ts reads
 // them; nothing here asserts anything.
 import { readFileSync } from 'node:fs';
@@ -59,7 +59,7 @@ export type TownName = keyof typeof TOWNS;
 
 const GREEN = ['picnic', 'books', 'games'],
   CONCERTS = ['rock', 'acoustic', 'jazz'];
-/** The seat call a trip answers (SPEC §4.0.A). */
+/** The seat call a trip answers (SEAT_ORDER). */
 export const callOf = (trip: ResidentTrip): SeatCall =>
   trip.event.outing ??
   (trip.event.id === 'football'

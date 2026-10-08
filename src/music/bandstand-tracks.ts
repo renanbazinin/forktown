@@ -1,4 +1,4 @@
-// The Bandstand's music (agent C, SPEC §4.2): one arrangement for each band, played only while the
+// The Bandstand's music (docs/BANDSTAND.md): one arrangement for each band, played only while the
 // Bandstand is on screen and the camera is close (bandstandListening), scaled by its gain. score.ts
 // adds the three ids to TrackId and reads both exports below; the music render worker reaches this
 // file through score.ts, so it imports nothing but types.

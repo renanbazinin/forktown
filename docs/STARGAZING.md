@@ -33,7 +33,7 @@ Up to eight night owls, seated first at night (see [Town events](TOWN_EVENTS.md)
   - **At the eyepiece**: stooped, their back to the viewer, their head at the eyepiece (4 to 9 minutes).
   - **Pointing**: a step back and to the side, off the eyepiece's end, turned toward the rugs with one arm raised to the sky over the river and the other at their side (3 to 6 minutes, the first minute of it the step across). It is the town's own `cheer` with the near arm left out and hung at the side, so the hand shows against the lawn and the sky, never the brass.
 
-  The turns are seeded by the night (`astronomer:${night}:${k}`), so every visitor sees the same night. They never stand on a rug or east of the riverside road, walk no faster than a neighbour's stroll, and fade over 0.6 minutes on the road only.
+  The turns are seeded by the night (`astronomer:${night}:${k}`), so every visitor sees the same night. They never stand on a rug or east of the riverside road, walk no faster than a neighbor's stroll, and fade over 0.6 minutes on the road only.
 
 ### The summer meteors
 
@@ -66,7 +66,7 @@ On Winter 3, 7, 11 and 15 the lunch on the green (C5) builds a snowman, one each
 
 ### The snowman
 
-Snowman k stands at spot k, in tiles from the green's centre (19.5, 11.5): (1.15, −0.45), (1.0, −1.1), (1.4, 0.45) and (−0.6, −1.15). Each is at least 0.85 tiles from every lunch seat and 0.75 from the lane at x −1.35, clear of the stepping stones, on the green's back lawn. Snowman 1 stands right of the lemonade table and its bunting pole, so the whole of it shows; the spec's (0.2, −1.1) put it behind the table, a head over the jug.
+Snowman k stands at spot k, in tiles from the green's centre (19.5, 11.5): (1.15, −0.45), (1.0, −1.1), (1.4, 0.45) and (−0.6, −1.15). Each is at least 0.85 tiles from every lunch seat and 0.75 from the lane at x −1.35, clear of the stepping stones, on the green's back lawn. Snowman 1 stands right of the lemonade table and its bunting pole, so the whole of it shows.
 
 - **Look.** Three balls of snow, 10, 8 and 6 pixels across, each sitting a little into the one below, 21 pixels tall in all. They are the colour of the snow on the roofs (`SNOW.top`), by day and by night. One fill paints all three, and that fill's own hard shadow, one world pixel down and to the right in a cool grey, gives each ball its shaded edge and the base its foothold on the lawn. A wool scarf at the neck, a carrot nose pointing the way it looks (two look left, two right), and two coal eyes. Nine canvas calls a snowman, so four stay within the cap of 40; below zoom 0.6 the face is under a pixel and is left out.
 - **Rolled up ball by ball** on its build day (`snowmanShape`, pure in the day and the minute, from `snowmanState`): the base from 14:00, the body from 14:40, the head from 15:15, each starting as a snowball a third of its size and growing to full size over 40, 35 and 25 minutes. The scarf, the carrot and the eyes go on at 15:45.

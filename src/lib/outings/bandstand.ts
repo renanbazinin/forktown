@@ -1,7 +1,7 @@
-// Bandstand guests (agent C, SPEC §4.2): the teatime set takes `tea` and `perch`, the sundown set
+// Bandstand guests (docs/BANDSTAND.md): the teatime set takes `tea` and `perch`, the sundown set
 // `perch` and `sip`, with `cheer` only in each set's last 5 minutes. Poses are held at least a
 // minute. Existing poses only.
-// Import rule (SPEC §7.3): value-import only world, town-calendar, seasons, district-places and
+// Import rule: value-import only world, town-calendar, seasons, district-places and
 // district-calendar; never resident-trips, events or anything under src/city/.
 import type { EventPose } from '../events.ts';
 import type { OutingPose, PoseContext } from '../outings.ts';

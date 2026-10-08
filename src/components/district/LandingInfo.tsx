@@ -1,4 +1,4 @@
-// The Boat Landing's panel (agent C, SPEC §4.5): the lawn by the river, and in Regatta Week the
+// The Boat Landing's panel (docs/REGATTA.md): the lawn by the river, and in Regatta Week the
 // day's regatta first, where the boats are now and the neighbors at the water (names only while
 // they are there). It reports and never ranks: no winner, no times, no order.
 import {

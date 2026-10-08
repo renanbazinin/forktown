@@ -78,7 +78,7 @@ const TOWNS = {
 const GREEN = ['picnic', 'books', 'games'],
   CONCERTS = ['rock', 'acoustic', 'jazz'];
 /**
- * The seats each call has (SPEC §4.0.A): today's, then every Riverside outing's spots from the
+ * The seats each call has: today's, then every Riverside outing's spots from the
  * registry. Football and skating seat six (six stands, six loops).
  */
 const CAPACITY: Record<SeatCall, number> = {
@@ -105,7 +105,7 @@ const outing = (trip: ResidentTrip): Outing =>
       : CONCERTS.includes(trip.event.id)
         ? 'concert'
         : (trip.event.id as Outing));
-/** Each routine period's calls, at most one of them per neighbor (SPEC §4.0.F). */
+/** Each routine period's calls, at most one of them per neighbor. */
 const PERIOD_CALLS: Record<'morning' | 'afternoon' | 'evening' | 'night', Outing[]> = {
   morning: ['football-morning'],
   afternoon: ['green', 'zoo', 'football-afternoon', 'millpond'],
@@ -114,8 +114,8 @@ const PERIOD_CALLS: Record<'morning' | 'afternoon' | 'evening' | 'night', Outing
 };
 for (const spec of OUTINGS) PERIOD_CALLS[spec.period].push(spec.id);
 /**
- * Whether the planner seats the Riverside's outings in this town at all: until it does (SPEC §7.2
- * F4 wires them), none of them has a guest on any day, and their seat checks wait for it.
+ * Whether the planner seats the Riverside's outings in this town at all: in a town where none of
+ * them has a guest on any day, their seat checks are skipped.
  */
 const riversideSeated = (homes: Place[]) =>
   year(homes).some(({ guests }) => OUTINGS.some((spec) => guests.has(spec.id)));
@@ -248,7 +248,7 @@ describe('Event seats at a full town', () => {
             expect(seat).toBeLessThan(CAPACITY[kind]);
           }
         }
-        // At most one outing each in every routine period (SPEC §4.0.F).
+        // At most one outing each in every routine period.
         for (const calls of Object.values(PERIOD_CALLS)) {
           const ids = calls.flatMap((kind) => (guests.get(kind) ?? []).map(([id]) => id));
           expect(new Set(ids).size).toBe(ids.length);

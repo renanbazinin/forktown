@@ -1,6 +1,6 @@
-// The district harness's registry (SPEC §7.1): tests/manual/district.html shows each venue at its
-// frame on a chosen day and minute, with one row of buttons per feature. Each feature agent fills
-// only their own tests/manual/district-*.ts list; the imports here are frozen. Write a moment's
+// The district harness's registry: tests/manual/district.html shows each venue at its frame on a
+// chosen day and minute, with one row of buttons per feature. Each feature keeps its moments in
+// its own tests/manual/district-*.ts list; the imports here are frozen. Write a moment's
 // day with townDay from ./district-days (townDay('Summer', 10) is Summer 10 of Year 1), never
 // with a value imported from this file, which imports the lists.
 import { buttons as market } from './district-market';

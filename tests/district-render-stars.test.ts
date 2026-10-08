@@ -1,4 +1,4 @@
-// Agent E's render checks (SPEC §6.6): the stargazing props and the snowmen within their call
+// Render checks for stargazing and the snowmen: the props and the snowmen within their call
 // caps at every moment they are out, nothing off-screen, the static art painted once by season day
 // and night, their heights, their depths, no amber and no flashing.
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -418,7 +418,7 @@ describe('A snowman build day', () => {
   });
 });
 
-describe('Agent E’s colours', () => {
+describe('The stargazing and snowmen colours', () => {
   /** A bright warm colour: what the eye reads as lamplight (district-render.test's rule). */
   const AMBER = new Set([BRAND.lantern, BRAND.glow, BRAND.lanternInk].map((c) => c.toUpperCase()));
   const amberLike = (colour: string) => {

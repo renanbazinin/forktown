@@ -1,4 +1,4 @@
-// The Riverside's reservations and frozen data (SPEC §2, §4, §6.1): the 20 × 15 town's house
+// The Riverside's reservations and frozen data: the 20 × 15 town's house
 // plots, the market square's roads and lamps, every district spot and way in, the harvest props
 // round the scarecrow, the regatta's boats, the bandstand's furniture and the district calendar.
 // Static: nothing here plans a day.
@@ -68,7 +68,7 @@ import {
   type Point,
 } from '../src/lib/world';
 import { schemaHousePlots } from './house-plots';
-// The registries (F0b) and every owner's file they read (SPEC §7.0, §7.3).
+// The registries and every feature file they read.
 import {
   OUTINGS,
   outingOf,
@@ -130,7 +130,7 @@ const OCCUPIED = [
 const WANTED = ['F8', 'J4', 'A8'];
 /** The 20 × 15 town's eleven new reservations. */
 const NEW_RESERVATIONS = [...MARKET_PLOTS, 'J15', 'K15', 'R1', 'A9', 'C15', 'L15', 'R15'];
-/** Plots other tests pin as house plots (SPEC §2.2). */
+/** Plots other tests pin as house plots. */
 const PINNED_HOUSES = [
   'A4', 'B10', 'T10', 'P10', 'Q10', 'R10', 'S3', 'T2', 'T3', 'B7', 'B1', 'D1', 'C2', 'M1', 'O1',
   'N2', 'A1', 'E2', 'A7', 'Q3', 'H2', 'H7', 'I2', 'I7', 'J3', 'J6', 'G2', 'E5',
@@ -608,7 +608,7 @@ describe('The Riverside’s words', () => {
 
 describe('The Riverside’s registries', () => {
   const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
-  /** SPEC §4.0.A: each new outing's seat call, period, venue and exclusions. */
+  /** The seat order: each new outing's seat call, period, venue and exclusions. */
   const SEATS: Record<
     OutingId,
     { order: number; period: string; venue: DistrictKind; excludes: SeatCall[] }
@@ -713,7 +713,7 @@ describe('The Riverside’s registries', () => {
         expect(SEAT_ORDER.indexOf(excluded), `${call} excludes ${excluded}`).toBeLessThan(
           SEAT_ORDER.indexOf(call),
         );
-    // SPEC §4.0.F: at most one of each set a day, so the later call of any pair excludes the
+    // At most one of each set a day, so the later call of any pair excludes the
     // earlier; a film guest has none of the evening's outings and no stargazing.
     const ONE_OF: SeatCall[][] = [
       ['football-morning', 'market'],
@@ -743,7 +743,7 @@ describe('The Riverside’s registries', () => {
   });
 
   it('reads every feature function from its owner’s file', () => {
-    // SPEC §7.3: agent B the market, C the bandstand and the regatta, D the harvest, E the stars.
+    // Each outing's poses and facing come from its own file under src/lib/outings/.
     const poses: Record<OutingId, OutingPose> = {
       market: marketPose,
       regatta: regattaPose,

@@ -1,4 +1,4 @@
-// Harness buttons for the Boat Landing (agent C): the moments worth checking by eye.
+// Harness buttons for the Boat Landing: the moments worth checking by eye.
 import type { DistrictButton } from './district';
 import { townDay } from './district-days';
 

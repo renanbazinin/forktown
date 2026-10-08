@@ -1,6 +1,6 @@
-// Snowmen on the Lunch Green (agent E, SPEC §4.6): four snowmen from snowmanState, about 22 px tall,
-// leaning and shrinking as they melt, then a carrot and a scarf on the grass. Render cap: 40 calls
-// for all four (SPEC §6.6).
+// Snowmen on the Lunch Green (docs/STARGAZING.md): four snowmen from snowmanState, about 22 px
+// tall, leaning and shrinking as they melt, then a carrot and a scarf on the grass. Render cap: 40
+// calls for all four.
 // No Math.random, Date.now or performance.now: everything runs on the town clock.
 //
 // A snowman is three balls of snow, the colour of the snow on the roofs, in one path: one fill
@@ -26,10 +26,9 @@ const GREEN_PLOT = getPlot(VENUES.find((venue) => venue.kind === 'green')!.plot)
 /** The Lunch Green's centre, in tiles (C5: 19.5, 11.5). */
 export const GREEN_CENTER: Point = { x: GREEN_PLOT.x + 0.5, y: GREEN_PLOT.y + 0.5 };
 /**
- * Where snowman k stands, in tiles from the green's centre (SPEC §2.3): on the back lawn, clear
- * of the guests' blankets, the lane at x −1.35 and the stepping stones. Snowman 1 stands right of
- * the lemonade table and its bunting pole, so the whole of it shows (the spec's (0.2, −1.1) put
- * it behind the table, a head over the jug).
+ * Where snowman k stands, in tiles from the green's centre: on the back lawn, clear of the
+ * guests' blankets, the lane at x −1.35 and the stepping stones. Snowman 1 stands right of the
+ * lemonade table and its bunting pole, so the whole of it shows.
  */
 export const SNOWMAN_SPOTS: readonly Point[] = [
   { x: 1.15, y: -0.45 },

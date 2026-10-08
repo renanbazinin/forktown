@@ -1,4 +1,4 @@
-// The Harvest Fair and the Long Table's art (SPEC §4.3, §6.6), agent D: the stubble patch, the
+// The Harvest Fair and the Long Table's art (docs/HARVEST_FAIR.md): the stubble patch, the
 // props at their places and times, the table laid and cleared, each guest's dish from their
 // arrival, the lamps in the streetlamp wave, the scarecrow's hat, heights, caps over the whole
 // day, no amber but a lit lamp, no flashing, and the static art cached by kind, season day and

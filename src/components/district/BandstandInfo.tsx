@@ -1,6 +1,6 @@
-// The Bandstand's panel (agent C, SPEC §4.2): tonight's band, the two sets and the deckchairs, what
+// The Bandstand's panel (docs/BANDSTAND.md): tonight's band, the two sets and the deckchairs, what
 // the band is doing now, and the neighbors in the deckchairs (names only while they are there; the
-// scenery players are never counted). On new-moon nights it holds the StargazingNote (agent E's),
+// scenery players are never counted). On new-moon nights it holds the StargazingNote,
 // first once the players are gone or when the visitor chose the stars; on any other night it says
 // when the next one is.
 import { bandOf, OUTING_TIMES, starNight } from '../../lib/district-calendar';

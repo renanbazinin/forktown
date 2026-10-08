@@ -1,4 +1,4 @@
-// The stargazing note in the Bandstand's panel on new-moon nights (agent E, SPEC §4.4): the night's
+// The stargazing note in the Bandstand's panel on new-moon nights (docs/STARGAZING.md): the night's
 // words, its hours, who is out on the rugs (names only while they are there, never a promise of a
 // crowd), the summer meteors on their three nights, and once the rugs are rolled up, when they come
 // out again, counted from the reader's own calendar day.

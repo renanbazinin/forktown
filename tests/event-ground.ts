@@ -1,5 +1,5 @@
 // Where a guest may stand while at an outing: inside its venue's own ground. One helper for every
-// walking test (SPEC §6.5), so the Riverside's grounds (the square, the Bandstand's and the
+// walking test, so the Riverside's grounds (the square, the Bandstand's and the
 // Landing's lawns, the farm's west end) count wherever today's venues do.
 import { insideCinema } from '../src/lib/cinema';
 import { insideDistrict } from '../src/lib/district-places';

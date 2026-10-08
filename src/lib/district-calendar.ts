@@ -1,6 +1,6 @@
 // The riverside's calendar: which outings run on which town days, their times, and the scenery
 // that is a pure function of the day and the minute (the regatta's paper boats, the snowmen).
-// Frozen data for the bigger town (SPEC §4, §7.0). Pure: it reads only the town calendar, the
+// Frozen data for the bigger town (docs/TOWN_EVENTS.md). Pure: it reads only the town calendar, the
 // seasons and the world's hash, so the planner, the art and the copy all agree without a cache.
 import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt } from './town-calendar.ts';
 import { seedFraction, WINTER, yearDayAt } from './seasons.ts';
@@ -156,7 +156,7 @@ export const OUTING_TABLE: Record<OutingId, OutingRow> = {
   },
 };
 
-// ---- The Paper-boat Regatta (SPEC §2.3, §4.5) ----
+// ---- The Paper-boat Regatta (docs/REGATTA.md) ----
 
 /** The course on the near half of the river, by the Boat Landing (J15). district-places
  * re-exports it; it lives here because the boats below are pure in the day and the minute. */
@@ -228,7 +228,7 @@ export function regattaBoat(k: number, day: number, minutes: number): RegattaBoa
   return { x, y: restY, state: netted ? 'netted' : 'resting', restAt };
 }
 
-// ---- Snowmen on the Lunch Green (SPEC §4.6) ----
+// ---- Snowmen on the Lunch Green (docs/STARGAZING.md) ----
 
 /** Year days of the four build days: Winter 3, 7, 11 and 15. Snowman k is built on day k. */
 export const SNOWMAN_DAYS = [86, 90, 94, 98] as const;

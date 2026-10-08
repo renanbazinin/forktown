@@ -1,4 +1,4 @@
-// The Paper-boat Regatta (SPEC §4.5), agent C: every guest cheers their own boat in; every boat
+// The Paper-boat Regatta (docs/REGATTA.md): every guest cheers their own boat in; every boat
 // goes from its guest's hands to the lawn's edge, to the boatwright, to the water and at last to the
 // boatman's basket, one place at a time; the paper boat in hand; and the Landing's panel.
 import { createElement } from 'react';
@@ -77,7 +77,7 @@ describe('Regatta guests', () => {
               if (!inside) expect(pose, `${id} at ${t}`).toBeUndefined();
             }
           }
-      // Every guest is at the water when their own boat comes in (SPEC §4.5: 70 of 70 seat-days).
+      // Every guest is at the water when their own boat comes in (70 of 70 seat-days).
       expect(guests).toBe(4 * 7 * REGATTA_BOATS);
       expect(cheered).toBe(guests);
     },

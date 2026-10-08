@@ -1,6 +1,7 @@
 // The Riverside's places: the four district venues, their grounds, spots and ways in, the
 // harvest props, the regatta course and the bandstand's furniture times. Frozen data for the
-// bigger town (SPEC §2.2, §2.3, §7.0). The district venues are defined here, never in events.ts.
+// bigger town, checked by tests/district-places.test.ts. The district venues are defined here,
+// never in events.ts.
 // Pure: it value-imports only the world, the town config and the district calendar.
 import { MARKET_SITE } from './town-config.ts';
 import type { Point } from './world.ts';
@@ -85,8 +86,9 @@ export const SCARECROW_KEEP_OUT = {
 export type HarvestProp = { id: string; x: number; y: number; r: number; from: number; to: number };
 /**
  * The fair's props on Autumn 23–25: centre (tiles), footprint radius (tiles) and the town minutes
- * each one is out. The press and the bales fade 17:10–17:15 as the table is laid; the table is laid
- * 17:15–17:45 and cleared 21:00–21:15 (its own fades are the painter's, inside these times).
+ * each one is out. The press and the bales fade 17:05–17:10 as the farmhands clear them; the table
+ * is laid in 17:15–17:45 (the painter's laying runs 17:15–17:42) and cleared 21:00–21:15 (its own
+ * fades are the painter's, inside these times).
  */
 export const HARVEST_PROPS: readonly HarvestProp[] = [
   { id: 'cart', x: 14.6, y: 77.5, r: 0.3, from: 360, to: 1260 },
@@ -105,7 +107,7 @@ export const HARVEST_PROPS: readonly HarvestProp[] = [
   { id: 'fiddler', x: 21.45, y: 77.5, r: 0.3, from: 1080, to: 1230 },
 ];
 
-/** Where each outing's guests stand or sit, absolute tiles (SPEC §2.3). */
+/** Where each outing's guests stand or sit, absolute tiles. */
 export const DISTRICT_SPOTS: Record<
   'market' | 'bandstand' | 'landing' | 'harvest-fair' | 'long-table',
   readonly Spot[]
@@ -161,7 +163,7 @@ export function outingSpots(outingId: OutingId): readonly Spot[] {
 const squeeze = (points: Point[]) =>
   points.filter((p, i) => i === 0 || p.x !== points[i - 1].x || p.y !== points[i - 1].y);
 /**
- * An outing's own way in for a seat, from a road-tile centre to the spot (SPEC §2.3). The first
+ * An outing's own way in for a seat, from a road-tile centre to the spot. The first
  * point is the key for joinApproach and for the gate headway. The way home is its reverse.
  */
 export function districtApproach(outingId: OutingId, seat: number): Point[] {
@@ -226,7 +228,7 @@ export const farmPanelFrame = (day: number) => (harvestDay(day) ? HARVEST_FRAME 
 
 /**
  * When the Bandstand's furniture is out, town minutes on the evening's timeline: the deckchairs
- * every day (agent C's), the rugs and the telescope on star nights (agent E's). Never both.
+ * every day, the rugs and the telescope on star nights; never both at once.
  */
 export const BANDSTAND_FURNITURE = {
   chairs: { from: 935, to: 1220 },

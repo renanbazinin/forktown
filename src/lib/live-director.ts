@@ -57,7 +57,7 @@ export type LiveProgram = {
   events: TownEvent[];
   highlights: Highlight[];
   previousHighlights: Highlight[];
-  /** The day's district shots with someone planned there in their window (SPEC §4.7). */
+  /** The day's district shots with someone planned there in their window. */
   district: DistrictShot[];
   /** The day before's district shots that run past midnight (a film night's stars), on this
    *  day's clock (`from` < 0), with someone planned there in what is left of their window. */
@@ -88,7 +88,7 @@ export const LANTERN_SHOT = { start: 1198, end: 1224 };
 const FORK_CENTER = plotCenter(getPlot(FORK_PLOT)!);
 
 /**
- * The Riverside's shot windows (SPEC §4.1–4.5, §4.7), in town minutes on the plan day's own
+ * The Riverside's shot windows (docs/TOWN_EVENTS.md), in town minutes on the plan day's own
  * timeline: the festivals', and the two daily highlights' (the market, the teatime set).
  */
 export const DISTRICT_SHOTS = {
@@ -101,7 +101,7 @@ export const DISTRICT_SHOTS = {
 } as const satisfies Partial<Record<OutingId, { from: number; to: number; frame: DistrictFrame }>>;
 /**
  * On a night the lineup films the cinema, the bill holds the air from 20:30 until it ends
- * (1428–1434), and the director ranks it before a festival (SPEC §4.7). A festival moment it
+ * (1428–1434), and the director ranks it before a festival. A festival moment it
  * would cover moves, so it airs whole: the Long Table to its supper before lantern hour, the
  * stars to the end of the bill until the rugs are rolled up at 00:15 (the outing's end).
  */

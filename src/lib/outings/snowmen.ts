@@ -1,11 +1,11 @@
-// Snowmen on the Lunch Green (agent E, SPEC §4.6): on a build day (variant `snowmen`) lunch seats 0
+// Snowmen on the Lunch Green (docs/STARGAZING.md): on a build day (variant `snowmen`) lunch seats 0
 // and 1 alternate `crouch` and `play` (each held at least a minute) from 14:00 to 15:45; seats 2–5
 // only `sit`, `chat` or `cheer` until the last cheer. The planner's attendingPose calls these on
 // that variant only, with the guest's visit and the lunch's own pose at any minute (`lunch`).
 // Either side of the building the lunch keeps its own poses: the one a guest has a minute before
 // 14:00 holds until the building starts, and the one they will have a minute after it is done
 // starts as it ends, so no pose either side is held under a minute.
-// Import rule (SPEC §7.3): value-import only world, town-calendar, seasons, district-places and
+// Import rule: value-import only world, town-calendar, seasons, district-places and
 // district-calendar; never resident-trips, events or anything under src/city/.
 import type { EventPose } from '../events.ts';
 import type { PoseContext } from '../outings.ts';
@@ -72,7 +72,7 @@ export function snowmenBuilderPose(c: SnowmenContext): EventPose | undefined {
 
 /**
  * Which way each builder faces the day's snowman (k = 0..3, from lunch seats 0 and 1): the
- * quarter its spot lies in from the seat (SPEC §2.3 spots; the green's seats at local (−0.55, 0)
+ * quarter its spot lies in from the seat (SNOWMAN_SPOTS; the green's seats at local (−0.55, 0)
  * and (0.35, 0)). tests/snowmen.test.ts checks the table against both.
  */
 type Facing = 'ne' | 'nw' | 'se' | 'sw';

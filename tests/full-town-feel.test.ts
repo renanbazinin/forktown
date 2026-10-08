@@ -1,4 +1,4 @@
-// How the full town feels on its busiest days (SPEC §6.4, §5.12): with every house plot taken,
+// How the full town feels on its busiest days: with every house plot taken,
 // walkers who share a street are drawn side by side, never as one figure for long; nobody jumps
 // further in a sample than a brisk walk (or the tube); greetings never talk over each other at
 // the Riverside's busy gates; nobody turns about in a frame at the Harvest Fair or the Long
@@ -26,9 +26,9 @@ const dayOf = (season: string, date: number) => {
   }
 };
 /**
- * The days (SPEC §6.4, re-measured with this planner): a new-moon night, the regatta's first
+ * The days (re-measured with this planner): a new-moon night, the regatta's first
  * day, the Harvest Fair's, a skating and snowmen day, and Spring 3, where a fan and a stroller
- * once walked as one figure at the pitch gate (§5.12). Measured: fused 1.6, 1.6, 1.4, 1.8, 1.4;
+ * once walked as one figure at the pitch gate. Measured: fused 1.6, 1.6, 1.4, 1.8, 1.4;
  * stacked 2.0, 2.0, 2.0, 2.2, 1.8; close/together 0.063 over the five.
  */
 const SPRING_1 = dayOf('Spring', 1),

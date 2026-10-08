@@ -67,7 +67,7 @@ Every district panel lists the people there the same way (`district/NeighborList
 - `src/city/district/bandstand.ts` is the painter. Its ground (in the town's cached ground layer) is the lawn, its tufts and the gravel ring. Its floor lights the lawn when K15 is hovered or selected. Its objects are the stand (one depth object at the stand's centre), each chair's two parts and the stack. Its hit test answers a click on the stand, which rises over the road and the Landing's lawn, with K15.
 - The stand's own art is static, so it is painted once per look into two offscreen layers at the device scale, `bandstand:back` (plinth, deck, steps, back railings, posts) and `bandstand:front` (front railings, the cap, the unlit lamp, the petals or leaves). They are kept by the night and, for the cap, the season's day; a new zoom paints straight onto the map until it has held for three frames. The players, the notes, the snow and the lit lamp are drawn between and over them every frame.
 - Its scenery figures (`drawFigure`) are drawn the way `residents.ts` draws a neighbor, at the same 1.25 scale, with the scene's own arms for each instrument. The Landing's boatwright and boatman use them too.
-- Render cap: 500 calls with the players, measured at about 400 at full detail with every chair taken (node paints straight on, with no offscreen layers).
+- Render cap: 500 calls with the players, measured at most 437 (Winter 3, 16:00) at full detail (node paints straight on, with no offscreen layers).
 
 ## Checking it
 

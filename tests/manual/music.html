@@ -131,7 +131,7 @@
       <div class="eyebrow">FORKTOWN FM / VOL. 01</div>
       <h1>A soundtrack for<br />a little place.</h1>
       <p class="intro">
-        Six original miniatures. Warm keys, wooden plucks, soft pixel bells, and a tiny band with
+        Nine original miniatures. Warm keys, wooden plucks, soft pixel bells, and a tiny band with
         somewhere to be. Pick a record. Stay a while.
       </p>
       <div id="tracks"></div>
@@ -144,8 +144,8 @@
       <pre id="checks"></pre>
       <p class="note">
         Each tune has a 16-bar arrangement and loops seamlessly. This listening room is only in the
-        local development build. In town, music follows the day, the evening concert, and the
-        midnight party.
+        local development build. In town, music follows the day, the evening concert, the
+        Bandstand's sets near the stand, and the midnight party.
       </p>
       <a href="/">Back to the town →</a>
     </main>
@@ -153,15 +153,26 @@
       import { TRACKS, durationOf } from '/src/music/score.ts';
       import { TownPlayer } from '/src/music/player.ts';
       import { renderTrack } from '/src/music/synth.ts';
-      const colors = ['#93ae7e', '#566b80', '#ba8064', '#c2a56f', '#798784', '#9b7ca8'];
-      const glyphs = ['♫', '☾', 'ϟ', '♬', '♪', '✦'];
+      // Each record's cover colour and glyph, by track id; a track without one gets a plain cover.
+      const covers = {
+        town: ['#93ae7e', '♫'],
+        night: ['#566b80', '☾'],
+        rock: ['#ba8064', 'ϟ'],
+        acoustic: ['#c2a56f', '♬'],
+        jazz: ['#798784', '♪'],
+        party: ['#9b7ca8', '✦'],
+        brass: ['#b8925a', '♩'],
+        folk: ['#7f9a6a', '♭'],
+        strings: ['#8a6f7f', '♯'],
+      };
       const list = document.querySelector('#tracks');
       const status = document.querySelector('#status');
       let player,
         revision = 0;
       Object.entries(TRACKS).forEach(([id, track], index) => {
         const article = document.createElement('article');
-        article.innerHTML = `<div class="art" style="--cover:${colors[index]}">${glyphs[index]}</div><span class="eyebrow">0${index + 1} / ${id}</span><h2>${track.title}</h2><p>${track.subtitle} · ${Math.round(durationOf(id))} seconds</p><button>Play ${track.title}</button>`;
+        const [color, glyph] = covers[id] ?? ['#8f9a86', '♪'];
+        article.innerHTML = `<div class="art" style="--cover:${color}">${glyph}</div><span class="eyebrow">0${index + 1} / ${id}</span><h2>${track.title}</h2><p>${track.subtitle} · ${Math.round(durationOf(id))} seconds</p><button>Play ${track.title}</button>`;
         article.querySelector('button').addEventListener('click', async () => {
           const current = ++revision;
           try {
@@ -195,7 +206,7 @@
       document.querySelector('#check').onclick = async (event) => {
         event.target.disabled = true;
         const report = document.querySelector('#checks');
-        report.textContent = 'Rendering and measuring all six mixes…\n';
+        report.textContent = `Rendering and measuring all ${Object.keys(TRACKS).length} mixes…\n`;
         try {
           for (const id of Object.keys(TRACKS)) {
             const buffer = await renderTrack(id);

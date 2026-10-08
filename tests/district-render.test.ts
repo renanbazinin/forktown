@@ -1,11 +1,11 @@
-// The Riverside's shared render checks (SPEC §6.6), with every cap final: each district painter
+// The Riverside's shared render checks, with every cap final: each district painter
 // draws nothing off-screen and keeps to its call cap at its year's busiest moments, the cached
 // ground never reads the minute, nothing is amber by day, no light or awning flashes, a boat under
 // the Kingfisher bridge stays in sight, and the frames that matter (the test camera box, the real
 // opening frame, the whole town, the east live frames) stay within their budgets with every
 // feature on, and the Bandstand lawn's two features (the bands' deckchairs, the stargazers' rugs
-// and telescope) keep out of each other's way. Each feature agent adds its own checks in
-// tests/district-render-<agent>.test.ts; none edits this file.
+// and telescope) keep out of each other's way. Each feature keeps its own checks in
+// tests/district-render-<feature>.test.ts.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
@@ -501,9 +501,9 @@ describe('The frames that matter, with every feature on', () => {
   it(
     'keeps the real opening frame within budget, on a desktop and on a phone',
     () => {
-      // The homes, the green and the stage, framed by opening-view.ts as City.tsx frames them
-      // (§2.4): today's frozen 30 homes, the spec's own frame whoever moves in, and the roster as
-      // it is, which in check:full-town is every house plot taken, at the zoom floor.
+      // The homes, the green and the stage, framed by opening-view.ts as City.tsx frames them:
+      // today's frozen 30 homes, the same frame whoever moves in, and the roster as it is, which
+      // in check:full-town is every house plot taken, at the zoom floor.
       for (const [name, homes] of [
         ['frozen', FROZEN_TOWN],
         ['live', LIVE_TOWN],
@@ -670,7 +670,7 @@ describe('The Bandstand lawn, shared by the bands and the stargazers', () => {
 });
 
 describe('The Riverside’s code', () => {
-  /** Every new src file of the Riverside (SPEC §6.6). */
+  /** Every new src file of the Riverside. */
   const files = [
     ...readdirSync('src/lib')
       .filter((file) => /^district-.*\.ts$/.test(file))

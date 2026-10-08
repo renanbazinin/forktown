@@ -1,7 +1,7 @@
-// Harvest Fair and Long Table guests (agent D, SPEC §4.3): the fair takes `sip` (cider), `chat`
+// Harvest Fair and Long Table guests (docs/HARVEST_FAIR.md): the fair takes `sip` (cider), `chat`
 // and `sit` on the straw seat at their spot; the table takes `sit`, `sip` and `chat`. Existing
 // poses only.
-// Import rule (SPEC §7.3): value-import only world, town-calendar, seasons, district-places and
+// Import rule: value-import only world, town-calendar, seasons, district-places and
 // district-calendar; never resident-trips, events or anything under src/city/.
 //
 // attendingPose returns these as they are (no hold, no beat, no settle), so every pose here is

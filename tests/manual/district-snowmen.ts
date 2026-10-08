@@ -1,4 +1,4 @@
-// Harness buttons for the snowmen (agent E): the moments worth checking by eye.
+// Harness buttons for the snowmen: the moments worth checking by eye.
 import type { DistrictButton } from './district';
 import { townDay } from './district-days';
 

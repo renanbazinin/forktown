@@ -1,6 +1,6 @@
-// The Boat Landing (agent C, SPEC §4.5): the slim stage, the paper boats from regattaBoat, the cork
+// The Boat Landing (docs/REGATTA.md): the slim stage, the paper boats from regattaBoat, the cork
 // boom, the boatwright and the boatman, and the cream and sage bunting all Regatta Week. Render
-// cap: 600 calls with 10 boats and the boom (SPEC §6.6).
+// cap: 600 calls with 10 boats and the boom.
 // Every guest sets their boat down on the lawn's river edge as they arrive; the boatwright crosses
 // from the stage, picks it up and sets it on the water at its launch; it drifts down the near half
 // of the river under the Kingfisher bridge to rest at the boom; the boatman nets it out after.
@@ -127,7 +127,7 @@ const ROAD_EDGE = 61.05;
 /**
  * Where the boatwright stoops to pick boat k up: a step east of it on its own row. That is the
  * road's lawn-side edge for the front column, and in among the guests for the odd rows, along
- * the row's own approach, which keeps clear of every other guest (SPEC §2.3).
+ * the row's own approach, which keeps clear of every other guest (districtApproach).
  */
 const pickAt = (k: number): Point => {
   const at = regattaHandover(k);
@@ -340,7 +340,7 @@ const BOATMAN_LOOK: Look = { skin: '#B98563', hair: '#8C857C', outfit: '#7E8B5C'
  * folder's colour, as [row, from x, to x, part] in px from the boat's point. It is as wide as
  * the boat in hand (paper-boat.ts at the town's 1.25), its fold lower on the water. Nothing rises
  * more than 4 px over that point, so a boat slipping under the Kingfisher bridge stays clear of
- * the glass above it (REQUESTS-C.md 2).
+ * the glass above it.
  */
 const BOAT_ROWS = [
   [-4, -1, 0, 'fold'],

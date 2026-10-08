@@ -1,4 +1,4 @@
-// Market Square's art (agent B, SPEC §4.1, §2.4, §6.6): the static art is made once per market,
+// Market Square's art (docs/MARKET.md): the static art is made once per market,
 // season day and night; the awnings unroll one at a time 07:15–07:45 and everything is packed by
 // noon; the stalls stay under 28 px and the pump under 24; the wares follow the market and the
 // farm's year; snow lies on the awnings in winter; the stalls sort between the browsers and the
@@ -148,7 +148,7 @@ describe('Market Square’s art', () => {
     },
   );
 
-  it('stands no taller than 28 px a stall and 24 px the pump (SPEC §2.4)', () => {
+  it('stands no taller than 28 px a stall and 24 px the pump', () => {
     expect(MARKET_HEIGHTS.stall).toBeLessThanOrEqual(28);
     expect(MARKET_HEIGHTS.pump).toBeLessThanOrEqual(24);
     for (const minutes of [460, 600, 730]) {

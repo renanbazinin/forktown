@@ -218,7 +218,7 @@ export function eventsForDay(day: number, minutes = 720): TownEvent[] {
       end: index ? 1260 : 960,
       homeBy: index ? 1310 : 1070,
       // Snowmen on the green: a choice override. The id stays the hashed choice's, so the lunch's
-      // guest list never changes; only the name, the words and the props do (SPEC §4.6).
+      // guest list never changes; only the name, the words and the props do.
       ...(!index && snowmenDay(day) ? { ...SNOWMEN_LUNCH, variant: 'snowmen' as const } : {}),
     };
   });
@@ -249,13 +249,13 @@ export function eventsForDay(day: number, minutes = 720): TownEvent[] {
       end: 1020,
       homeBy: 1320,
     },
-    // Then the Riverside's outings on this day (SPEC §4.0.I); today's five keep their places.
+    // Then the Riverside's outings on this day; today's five keep their places.
     ...districtEvents(day, minutes),
   ];
 }
 /**
  * The Riverside's venue and routine period for each outing, in the order the events list shows
- * them (SPEC §4.0.I). Frozen data only: events.ts never value-imports outings.ts.
+ * them. Frozen data only: events.ts never value-imports outings.ts.
  */
 const DISTRICT_EVENTS: readonly {
   id: OutingId;

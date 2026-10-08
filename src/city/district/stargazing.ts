@@ -1,6 +1,6 @@
-// Stargazing on the Bandstand lawn (agent E, SPEC §4.4): the rugs per BANDSTAND_FURNITURE, the
+// Stargazing on the Bandstand lawn (docs/STARGAZING.md): the rugs per BANDSTAND_FURNITURE, the
 // brass telescope (≤ 24 px) and the scenery astronomer; the summer meteors are in sky-extras.ts.
-// Nothing amber. Render cap: 300 calls (SPEC §6.6).
+// Nothing amber. Render cap: 300 calls.
 // No Math.random, Date.now or performance.now: everything runs on the town clock.
 //
 // On a new-moon night eight wool rugs unroll on the deckchairs' eight spots at 21:50, a brass
@@ -172,7 +172,7 @@ function paintFlask(ctx: Ctx, x: number, y: number, night: boolean) {
 
 /**
  * The telescope's foot (tiles): on the lawn's river side, east of the stand's front, on open
- * lawn: south of the Bandstand's folded deckchairs (stacked at (60.82, 42.42) all night, agent C)
+ * lawn: south of the Bandstand's folded deckchairs (stacked at (60.82, 42.42) all night)
  * and clear of the stand's plinth and its steps.
  */
 export const TELESCOPE: Point = { x: 60.85, y: 43.05 };
@@ -187,7 +187,7 @@ const SCOPE = {
     { x: 1, y: -2 },
   ],
 } as const;
-/** The telescope's tallest point above its foot, world px (SPEC §2.4: ≤ 24). */
+/** The telescope's tallest point above its foot, world px: 24 at most. */
 export const TELESCOPE_HEIGHT = 24;
 const BRASS = {
   tube: ['#A08C5C', '#8E8059'] as Pair,
@@ -257,7 +257,7 @@ export const AT_EYEPIECE: Point = { x: TELESCOPE.x, y: TELESCOPE.y + 0.18 };
 export const AT_POINT: Point = { x: TELESCOPE.x - 0.12, y: TELESCOPE.y + 0.38 };
 /** Where they come and go: the riverside road, on the eyepiece's row. */
 const ROADSIDE: Point = { x: 61.55, y: AT_EYEPIECE.y };
-/** The astronomer's evening (SPEC §4.4: there 22:00–00:30), on the evening's timeline. */
+/** The astronomer's evening (there 22:00–00:30), on the evening's timeline. */
 export const ASTRONOMER_HOURS = { from: 1320, to: 1470 } as const;
 const WALK_SPEED = 0.32;
 const RESIDENT_SCALE = 1.25;
