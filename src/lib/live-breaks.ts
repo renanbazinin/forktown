@@ -8,11 +8,12 @@ import {
 } from './break-cards';
 import type { CinemaAd } from './cinema';
 import { lanternCaption } from './evening-copy';
-import { eventsForDay, VENUES } from './events';
+import { districtEvents, eventsForDay, VENUES } from './events';
 import { FOOTBALL_VENUE, MATCH, TEAMS } from './football';
 import { FORK_NAME, LANTERN_HOUR, lanternRegister, type LanternRegister } from './lanterns';
 import {
   LANTERN_SHOT,
+  liveDistrictShots,
   liveHighlights,
   SCENERY_SECONDS,
   SCENERY_START,
@@ -48,7 +49,17 @@ export type ScheduledBreak = {
   end: number;
 };
 export type MomentKind =
-  'postcard' | 'lanterns' | 'ducks' | 'football' | 'green' | 'zoo' | 'evening' | 'night' | 'cinema';
+  | 'postcard'
+  | 'lanterns'
+  | 'ducks'
+  | 'football'
+  | 'green'
+  | 'zoo'
+  | 'evening'
+  | 'night'
+  | 'cinema'
+  /** The Riverside's moment of the day: a festival's shot, or the market or the teatime set. */
+  | 'district';
 /** A stretch of the broadcast no break may cover, in UTC ms. `announceAt` is when it's billed. */
 export type Moment = {
   kind: MomentKind;
@@ -223,6 +234,16 @@ function dayMoments(day: number, homes: boolean): readonly Moment[] {
   if (highlights.includes('cinema')) {
     const cinema = event('cinema');
     moments.push(moment('cinema', cinema.start, cinema.end, cinema.name, cinema.venue.name));
+  }
+  // The day's Riverside moment (live-director's district shots). A shot with nobody planned
+  // there stays off air, but its window is held clear all the same: breaks never need the plan.
+  // An empty town has nobody to film there.
+  const district = districtEvents(day);
+  for (const shot of homes ? liveDistrictShots(day) : []) {
+    const outing = district.find((candidate) => candidate.id === shot.outing);
+    moments.push(
+      moment('district', shot.from, shot.to, shot.label, outing?.venue.name ?? '', shot.from),
+    );
   }
   return remember(dayMomentCache, id, moments, 64);
 }

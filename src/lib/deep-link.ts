@@ -6,6 +6,7 @@ import { FORK_PLOT } from './lanterns';
 import { isMillpondPlot, MILLPOND_VENUE } from './millpond';
 import { isTubePlot, TUBE_VENUE } from './tubes';
 import { isZooPlot, ZOO_VENUE } from './zoo';
+import { BANDSTAND_VENUE, LANDING_VENUE, MARKET_PLOTS, MARKET_VENUE } from './district-places';
 
 // The Lunch Green and the Little Stage, where the Midnight Disco plays, are one plot each.
 const GREEN_PLOT = VENUES.find((venue) => venue.id === 'green')!.plot;
@@ -21,6 +22,13 @@ const VENUE_LINKS = new Map<string, string>([
   ['zoo', ZOO_VENUE.plot],
   ['cinema', CINEMA_VENUE.plot],
   ['football', FOOTBALL_VENUE.plot],
+  // The Riverside: Market Square, the Bandstand and the Boat Landing. Stargazing is on the
+  // Bandstand's lawn and the regatta at the Landing, so their links are aliases (SPEC §4.7).
+  ['market', MARKET_VENUE.plot],
+  ['bandstand', BANDSTAND_VENUE.plot],
+  ['landing', LANDING_VENUE.plot],
+  ['regatta', LANDING_VENUE.plot],
+  ['stars', BANDSTAND_VENUE.plot],
 ]);
 
 export const MISSING_LINK_COPY = {
@@ -61,6 +69,9 @@ const VENUE_OF: [string, (plot: string) => boolean][] = [
   ['fork', (plot) => plot === FORK_PLOT],
   ['stage', (plot) => plot === STAGE_PLOT],
   ['green', (plot) => plot === GREEN_PLOT],
+  ['market', (plot) => (MARKET_PLOTS as readonly string[]).includes(plot)],
+  ['bandstand', (plot) => plot === BANDSTAND_VENUE.plot],
+  ['landing', (plot) => plot === LANDING_VENUE.plot],
 ];
 
 /** The shared link (#place=… or #venue=…) for a selected plot, or '' for none. */

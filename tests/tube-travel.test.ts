@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { placeSchema, type Place } from '../src/lib/schema';
-import { HOUSE_PLOTS, eventsForDay, insideVenue } from '../src/lib/events';
+import { HOUSE_PLOTS, eventsForDay } from '../src/lib/events';
 import {
   eventRoute,
   eventTubeJourney,
@@ -13,9 +13,6 @@ import {
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { insideCinema } from '../src/lib/cinema';
-import { insideFootball } from '../src/lib/football';
-import { insideMillpond } from '../src/lib/millpond';
-import { insideZoo } from '../src/lib/zoo';
 import { nightBedtime } from '../src/lib/night-routine';
 import { getPlot, plotEntrance, type Point } from '../src/lib/world';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, routeLength, WALK_SPEED } from '../src/lib/walking';
@@ -32,6 +29,7 @@ import { tubeParcels, tubeParcelsAt, tubeRides, tubeStatus } from '../src/lib/tu
 import { readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
 import { onRoadOrTube, riding, stationWalk, stepBound } from './tube-riders';
+import { insideEventGround } from './event-ground';
 
 const places = readPlaces().sort((a, b) => a.plot.localeCompare(b.plot, 'en', { numeric: true }));
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -68,11 +66,7 @@ const allowed = (trip: ResidentTrip, state: ReturnType<typeof tripState>) => {
   const venue = trip.event.venue;
   return (
     onRoadOrTube({ position: p, transit: state.transit }) ||
-    (venue.kind === 'zoo' && insideZoo(p)) ||
-    (venue.kind === 'cinema' && insideCinema(p)) ||
-    (venue.kind === 'football' && insideFootball(p)) ||
-    (venue.kind === 'millpond' && insideMillpond(p)) ||
-    ((venue.kind === 'stage' || venue.kind === 'green') && insideVenue(venue, p)) ||
+    insideEventGround(venue, p) ||
     // A chained party starts inside the cinema.
     (trip.event.id === 'night-party' && insideCinema(p))
   );

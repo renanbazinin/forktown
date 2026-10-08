@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BEATS, compose, durationOf, trackForTown, TRACKS, type TrackId } from '../src/music/score';
-import { eventsForDay } from '../src/lib/events';
+import { districtEvents, eventsForDay } from '../src/lib/events';
+import { bandOf } from '../src/lib/district-calendar';
 
 describe('Original town soundtrack', () => {
   it('follows the concert boundaries and returns to the right day/night theme', () => {
@@ -18,6 +19,18 @@ describe('Original town soundtrack', () => {
       expect(trackForTown(concert.start, events)).toBe(concert.id);
       expect(trackForTown(concert.end - 0.01, events)).toBe(concert.id);
       expect(trackForTown(concert.end, events)).toBe('night');
+    }
+  });
+  it('plays a Bandstand set only while it is heard, and never over the stage', () => {
+    for (let day = 0; day < 20; day++) {
+      const events = [...eventsForDay(day), ...districtEvents(day)];
+      const concert = events[1];
+      // The sundown set is on until 20:00, the concert from 19:00: the stage comes first.
+      expect(trackForTown(concert.start - 0.01, events)).toBe('town');
+      expect(trackForTown(concert.start - 0.01, events, { gain: 0.004 })).toBe('town');
+      expect(trackForTown(concert.start - 0.01, events, { gain: 1 })).toBe(bandOf(day));
+      expect(trackForTown(concert.start, events, { gain: 1 })).toBe(concert.id);
+      expect(trackForTown(1000, events, { gain: 0.3 })).toBe(bandOf(day));
     }
   });
   it.each(Object.keys(TRACKS) as TrackId[])(

@@ -4,8 +4,9 @@ import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
 import { findPlotAt, getPlot, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
 import { plotDoor } from '../src/lib/home-life';
-import { eventsForDay, HOUSE_PLOTS, insideVenue } from '../src/lib/events';
-import { insideFootball } from '../src/lib/football';
+import { eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
+import { FOOTBALL_VENUE } from '../src/lib/football';
+import { insideEventGround } from './event-ground';
 import { TUBE_TRUNK_X } from '../src/lib/tubes';
 import { AFTER_HOURS } from './fixtures';
 import { readPlaces } from './full-town';
@@ -125,8 +126,8 @@ describe('A small predictable daily life', () => {
         if (
           !onRoadOrTube(state) &&
           !ownLot &&
-          !(state.event?.id === 'football' && insideFootball(state.position)) &&
-          !(event && insideVenue(event.venue, state.position))
+          !(state.event?.id === 'football' && insideEventGround(FOOTBALL_VENUE, state.position)) &&
+          !(event && insideEventGround(event.venue, state.position))
         )
           stray('off the road at');
         // Only the tube runs west of the lane, behind the trees.

@@ -12,8 +12,9 @@ export const harvestPainter: DistrictPainter = {
 };
 
 /**
- * The scarecrow's festival dress, drawn by farm.ts's scarecrow at its feet (x, y), world px.
- * Foundation stub: draws nothing.
+ * The scarecrow's festival dress, drawn by farm.ts's scarecrow at its feet (x, y), world px. The
+ * scarecrow calls it inside its own frame, so (x, y) is (0, 0) there and the dress lifts and tilts
+ * with it (its hat's brim is at y −48, the crown's top at y −56). Foundation stub: draws nothing.
  */
 export const drawScarecrowExtras: (
   ctx: Ctx,

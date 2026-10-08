@@ -12,6 +12,8 @@ export class TownPlayer {
   private cinema: CinemaPlayer;
   private current?: { source: AudioBufferSourceNode; gain: GainNode; track: TrackId };
   private cache = new Map<TrackId, Promise<AudioBuffer>>();
+  /** Each track's level below full: a Bandstand band, heard as far as the camera is from it. */
+  private levels = new Map<TrackId, number>();
   private revision = 0;
   private disposed = false;
   private active = new Map<AudioBufferSourceNode, GainNode>();
@@ -119,6 +121,20 @@ export class TownPlayer {
       0.06,
     );
   }
+  /**
+   * How loud a track plays, 0..1 (full by default): a Bandstand band follows the camera's
+   * distance from the stand. Eases there if that track is playing; otherwise its next start
+   * fades in to it.
+   */
+  level(track: TrackId, value: number) {
+    const level = Math.max(0, Math.min(1, value));
+    if (this.levels.get(track) === level) return;
+    this.levels.set(track, level);
+    if (this.disposed || this.current?.track !== track) return;
+    const time = this.context.currentTime;
+    this.current.gain.gain.cancelAndHoldAtTime(time);
+    this.current.gain.gain.setTargetAtTime(level, time, 0.25);
+  }
   async play(track: TrackId) {
     if (this.disposed) return;
     const revision = ++this.revision;
@@ -144,7 +160,7 @@ export class TownPlayer {
     source.buffer = buffer;
     source.loop = true;
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(1, time + 1.5);
+    gain.gain.linearRampToValueAtTime(this.levels.get(track) ?? 1, time + 1.5);
     source.connect(gain).connect(this.music);
     const old = this.current;
     if (old) {

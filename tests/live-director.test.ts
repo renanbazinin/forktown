@@ -14,7 +14,10 @@ import {
   liveCenterLift,
   liveEaseSeconds,
   liveLabelLift,
+  liveDistrictShot,
 } from '../src/lib/live-director';
+import { districtEvents } from '../src/lib/events';
+import { OUTING_IDS } from '../src/lib/district-calendar';
 import { tubeRides } from '../src/lib/tube-traffic';
 import { residentTrips } from '../src/lib/resident-trips';
 import { nightBedtime } from '../src/lib/night-routine';
@@ -71,8 +74,12 @@ describe('Live broadcast director', () => {
             } else if (shot.kind === 'neighbor') {
               const subject = residents.find((r) => r.id === shot.residentId)!;
               expect(subject.activity).toBe('stroll');
+              const outing = OUTING_IDS.find((id) => id === subject.event?.id);
+              // A Riverside guest is followed except while their outing's own shot is on air.
+              if (subject.event?.phase === 'attending' && outing)
+                expect(liveDistrictShot(program, minute)?.outing).not.toBe(outing);
               // Skaters on the Millpond are followable whatever the lineup (no show to skip).
-              if (subject.event?.phase === 'attending' && subject.event.id !== 'millpond') {
+              else if (subject.event?.phase === 'attending' && subject.event.id !== 'millpond') {
                 const highlight =
                   subject.event.id === 'football' || subject.event.id === 'cinema'
                     ? subject.event.id
@@ -82,7 +89,19 @@ describe('Live broadcast director', () => {
                 ).toContain(highlight);
               }
             } else if (shot.kind === 'event') {
-              if (shot.id.startsWith('football:')) {
+              if (shot.id.startsWith('district:')) {
+                // A Riverside shot: its outing is on, inside its own window, with someone there.
+                const [, shotDay, outing] = shot.id.split(':');
+                expect(Number(shotDay)).toBe(day);
+                const district = liveDistrictShot(program, minute)!;
+                expect(district.outing).toBe(outing);
+                expect(minute).toBeGreaterThanOrEqual(district.from);
+                expect(minute).toBeLessThan(district.to);
+                // On that day, and under way (the Long Table's lamps outlast its 20:30 end).
+                const event = districtEvents(day).find((event) => event.id === outing)!;
+                expect(minute).toBeGreaterThanOrEqual(event.start);
+                expect(minute).toBeLessThan(event.homeBy);
+              } else if (shot.id.startsWith('football:')) {
                 expect(program.highlights).toContain('football');
                 expect(footballAt(minute, day).live).toBe(true);
                 expect(minute).toBeGreaterThanOrEqual(640);

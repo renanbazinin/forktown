@@ -30,6 +30,7 @@ import { millpondSkatingDay, SKATING } from '../src/lib/millpond';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { nightBedtime } from '../src/lib/night-routine';
 import { readPlaces } from './full-town';
+import { OUTINGS, outingOf, SEAT_EXCLUDES, type SeatCall } from '../src/lib/outings';
 
 const real = readPlaces();
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -76,8 +77,11 @@ const TOWNS = {
 };
 const GREEN = ['picnic', 'books', 'games'],
   CONCERTS = ['rock', 'acoustic', 'jazz'];
-/** The seats each kind of outing has. Football and skating seat six (six stands, six loops). */
-const CAPACITY = {
+/**
+ * The seats each call has (SPEC §4.0.A): today's, then every Riverside outing's spots from the
+ * registry. Football and skating seat six (six stands, six loops).
+ */
+const CAPACITY: Record<SeatCall, number> = {
   'football-morning': 6,
   green: EVENT_SPOTS.green.length,
   zoo: EVENT_SPOTS.zoo.length,
@@ -86,16 +90,35 @@ const CAPACITY = {
   concert: EVENT_SPOTS.stage.length,
   cinema: EVENT_SPOTS.cinema.length,
   'night-party': EVENT_SPOTS.stage.length,
+  ...(Object.fromEntries(OUTINGS.map((spec) => [spec.id, spec.seats.spots])) as Record<
+    (typeof OUTINGS)[number]['id'],
+    number
+  >),
 };
-type Outing = keyof typeof CAPACITY;
+type Outing = SeatCall;
 const outing = (trip: ResidentTrip): Outing =>
-  trip.event.id === 'football'
+  trip.event.outing ??
+  (trip.event.id === 'football'
     ? `football-${trip.event.period as 'morning' | 'afternoon'}`
     : GREEN.includes(trip.event.id)
       ? 'green'
       : CONCERTS.includes(trip.event.id)
         ? 'concert'
-        : (trip.event.id as Outing);
+        : (trip.event.id as Outing));
+/** Each routine period's calls, at most one of them per neighbor (SPEC §4.0.F). */
+const PERIOD_CALLS: Record<'morning' | 'afternoon' | 'evening' | 'night', Outing[]> = {
+  morning: ['football-morning'],
+  afternoon: ['green', 'zoo', 'football-afternoon', 'millpond'],
+  evening: ['concert'],
+  night: ['night-party'],
+};
+for (const spec of OUTINGS) PERIOD_CALLS[spec.period].push(spec.id);
+/**
+ * Whether the planner seats the Riverside's outings in this town at all: until it does (SPEC §7.2
+ * F4 wires them), none of them has a guest on any day, and their seat checks wait for it.
+ */
+const riversideSeated = (homes: Place[]) =>
+  year(homes).some(({ guests }) => OUTINGS.some((spec) => guests.has(spec.id)));
 type Day = {
   day: number;
   plans: Map<string, ResidentTrip[]>;
@@ -121,17 +144,24 @@ function year(homes: Place[]) {
 
 describe('Event seats at a full town', () => {
   it('fills every seat when enough neighbors can make it', () => {
-    for (const homes of [TOWNS.mixed, TOWNS.eager])
+    for (const homes of [TOWNS.mixed, TOWNS.eager]) {
+      const riverside = riversideSeated(homes);
       for (const { day, guests } of year(homes))
         for (const [kind, capacity] of Object.entries(CAPACITY) as [Outing, number][]) {
           const seated = guests.get(kind)?.length ?? 0;
-          if (kind === 'millpond' && !millpondSkatingDay(day)) expect(seated).toBe(0);
+          const spec = outingOf(kind);
+          // A Riverside outing seats nobody off its own days, and every seat on them.
+          if (spec && !spec.on(day)) expect(seated, `${kind} on day ${day}`).toBe(0);
+          else if (spec) {
+            if (riverside) expect(seated, `${kind} on day ${day}`).toBe(capacity);
+          } else if (kind === 'millpond' && !millpondSkatingDay(day)) expect(seated).toBe(0);
           // The film keeps its own guest list, half the evening owls, and passes no seat on; see
           // the film guests' own test below.
           else if (kind === 'cinema')
             expect(seated).toBeLessThanOrEqual(cinemaGuests(homes, day).length);
           else expect(seated, `${kind} on day ${day}`).toBe(capacity);
         }
+    }
   }, 60_000);
 
   it('seats every film guest who can get to the film and home by bedtime', () => {
@@ -218,13 +248,23 @@ describe('Event seats at a full town', () => {
             expect(seat).toBeLessThan(CAPACITY[kind]);
           }
         }
-        // One afternoon outing each, and the film instead of the concert.
-        const afternoon = (['green', 'zoo', 'football-afternoon', 'millpond'] as const).flatMap(
-          (kind) => (guests.get(kind) ?? []).map(([id]) => id),
-        );
-        expect(new Set(afternoon).size).toBe(afternoon.length);
+        // At most one outing each in every routine period (SPEC §4.0.F).
+        for (const calls of Object.values(PERIOD_CALLS)) {
+          const ids = calls.flatMap((kind) => (guests.get(kind) ?? []).map(([id]) => id));
+          expect(new Set(ids).size).toBe(ids.length);
+        }
+        // The film instead of every call that leaves its guests out: the concert, the Long
+        // Table, the sundown set and the stars.
         const film = new Set((guests.get('cinema') ?? []).map(([id]) => id));
-        expect((guests.get('concert') ?? []).some(([id]) => film.has(id))).toBe(false);
+        const afterFilm = (Object.keys(SEAT_EXCLUDES) as Outing[]).filter((kind) =>
+          SEAT_EXCLUDES[kind].includes('cinema'),
+        );
+        expect(afterFilm).toContain('concert');
+        for (const kind of afterFilm)
+          expect(
+            (guests.get(kind) ?? []).some(([id]) => film.has(id)),
+            kind,
+          ).toBe(false);
       }
   }, 60_000);
 
@@ -262,7 +302,8 @@ describe('Event seats at a full town', () => {
     for (const { guests } of year(homes))
       for (const [kind, list] of guests)
         for (const [id] of list) seen.set(kind, (seen.get(kind) ?? new Set()).add(id));
-    // Everyone is free for everything, so most neighbors get to every kind of outing.
+    // Everyone is free for everything, so most neighbors get to every kind of daily outing: the
+    // market's and both Bandstand sets' turn tickets come round to every house.
     for (const kind of [
       'football-morning',
       'green',
@@ -270,6 +311,9 @@ describe('Event seats at a full town', () => {
       'football-afternoon',
       'concert',
       'cinema',
+      ...(riversideSeated(homes)
+        ? (['market', 'bandstand-tea', 'bandstand-sundown'] as const)
+        : []),
     ] as const)
       expect(seen.get(kind)!.size, kind).toBeGreaterThan(homes.length * 0.8);
     // Eleven frozen afternoons of six loops go round as far as they can.

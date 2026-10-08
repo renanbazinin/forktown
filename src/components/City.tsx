@@ -15,6 +15,14 @@ import { PLOT_COPY } from '../lib/brand';
 import { FollowErrandItem } from './ErrandItemPreview';
 import { VENUES, venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
+import {
+  BANDSTAND_VENUE,
+  bandstandListening,
+  DISTRICT_FRAMES,
+  LANDING_VENUE,
+  MARKET_PLOTS,
+  type DistrictFrame,
+} from '../lib/district-places';
 import { project, WORLD_BOUNDS } from '../lib/world';
 import {
   clampZoom,
@@ -53,10 +61,21 @@ type Props = {
   football: FootballState;
   onListening: (listening: { gain: number; pan: number }) => void;
   onCinemaListening: (listening: { gain: number; pan: number }) => void;
+  /** What the camera hears of the Bandstand (bandstandListening), for its band's set. */
+  onBandstandListening?: (listening: { gain: number; pan: number }) => void;
   followed: string | null;
   onStopFollowing: () => void;
   onResidentSelect: (id: string) => void;
 };
+
+/** The district frame a Riverside plot opens on: the square, the Bandstand, or the regatta's
+ *  stretch of river for the Boat Landing. */
+function districtFrameOf(id: string): DistrictFrame | undefined {
+  if ((MARKET_PLOTS as readonly string[]).includes(id)) return DISTRICT_FRAMES.market;
+  if (id === BANDSTAND_VENUE.plot) return DISTRICT_FRAMES.bandstand;
+  if (id === LANDING_VENUE.plot) return DISTRICT_FRAMES.regatta;
+  return undefined;
+}
 
 const City = forwardRef<CityHandle, Props>(function City(
   {
@@ -72,6 +91,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     football,
     onListening,
     onCinemaListening,
+    onBandstandListening,
     followed,
     onStopFollowing,
     onResidentSelect,
@@ -127,7 +147,11 @@ const City = forwardRef<CityHandle, Props>(function City(
   cameraRef.current = renderedCamera;
   // What the camera hears. Changes too small to hear are held back, so following a neighbor
   // doesn't re-render the whole app a second time on every frame.
-  const heard = useRef({ football: { gain: 0, pan: 0 }, cinema: { gain: 0, pan: 0 } });
+  const heard = useRef({
+    football: { gain: 0, pan: 0 },
+    cinema: { gain: 0, pan: 0 },
+    bandstand: { gain: 0, pan: 0 },
+  });
   useEffect(() => {
     const football = steadyListening(
       heard.current.football,
@@ -137,8 +161,15 @@ const City = forwardRef<CityHandle, Props>(function City(
       heard.current.cinema,
       cinemaListening(renderedCamera, size.width, size.height),
     );
+    // The Bandstand is heard like the cinema: only on screen, and only close up.
+    const bandstand = steadyListening(
+      heard.current.bandstand,
+      bandstandListening(renderedCamera, size.width, size.height),
+    );
     if (football !== heard.current.football) onListening((heard.current.football = football));
     if (cinema !== heard.current.cinema) onCinemaListening((heard.current.cinema = cinema));
+    if (bandstand !== heard.current.bandstand)
+      onBandstandListening?.((heard.current.bandstand = bandstand));
   }, [
     renderedCamera.x,
     renderedCamera.y,
@@ -147,6 +178,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     size.height,
     onListening,
     onCinemaListening,
+    onBandstandListening,
   ]);
   const footballCamera = (width: number, height: number): Camera => {
     const pt = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y);
@@ -242,6 +274,23 @@ const City = forwardRef<CityHandle, Props>(function City(
       zoom,
     };
   };
+  // Frames one of the Riverside's venues by its district frame (district-places.ts).
+  const frameCamera = (frame: DistrictFrame, width: number, height: number): Camera => {
+    const mobile = width < 600;
+    const zoom = Math.max(
+      0.05,
+      Math.min(
+        1.4,
+        (width - (mobile ? 24 : 400)) / frame.width,
+        (mobile ? height * 0.43 : height - 150) / frame.height,
+      ),
+    );
+    return {
+      x: (mobile ? width / 2 : (width - 370) / 2) - frame.center.x * zoom,
+      y: (mobile ? height * 0.29 : height * 0.5) - frame.center.y * zoom,
+      zoom,
+    };
+  };
   const defaultCamera = useCallback((width: number, height: number): Camera => {
     const view = fitView(width, height, WORLD_BOUNDS);
     fit.current = view.zoom;
@@ -255,6 +304,8 @@ const City = forwardRef<CityHandle, Props>(function City(
     if (isTubePlot(id)) return tubeCamera(width, height, id);
     if (isCinemaPlot(id)) return cinemaCamera(width, height);
     if (isFootballPlot(id)) return footballCamera(width, height);
+    const district = districtFrameOf(id);
+    if (district) return frameCamera(district, width, height);
     const plot = getPlot(id);
     if (!plot) return null;
     const point = plotCenter(plot);
@@ -423,7 +474,14 @@ const City = forwardRef<CityHandle, Props>(function City(
       y: (local.y - current.y) / current.zoom,
     };
     const ground = unproject(world.x, world.y);
-    const target = cityHit(world, places, residents, cinemaAt(minutes, day).screenReveal);
+    const target = cityHit(world, places, residents, cinemaAt(minutes, day).screenReveal, {
+      day,
+      minutes,
+      night,
+      zoom: current.zoom,
+      selected: selectedPlot,
+      hovered: hover,
+    });
     return {
       id: target?.kind === 'place' ? target.id : (findPlotAt(ground.x, ground.y)?.id ?? null),
       residentId: target?.kind === 'resident' ? target.id : undefined,

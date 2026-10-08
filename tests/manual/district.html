@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forktown · The Riverside</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #eaf0df;
+        color: #304d40;
+        font: 15px system-ui;
+      }
+      h1 {
+        font: 32px Georgia;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font:
+          13px 'Space Mono',
+          monospace;
+        letter-spacing: 0.06em;
+        margin: 14px 0 4px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      button {
+        padding: 8px 14px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+        cursor: pointer;
+      }
+      button[aria-pressed='true'] {
+        background: #d9e6c8;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      input[type='number'] {
+        width: 7em;
+        padding: 6px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+      }
+      input[type='range'] {
+        width: 100%;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        max-width: 1280px;
+        height: auto;
+        border-radius: 12px;
+        background: #dae4cd;
+      }
+      .muted {
+        color: #5d7566;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="muted">FORKTOWN · THE RIVERSIDE</span>
+      <h1>The Riverside, one frame at a time.</h1>
+      <p class="muted">
+        Each venue at its own frame, on any town day and minute, with the published town out and
+        about. Every feature adds its moments to its own button row.
+      </p>
+      <h2>VENUE</h2>
+      <nav id="venues"></nav>
+      <h2>MOMENTS</h2>
+      <nav id="moments"></nav>
+      <nav>
+        <label>Town day <input id="day" type="number" step="1" /></label>
+        <span id="date" class="muted"></span>
+        <button id="play">Play</button>
+      </nav>
+      <input id="time" type="range" min="0" max="1439.9" step="0.1" aria-label="Town minute" />
+      <p id="status" role="status"></p>
+      <canvas width="1280" height="720" aria-label="The chosen venue at its frame"></canvas>
+      <script type="module">
+        import { renderCity } from '/src/city/render.ts';
+        import { districtEvents, eventsForDay, VENUES } from '/src/lib/events.ts';
+        import { DISTRICT_FRAMES } from '/src/lib/district-places.ts';
+        import { places } from '/src/lib/places.ts';
+        import { getPlot, plotCenter } from '/src/lib/world.ts';
+        import { simulateResidents, timeLabel } from '/src/lib/simulation.ts';
+        import { CALENDAR_EPOCH_DAY, townCalendarAt } from '/src/lib/town-calendar.ts';
+        import { DISTRICT_BUTTONS } from '/tests/manual/district.ts';
+
+        const green = plotCenter(getPlot(VENUES.find((venue) => venue.id === 'green').plot));
+        // Where each feature is framed: its district frame, or the Lunch Green for the snowmen.
+        const VIEWS = {
+          market: { label: 'Market Square', frame: DISTRICT_FRAMES.market, plot: 'D14' },
+          bandstand: { label: 'The Bandstand', frame: DISTRICT_FRAMES.bandstand, plot: 'K15' },
+          landing: { label: 'The Boat Landing', frame: DISTRICT_FRAMES.regatta, plot: 'J15' },
+          harvest: { label: 'Moon Harvest Farm', frame: DISTRICT_FRAMES.harvest, plot: 'S9' },
+          stars: { label: 'Stargazing', frame: DISTRICT_FRAMES.bandstand, plot: 'K15' },
+          snowmen: {
+            label: 'Snowmen on the green',
+            frame: { center: { x: green.x, y: green.y - 35 }, width: 520, height: 370 },
+            plot: 'C5',
+          },
+        };
+        const canvas = document.querySelector('canvas'),
+          ctx = canvas.getContext('2d'),
+          slider = document.querySelector('#time'),
+          dayInput = document.querySelector('#day');
+        let view = 'market',
+          day = CALENDAR_EPOCH_DAY,
+          minutes = 600,
+          playing = false,
+          last = 0;
+
+        function paint() {
+          const { frame, plot } = VIEWS[view];
+          const zoom = Math.min((1280 * 0.9) / frame.width, (720 * 0.86) / frame.height);
+          const events = [...eventsForDay(day, minutes), ...districtEvents(day, minutes)];
+          const residents = simulateResidents(places, minutes, day);
+          renderCity({
+            ctx,
+            width: 1280,
+            height: 720,
+            camera: { x: 640 - frame.center.x * zoom, y: 360 - frame.center.y * zoom, zoom },
+            places,
+            residents,
+            events,
+            minutes,
+            day,
+            night: minutes < 360 || minutes >= 1200,
+            selectedPlot: null,
+            hoveredPlot: plot,
+            showPlots: false,
+          });
+          const here = events.filter((event) => event.venue.plot === plot);
+          const present = residents.filter((resident) =>
+            here.some(
+              (event) => resident.event?.id === event.id && resident.event.phase === 'attending',
+            ),
+          ).length;
+          document.querySelector('#date').textContent = townCalendarAt(day, minutes).label;
+          document.querySelector('#status').textContent =
+            `${timeLabel(minutes)} · ${VIEWS[view].label}` +
+            (here.length ? ` · ${[...new Set(here.map((event) => event.name))].join(' · ')}` : '') +
+            ` · ${present} there`;
+          slider.value = String(minutes);
+          dayInput.value = String(day);
+        }
+        function nav(id, items, pressed, choose) {
+          document.querySelector(id).replaceChildren(
+            ...items.map(([key, label]) => {
+              const button = document.createElement('button');
+              button.textContent = label;
+              button.setAttribute('aria-pressed', String(key === pressed));
+              button.onclick = () => choose(key);
+              return button;
+            }),
+          );
+        }
+        function moments() {
+          const buttons = DISTRICT_BUTTONS[view];
+          nav(
+            '#moments',
+            buttons.map((button, index) => [index, button.label]),
+            -1,
+            (index) => {
+              day = buttons[index].day;
+              minutes = buttons[index].minutes;
+              paint();
+            },
+          );
+          if (!buttons.length) {
+            const none = document.createElement('span');
+            none.className = 'muted';
+            none.textContent = 'No moments yet.';
+            document.querySelector('#moments').replaceChildren(none);
+          }
+        }
+        function venues() {
+          nav(
+            '#venues',
+            Object.entries(VIEWS).map(([key, { label }]) => [key, label]),
+            view,
+            (key) => {
+              view = key;
+              venues();
+              moments();
+              paint();
+            },
+          );
+        }
+        slider.oninput = () => {
+          minutes = Number(slider.value);
+          paint();
+        };
+        dayInput.onchange = () => {
+          day = Math.floor(Number(dayInput.value)) || day;
+          paint();
+        };
+        document.querySelector('#play').onclick = (event) => {
+          playing = !playing;
+          event.target.textContent = playing ? 'Pause' : 'Play';
+        };
+        function tick(now) {
+          if (playing && last) {
+            minutes += (now - last) / 1000;
+            if (minutes >= 1440) {
+              minutes -= 1440;
+              day++;
+            }
+            paint();
+          }
+          last = now;
+          requestAnimationFrame(tick);
+        }
+        venues();
+        moments();
+        paint();
+        requestAnimationFrame(tick);
+      </script>
+    </main>
+  </body>
+</html>

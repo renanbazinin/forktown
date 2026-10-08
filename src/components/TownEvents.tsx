@@ -8,6 +8,33 @@ import MillpondEventCard from './MillpondEventCard';
 import { skatingCard } from '../lib/millpond-copy';
 import SeasonalErrandCard from './SeasonalErrandCard';
 import type { Place } from '../lib/schema';
+import { DISTRICT_CARDS } from './district/cards';
+
+const LIVE = 'Happening now';
+/**
+ * The Riverside's cards, one per outing, both Bandstand sets on one card: the set that is on,
+ * else the next one today, else the teatime set. In start order.
+ */
+export function districtCards(events: readonly TownEvent[], minutes: number): TownEvent[] {
+  const cards: TownEvent[] = [];
+  const groups = new Map<string, TownEvent[]>();
+  for (const event of events) {
+    if (!event.outing) continue;
+    const group = DISTRICT_CARDS[event.outing].group;
+    if (!group) cards.push(event);
+    else groups.set(group, [...(groups.get(group) ?? []), event]);
+  }
+  for (const sets of groups.values()) {
+    const byStart = [...sets].sort((a, b) => a.start - b.start);
+    cards.push(
+      byStart.find((set) => eventStatus(set, minutes) === LIVE) ??
+        byStart.find((set) => eventStatus(set, minutes).startsWith('Later')) ??
+        byStart[0],
+    );
+  }
+  // A stable sort: outings that start together keep the events list's order.
+  return cards.sort((a, b) => a.start - b.start);
+}
 
 export default function TownEvents({
   events,
@@ -19,6 +46,7 @@ export default function TownEvents({
   skaters,
   places,
   onFollow,
+  attending,
 }: {
   events: TownEvent[];
   minutes: number;
@@ -29,6 +57,8 @@ export default function TownEvents({
   skaters?: number;
   places?: Place[];
   onFollow?: (id: string) => void;
+  /** Neighbors at each event right now, by event id: a live Riverside card counts them. */
+  attending?: ReadonlyMap<string, number>;
 }) {
   const minute = Math.min(10, Number(football.clock.slice(0, 2)) + 1);
   const phase =
@@ -44,12 +74,23 @@ export default function TownEvents({
   const spoken = football.live
     ? `${phase.startsWith('LIVE') ? `live, minute ${minute}` : phase.toLowerCase()}: Meadow FC ${football.score[0]}, Sunset United ${football.score[1]}`
     : 'back at sunrise';
-  // Skating waits at the end of the list, and joins the live cards while it is on.
-  const firstLater = events.findIndex((event) => eventStatus(event, minutes) !== 'Happening now');
-  const skatingAt =
-    day !== undefined && skatingCard(minutes, day)?.live && firstLater >= 0
-      ? firstLater
-      : events.length;
+  // Today's five first, as they come. Skating waits at the end of the list, and joins the live
+  // cards while it is on; so does a live Riverside card, just after it. The rest of the Riverside
+  // follows today's five, in start order.
+  const today = events.filter((event) => !event.outing);
+  const district = districtCards(events, minutes);
+  const firstLater = today.findIndex((event) => eventStatus(event, minutes) !== LIVE);
+  const splice = firstLater >= 0 ? firstLater : today.length;
+  const liveDistrict = district.filter((event) => eventStatus(event, minutes) === LIVE);
+  const skatingLive = day !== undefined && !!skatingCard(minutes, day)?.live && firstLater >= 0;
+  const cards: (TownEvent | null)[] = [
+    ...today.slice(0, splice),
+    ...(skatingLive ? [null] : []),
+    ...liveDistrict,
+    ...today.slice(splice),
+    ...district.filter((event) => !liveDistrict.includes(event)),
+    ...(skatingLive ? [] : [null]),
+  ];
   return (
     <section className="town-events" aria-label="Today’s town events">
       <div className="events-intro">
@@ -100,7 +141,7 @@ export default function TownEvents({
           </span>
         </span>
       </button>
-      {[...events.slice(0, skatingAt), null, ...events.slice(skatingAt)].map((event) => {
+      {cards.map((event) => {
         if (!event)
           return day === undefined ? null : (
             <MillpondEventCard
@@ -111,21 +152,25 @@ export default function TownEvents({
               onVisit={onVisit}
             />
           );
-        const live = eventStatus(event, minutes) === 'Happening now';
-        const Icon =
-          event.venue.kind === 'zoo'
+        const live = eventStatus(event, minutes) === LIVE;
+        const Icon = event.outing
+          ? DISTRICT_CARDS[event.outing].icon
+          : event.venue.kind === 'zoo'
             ? PawPrint
             : event.venue.kind === 'cinema'
               ? Film
               : event.venue.kind === 'stage'
                 ? Music2
                 : Sun;
+        // Who is at a live Riverside outing, only while someone is; never a promise of a crowd.
+        const there = live && event.outing ? (attending?.get(event.id) ?? 0) : 0;
+        const group = event.outing && DISTRICT_CARDS[event.outing].group;
         return (
           <button
             className={`event-card ${live ? 'is-live' : ''}`}
-            key={event.id}
+            key={group ?? event.id}
             onClick={() => onVisit(event.venue.plot, event.id)}
-            aria-label={`Visit ${event.venue.name}: ${event.name}`}
+            aria-label={`Visit ${event.venue.name}: ${event.name}${there ? `, ${there} there` : ''}`}
           >
             <span className="event-symbol">
               <Icon size={20} />
@@ -134,6 +179,7 @@ export default function TownEvents({
               <span className="event-time">
                 {live && <i className="live-dot" />} {eventStatus(event, minutes)} ·{' '}
                 {timeLabel(event.start)}–{timeLabel(event.end)}
+                {there > 0 && ` · ${there} there`}
               </span>
               <strong>{event.name}</strong>
               <span>

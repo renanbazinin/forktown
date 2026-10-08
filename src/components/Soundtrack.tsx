@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX, X } from 'lucide-react';
-import { TRACKS, type TrackId } from '../music/score';
+import { isBandTrack, TRACKS, type TrackId } from '../music/score';
 import { TownPlayer } from '../music/player';
 import { footballSoundsBetween } from '../music/football-sound';
 import type { FootballState } from '../lib/football';
@@ -14,6 +14,7 @@ export default function Soundtrack({
   listening,
   cinema,
   cinemaListening,
+  bandstand = { gain: 0, pan: 0 },
   breakSound = null,
   prepare = null,
   autoStart = false,
@@ -25,6 +26,8 @@ export default function Soundtrack({
   listening: { gain: number; pan: number };
   cinema: ReturnType<typeof cinemaAt>;
   cinemaListening: { gain: number; pan: number };
+  /** What the camera hears of the Bandstand: a band's set plays at this gain (bandstandListening). */
+  bandstand?: { gain: number; pan: number };
   /** A live-stream break on air: its jingle plays full and centred, over the town's music. */
   breakSound?: { film: Playable; elapsed: number; key: string } | null;
   /** The next break's ad or card, rendered ahead so its sound starts on time. */
@@ -65,6 +68,11 @@ export default function Soundtrack({
   useEffect(() => {
     if (enabled && prepare) player.current?.cinemaPrepare(prepare);
   }, [enabled, prepare]);
+  // A band at the Bandstand is heard only near it: its tune is scaled by the camera's gain.
+  const bandGain = bandstand.gain;
+  useEffect(() => {
+    if (enabled && isBandTrack(track)) player.current?.level(track, bandGain);
+  }, [enabled, track, bandGain]);
   useEffect(() => {
     if (
       !enabled ||

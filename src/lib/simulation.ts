@@ -2,6 +2,8 @@ import type { Place } from './schema';
 import { getPlot, hash, plotEntrance, project, type Plot, type Point } from './world';
 import type { EventPose } from './events';
 import type { CarryKind } from './outings';
+import { OUTING_IDS, type OutingId } from './district-calendar';
+import { DISTRICT_COPY } from './district-copy';
 import {
   chainTurn,
   dayTripWalks,
@@ -90,12 +92,16 @@ export function periodAt(minutes: number) {
         ? 'afternoon'
         : 'evening';
 }
-// Where a tube ride is heading, and where it is coming home from.
+/** A Riverside outing's own words (district-copy.ts), when the event is one. */
+const outingLabels = (id: string) =>
+  (OUTING_IDS as readonly string[]).includes(id) ? DISTRICT_COPY[id as OutingId].labels : undefined;
+// Where a tube ride is heading, and where it is coming home from; the Riverside's from its copy.
 const TUBE_PLACES: Record<string, readonly [to: string, from: string]> = {
   zoo: ['Willow Grove Zoo', 'the zoo'],
   cinema: ['the Starlight Cinema', 'the movies'],
   football: ['the football', 'the football'],
   millpond: ['the Millpond', 'the Millpond'],
+  ...Object.fromEntries(OUTING_IDS.map((id) => [id, DISTRICT_COPY[id].labels.tube])),
 };
 function tubeLabel(transit: ResidentTransit, event: NonNullable<ResidentState['event']>) {
   if (transit.stage === 'alighting')
@@ -110,6 +116,9 @@ export function residentActivityLabel(state: ResidentState): string {
   if (state.errand) return errandAction(state.errand.kind, state.errand.phase);
   if (state.duckLove) return 'Stopped to admire the ducklings';
   if (state.transit && state.event) return tubeLabel(state.transit, state.event);
+  // The Riverside's outings say what they are: walking to the square, browsing, home again.
+  const outing = state.event && outingLabels(state.event.id);
+  if (state.event && outing) return outing[state.event.phase];
   if (state.event?.phase === 'waiting')
     return `Waiting for ${state.event.id === 'cinema' ? 'the film to start' : state.event.name}`;
   if (state.event?.id === 'zoo')

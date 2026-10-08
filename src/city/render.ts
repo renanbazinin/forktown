@@ -52,6 +52,8 @@ import {
 } from './tubes';
 import { isTubePlot, isTubeTreeGap } from '../lib/tubes';
 import { isDistrictPlot } from '../lib/district-places';
+import { DISTRICT_PAINTERS, type DistrictPainter, type DistrictScene } from './district-art';
+import { residentTrips, type ResidentTrip } from '../lib/resident-trips';
 import { tubeParcelsAt, type TubeParcelState } from '../lib/tube-traffic';
 import { insideCinema, isCinemaPlot, CINEMA_VENUE } from '../lib/cinema';
 import { ducksAt } from '../lib/ducks';
@@ -257,6 +259,13 @@ const terrain = Array.from({ length: WORLD_WIDTH * WORLD_HEIGHT }, (_, i) => {
   return { x, y, point: project(x + 0.5, y + 0.5), seed: hash(`${x},${y}`), road: isRoad(x, y) };
 });
 const venuePlots = VENUES.map((venue) => PLOTS.find((plot) => plot.id === venue.plot)!);
+/** Every plot a venue or the Riverside holds, for keeping the block trees off them. */
+const reservedPlots = [...venuePlots, ...PLOTS.filter((plot) => isDistrictPlot(plot.id))];
+/** The plan day a town minute reads: before 06:00 the night belongs to yesterday. */
+const planDayAt = (minutes: number, day: number) =>
+  ((minutes % 1440) + 1440) % 1440 < 360 ? day - 1 : day;
+/** The Riverside's painters (district-art.ts), in the registry's order. */
+const PAINTERS: readonly DistrictPainter[] = Object.values(DISTRICT_PAINTERS);
 /**
  * Where the edge tile (x, y) grows its tree, in world px, if it grows one: the west and north
  * edges, the two front rows and the far bank below the river's head, two tiles in three by hash,
@@ -294,7 +303,7 @@ const trees = terrain.flatMap(({ x, y, point }) => {
     !insideZoo({ x, y }) &&
     !insideFarm({ x, y }) &&
     !insideMillpond({ x, y }) &&
-    !venuePlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
+    !reservedPlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
     x % BLOCK_SIZE === 0 &&
     y % BLOCK_SIZE === 2 &&
     seed % 2
@@ -421,6 +430,8 @@ export function renderCity({
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
   drawSky(ctx, width, height, day, minutes);
+  // The Riverside's sky extras (the summer meteors), in screen space over the sky.
+  for (const painter of PAINTERS) painter.sky?.(ctx, { day, minutes, night, width, height });
   const p = night ? NIGHT : DAY;
   // The turning year: one snapshot per frame, from the same day and minute as the sky.
   const season = townSeasonAt(day, minutes);
@@ -468,7 +479,8 @@ export function renderCity({
       isCinemaPlot(plot.id) ||
       isZooPlot(plot.id) ||
       isFarmPlot(plot.id) ||
-      isMillpondPlot(plot.id)
+      isMillpondPlot(plot.id) ||
+      isDistrictPlot(plot.id)
     )
       return '';
     return isTubePlot(plot.id) ? `tube:${plot.id}` : plot.id;
@@ -507,6 +519,22 @@ export function renderCity({
     followed,
     parcels: () => (parcels ??= tubeParcelsAt(places, minutes, day)),
   } as const;
+  // What the Riverside's painters see: the moment, the view, the marks and, read only when one
+  // asks, the plan day's trips (before 06:00 the night belongs to yesterday, as in the town).
+  let plan: ReadonlyMap<string, readonly ResidentTrip[]> | undefined;
+  const district: DistrictScene = {
+    day,
+    minutes,
+    night,
+    season,
+    zoom: camera.zoom,
+    visible,
+    selected: selectedPlot,
+    hovered: hoveredPlot,
+    places,
+    residents,
+    plan: () => (plan ??= residentTrips(places, planDayAt(minutes, day))),
+  };
   const paintGround = (ctx: Ctx, area?: GroundArea) => {
     // A partial repaint culls tiles and plots to its own area; the canvas clips the rest.
     const near = area ? within(area) : visible;
@@ -640,12 +668,17 @@ export function renderCity({
       if (!occupied && !tubePlot) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
     }
     drawFarmGround(ctx, night, season);
+    // The Riverside's ground art (the harvest's stubble patch first): cached, so by the day only.
+    for (const painter of PAINTERS)
+      painter.ground?.(ctx, { night, season, groundDay: season.groundDay, visible: near });
     drawMillpondGround(ctx, night, season, p.water, p.waterLight);
     drawTubeGround(ctx, tube);
   };
   paintGroundLayer(ctx, groundKey, paintGround, marks);
   // Riders in the glass behind the tree line: every edge tree stands in front of them.
   drawTubeTraffic(ctx, tube);
+  // The Riverside's floor paint (rugs, wakes, the stubble shadow): under everything sorted.
+  for (const painter of PAINTERS) painter.floor?.(ctx, district);
   const objects = drawFootball(
     ctx,
     football,
@@ -688,6 +721,8 @@ export function renderCity({
   };
   drawMillpondSurface(ctx, pond);
   objects.push(...drawMillpond(ctx, pond));
+  // The Riverside's stalls, stand, boats, tables and props join the sort before the residents.
+  for (const painter of PAINTERS) objects.push(...painter.objects(ctx, district));
   for (const venue of VENUES) {
     // Only the green and the stage are drawn here; every other venue has its own painter.
     if (venue.kind !== 'green' && venue.kind !== 'stage') continue;
@@ -903,12 +938,25 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
 }
 
 type CityHit = { kind: 'place' | 'resident'; id: string };
+/** The moment and the marks a click is judged at, for the Riverside's painters' hit tests. */
+export type HitMoment = Pick<
+  DistrictScene,
+  'day' | 'minutes' | 'night' | 'zoom' | 'selected' | 'hovered'
+>;
 
 export function cityHit(
   point: Point,
   places: Place[],
   residents: ResidentState[],
   cinemaScreenReveal = 1,
+  moment: HitMoment = {
+    day: 0,
+    minutes: 720,
+    night: false,
+    zoom: 1,
+    selected: null,
+    hovered: null,
+  },
 ): CityHit | undefined {
   const plotId = buildingHit(point, places);
   const plot = plotId ? getPlot(plotId) : undefined;
@@ -948,7 +996,9 @@ export function cityHit(
     }
   }
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo') continue;
+    // Only the green, the stage and the Fork's crown are hit here; the cinema and the zoo have
+    // their own shapes above, and the Riverside's venues their painters' hit tests below.
+    if (venue.kind !== 'green' && venue.kind !== 'stage' && venue.kind !== 'fork') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const p = plotCenter(plot),
       bounds = venueBounds(venue);
@@ -961,6 +1011,23 @@ export function cityHit(
     ) {
       depth = venueDepth(plot);
       target = { kind: 'place', id: plot.id };
+    }
+  }
+  // The Riverside's stalls, stand and props, each by its painter's own shape and depth.
+  let plan: ReadonlyMap<string, readonly ResidentTrip[]> | undefined;
+  const scene: DistrictScene = {
+    ...moment,
+    season: townSeasonAt(moment.day, moment.minutes),
+    visible: () => true,
+    places,
+    residents,
+    plan: () => (plan ??= residentTrips(places, planDayAt(moment.minutes, moment.day))),
+  };
+  for (const painter of PAINTERS) {
+    const hit = painter.hit?.(point, scene);
+    if (hit && hit.depth >= depth) {
+      depth = hit.depth;
+      target = { kind: 'place', id: hit.plot };
     }
   }
   // Match the painter's order: residents follow houses at equal depth, and

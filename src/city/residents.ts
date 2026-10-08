@@ -2,6 +2,7 @@ import type { Resident } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { tint } from './houses';
 import { drawErrandItem, errandItemPose } from './errand-items';
+import { CARRY_SPRITES } from './carry-items';
 
 const GREETING_FONT = '10px "Space Mono", monospace';
 /** How much lower, in a figure's own px, a neighbour perches on the porch chair than the bench. */
@@ -18,9 +19,11 @@ export const NIGHT_DIM = -35;
 export function residentReach(
   ctx: CanvasRenderingContext2D,
   resident: Resident,
-  state?: Pick<ResidentState, 'greeting' | 'duckLove'>,
+  state?: Pick<ResidentState, 'greeting' | 'duckLove'> & Partial<Pick<ResidentState, 'carry'>>,
 ) {
-  const figure = { x: 18, above: 48, below: 5 };
+  // Something carried home from an outing can rise above the hand (carry-items.ts).
+  const lift = state?.carry ? CARRY_SPRITES[state.carry.kind].height : 0;
+  const figure = { x: 18, above: 48 + lift, below: 5 };
   if (!state?.greeting || state.duckLove) return figure;
   ctx.save();
   ctx.font = GREETING_FONT;
@@ -50,7 +53,7 @@ export function drawResident(
     ResidentState,
     'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove' | 'event'
   > &
-    Partial<Pick<ResidentState, 'lot' | 'errand'>>,
+    Partial<Pick<ResidentState, 'lot' | 'errand' | 'carry'>>,
   /**
    * `shadow: false` leaves out the ground shadow, for a figure lifted off the ground.
    * `speech: false` leaves out the greeting or heart, for drawResidentSpeech to add on top.
@@ -64,6 +67,12 @@ export function drawResident(
   const left = facing === 'sw' || facing === 'nw';
   const errand = errandItemPose(state?.errand, facing, state?.walkPhase, state?.moving);
   const errandBehind = back || !!errand?.grounded;
+  // What a Riverside guest carries on one leg of their outing, held in the near hand: the bag
+  // home from the market, a paper boat to the regatta, a dish to the Long Table. A seasonal
+  // round's object, when there is one, takes the hands instead.
+  const carry = !errand && state?.carry ? state.carry : undefined;
+  const carrySprite = carry ? CARRY_SPRITES[carry.kind] : undefined;
+  const carried = carrySprite?.grip(facing, state?.walkPhase ?? 0);
   const female = resident.figure === 'female';
   const seated = !!state?.pose && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
   // Skating on the Millpond: a forward lean, arms out for balance, one foot pushing back on a blade.
@@ -119,8 +128,7 @@ export function drawResident(
       y: Math.round(rest.y + (at.y - rest.y) * errand!.armReach),
     };
   };
-  const carryingArm = (near: boolean) => {
-    const hand = grip(near);
+  const carryingArm = (near: boolean, hand = grip(near)) => {
     const shoulder = { x: near ? 3 : -4, y: -11 + bob };
     const elbow = { x: Math.round((shoulder.x + hand.x) / 2), y: -8 + bob };
     ctx.fillStyle = near ? outfit : outfitShadow;
@@ -138,10 +146,22 @@ export function drawResident(
         );
     }
   };
-  const carryingHand = (near: boolean) => {
-    const hand = grip(near);
+  const carryingHand = (near: boolean, hand = grip(near)) => {
     ctx.fillStyle = skin;
     ctx.fillRect(hand.x - 1, hand.y - 1, 2, 2);
+  };
+  const carriedItem = () => {
+    if (!carry || !carrySprite || !carried) return;
+    ctx.save();
+    carrySprite.draw(
+      ctx,
+      carried.anchor.x,
+      carried.anchor.y,
+      carry.variant,
+      resident,
+      !!options.night,
+    );
+    ctx.restore();
   };
   const errandItem = () => {
     if (!errand || !state?.errand) return;
@@ -168,6 +188,7 @@ export function drawResident(
   // A sitter's body sits back over the seat, behind the feet at the anchor.
   if (perched) ctx.translate(-3, 0);
   if (errandBehind) errandItem();
+  if (carried?.behind) carriedItem();
   // The far arm and foot sit behind the body; feet lift rather than stretch.
   ctx.fillStyle = outfitShadow;
   if (errand && errand.armReach > 0) {
@@ -269,6 +290,8 @@ export function drawResident(
   ctx.fillStyle = outfit;
   if (errand && errand.armReach > 0) {
     carryingArm(true);
+  } else if (carried) {
+    carryingArm(true, carried.anchor);
   } else if (cheering || (disco && stride <= 0)) {
     ctx.fillRect(3, -15 + bob, 4, 4);
     ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);
@@ -352,6 +375,8 @@ export function drawResident(
     if (!back) carryingHand(false);
     carryingHand(true);
   }
+  if (carried && !carried.behind) carriedItem();
+  if (carried) carryingHand(true, carried.anchor);
   if (state?.pose === 'read') {
     ctx.fillStyle = ink('#567F79');
     ctx.fillRect(-5, -9 + bob, 11, 7);

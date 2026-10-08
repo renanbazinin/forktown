@@ -9,13 +9,18 @@ import { FORK_ID, FORK_NAME, FORK_PLOT } from './lanterns.ts';
 import {
   BANDSTAND_VENUE,
   DISTRICT_SPOTS,
+  HARVEST_VENUE,
   insideDistrict,
   isDistrictPlot,
   LANDING_VENUE,
   MARKET_PLOTS,
   MARKET_VENUE,
+  type DistrictVenue,
   type Spot,
 } from './district-places.ts';
+import { OUTING_TIMES, outingOn, SNOWMAN_DAYS, type OutingId } from './district-calendar.ts';
+import { DISTRICT_COPY, SNOWMEN_LUNCH } from './district-copy.ts';
+import { yearDayAt } from './seasons.ts';
 
 // Public venues belong to the town, outside the one-house contribution files.
 export const VENUES = [
@@ -100,11 +105,14 @@ export function eventSpot(venue: Venue, index: number) {
   const spot = EVENT_SPOTS[venue.kind][index];
   return { position: { x: plot.x + 0.5 + spot.x, y: plot.y + 0.5 + spot.y }, facing: spot.facing };
 }
-export function insideVenue(venue: Venue, point: { x: number; y: number }) {
+const DISTRICT_KINDS: readonly string[] = ['market', 'bandstand', 'landing', 'harvest'];
+/** Whether a venue is one of the Riverside's (the Harvest Fair's farm included). */
+export const isDistrictVenue = (venue: { kind: string }): venue is DistrictVenue =>
+  DISTRICT_KINDS.includes(venue.kind);
+export function insideVenue(venue: Venue | DistrictVenue, point: { x: number; y: number }) {
+  if (isDistrictVenue(venue)) return insideDistrict(venue.kind, point);
   if (venue.kind === 'zoo') return insideZoo(point);
   if (venue.kind === 'cinema') return insideCinema(point);
-  if (venue.kind === 'market' || venue.kind === 'bandstand' || venue.kind === 'landing')
-    return insideDistrict(venue.kind, point);
   const plot = getPlot(venue.plot)!;
   return Math.abs(point.x - plot.x - 0.5) <= 1.5 && Math.abs(point.y - plot.y - 0.5) <= 1.5;
 }
@@ -166,12 +174,17 @@ export type TownEvent = {
   id: string;
   name: string;
   description: string;
-  venue: Venue;
-  period: 'afternoon' | 'evening' | 'night';
+  /** A Riverside outing is held at a district venue; the Harvest Fair's is the farm. */
+  venue: Venue | DistrictVenue;
+  period: 'morning' | 'afternoon' | 'evening' | 'night';
   depart: number;
   start: number;
   end: number;
   homeBy: number;
+  /** The lunch on a snowman build day (Winter 3, 7, 11 and 15): same guests, other props. */
+  variant?: 'snowmen';
+  /** A Riverside outing (src/lib/outings.ts); its id is the event's own. */
+  outing?: OutingId;
 };
 
 export function cinemaEventForDay(day: number): TownEvent {
@@ -188,8 +201,12 @@ export function cinemaEventForDay(day: number): TownEvent {
     homeBy: bill.homeBy,
   };
 }
+/** Whether the lunch on the green is a snowman build day (Winter 3, 7, 11 and 15). */
+export const snowmenDay = (day: number) =>
+  (SNOWMAN_DAYS as readonly number[]).includes(yearDayAt(Math.floor(day)));
+
 export function eventsForDay(day: number, minutes = 720): TownEvent[] {
-  const daytime = (['afternoon', 'evening'] as const).map((period, index) => {
+  const daytime = (['afternoon', 'evening'] as const).map((period, index): TownEvent => {
     const choices = EVENT_CHOICES[period];
     const choice = choices[hash(`forktown-event:${Math.floor(day)}:${period}`) % choices.length];
     return {
@@ -200,6 +217,9 @@ export function eventsForDay(day: number, minutes = 720): TownEvent[] {
       start: index ? 1140 : 780,
       end: index ? 1260 : 960,
       homeBy: index ? 1310 : 1070,
+      // Snowmen on the green: a choice override. The id stays the hashed choice's, so the lunch's
+      // guest list never changes; only the name, the words and the props do (SPEC §4.6).
+      ...(!index && snowmenDay(day) ? { ...SNOWMEN_LUNCH, variant: 'snowmen' as const } : {}),
     };
   });
   return [
@@ -231,6 +251,48 @@ export function eventsForDay(day: number, minutes = 720): TownEvent[] {
     },
   ];
 }
+/**
+ * The Riverside's venue and routine period for each outing, in the order the events list shows
+ * them (SPEC §4.0.I). Frozen data only: events.ts never value-imports outings.ts.
+ */
+const DISTRICT_EVENTS: readonly {
+  id: OutingId;
+  venue: DistrictVenue;
+  period: TownEvent['period'];
+}[] = [
+  { id: 'market', venue: MARKET_VENUE, period: 'morning' },
+  { id: 'bandstand-tea', venue: BANDSTAND_VENUE, period: 'afternoon' },
+  { id: 'bandstand-sundown', venue: BANDSTAND_VENUE, period: 'evening' },
+  { id: 'regatta', venue: LANDING_VENUE, period: 'afternoon' },
+  { id: 'harvest-fair', venue: HARVEST_VENUE, period: 'afternoon' },
+  { id: 'long-table', venue: HARVEST_VENUE, period: 'evening' },
+  { id: 'stargazing', venue: BANDSTAND_VENUE, period: 'night' },
+];
+
+/**
+ * The Riverside's outings on a town day: the market and both Bandstand sets every day, then the
+ * regatta, the Harvest Fair, the Long Table and stargazing on their own days. Before 06:00 the
+ * night belongs to yesterday, like the film. Built only from the frozen calendar, places and copy.
+ */
+export function districtEvents(day: number, minutes = 720): TownEvent[] {
+  return DISTRICT_EVENTS.flatMap(({ id, venue, period }) => {
+    const on = period === 'night' && minutes < 360 ? day - 1 : day;
+    if (!outingOn(id, on)) return [];
+    const copy = DISTRICT_COPY[id];
+    return [
+      {
+        id,
+        outing: id,
+        name: copy.name(on),
+        description: copy.description(on),
+        venue,
+        period,
+        ...OUTING_TIMES[id],
+      },
+    ];
+  });
+}
+
 // Night events use the evening's timeline: 02:30 is minute 1590, not 150.
 // Every consumer (travel, artwork, labels, and music) shares this midnight rule.
 export function eventMinutes(event: TownEvent, minutes: number) {
@@ -252,6 +314,7 @@ export function eventAtVenue(events: TownEvent[], venueId: string, minutes: numb
     program.at(-1)
   );
 }
+/** "Later today" before the start, morning outings before 08:00 included. */
 export function eventStatus(event: TownEvent, minutes: number) {
   const time = eventMinutes(event, minutes);
   return time < event.start

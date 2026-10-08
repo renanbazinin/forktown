@@ -6,6 +6,7 @@ import {
   eventSpot,
   eventsForDay,
   HOUSE_PLOTS,
+  isDistrictVenue,
   type EventPose,
   type TownEvent,
   type Venue,
@@ -13,8 +14,14 @@ import {
 import { cinemaGuests, CINEMA_ENTRANCE } from './cinema';
 import { FOOTBALL_ENTRANCE, FOOTBALL_VENUE, spectatorSpot, footballAt } from './football';
 import { zooRoute } from './zoo';
-import { districtApproach, DISTRICT_OUTINGS } from './district-places';
+import {
+  districtApproach,
+  DISTRICT_OUTINGS,
+  outingSpots,
+  type DistrictVenue,
+} from './district-places';
 import { activeIndex } from './district-calendar';
+import { outingOf, snowmenBuilderPose, snowmenWatcherPose } from './outings';
 import { MILLPOND_VENUE, SKATING, millpondRoute, millpondSkatingDay, skateGlide } from './millpond';
 import {
   facingAlong,
@@ -55,7 +62,7 @@ import {
 } from './tube-journeys';
 
 export type VisitEvent = Omit<TownEvent, 'venue' | 'period'> & {
-  venue: Venue | typeof FOOTBALL_VENUE | typeof MILLPOND_VENUE;
+  venue: Venue | DistrictVenue | typeof FOOTBALL_VENUE | typeof MILLPOND_VENUE;
   period: 'morning' | 'afternoon' | 'evening' | 'night';
 };
 export type ResidentTrip = TravelPlan & {
@@ -126,21 +133,21 @@ function venueApproach(venue: Venue, seat: number): Point[] {
   return [entrance, { x: laneX, y: entrance.y }, { x: laneX, y: audience.y }, audience];
 }
 
+/** The Riverside outing whose spots and ways in a visit uses: its own, else its venue's first. */
+const districtOuting = (event: Pick<VisitEvent, 'outing'>, venue: DistrictVenue) =>
+  event.outing ?? DISTRICT_OUTINGS[venue.kind][0];
+
 /** The venue's own way in, from the road point where the approach starts to the seat. */
-export function eventApproach(event: Pick<VisitEvent, 'venue'>, seat: number): Point[] {
+export function eventApproach(event: Pick<VisitEvent, 'venue' | 'outing'>, seat: number): Point[] {
+  // The Riverside's venues have their own frozen ways in (an outing's seat k, district-places).
+  if (isDistrictVenue(event.venue))
+    return districtApproach(districtOuting(event, event.venue), seat);
   if (event.venue.kind === 'football') {
     const spot = spectatorSpot(seat);
     return [FOOTBALL_ENTRANCE, { x: spot.x, y: FOOTBALL_ENTRANCE.y }, spot];
   }
   if (event.venue.kind === 'zoo') return zooRoute(eventSpot(event.venue, seat).position);
   if (event.venue.kind === 'millpond') return millpondRoute(seat);
-  // The Riverside's venues have their own frozen ways in (an outing's seat k, district-places).
-  if (
-    event.venue.kind === 'market' ||
-    event.venue.kind === 'bandstand' ||
-    event.venue.kind === 'landing'
-  )
-    return districtApproach(DISTRICT_OUTINGS[event.venue.kind][0], seat);
   return venueApproach(event.venue, seat);
 }
 
@@ -703,8 +710,9 @@ export function planHome(
       ...window,
       event,
       seat,
-      facing:
-        event.venue.kind === 'football' || event.venue.kind === 'millpond'
+      facing: isDistrictVenue(event.venue)
+        ? outingSpots(districtOuting(event, event.venue))[seat].facing
+        : event.venue.kind === 'football' || event.venue.kind === 'millpond'
           ? 'ne'
           : eventSpot(event.venue, seat).facing,
       ...(legs ? { legs, returnLegs: reverseLegs(legs) } : {}),
@@ -904,11 +912,15 @@ export function tripState(
     ((time < arrive + SPOT_TURN && opposite(endFacing(route), movement.facing)) ||
       (time >= leave - SPOT_TURN && opposite(movement.facing, startFacing(returnRoute))));
   const shown = settling ? 'crouch' : turning ? undefined : pose;
+  // What a Riverside guest carries, on their outing's own leg only (OutingSpec.carry).
+  const carry = event.outing ? outingOf(event.outing)?.carry : undefined;
+  const carrying = carry && carry.leg === phase;
   return {
     ...movement,
     ...(turning ? { facing: sideways(movement.facing) } : {}),
     activity: 'stroll',
     event: { id: event.id, name: event.name, phase },
+    ...(carrying ? { carry: { kind: carry.kind, variant: carry.variant(day, home.id) } } : {}),
     ...(phase === 'attending'
       ? {
           ...(shown ? { pose: shown } : {}),
@@ -1067,6 +1079,13 @@ function attendingPose(
     if (time >= event.end) return undefined;
     if (event.id === 'night-party') return 'dance';
     return (event.id === 'rock' ? beat % 3 !== 0 : beat % 4 === 0) ? 'cheer' : 'sway';
+  }
+  // On a snowman build day lunch seats 0 and 1 build and the rest watch (outings/snowmen.ts);
+  // whenever those say nothing, the lunch's own pose.
+  if (event.variant === 'snowmen') {
+    const snowmen =
+      seat < 2 ? snowmenBuilderPose(seat, time, day) : snowmenWatcherPose(seat, time, day);
+    if (snowmen) return snowmen;
   }
   if (event.id === 'books') return beat % 4 === 0 ? 'sip' : 'read';
   if (event.id === 'games' && seat % 2 === 0) return 'play';
