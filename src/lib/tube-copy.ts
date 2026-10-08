@@ -1,4 +1,5 @@
 import {
+  isTubePlot,
   TUBE_MIN_SAVING,
   TUBE_PARCEL_ROUTE,
   TUBE_PLOTS,
@@ -32,10 +33,45 @@ const clock = (minutes: number) => {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 };
 const station = (id: string) => tubeStation(id).name;
-/** The sign's halt to the parcels' far halt, by tube and on foot, door to door (a road walk, so
- * worked out once, on first use). */
-let line: { tube: number; walk: number } | undefined;
-const lineMinutes = () => (line ??= tubeLineMinutes(...TUBE_PARCEL_ROUTE));
+/** Two halts' minutes by tube and on foot, door to door (a road walk, so each pair is worked out
+ * once, on first use). */
+const MINUTES = new Map<string, { tube: number; walk: number }>();
+function minutesBetween(from: string, to: string) {
+  const key = `${from}>${to}`;
+  let minutes = MINUTES.get(key);
+  if (!minutes) MINUTES.set(key, (minutes = tubeLineMinutes(from, to)));
+  return minutes;
+}
+/** The sign's halt to the parcels' far halt: the oldest stretch of the line. */
+const lineMinutes = () => minutesBetween(...TUBE_PARCEL_ROUTE);
+const NUMBERS = [
+  'No',
+  'One',
+  'Two',
+  'Three',
+  'Four',
+  'Five',
+  'Six',
+  'Seven',
+  'Eight',
+  'Nine',
+  'Ten',
+  'Eleven',
+  'Twelve',
+];
+/** "Seven halts round the edge of town, one bore." */
+export const TUBE_LOOP_LINE = `${NUMBERS[TUBE_STATIONS.length] ?? TUBE_STATIONS.length} halts round the edge of town, one bore.`;
+/** Where each halt stands, in a line: the heading of its own block when it is chosen on the map.
+ * Scenery, never counted; the regatta course is the river's own whether a regatta is on or not. */
+export const TUBE_HALT_NOTES: Readonly<Record<string, string>> = {
+  R1: 'The south-west end of the line.',
+  N1: 'On the west edge, on the road to the zoo gate.',
+  C1: 'The halt with the sign and the umbrella stand.',
+  A9: 'The one halt on the north edge.',
+  C15: 'Across the duck street from the Market Square.',
+  L15: 'Its bridge spans the regatta course.',
+  R15: 'The south-east end of the line, down the far bank.',
+};
 
 /** "Eliza is riding to Willow Halt.", "Eliza and Sol are on the line.", "Two neighbors named Jon
  * are on the line." (never "Jon and Jon"), "3 neighbors are on the line."; nothing for nobody. */
@@ -56,13 +92,17 @@ export function onTheLine(now: TubeStatus['now']): string | undefined {
   return `${named[0]} is stepping off at ${station(ride.to)}.`;
 }
 
-/** The line right now: who is on it, how long it takes, and the parcel on the pad or in the glass. */
-function lineBlock(status: TubeStatus): TubeCopyBlock {
-  // The loop's two ends, and the oldest stretch of it, Hedgerow Halt to Willow Halt.
-  const first = TUBE_STATIONS[0],
-    last = TUBE_STATIONS.at(-1)!;
+/** The line right now: who is on it, how long it takes, and the parcel on the pad or in the glass.
+ * The oldest stretch, Hedgerow Halt to Willow Halt, is timed here unless the chosen halt's own
+ * block already times it. */
+function lineBlock(status: TubeStatus, chosen?: string): TubeCopyBlock {
   const [from, to] = TUBE_PARCEL_ROUTE.map(station);
   const { tube, walk } = lineMinutes();
+  const timed =
+    !!chosen &&
+    neighborsOf(chosen).some((other) =>
+      [chosen, other.id].every((id) => (TUBE_PARCEL_ROUTE as readonly string[]).includes(id)),
+    );
   const parcel = status.parcel;
   const note = !parcel
     ? undefined
@@ -76,8 +116,32 @@ function lineBlock(status: TubeStatus): TubeCopyBlock {
   return {
     eyebrow: status.now.length ? 'ON THE LINE NOW' : 'QUIET ON THE LINE',
     heading: onTheLine(status.now) ?? 'Nobody in the glass right now.',
-    body: `Glass runs round the edge of town, from ${first.name} to ${last.name}. ${from} to ${to} takes about ${Math.round(tube)} minutes; on foot it takes about ${Math.round(walk)}.`,
+    body: timed
+      ? TUBE_LOOP_LINE
+      : `${TUBE_LOOP_LINE} ${from} to ${to} takes about ${Math.round(tube)} minutes; on foot it takes about ${Math.round(walk)}.`,
     note,
+  };
+}
+
+/** The halts either side of one along the line (one at either end of it). */
+function neighborsOf(id: string) {
+  const i = TUBE_STATIONS.findIndex((s) => s.id === id);
+  return [TUBE_STATIONS[i - 1], TUBE_STATIONS[i + 1]].filter((s) => !!s);
+}
+/** The halt chosen on the map: where it stands, and its minutes to the halts either side, by glass
+ * and on foot. */
+function haltBlock(id: string): TubeCopyBlock {
+  const here = tubeStation(id);
+  const [a, b] = neighborsOf(id).map((other) => {
+    const { tube, walk } = minutesBetween(id, other.id);
+    return { name: other.name, tube: Math.round(tube), walk: Math.round(walk) };
+  });
+  return {
+    eyebrow: `${here.name.toUpperCase()} · ${here.plot}`,
+    heading: TUBE_HALT_NOTES[id],
+    body: b
+      ? `${a.name} is about ${a.tube} minutes away by glass, ${b.name} about ${b.tube}. On foot they take about ${a.walk} and ${b.walk}.`
+      : `${a.name} is about ${a.tube} minutes away by glass. On foot it takes about ${a.walk}.`,
   };
 }
 
@@ -117,11 +181,13 @@ function ridesBlock(status: TubeStatus): TubeCopyBlock {
   };
 }
 
-/** The panel's words for a given line status (pure: the tests feed it every combination). */
-export function tubeCopy(status: TubeStatus): TubeCopy {
+/** The panel's words for a given line status, and the halt chosen on the map, if one is (pure:
+ * the tests feed it every combination). */
+export function tubeCopy(status: TubeStatus, chosen?: string | null): TubeCopy {
+  const halt = chosen && isTubePlot(chosen) ? chosen : undefined;
   return {
     label: TUBE_LABEL,
-    blocks: [lineBlock(status), ridesBlock(status)],
+    blocks: [...(halt ? [haltBlock(halt)] : []), lineBlock(status, halt), ridesBlock(status)],
     sign: { caption: TUBE_SIGN_CAPTION, text: TUBE_SIGN },
     footer: `Neighbors ride only when it saves at least ${TUBE_MIN_SAVING} minutes; short trips stay on foot. Everyone sees the same rides at the same moment, even after a refresh.`,
   };

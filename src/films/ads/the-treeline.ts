@@ -1,4 +1,12 @@
-import { TUBE_LINE_NAME, TUBE_SIGN_LINES, TUBE_SIGN_STATION, tubeStation } from '../../lib/tubes';
+import {
+  stationTap,
+  TUBE_LINE_NAME,
+  TUBE_PARCEL_ROUTE,
+  TUBE_SIGN_LINES,
+  TUBE_SIGN_STATION,
+  TUBE_STATIONS,
+  tubeStation,
+} from '../../lib/tubes';
 import type { AdModule } from '../types';
 import {
   alpha,
@@ -32,7 +40,9 @@ import {
 import { composeAd } from '../score-kit';
 
 // The Treeline, 20 s: why the brass bucket at Hedgerow Halt holds one plum umbrella. A neighbor
-// meets the sign the hard way, rides the glass behind the trees and steps off at Willow Halt.
+// meets the sign the hard way, rides the glass behind the trees and steps off at Willow Halt. On
+// the ride, the strip at the top maps the whole line: seven halts round the edge of town, the
+// stretch from Hedgerow to Willow lit and named, the rest of the loop waiting either side.
 /** Shot starts: Hedgerow Halt, the ride behind the tree line, Willow Halt. */
 export const CUTS = [0, 0.48, 0.635] as const;
 /** The open umbrella meets the glass stack. */
@@ -55,9 +65,16 @@ export const PAT = 0.722;
 export const SPRING = 0.748;
 
 const LINE = TUBE_LINE_NAME.toUpperCase();
-// The sign's halt, where the umbrella is stowed, and Willow Halt, where the robin's ride ends.
-const HEDGEROW = tubeStation(TUBE_SIGN_STATION).name.toUpperCase();
-const WILLOW = tubeStation('N1').name.toUpperCase();
+// The sign's halt, where the umbrella is stowed, and Willow Halt, where the robin's ride ends:
+// the parcels' own stretch of the line.
+const [FROM, TO] = [TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE[1]];
+const HEDGEROW = tubeStation(FROM).name.toUpperCase();
+const WILLOW = tubeStation(TO).name.toUpperCase();
+/** On the line's strip a stop is its own name, "Halt" left off, as on a line map. */
+export const stopName = (id: string) =>
+  tubeStation(id)
+    .name.replace(/ Halt$/, '')
+    .toUpperCase();
 
 // The Treeline’s own daytime colours (src/city/tubes.ts), at film scale.
 const GLASS = '#B9D8CE',
@@ -525,18 +542,36 @@ function robin(ctx: Ctx, x: number, y: number, facing: number, fluff: number) {
   ctx.restore();
 }
 
+/**
+ * The whole line along a strip, each halt where it sits along the loop, the far bank's end on the
+ * left so the ride runs left to right as the shot does: the stretch from Hedgerow to Willow lit,
+ * its two stops named under them, and the rider's dot between them.
+ */
+const STRIP = { left: 22, right: W - 22, y: 14 };
+const TAPS = TUBE_STATIONS.map((station) => stationTap(station.id));
+const stripX = (id: string) =>
+  lerp(
+    STRIP.left,
+    STRIP.right,
+    (Math.max(...TAPS) - stationTap(id)) / (Math.max(...TAPS) - Math.min(...TAPS)),
+  );
 function route(ctx: Ctx, progress: number) {
-  box(ctx, 8, 6, W - 16, 18, alpha(BAND, 0.75));
-  write(ctx, HEDGEROW, 14, 18.5, { size: 7, color: PAPER, align: 'left' });
-  write(ctx, WILLOW, W - 14, 18.5, { size: 7, color: PAPER, align: 'right' });
-  const a = 78,
-    b = 246;
-  box(ctx, a, 14, b - a, 2, alpha(MINT, 0.85));
-  disc(ctx, a, 15, 2.5, PAPER);
-  disc(ctx, b, 15, 2.5, PAPER);
+  box(ctx, 8, 6, W - 16, 26, alpha(BAND, 0.75));
+  const { y } = STRIP;
+  const a = stripX(FROM),
+    b = stripX(TO);
+  box(ctx, STRIP.left, y - 0.5, STRIP.right - STRIP.left, 1, alpha(MINT, 0.4));
+  box(ctx, a, y - 1, b - a, 2, alpha(MINT, 0.85));
+  for (const station of TUBE_STATIONS) {
+    const ride = station.id === FROM || station.id === TO;
+    disc(ctx, stripX(station.id), y, ride ? 2.5 : 1.5, ride ? PAPER : alpha(MINT, 0.85));
+  }
+  write(ctx, LINE, STRIP.left - 3, y + 13, { size: 7, color: MINT, align: 'left' });
+  write(ctx, stopName(FROM), a, y + 13, { size: 7, color: PAPER });
+  write(ctx, stopName(TO), b, y + 13, { size: 7, color: PAPER });
   const x = lerp(a, b, progress);
-  disc(ctx, x, 15, 3.5, PAPER);
-  disc(ctx, x, 15, 2.5, RIDER.coat);
+  disc(ctx, x, y, 3.5, PAPER);
+  disc(ctx, x, y, 2.5, RIDER.coat);
 }
 
 /** The glass on the ride, close up, and where the rider’s middle is across the shot. */
