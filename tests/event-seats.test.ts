@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { placeSchema, type Place } from '../src/lib/schema';
 import { EVENT_SPOTS, eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
@@ -31,9 +30,10 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { nightBedtime } from '../src/lib/night-routine';
 import { readPlaces } from './full-town';
 import { OUTINGS, outingOf, SEAT_EXCLUDES, type SeatCall } from '../src/lib/outings';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 const real = readPlaces();
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
 type Routine = Place['resident']['routine'];
 const ACTIVITIES = ['stroll', 'work', 'home'] as const;

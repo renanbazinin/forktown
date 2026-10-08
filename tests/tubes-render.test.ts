@@ -1679,8 +1679,9 @@ describe('Marking one halt', () => {
 
 describe('The station plots', () => {
   it('keep their meadow and lose only the stake, the label and the outline', () => {
-    // B1 stands empty for comparison, even once someone lives there.
-    const town = places.filter((place) => place.plot !== 'B1');
+    // B1 stands empty for comparison. The frozen town (tests/district.ts), because every word on
+    // the map is a fillText and a neighbor's sign may read "N1".
+    const town = FROZEN_TOWN.filter((place) => place.plot !== 'B1');
     const paintGround = (showPlots: boolean) => {
       vi.mocked(drawMeadow).mockClear();
       vi.mocked(drawSproutStake).mockClear();
@@ -1821,15 +1822,25 @@ describe('Determinism', () => {
     'draws a real ride: into the stack, through the glass and out again',
     { timeout: 20_000 },
     () => {
-      const ride = tubeRides(places, SUMMER)[0];
+      // The frozen town's first rider (tests/district.ts), so the colour looked for is one we
+      // know, whoever boards first in the real town.
+      const homes = FROZEN_TOWN;
+      const ride = tubeRides(homes, SUMMER)[0];
       const rider = (minutes: number) =>
-        simulateResidents(places, minutes, SUMMER).find((r) => r.id === ride.residentId)!;
-      const outfit = places.find((place) => place.id === ride.residentId)!.resident.outfit;
+        simulateResidents(homes, minutes, SUMMER).find((r) => r.id === ride.residentId)!;
+      const outfit = homes.find((place) => place.id === ride.residentId)!.resident.outfit;
       const moments = [ride.board + 1.7, ride.depart + 0.3, ride.depart + 2.5, ride.off - 1.95];
       for (const minutes of moments) {
         const state = rider(minutes);
         expect(state.transit, `${minutes}`).toBeDefined();
-        const painted = paint(realScene(WHOLE, minutes, SUMMER, { zoom: 3, visible: everywhere }));
+        const painted = paint(
+          realScene(WHOLE, minutes, SUMMER, {
+            zoom: 3,
+            visible: everywhere,
+            residents: simulateResidents(homes, minutes, SUMMER),
+            parcels: () => tubeParcelsAt(homes, minutes, SUMMER),
+          }),
+        );
         const drawn = painted.all.filter(
           (call) => call.name === 'fillRect' && call.fill === outfit,
         );

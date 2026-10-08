@@ -11,6 +11,7 @@ import { townCatAt } from '../src/lib/town-cat';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { tubeRides } from '../src/lib/tube-traffic';
 import { fullTown as variedTown, readPlaces } from './full-town';
+import { bubbleWidth } from './greeting-bubble';
 import { rosterTimeout } from './roster-timeout';
 import { roadNodes, roadPath, WALK_SPEED } from '../src/lib/walking';
 import {
@@ -230,7 +231,7 @@ describe('The town simulation at any size', () => {
     // Bubbles as drawResident draws them at scale 1.25: 10px Space Mono, padded, 20 px tall.
     const bubble = (state: ResidentState) => {
       const at = project(state.position.x, state.position.y);
-      const half = ((state.resident.greeting.length * 6.12 + 12) * 1.25) / 2;
+      const half = bubbleWidth(state.resident.greeting) / 2;
       return { left: at.x - half, right: at.x + half, top: at.y - 57.5 };
     };
     let greetings = 0;

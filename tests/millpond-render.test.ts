@@ -68,11 +68,12 @@ import {
   type PondBoat,
 } from '../src/lib/millpond';
 import { FOOTBALL_CENTER } from '../src/lib/football';
-import { DEFAULT_RESIDENT, placeSchema } from '../src/lib/schema';
+import { DEFAULT_RESIDENT } from '../src/lib/schema';
 import { townSeasonAt } from '../src/lib/seasons';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { getPlot, plotCenter, project, unproject, type Point } from '../src/lib/world';
 import type { ResidentState } from '../src/lib/simulation';
+import { AFTER_HOURS } from './fixtures';
 import { matrixContext, type MatrixPoint } from './matrix-context';
 import { recordingContext, type RecordedCall } from './recording-context';
 
@@ -1056,9 +1057,7 @@ describe('Picking the Millpond on the map', () => {
   });
 
   it('lets a roof in front keep its own clicks', () => {
-    const [first] = placeSchema
-      .array()
-      .parse([JSON.parse(readFileSync('places/after-hours.json', 'utf8'))]);
+    const first = AFTER_HOURS;
     let checked = 0;
     for (const id of ['J3', 'J4', 'J5', 'J6']) {
       const house = { ...first, plot: id, design: { ...first.design, floors: 3 as const } };

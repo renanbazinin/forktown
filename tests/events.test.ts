@@ -1,6 +1,5 @@
 import { POSE_HOLD, residentTrips, SEAT_SETTLE, ZOO_TURN } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import {
   EVENT_SPOTS,
   eventSpot,
@@ -10,7 +9,7 @@ import {
   insideVenue,
   VENUES,
 } from '../src/lib/events';
-import { placeSchema, validatePlaces } from '../src/lib/schema';
+import { validatePlaces } from '../src/lib/schema';
 import {
   residentActivityLabel,
   simulateResidents,
@@ -19,6 +18,7 @@ import {
 import { findPlotAt, getPlot, isRoad, plotEntrance } from '../src/lib/world';
 import { DISTRICT_COPY } from '../src/lib/district-copy';
 import { outingOf } from '../src/lib/outings';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 /** Away from events, a gesture only while still at a spot on their own lot (a seat, the beds). */
 const homePoseOnly = (state: ResidentState) =>
@@ -28,7 +28,7 @@ import { schemaHousePlots } from './house-plots';
 import { readPlaces } from './full-town';
 import { onRoadOrTube, stepBound } from './tube-riders';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const walker = {
   ...sample,
   resident: {

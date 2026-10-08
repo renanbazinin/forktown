@@ -143,7 +143,11 @@ function walkDay(day: number): DayWalk {
     const talking = states.filter((state) => state.greeting);
     const bubble = (state: ResidentState) => {
       const at = project(state.position.x, state.position.y);
-      const half = ((state.resident.greeting.length * 6.12 + 12) * 1.25) / 2;
+      // Sized by simulation.ts's own rule: a wide glyph (emoji, CJK) is 12 px, by code point.
+      let width = 12;
+      for (const char of state.resident.greeting)
+        width += char.codePointAt(0)! < 0x2000 ? 6.12 : 12;
+      const half = (width * 1.25) / 2;
       return { left: at.x - half, right: at.x + half, top: at.y - 57.5 };
     };
     for (let i = 0; i < talking.length; i++) {

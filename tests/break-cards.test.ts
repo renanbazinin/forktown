@@ -18,24 +18,30 @@ import type { Place } from '../src/lib/schema';
 import { cinemaScore } from '../src/music/cinema-score';
 import { renderCinemaPCM } from '../src/music/cinema-render';
 import { readPlaces } from './full-town';
+import { FROZEN_TOWN } from './district';
 import { recordingContext } from './recording-context';
+import { isSignFont, OFF_VOICE, withoutTheirWords, WORDY_HOUSES, writing } from './their-words';
 
 const cards = Object.values(BREAK_CARDS);
 
-/** A handful of real houses: a founder, a neighbor, and the longest name in town. */
-let sampled: Place[] | undefined;
-function sampleHouses(): Place[] {
-  if (sampled) return sampled;
-  const town = readPlaces();
+/** A founder, a neighbor, and the longest name: from a town, the real one by default. */
+function sampleOf(town: readonly Place[]): Place[] {
   const founder = town.find((place) => place.creator === 'forktown');
   const neighbor = town.find((place) => place.creator !== 'forktown');
   const longest = [...town].sort(
     (a, b) => b.name.length - a.name.length || (a.id < b.id ? -1 : 1),
   )[0];
-  return (sampled = [
-    ...new Set([founder, neighbor, longest].filter((place): place is Place => !!place)),
-  ]);
+  return [...new Set([founder, neighbor, longest].filter((place): place is Place => !!place))];
 }
+let sampled: Place[] | undefined;
+const sampleHouses = () => (sampled ??= sampleOf(readPlaces()));
+/**
+ * Every house the voice is checked against: the real town's sample, the same from the frozen town
+ * (tests/district.ts), and houses whose owners wrote "!" and apostrophes everywhere.
+ */
+const voiceHouses = () => [
+  ...new Set([...sampleHouses(), ...sampleOf(FROZEN_TOWN), ...WORDY_HOUSES]),
+];
 const houseData = (place: Place): BreakCardData => ({
   now: Date.UTC(2026, 8, 29, 18, 30),
   house: {
@@ -118,26 +124,21 @@ describe('Break cards', () => {
   });
 
   it.each(cards)('$title speaks in the town’s voice, whatever the house', (card) => {
-    const samples: BreakCardData[] = [{ now: 0 }, ...sampleHouses().map(houseData)];
-    for (const data of samples) {
-      // A neighbor's own words are theirs to punctuate; only our copy is checked.
-      const theirs = data.house
-        ? [
-            data.house.place.name,
-            data.house.place.resident.name,
-            data.house.place.resident.greeting,
-            data.house.place.creator,
-          ]
-        : [];
-      for (let elapsed = 0; elapsed < card.duration; elapsed += 1)
-        for (const call of frame(card, elapsed, data).filter((c) => c.name === 'fillText')) {
-          const ours = theirs.reduce(
-            (text, words) => text.split(words).join(''),
-            String(call.args[0]),
-          );
-          expect(ours, ours).not.toMatch(/!|'|\b(?:repo|commit|branch|SHA|merged)\b/i);
+    const samples: BreakCardData[] = [{ now: 0 }, ...voiceHouses().map(houseData)];
+    let checked = 0;
+    for (const data of samples)
+      for (let elapsed = 0; elapsed < card.duration; elapsed += 1) {
+        const recording = writing(recordingContext(320, 180).ctx);
+        drawBreakCard(recording.ctx, card, elapsed, data);
+        // A neighbor's own words, and their sign, are theirs to punctuate; only our copy is checked.
+        for (const { text, font } of recording.written) {
+          if (isSignFont(font)) continue;
+          const ours = data.house ? withoutTheirWords(text, data.house.place) : text;
+          expect(ours, `${data.house?.place.id}: ${text}`).not.toMatch(OFF_VOICE);
+          checked++;
         }
-    }
+      }
+    expect(checked).toBeGreaterThan(0);
   });
 
   it.each(cards)('$title has a clean, repeatable jingle', (card) => {

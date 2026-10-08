@@ -79,6 +79,7 @@ import {
 import { recordingContext } from './recording-context';
 import { insideEventGround } from './event-ground';
 import { FROZEN_TOWN } from './district';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 // The scarecrow's festival dress is the harvest painter's, and the snowmen's builders and
 // watchers are the snowmen outing's; the hooks only have to call them.
@@ -92,7 +93,7 @@ vi.mock('../src/lib/outings/snowmen', () => ({
   snowmenBuilderFacing: vi.fn(() => 'ne'),
 }));
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const YEAR = Array.from({ length: 112 }, (_, i) => CALENDAR_EPOCH_DAY + i);
 const REGATTA = YEAR.find(regattaDay)!;
 const HARVEST = YEAR.find(harvestDay)!;

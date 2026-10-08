@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   FARM,
@@ -15,6 +14,7 @@ import { getPlot, isRoad, project, STREETLIGHTS } from '../src/lib/world';
 import { placeSchema } from '../src/lib/schema';
 import { cityHit } from '../src/city/render';
 import { readPlaces } from './full-town';
+import { frozenFile } from './fixtures';
 
 const houses = [
   { id: 'alpha', plot: 'A1' },
@@ -145,7 +145,7 @@ describe('Farm land and map integration', () => {
       'T9',
     ]);
     expect(HOUSE_PLOTS.some((p) => FARM_PLOTS.includes(p.id))).toBe(false);
-    const sample = JSON.parse(readFileSync('places/my-little-place.json', 'utf8'));
+    const sample = frozenFile('my-little-place');
     for (const plot of FARM_PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot }).success).toBe(false);
     for (const place of readPlaces()) expect(FARM_PLOTS).not.toContain(place.plot);

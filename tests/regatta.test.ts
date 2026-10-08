@@ -32,6 +32,7 @@ import { DEFAULT_RESIDENT, type Place } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
 import { project, type Point } from '../src/lib/world';
 import { TOWNS, YEAR } from './district';
+import { rowNames, sortedNames } from './markup';
 import { recordingContext } from './recording-context';
 import { rosterTimeout } from './roster-timeout';
 
@@ -343,9 +344,10 @@ describe('The Landing’s panel', () => {
     expect(html).toContain(PANEL_COPY.landing.here);
     const here = atTheWater(simulateResidents(TOWNS.full, 915, day));
     expect(here.length).toBeGreaterThan(0);
-    for (const resident of here) expect(html).toContain(resident.resident.name);
-    const morning = render(day, 600);
-    for (const resident of here) expect(morning).not.toContain(resident.resident.name);
+    // Read from the rows, decoded: a name React escapes, or one that is a word of the panel's own
+    // copy (Bo in "Boats"), is still told apart.
+    expect(sortedNames(rowNames(html))).toEqual(sortedNames(here.map((r) => r.resident.name)));
+    expect(rowNames(render(day, 600))).toEqual([]);
     for (let minutes = 600; minutes < 1100; minutes += 5)
       for (const line of [regattaNow(day, minutes), regattaNow(DAYS.at(-1)!, minutes)]) {
         expect(line).not.toMatch(/!|first|last|winner|won|fastest|place/i);

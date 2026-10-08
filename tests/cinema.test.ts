@@ -2,7 +2,6 @@ import { residentTrips } from '../src/lib/resident-trips';
 import { nightBedtime } from '../src/lib/night-routine';
 import { BORROW_MAX } from '../src/lib/home-life';
 import { describe, expect, it, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
 import {
   CINEMA_ADS,
   CINEMA_FILMS,
@@ -29,8 +28,9 @@ import { eventApproach } from '../src/lib/resident-trips';
 import { cityHit } from '../src/city/render';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
 import { onRoadOrTube } from './tube-riders';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const crowd = HOUSE_PLOTS.slice(0, 32).map((plot, index) => ({
   ...sample,
   id: `moviegoer-${index}`,
