@@ -115,6 +115,7 @@ import GreenNote from '../src/components/district/GreenNote';
 import FarmInfo from '../src/components/FarmInfo';
 import TubeInfo from '../src/components/TubeInfo';
 import { DISTRICT_BUTTONS } from './manual/district';
+import { townDay } from './manual/district-days';
 import type { ComponentProps } from 'react';
 import type { EventPose } from '../src/lib/events';
 import type { Band } from '../src/lib/district-calendar';
@@ -819,6 +820,21 @@ describe('The Riverside’s registries', () => {
     ]);
     for (const buttons of Object.values(DISTRICT_BUTTONS))
       expect(Array.isArray(buttons)).toBe(true);
+  });
+
+  it('jumps to a whole town day and a minute of it, each moment with a label of its own', () => {
+    expect(townDay('Spring', 1)).toBe(CALENDAR_EPOCH_DAY);
+    expect(townCalendarAt(townDay('Summer', 10)).label).toBe('Summer 10, Year 1');
+    expect(townCalendarAt(townDay('Winter', 28, 2)).label).toBe('Winter 28, Year 3');
+    for (const [feature, buttons] of Object.entries(DISTRICT_BUTTONS)) {
+      for (const { label, day, minutes } of buttons) {
+        expect(label.trim(), feature).not.toBe('');
+        expect(Number.isInteger(day), `${feature}: ${label}`).toBe(true);
+        expect(minutes, `${feature}: ${label}`).toBeGreaterThanOrEqual(0);
+        expect(minutes, `${feature}: ${label}`).toBeLessThan(1440);
+      }
+      expect(new Set(buttons.map((button) => button.label)).size, feature).toBe(buttons.length);
+    }
   });
 });
 

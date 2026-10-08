@@ -1,6 +1,6 @@
 # Football at the Meadow Ground
 
-The football ground was added at the 100-plot expansion; the town now has 200 plots. Six new, unoccupied plots — F3, F4, F5, G3, G4, G5 — form one public ground beside the original neighborhood. The pitch has striped grass, white markings, two netted goals, corner flags, sponsor boards, two dugouts with a manager each, floodlight masts, a refreshment cart, a crowd rail, and an elevated scoreboard. Its internal roads, streetlights, trees, and plot outlines are removed; roads around its perimeter remain connected. All six plots are excluded from the builder and shared contribution validation.
+The football ground was added at the 100-plot expansion; the town now has 300 plots. Six new, unoccupied plots — F3, F4, F5, G3, G4, G5 — form one public ground beside the original neighborhood. The pitch has striped grass, white markings, two netted goals, corner flags, sponsor boards, two dugouts with a manager each, floodlight masts, a refreshment cart, a crowd rail, and an elevated scoreboard. Its internal roads, streetlights, trees, and plot outlines are removed; roads around its perimeter remain connected. All six plots are excluded from the builder and shared contribution validation.
 
 ## A match worth stopping for
 
