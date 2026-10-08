@@ -17,7 +17,6 @@ import {
 import {
   builderSnow,
   buildersAt,
-  FIGURE_SCALE,
   GREEN_CENTER,
   SCARVES,
   SNOWMAN_SPOTS,
@@ -33,10 +32,10 @@ import { BRAND } from '../src/lib/brand';
 import { SNOWMAN_DAYS, starNight } from '../src/lib/district-calendar';
 import { BANDSTAND_FURNITURE, DISTRICT_SPOTS } from '../src/lib/district-places';
 import { SNOWMEN_LUNCH } from '../src/lib/district-copy';
-import { EVENT_SPOTS, VENUES } from '../src/lib/events';
+import { EVENT_SPOTS } from '../src/lib/events';
 import { residentTrips, tripState } from '../src/lib/resident-trips';
 import type { ResidentState } from '../src/lib/simulation';
-import { getPlot, project } from '../src/lib/world';
+import { project } from '../src/lib/world';
 import { townSeasonAt } from '../src/lib/seasons';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { SAMPLE, TOWNS, YEAR } from './district';
@@ -208,9 +207,6 @@ describe('The snowmen', () => {
       // Sorted just ahead of its own ground point, so whatever stands in front of it covers it.
       expect(object.depth).toBeCloseTo(GREEN_CENTER.x + spot.x + GREEN_CENTER.y + spot.y - 0.02);
     }
-    // The one behind the lemonade table sorts before the green, whose table stands in front of it.
-    const green = getPlot(VENUES.find((venue) => venue.kind === 'green')!.plot)!;
-    expect(objects[1].depth).toBeLessThan(green.x + green.y + 0.1);
   });
 });
 
@@ -324,9 +320,12 @@ describe('A snowman build day', () => {
         if (minute < 840 || minute >= 945) expect(builders).toEqual([]);
         for (const builder of builders) {
           expect(builder.seat).toBeLessThanOrEqual(1);
-          if (builder.pose === 'crouch') heaps++;
-          else balls++;
+          expect(builder.pose).toBe('crouch');
+          heaps++;
         }
+        // Up on their feet packing snow: the figure's own ball, drawn as snow (residents.ts).
+        if (minute >= 840 && minute < 945)
+          balls += residents.filter((resident) => resident.pose === 'play').length;
         for (const zoom of [1, 2.4]) {
           const calls = paint(SNOWMEN, { ...sceneAt(day, minute, zoom), residents }).calls.length;
           worst = Math.max(worst, calls);
@@ -339,9 +338,14 @@ describe('A snowman build day', () => {
     expect(worst).toBeGreaterThan(30);
   });
 
-  it('covers the play ball with a snowball at every bounce, and heaps the snow by the toes', () => {
+  it('packs a snowball, not the lawn games’ ball, and heaps the snow by the toes', () => {
     const spot = EVENT_SPOTS.green[1];
-    const builder = (pose: 'play' | 'crouch', walkPhase: number, facing: 'sw' | 'ne') =>
+    const builder = (
+      pose: 'play' | 'crouch',
+      walkPhase: number,
+      facing: 'sw' | 'ne',
+      name: string = SNOWMEN_LUNCH.name,
+    ) =>
       ({
         id: 'builder',
         resident: SAMPLE.resident,
@@ -351,51 +355,46 @@ describe('A snowman build day', () => {
         pose,
         moving: false,
         greeting: false,
-        event: { id: 'books', name: SNOWMEN_LUNCH.name, phase: 'attending' },
+        event: { id: 'books', name, phase: 'attending' },
       }) as ResidentState;
     const GOLD = ['#D7AA63', '#F5DFA4'];
-    for (let phase = 0; phase < 1; phase += 0.02)
-      for (const device of [1, 2, 2.4]) {
-        const state = builder('play', phase, 'sw');
-        const [found] = buildersAt([state], 870);
-        const snow = builderSnow(found, device);
-        // The ball as residents.ts draws it, in world px.
-        const recorder = matrixContext(1280, 720);
-        const feet = project(state.position.x, state.position.y);
-        drawResident(recorder.ctx, state.resident, feet.x, feet.y, FIGURE_SCALE, state);
-        const ball = recorder.points.filter(
-          (point) =>
-            point.call === 'fillRect' &&
-            GOLD.includes(String(recorder.calls[point.index].fillStyle)),
-        );
-        expect(ball.length).toBe(8);
-        // A whole device pixel of snow beyond the gold on every side, so none of it shows.
-        for (const point of ball) {
-          expect(point.x).toBeGreaterThanOrEqual(snow.x + 1 / device - 1e-9);
-          expect(point.x).toBeLessThanOrEqual(snow.x + snow.w - 1 / device + 1e-9);
-          expect(point.y).toBeGreaterThanOrEqual(snow.y + 1 / device - 1e-9);
-          expect(point.y).toBeLessThanOrEqual(snow.y + snow.h - 1 / device + 1e-9);
-        }
-        // Painted just after the figure that holds it.
-        expect(snow.depth).toBeGreaterThan(state.position.x + state.position.y);
-        expect(snow.depth - (state.position.x + state.position.y)).toBeLessThan(1e-3);
+    /** The fills of the figure's ball: a 4-px square at x 7, at its bounce, and its 1-px edge. */
+    const ballOf = (state: ResidentState, night = false) => {
+      const { ctx, calls } = recordingContext();
+      drawResident(ctx, state.resident, 0, 0, 1, state, { night });
+      return calls.filter(
+        (call) =>
+          call.name === 'fillRect' &&
+          [7, 9].includes((call.args as number[])[0]) &&
+          (call.args as number[])[1] <= 0 &&
+          ((call.args as number[])[2] === 4 || (call.args as number[])[3] === 1),
+      );
+    };
+    for (let phase = 0; phase < 1; phase += 0.05)
+      for (const night of [false, true]) {
+        const fills = ballOf(builder('play', phase, 'sw'), night).map((call) => call.fillStyle);
+        expect(fills).toEqual([pick(SNOW.top, night), pick(SNOW.shade, night)]);
+        // Any other lunch keeps its gold ball.
+        const games = ballOf(builder('play', phase, 'sw', 'Lawn games club'));
+        expect(games.map((call) => call.fillStyle)).toEqual(GOLD);
       }
     // The heap lies on the lawn just past the toes, the way they face.
     const feet = project(GREEN_CENTER.x + spot.x, GREEN_CENTER.y + spot.y);
     for (const facing of ['sw', 'ne'] as const) {
-      const heap = builderSnow(buildersAt([builder('crouch', 0, facing)], 870)[0], 1);
+      const heap = builderSnow(buildersAt([builder('crouch', 0, facing)], 870)[0]);
       expect(heap.y + heap.h).toBeLessThanOrEqual(feet.y + 1);
       expect(heap.y).toBeGreaterThanOrEqual(feet.y - 4);
       if (facing === 'sw') expect(heap.x + heap.w).toBeLessThanOrEqual(feet.x - 8);
       else expect(heap.x).toBeGreaterThanOrEqual(feet.x + 8);
     }
-    // Nobody else's: a watcher, or a builder on another day's lunch, gets no snow.
-    expect(buildersAt([{ ...builder('play', 0, 'sw'), event: undefined }], 870)).toEqual([]);
+    // Nobody else's: a builder on their feet, a watcher, or a builder at another lunch.
+    expect(buildersAt([builder('play', 0, 'sw')], 870)).toEqual([]);
+    expect(buildersAt([{ ...builder('crouch', 0, 'sw'), event: undefined }], 870)).toEqual([]);
     expect(
       buildersAt(
         [
           {
-            ...builder('play', 0, 'sw'),
+            ...builder('crouch', 0, 'sw'),
             position: { x: GREEN_CENTER.x - 0.55, y: GREEN_CENTER.y + 0.85 },
           },
         ],

@@ -66,7 +66,11 @@ import { drawResident, residentReach } from '../src/city/residents';
 import { drawFarm } from '../src/city/farm';
 import { drawVenue } from '../src/city/venues';
 import { drawScarecrowExtras } from '../src/city/district/harvest';
-import { snowmenBuilderPose, snowmenWatcherPose } from '../src/lib/outings/snowmen';
+import {
+  snowmenBuilderFacing,
+  snowmenBuilderPose,
+  snowmenWatcherPose,
+} from '../src/lib/outings/snowmen';
 import { recordingContext } from './recording-context';
 import { insideEventGround } from './event-ground';
 
@@ -79,6 +83,7 @@ vi.mock('../src/city/district/harvest', async (original) => ({
 vi.mock('../src/lib/outings/snowmen', () => ({
   snowmenBuilderPose: vi.fn(() => 'crouch'),
   snowmenWatcherPose: vi.fn(() => 'cheer'),
+  snowmenBuilderFacing: vi.fn(() => 'ne'),
 }));
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -417,24 +422,36 @@ describe('A Riverside guest on the way', () => {
     const builders = vi.mocked(snowmenBuilderPose),
       watchers = vi.mocked(snowmenWatcherPose);
     const lunchGoer = { ...shopper, resident: { ...shopper.resident, routine: AFTERNOONS } };
-    const posed = (day: number, seat: number) => {
+    const facings = vi.mocked(snowmenBuilderFacing);
+    const visit = (day: number, seat: number) => {
       const lunch = eventsForDay(day)[0];
       const [trip] = planHome(lunchGoer, [{ event: lunch, seat, period: 'afternoon' }]);
-      return tripState(lunchGoer, trip, 870, day).pose;
+      return { trip, state: tripState(lunchGoer, trip, 870, day) };
     };
     const build = YEAR.find(snowmenDay)!;
     builders.mockClear();
     watchers.mockClear();
-    expect(posed(build, 0)).toBe('crouch');
-    expect(builders).toHaveBeenCalledWith(0, 870, build);
-    expect(posed(build, 3)).toBe('cheer');
-    expect(watchers).toHaveBeenCalledWith(3, 870, build);
+    facings.mockClear();
+    const builder = visit(build, 0);
+    expect(builder.state.pose).toBe('crouch');
+    // With the guest's visit and the lunch's own pose at any minute.
+    const [asked] = builders.mock.calls.at(-1)!;
+    expect(asked).toMatchObject({ seat: 0, time: 870, day: build, home: lunchGoer });
+    expect(asked).toMatchObject({ arrive: builder.trip.arrive, leave: builder.trip.leave });
+    expect(['sit', 'sip', 'chat', 'read', 'play']).toContain(asked.lunch(800));
+    // The builders face the way the snowmen's file says.
+    expect(facings).toHaveBeenCalledWith(0, 870, build);
+    expect(builder.state.facing).toBe('ne');
+    expect(visit(build, 3).state.pose).toBe('cheer');
+    expect(watchers.mock.calls.at(-1)![0]).toMatchObject({ seat: 3, time: 870, day: build });
     builders.mockClear();
     watchers.mockClear();
-    posed(build + 1, 0);
-    posed(build + 1, 3);
+    facings.mockClear();
+    visit(build + 1, 0);
+    visit(build + 1, 3);
     expect(builders).not.toHaveBeenCalled();
     expect(watchers).not.toHaveBeenCalled();
+    expect(facings).not.toHaveBeenCalled();
   });
 
   it('says where they are going in the outing’s own words, on foot and on the tube', () => {

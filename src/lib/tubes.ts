@@ -420,6 +420,24 @@ export const TUBE_TREE_GAPS: readonly Point[] = TUBE_STATIONS.map(({ edge, dock 
 /** Whether tile (x, y) is one of the Treeline's tree gaps. */
 export const isTubeTreeGap = (x: number, y: number) =>
   TUBE_TREE_GAPS.some((gap) => gap.x === x && gap.y === y);
+/**
+ * Far-bank edge tiles kept clear so that what stands low on the river shows: no spur passes
+ * through them, but their trees would sort after it and stand in front of it on screen. The tile
+ * one row south of each bank halt's gap, (W − 1, ⌊dock.y⌋ + 1), in front of that halt's pier and,
+ * at Kingfisher Halt, of the regatta lane under its bridge; and (W − 1, 39), in front of the Boat
+ * Landing's stage and its launch (REGATTA_COURSE.stage, y 37.6–39.5; the launch's row, which
+ * tests/edge-loop.test.ts ties to it). In line order, then the Landing.
+ */
+export const RIVERSIDE_TREE_GAPS: readonly Point[] = [
+  ...TUBE_STATIONS.filter(({ edge }) => edge === 'bank').map(({ dock }) => ({
+    x: WORLD_WIDTH - 1,
+    y: Math.floor(dock.y) + 1,
+  })),
+  { x: WORLD_WIDTH - 1, y: 39 },
+];
+/** Whether tile (x, y) is one of the far bank's gaps for the Riverside (RIVERSIDE_TREE_GAPS). */
+export const isRiversideTreeGap = (x: number, y: number) =>
+  RIVERSIDE_TREE_GAPS.some((gap) => gap.x === x && gap.y === y);
 
 const routes = new Map<string, readonly TubePoint[]>();
 const distances = new Map<string, readonly number[]>();

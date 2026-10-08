@@ -27,11 +27,13 @@ const GREEN_PLOT = getPlot(VENUES.find((venue) => venue.kind === 'green')!.plot)
 export const GREEN_CENTER: Point = { x: GREEN_PLOT.x + 0.5, y: GREEN_PLOT.y + 0.5 };
 /**
  * Where snowman k stands, in tiles from the green's centre (SPEC §2.3): on the back lawn, clear
- * of the guests' blankets, the lane at x −1.35 and the stepping stones.
+ * of the guests' blankets, the lane at x −1.35 and the stepping stones. Snowman 1 stands right of
+ * the lemonade table and its bunting pole, so the whole of it shows (the spec's (0.2, −1.1) put
+ * it behind the table, a head over the jug).
  */
 export const SNOWMAN_SPOTS: readonly Point[] = [
   { x: 1.15, y: -0.45 },
-  { x: 0.2, y: -1.1 },
+  { x: 1.0, y: -1.1 },
   { x: 1.4, y: 0.45 },
   { x: -0.6, y: -1.15 },
 ];
@@ -251,7 +253,7 @@ const REACH = { x: 12, above: 24, below: 4 };
 export const TRACK_START: Point = { x: -0.1, y: -0.2 };
 export const TRACK_BENDS: readonly Point[] = [
   { x: 0.55, y: -0.5 },
-  { x: -0.15, y: -0.7 },
+  { x: 0.55, y: -0.75 },
   { x: 1.45, y: -0.45 },
   { x: -0.15, y: -0.75 },
 ];
@@ -294,20 +296,14 @@ export function snowTrack(day: number, minutes: number) {
 
 /** The scale render.ts draws every neighbor at (its RESIDENT_SCALE). */
 export const FIGURE_SCALE = 1.25;
-/**
- * residents.ts's `play` ball, in figure px from the feet and never mirrored: a 4-px square at
- * x 7, bouncing up to 10 px on |sin| of the walk phase. On a build day a builder up on their feet
- * is packing snow, so a snowball is laid over it, a device pixel wider all round so that none of
- * the ball's gold shows at its edges.
- */
-export const PLAY_BALL = { x: 7, y: -3, size: 4, bounce: 10 } as const;
 /** A crouching builder's heap of snow, in figure px from the feet: just past their toes. */
 export const HEAP = { x: 7, y: -2.5, w: 5, h: 2.5 } as const;
 const BUILDERS = EVENT_SPOTS.green.slice(0, 2);
 
 /**
  * The builders at their work on a build day (14:00–15:45): the lunch's seats 0 and 1, at their
- * spots, crouched over the snow or up on their feet packing it.
+ * spots, crouched over the snow. (Up on their feet they pack a snowball: residents.ts draws the
+ * `play` ball as snow at the snowmen lunch.)
  */
 export function buildersAt(residents: readonly ResidentState[], minutes: number) {
   const minute = ((minutes % 1440) + 1440) % 1440;
@@ -316,7 +312,7 @@ export function buildersAt(residents: readonly ResidentState[], minutes: number)
     if (resident.event?.name !== SNOWMEN_LUNCH.name || resident.event.phase !== 'attending')
       return [];
     const pose = resident.pose;
-    if (pose !== 'crouch' && pose !== 'play') return [];
+    if (pose !== 'crouch') return [];
     const seat = BUILDERS.findIndex(
       (spot) =>
         Math.hypot(
@@ -342,36 +338,22 @@ function paintSnow(ctx: Ctx, box: Box, night: boolean, shade: number) {
   ctx.shadowOffsetY = 0;
 }
 
-/** Where a builder's snow lies, in world px: the heap by their knees, or the snowball in hand. */
+/** Where a crouching builder's heap of snow lies, in world px: by their knees, the way they face. */
 export function builderSnow(
   builder: ReturnType<typeof buildersAt>[number],
-  device: number,
 ): Box & { depth: number } {
-  const { resident, ground, pose } = builder;
+  const { resident, ground } = builder;
   const feet = project(ground.x, ground.y);
-  const depth = ground.x + ground.y;
   const s = FIGURE_SCALE;
-  if (pose === 'crouch') {
-    const left = resident.facing === 'sw' || resident.facing === 'nw';
-    const front = resident.facing === 'se' || resident.facing === 'sw';
-    return {
-      x: left ? feet.x - s * (HEAP.x + HEAP.w) : feet.x + s * HEAP.x,
-      y: feet.y + s * HEAP.y,
-      w: s * HEAP.w,
-      h: s * HEAP.h,
-      // In front of the knees: after the figure when they face us, before it when they face away.
-      depth: depth + (front ? 1e-4 : -1e-4),
-    };
-  }
-  const bounce = Math.round(Math.abs(Math.sin(resident.walkPhase * TAU)) * PLAY_BALL.bounce);
-  const edge = 1 / device;
+  const left = resident.facing === 'sw' || resident.facing === 'nw';
+  const front = resident.facing === 'se' || resident.facing === 'sw';
   return {
-    x: feet.x + s * PLAY_BALL.x - edge,
-    y: feet.y + s * (PLAY_BALL.y - bounce) - edge,
-    w: s * PLAY_BALL.size + 2 * edge,
-    h: s * PLAY_BALL.size + 2 * edge,
-    // Just after the figure, whose ball it covers.
-    depth: depth + 1e-4,
+    x: left ? feet.x - s * (HEAP.x + HEAP.w) : feet.x + s * HEAP.x,
+    y: feet.y + s * HEAP.y,
+    w: s * HEAP.w,
+    h: s * HEAP.h,
+    // In front of the knees: after the figure when they face us, before it when they face away.
+    depth: ground.x + ground.y + (front ? 1e-4 : -1e-4),
   };
 }
 
@@ -424,19 +406,18 @@ export const snowmenPainter: DistrictPainter = {
       const scarf = scarfOf(k, day);
       const px = device();
       objects.push({
-        // Just ahead of its own ground point: the green's table and bunting (at its plot's depth)
-        // stand in front of the snowman behind them.
+        // Just ahead of its own ground point: whatever stands in front of a snowman covers it.
         depth: tile.x + tile.y - 0.02,
         paint: () => paintSnowman(ctx, feet.x, feet.y, shape, scarf, night, px, zoom >= FACE_ZOOM),
       });
     }
-    // The builders' snow: a heap at a crouching builder's knees, a snowball in the hands of one up
-    // on their feet packing it. One call each, shaded like the snowmen by a hard shadow.
+    // The builders' snow: a heap at a crouching builder's knees, one call shaded like the
+    // snowmen by a hard shadow.
     for (const builder of buildersAt(scene.residents, minutes)) {
       const feet = project(builder.ground.x, builder.ground.y);
       if (!visible(feet, 16 * FIGURE_SCALE, 16 * FIGURE_SCALE, 4)) continue;
       const px = device();
-      const snow = builderSnow(builder, px);
+      const snow = builderSnow(builder);
       objects.push({ depth: snow.depth, paint: () => paintSnow(ctx, snow, night, px) });
     }
     return objects;

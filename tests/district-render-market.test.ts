@@ -6,7 +6,6 @@
 // cap holds on the busiest morning of every market.
 import { describe, expect, it } from 'vitest';
 import {
-  BUBBLE_LIFT,
   COUNTER_FRONT,
   holderFacing,
   holderTurned,
@@ -16,13 +15,13 @@ import {
   MARKET_STALL_GEOMETRY,
   marketArt,
   marketPainter,
-  paintBubble,
   stallAt,
   stallDepth,
   stallTimes,
   waresKey,
 } from '../src/city/district/market';
 import type { DistrictScene } from '../src/city/district-art';
+import { drawResident } from '../src/city/residents';
 import { SNOW, PUMPKIN } from '../src/city/season-palette';
 import { BRAND } from '../src/lib/brand';
 import { marketKind, type MarketKind } from '../src/lib/district-calendar';
@@ -348,13 +347,57 @@ describe('Market Square’s art', () => {
     );
   });
 
-  it('lifts a chat bubble clear of a standing browser’s head and hat', () => {
-    const recorder = matrixContext(1280, 720);
-    paintBubble(recorder.ctx, { x: 0, y: 0 });
-    const ys = recorder.points.map((p) => p.y);
-    // A standing figure's hair starts 22 px up and a hat's crown 25, in its own px at 1.25.
-    expect(Math.max(...ys)).toBeLessThanOrEqual(-25 * 1.25);
-    expect(BUBBLE_LIFT).toBe(5);
+  it('stands a chatting browser up, its bubble clear of the head and hat all chat long', () => {
+    // The chat's bubble, and the three dots in it.
+    const BUBBLE = ['#FCFAEF', '#7B8A69'],
+      DOTS = '#7B8A69';
+    const guest = (event: string | undefined, pose?: 'chat' | 'sit', extra = {}) =>
+      ({
+        id: 'guest',
+        resident: town[0].resident,
+        position: { x: 58.3, y: 15.75 },
+        facing: 'ne',
+        walkPhase: 0.2,
+        moving: false,
+        greeting: false,
+        ...(pose ? { pose } : {}),
+        ...(event ? { event: { id: event, name: 'Anything', phase: 'attending' } } : {}),
+        ...extra,
+      }) as ResidentState;
+    /** The figure's calls at the town's 1.25, and where its bubble's fills land. */
+    const drawn = (state: ResidentState) => {
+      const recorder = matrixContext(1280, 720);
+      drawResident(recorder.ctx, state.resident, 0, 0, 1.25, state);
+      const inBubble = (call: (typeof recorder.calls)[number]) =>
+        call.name === 'fillRect' && BUBBLE.includes(String(call.fillStyle));
+      const bubble = recorder.points.filter((point) => inBubble(recorder.calls[point.index]));
+      const dots = bubble.filter((point) => recorder.calls[point.index].fillStyle === DOTS);
+      const body = recorder.calls
+        .filter((call) => !inBubble(call))
+        .map((call) => [call.name, call.args, call.name === 'restore' ? '' : call.fillStyle]);
+      return { bubble, dots, body };
+    };
+    for (let walkPhase = 0; walkPhase < 1; walkPhase += 0.1) {
+      // On their feet, as a browser who is not chatting, under a bubble the whole chat long.
+      const chat = drawn(guest('market', 'chat', { walkPhase }));
+      expect(chat.body).toEqual(drawn(guest('market', undefined, { walkPhase })).body);
+      expect(chat.bubble.length).toBeGreaterThan(0);
+      // A standing figure's hair starts 22 px up and a hat's crown 25, in its own px at 1.25.
+      expect(Math.max(...chat.bubble.map((p) => p.y))).toBeLessThanOrEqual(-25 * 1.25);
+    }
+    // A greeting or a heart takes its place: its own bubble, without the chat's three dots.
+    expect(drawn(guest('market', 'chat')).dots).toHaveLength(3 * 4);
+    expect(drawn(guest('market', 'chat', { greeting: true })).dots).toEqual([]);
+    expect(drawn(guest('market', 'chat', { duckLove: true })).dots).toEqual([]);
+    // Everyone else still sits to chat, the bubble over a seated head now and then: at home, on
+    // the green, at the fair on a straw seat, on a rug and in a deckchair.
+    for (const event of [undefined, 'picnic', 'harvest-fair', 'stargazing', 'bandstand-sundown'])
+      for (const walkPhase of [0.2, 0.6]) {
+        const chat = drawn(guest(event, 'chat', { walkPhase }));
+        expect(chat.body, `${event}`).toEqual(drawn(guest(event, 'sit', { walkPhase })).body);
+        if (walkPhase < 0.4) expect(Math.max(...chat.bubble.map((p) => p.y))).toBe(-19 * 1.25);
+        else expect(chat.bubble).toEqual([]);
+      }
   });
 
   it('turns a stallholder a quarter to the stock now and then, never while a browser chats', () => {

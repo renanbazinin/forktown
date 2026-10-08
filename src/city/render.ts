@@ -50,7 +50,7 @@ import {
   tubeCrowdOffsets,
   tubeMarkArea,
 } from './tubes';
-import { isTubePlot, isTubeTreeGap } from '../lib/tubes';
+import { isRiversideTreeGap, isTubePlot, isTubeTreeGap } from '../lib/tubes';
 import { isDistrictPlot } from '../lib/district-places';
 import { DISTRICT_PAINTERS, type DistrictPainter, type DistrictScene } from './district-art';
 import { residentTrips, type ResidentTrip } from '../lib/resident-trips';
@@ -267,33 +267,36 @@ const planDayAt = (minutes: number, day: number) =>
 /** The Riverside's painters (district-art.ts), in the registry's order. */
 const PAINTERS: readonly DistrictPainter[] = Object.values(DISTRICT_PAINTERS);
 /**
- * Where the edge tile (x, y) grows its tree, in world px, if it grows one: the west and north
- * edges, the two front rows and the far bank below the river's head, two tiles in three by hash,
- * swayed up to 7 px either way, and never where a Treeline spur crosses the edge
- * (TUBE_TREE_GAPS).
+ * The tree the edge tile (x, y) grows, if it grows one: the west and north edges, the two front
+ * rows and the far bank below the river's head, two tiles in three by hash. Its foot in world px,
+ * swayed up to 7 px either way, its depth, its size and its look (drawTownTree's variant). Never
+ * where a Treeline spur crosses the edge (TUBE_TREE_GAPS), nor in front of a bank pier or the
+ * Boat Landing's stage (RIVERSIDE_TREE_GAPS).
  */
-export function edgeTreeAt(x: number, y: number): Point | undefined {
+export function edgeTree(x: number, y: number) {
   const seed = hash(`tree${x},${y}`);
   if (
     !(x === 0 || y === 0 || y >= WORLD_HEIGHT - 2 || (x === WORLD_WIDTH - 1 && y >= 9)) ||
     seed % 3 === 0 ||
-    isTubeTreeGap(x, y)
+    isTubeTreeGap(x, y) ||
+    isRiversideTreeGap(x, y)
   )
     return undefined;
   const point = project(x + 0.5, y + 0.5);
-  return { x: point.x + (seed % 15) - 7, y: point.y };
+  return {
+    point: { x: point.x + (seed % 15) - 7, y: point.y },
+    depth: x + y,
+    scale: 1 + (seed % 5) * 0.12,
+    seed,
+  };
 }
+/** Where the edge tile (x, y) grows its tree, in world px, if it grows one (edgeTree). */
+export const edgeTreeAt = (x: number, y: number): Point | undefined => edgeTree(x, y)?.point;
 const trees = terrain.flatMap(({ x, y, point }) => {
   const seed = hash(`tree${x},${y}`);
   const result: { point: Point; depth: number; scale: number; seed: number }[] = [];
-  const edge = edgeTreeAt(x, y);
-  if (edge)
-    result.push({
-      point: edge,
-      depth: x + y,
-      scale: 1 + (seed % 5) * 0.12,
-      seed,
-    });
+  const edge = edgeTree(x, y);
+  if (edge) result.push(edge);
   if (
     x < ROAD_MAX_X &&
     y < ROAD_MAX_Y &&

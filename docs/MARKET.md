@@ -56,7 +56,7 @@ Up to twelve browsers stand at the twelve spots, two to a stall (SPEC §2.3). Th
 - Nothing starts in their first minute at the spot or runs into their last, so they always arrive and set off facing their stall, and every look is held for a minute at least.
 - Someone who comes before their own hour opens browses their own stall until it does, and glances only after, as an early guest anywhere in town faces the show.
 
-`chat` is a seated pose in the figure (folded legs), so a browser never takes it. The market painter draws the residents' own chat bubble over them instead, from the same beat, while they keep standing. The figure's own bubble sits over a seated chatter, whose head is 5 px lower than a standing one's, so the market's is lifted by that much (`BUBBLE_LIFT`): its tail ends on the crown of a hat and clears a bare head. It skips a browser who is greeting someone.
+A chatting browser takes the `chat` pose and keeps standing: the market is the one outing whose guests chat on their feet (`src/city/residents.ts`), while everyone else still sits to chat. The bubble stays up for the whole two minutes, 5 px higher than a seated chatter's, since a standing head is 5 px higher: its tail ends on the crown of a hat and clears a bare head. A greeting or a duck heart takes its place. The market is not a seated outing, so no crouch leads into the chat.
 
 ## The paper bag
 
@@ -68,15 +68,15 @@ On the way home every browser carries a brown paper bag in the crook of the near
 
 ## Where it lives
 
-| File                                     | What                                                                                                                                   |
-| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/lib/outings/market.ts`              | `marketBeat`, `marketFacing`, `marketPose` (none) and `marketChat`                                                                     |
-| `src/city/district/market.ts`            | The paving and shadows (ground), the outline (floor), the stalls, cart, pump, tubs, board and chat bubbles (objects), and clicks (hit) |
-| `src/city/carry/paper-bag.ts`            | The bag                                                                                                                                |
-| `src/components/district/MarketInfo.tsx` | The panel                                                                                                                              |
-| `tests/manual/district-market.ts`        | The harness's market moments                                                                                                           |
-| `tests/market.test.ts`                   | The browsers' rhythm, the bag and the panel                                                                                            |
-| `tests/district-render-market.test.ts`   | The art: its cache, the clock, heights, wares, snow, night, depth, clicks, amber and the call cap                                      |
+| File                                     | What                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `src/lib/outings/market.ts`              | `marketBeat`, `marketFacing`, `marketPose` (`chat` on a chat beat, else none) and `marketChat`                           |
+| `src/city/district/market.ts`            | The paving and shadows (ground), the outline (floor), the stalls, cart, pump, tubs and board (objects), and clicks (hit) |
+| `src/city/carry/paper-bag.ts`            | The bag                                                                                                                  |
+| `src/components/district/MarketInfo.tsx` | The panel                                                                                                                |
+| `tests/manual/district-market.ts`        | The harness's market moments                                                                                             |
+| `tests/market.test.ts`                   | The browsers' rhythm, the bag and the panel                                                                              |
+| `tests/district-render-market.test.ts`   | The art: its cache, the clock, heights, wares, snow, night, depth, clicks, amber and the call cap                        |
 
 **Cached art.** Everything that depends only on the market, the season's day and the night (`marketArt(day, groundDay, night)`, keyed `kind:groundDay:night`) is worked out once and kept: the colours, each stall's display, the stallholders and the snow. The paving and the shadows of the counters, the cart, the pump and the tubs are in the town's cached ground layer, which reads only the night and the season's whole day. A frame only places the art and runs the clock.
 

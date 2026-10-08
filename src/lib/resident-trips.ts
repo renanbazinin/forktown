@@ -31,10 +31,12 @@ import {
 import {
   outingOf,
   SEAT_EXCLUDES,
+  snowmenBuilderFacing,
   snowmenBuilderPose,
   snowmenWatcherPose,
   type PoseContext,
   type SeatCall,
+  type SnowmenContext,
 } from './outings';
 import { MILLPOND_VENUE, SKATING, millpondRoute, millpondSkatingDay, skateGlide } from './millpond';
 import {
@@ -1040,11 +1042,16 @@ export function tripState(
   const lanes = phase === 'going' || phase === 'returning' ? tripLanes(trip, home.id) : undefined;
   const zoo =
     event.venue.kind === 'zoo' && phase === 'attending' && zooGlance(home.id, arrive, time, leave);
-  // Where a Riverside guest looks while it is on (the market's stalls), else their spot's way.
+  // Where a Riverside guest looks while it is on (the market's stalls), and where a snowman's
+  // builders look while they build (its own side of the lunch), else their spot's way.
   const looking =
-    spec?.facing && phase === 'attending'
-      ? spec.facing({ home, trip, time, day, seat, arrive, leave })
-      : undefined;
+    phase !== 'attending'
+      ? undefined
+      : spec?.facing
+        ? spec.facing({ home, trip, time, day, seat, arrive, leave })
+        : event.variant === 'snowmen'
+          ? snowmenBuilderFacing(seat, time, day)
+          : undefined;
   const movement =
     phase === 'going'
       ? legs
@@ -1256,13 +1263,6 @@ function attendingPose(
     const context: PoseContext = { home, trip, time, day, seat, arrive, leave };
     return spec.pose(context);
   }
-  const from = Math.max(arrive, event.start) + SEAT_SETTLE,
-    to = (event.venue.kind === 'stage' ? Math.min(leave, event.end) : leave) - SEAT_SETTLE;
-  const held =
-    to - from >= 2 * POSE_HOLD
-      ? Math.min(Math.max(time, from + POSE_HOLD), to - POSE_HOLD)
-      : (from + to) / 2;
-  const beat = Math.floor((held + (hash(home.id) % 19)) / 12);
   if (event.venue.kind === 'football')
     return supporterCheers(time, day, seat) ? 'cheer' : undefined;
   if (event.venue.kind === 'zoo') return zoo && zoo.cheer ? 'cheer' : undefined;
@@ -1271,15 +1271,46 @@ function attendingPose(
     // The band has gone: the last of the crowd stand quietly until they leave, with no more notes.
     if (time >= event.end) return undefined;
     if (event.id === 'night-party') return 'dance';
+    const beat = poseBeat(home, trip, time);
     return (event.id === 'rock' ? beat % 3 !== 0 : beat % 4 === 0) ? 'cheer' : 'sway';
   }
-  // On a snowman build day lunch seats 0 and 1 build and the rest watch (outings/snowmen.ts);
-  // whenever those say nothing, the lunch's own pose.
+  // On a snowman build day lunch seats 0 and 1 build and the rest watch (outings/snowmen.ts).
+  // Either side of it the lunch keeps its own poses, handed over so each is held a minute.
   if (event.variant === 'snowmen') {
-    const snowmen =
-      seat < 2 ? snowmenBuilderPose(seat, time, day) : snowmenWatcherPose(seat, time, day);
+    const context: SnowmenContext = {
+      home,
+      trip,
+      time,
+      day,
+      seat,
+      arrive,
+      leave,
+      lunch: (at) => lunchPose(home, trip, at),
+    };
+    const snowmen = seat < 2 ? snowmenBuilderPose(context) : snowmenWatcherPose(context);
     if (snowmen) return snowmen;
   }
+  return lunchPose(home, trip, time);
+}
+/**
+ * The beat a guest's pose is on at `time`: every 12 minutes, each guest on beats of their own,
+ * the first and the last held POSE_HOLD at least, from settling at the spot to the crouch to get
+ * up (or the band going).
+ */
+function poseBeat(home: Place, trip: ResidentTrip, time: number) {
+  const { event, arrive, leave } = trip;
+  const from = Math.max(arrive, event.start) + SEAT_SETTLE,
+    to = (event.venue.kind === 'stage' ? Math.min(leave, event.end) : leave) - SEAT_SETTLE;
+  const held =
+    to - from >= 2 * POSE_HOLD
+      ? Math.min(Math.max(time, from + POSE_HOLD), to - POSE_HOLD)
+      : (from + to) / 2;
+  return Math.floor((held + (hash(home.id) % 19)) / 12);
+}
+/** A lunch guest's own pose on the green at `time`, by the lunch and their seat. */
+function lunchPose(home: Place, trip: ResidentTrip, time: number): EventPose {
+  const { event, seat } = trip;
+  const beat = poseBeat(home, trip, time);
   if (event.id === 'books') return beat % 4 === 0 ? 'sip' : 'read';
   if (event.id === 'games' && seat % 2 === 0) return 'play';
   return (['sit', 'sip', 'chat', 'sit'] as const)[(beat + seat) % 4];

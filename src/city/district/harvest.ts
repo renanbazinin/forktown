@@ -1,5 +1,5 @@
 // The Harvest Fair and the Long Table (agent D, SPEC §4.3): the trodden-stubble patch over bed 1
-// (ground, keyed by groundDay), the props of HARVEST_PROPS, the table, the dishes, the four table
+// (ground, keyed by groundDay, from the last of the grain to spring), the props of HARVEST_PROPS, the table, the dishes, the four table
 // lamps and the fiddler; and the scarecrow's ribboned hat. Render cap: 1,200 calls (SPEC §6.6).
 // No Math.random, Date.now or performance.now: everything runs on the town clock.
 //
@@ -25,7 +25,8 @@ import { outingOf } from '../../lib/outings';
 import type { ResidentTrip } from '../../lib/resident-trips';
 import { DEFAULT_RESIDENT, type Resident } from '../../lib/schema';
 import type { ResidentState } from '../../lib/simulation';
-import { AUTUMN } from '../../lib/seasons';
+import { FARM_GROUND } from '../../lib/farm';
+import { AUTUMN, snowAt, WINTER } from '../../lib/seasons';
 import { facingToward } from '../../lib/walking';
 import { getPlot, hash, project, type Point } from '../../lib/world';
 import { drawDish, paintPixels } from '../carry/dish';
@@ -39,7 +40,7 @@ import { drawGlow, LIGHT } from '../glow';
 import { MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from '../lamplight';
 import { tint } from '../houses';
 import { drawResident, NIGHT_DIM } from '../residents';
-import { pick, PUMPKIN, type Pair } from '../season-palette';
+import { mixHex, pick, PUMPKIN, SNOW, type Pair } from '../season-palette';
 
 type Ctx = CanvasRenderingContext2D;
 type Facing = ResidentState['facing'];
@@ -558,10 +559,25 @@ const pixels = (
 // ---------------------------------------------------------------------------------------------
 // The ground: bed 1's greens are picked for the fair, and the bed is trodden stubble.
 
-/** Bed 1 of the farm (leafy greens all year), and the patch laid over it on fair days. */
+/** Bed 1 of the farm (leafy greens all year), and the patch laid over it once it is picked. */
 export const STUBBLE_PATCH = { left: 18.2, right: 21.5, top: 74.3, bottom: 81.0 } as const;
+/**
+ * The ground days bed 1 lies as stubble: from the day the farm cuts the last of its grain (row by
+ * row over Autumn 15–22, farm.ts `grain`), as its greens are picked for the fair, until the year
+ * is out, as the grain's own stubble stands through the winter. Nothing grows there again until
+ * spring, when the farm sows its beds afresh.
+ */
+export const STUBBLE_FROM = AUTUMN + 21;
+export const isStubbleGroundDay = (groundDay: number) => groundDay >= STUBBLE_FROM;
+/** The fair's three days, Autumn 23–25: the loose straw lies from the first to the autumn's end. */
 const FAIR_DAYS = [AUTUMN + 22, AUTUMN + 23, AUTUMN + 24];
 export const isFairGroundDay = (groundDay: number) => FAIR_DAYS.includes(groundDay);
+const strawLies = (groundDay: number) => groundDay >= FAIR_DAYS[0] && groundDay < WINTER;
+/** The bed's four strips of soil, as the farm lays them (its tops from FARM_GROUND.top). */
+const BED_ROWS = [0.35, 2.1, 3.9, 5.9].map((top) => FARM_GROUND.top + top);
+/** Whether the snow lies in a furrow of bed 1, on the farm's own schedule for that row. */
+const snowyFurrow = (groundDay: number, top: number, line: number) =>
+  snowAt(groundDay, (hash(`row:1:${top}:${line}`) % 1000) / 1000) > 0.5;
 const PATCH_MID = project(
   (STUBBLE_PATCH.left + STUBBLE_PATCH.right) / 2,
   (STUBBLE_PATCH.top + STUBBLE_PATCH.bottom) / 2,
@@ -570,19 +586,23 @@ function tile(ctx: Ctx, x0: number, y0: number, x1: number, y1: number, color: s
   poly(ctx, [project(x0, y0), project(x1, y0), project(x1, y1), project(x0, y1)], color);
 }
 function drawStubble(ctx: Ctx, { night, groundDay, visible }: DistrictGroundScene) {
-  if (!isFairGroundDay(groundDay) || !visible(PATCH_MID, 200, 110, 110)) return;
+  if (!isStubbleGroundDay(groundDay) || !visible(PATCH_MID, 200, 110, 110)) return;
   const { left, right, top, bottom } = STUBBLE_PATCH;
-  tile(ctx, left, top, right, bottom, pick(P.field, night));
+  // The farm's frost while the snow lies, the same over the patch as over the field round it.
+  const frost = snowAt(groundDay) > 0.5;
+  const frosted = (pair: Pair, amount: number) =>
+    frost ? mixHex(pick(pair, night), pick(SNOW.frost, night), amount) : pick(pair, night);
+  tile(ctx, left, top, right, bottom, frosted(P.field, 0.3));
   // The footpaths run on through it, as the farm lays them.
   for (const y of [75.5, 79.5]) tile(ctx, left, y - 0.35, right, y + 0.35, pick(P.path, night));
   // The bed's rows, flattened by the fair, with the picked stalks left in them.
-  const rows = [74.35, 76.1, 77.9, 79.9];
-  for (const row of rows) {
+  for (const row of BED_ROWS) {
     const h = row > 79.5 ? 0.7 : 1.05;
-    tile(ctx, 18.3, row, 21.4, row + h, pick(P.soil, night));
+    tile(ctx, 18.3, row, 21.4, row + h, frosted(P.soil, 0.15));
     for (let line = 0; line < 2; line++) {
       const y = row + line * 0.36 + 0.13;
-      tile(ctx, 18.42, y, 21.28, y + 0.08, pick(P.furrow, night));
+      const furrow = snowyFurrow(groundDay, row, line) ? SNOW.shade : P.furrow;
+      tile(ctx, 18.42, y, 21.28, y + 0.08, pick(furrow, night));
       for (let plant = 0; plant < 8; plant++) {
         const seed = hash(`stubble:${row}:${line}:${plant}`);
         const p = project(18.54 + plant * 0.36, row + line * 0.36 + 0.2);
@@ -591,7 +611,8 @@ function drawStubble(ctx: Ctx, { night, groundDay, visible }: DistrictGroundScen
       }
     }
   }
-  // Loose straw from the bales, scattered where the fair stood.
+  // Loose straw from the bales, scattered where the fair stood, until the autumn is out.
+  if (!strawLies(groundDay)) return;
   for (let k = 0; k < 18; k++) {
     const seed = hash(`wisp:${k}`);
     const p = project(

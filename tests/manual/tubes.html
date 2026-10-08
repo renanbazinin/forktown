@@ -162,7 +162,9 @@
       A development fixture for the Treeline. It never saves houses or changes the live town clock.
       The real renderer and residents at a pinned town day and minute (Year 3). Deep links:
       <code>?day=42&amp;time=720&amp;view=c1&amp;emphasis=none</code> (day is the year day 0–111;
-      <b>Play</b> and <b>Next ride</b> go round from day 111 to day 0).
+      view is a halt's plot, <code>trunk</code>, <code>opening</code> or <code>whole</code>;
+      <b>Play</b> and <b>Next ride</b> go round from day 111 to day 0). In a halt's view the mark
+      and the panel are that halt's, as if it were chosen on the map.
     </p>
     <p class="problem" id="problem" role="alert" hidden></p>
     <h2>SCENES</h2>
@@ -170,14 +172,8 @@
     <nav aria-label="View">
       <label
         >View
-        <select id="view">
-          <option value="c1">Hedgerow Halt (C1, zoom 3)</option>
-          <option value="n1">Willow Halt (N1, zoom 2.5)</option>
-          <option value="trunk">Trunk (zoom 3)</option>
-          <option value="opening">Opening view</option>
-          <option value="whole">Whole town</option>
-        </select></label
-      >
+        <select id="view"></select
+      ></label>
       <label
         >Emphasis
         <select id="emphasis">
@@ -216,7 +212,7 @@
         { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt },
         { tubeRides, tubeStatus, tubeParcelsAt },
         { tubeCopy },
-        { TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE },
+        { TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE, TUBE_STATIONS, tubeFrame },
       ] = await Promise.all(
         [
           '/src/city/render.ts',
@@ -237,9 +233,18 @@
       const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like scene.html
       const W = 1440,
         H = 900;
-      // The sign's halt and Willow Halt: the views and the scripted rides use the oldest stretch.
+      // The sign's halt and Willow Halt: the scripted rides use the oldest stretch.
       const [FIRST, LAST] = [TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE[1]];
-      const VIEWS = ['c1', 'n1', 'trunk', 'opening', 'whole'];
+      // A view for each of the seven halts, in line order, by its plot (c1, n1, … r15), then the
+      // trunk, the opening view and the whole town. Willow Halt keeps its own closer zoom.
+      const HALT_ZOOM = { N1: 2.5 };
+      const HALT_VIEWS = TUBE_STATIONS.map((station) => ({
+        value: station.id.toLowerCase(),
+        id: station.id,
+        label: `${station.name} (${station.id}, zoom ${HALT_ZOOM[station.id] ?? 3})`,
+      }));
+      const haltOf = (view) => HALT_VIEWS.find((halt) => halt.value === view)?.id;
+      const VIEWS = [...HALT_VIEWS.map((halt) => halt.value), 'trunk', 'opening', 'whole'];
       const EMPHASES = ['none', 'hover', 'selected'];
 
       // The page stays in Year 3: past day 111 it wraps to day 0, so the slider, the status line
@@ -324,6 +329,14 @@
 
       const SCENES = [
         ['Hedgerow Halt at noon', () => set({ day: YEAR + 42, minutes: 720, view: 'c1' })],
+        ...HALT_VIEWS.filter((halt) => halt.id !== FIRST).map((halt) => [
+          `${halt.label.split(' (')[0]} at noon`,
+          () => set({ day: YEAR + 42, minutes: 720, view: halt.value }),
+        ]),
+        [
+          'The regatta under the Kingfisher bridge',
+          () => set({ day: YEAR + 37, minutes: 915, view: 'l15' }),
+        ],
         ['Boarding at C1 · walk in (+0.8)', at(fromFirst, (r) => r.board + 0.8, 'c1')],
         ['Boarding at C1 · crouch (+1.7)', at(fromFirst, (r) => r.board + 1.7, 'c1')],
         ['Boarding at C1 · fwoomp (+1.95)', at(fromFirst, (r) => r.board + 1.95, 'c1')],
@@ -345,6 +358,17 @@
         ['Hovered', () => set({ emphasis: 'hover' })],
       ];
       const $ = (selector) => document.querySelector(selector);
+      for (const [value, label] of [
+        ...HALT_VIEWS.map((halt) => [halt.value, halt.label]),
+        ['trunk', 'Trunk (zoom 3)'],
+        ['opening', 'Opening view'],
+        ['whole', 'Whole town'],
+      ]) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        $('#view').append(option);
+      }
       for (const [label, go] of SCENES) {
         const b = document.createElement('button');
         b.textContent = label;
@@ -369,7 +393,8 @@
       };
       syncControls();
 
-      // Cameras: the app's whole-town and opening framings (City.tsx), and scene.html's close-ups.
+      // Cameras: the app's whole-town and opening framings (City.tsx), and close-ups: a halt's
+      // centred on the app's own frame for it (its stack, its spur and the trunk behind).
       function wholeTown(width, height) {
         const zoom = Math.max(
           0.01,
@@ -422,9 +447,12 @@
         if (state.view === 'whole') return wholeTown(W, H);
         if (state.view === 'opening') return openingView(W, H);
         if (state.view === 'trunk') return closeUp(project(-0.5, 33), 3);
-        if (state.view === 'n1') return closeUp(plotCenter(getPlot(LAST)), 2.5);
-        return closeUp(plotCenter(getPlot(FIRST)), 3);
+        const halt = haltOf(state.view) ?? FIRST;
+        const focus = halt === FIRST || halt === LAST ? plotCenter(getPlot(halt)) : null;
+        return closeUp(focus ?? tubeFrame(halt).center, HALT_ZOOM[halt] ?? 3);
       }
+      /** The halt the mark and the panel are for: the one in view, else Hedgerow Halt. */
+      const markedHalt = () => haltOf(state.view) ?? FIRST;
 
       const canvas = $('#map'),
         ctx = canvas.getContext('2d');
@@ -454,7 +482,7 @@
         return bits.join(' · ');
       }
       function renderPanel(day, minutes) {
-        const copy = tubeCopy(tubeStatus(places, minutes, day));
+        const copy = tubeCopy(tubeStatus(places, minutes, day), haltOf(state.view));
         const key = JSON.stringify(copy);
         if (key === lastPanel) return;
         lastPanel = key;
@@ -506,8 +534,8 @@
             minutes,
             day,
             night: minutes < 360 || minutes >= 1200,
-            selectedPlot: state.emphasis === 'selected' ? FIRST : null,
-            hoveredPlot: state.emphasis === 'hover' ? FIRST : null,
+            selectedPlot: state.emphasis === 'selected' ? markedHalt() : null,
+            hoveredPlot: state.emphasis === 'hover' ? markedHalt() : null,
             showPlots: false,
           });
           $('#status').textContent = describe(day, minutes, residents);

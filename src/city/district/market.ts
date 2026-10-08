@@ -26,12 +26,11 @@
 // places it and runs the clock.
 import { DISTRICT_SPOTS, MARKET_GROUND, MARKET_PLOTS } from '../../lib/district-places';
 import { marketKind, type MarketKind } from '../../lib/district-calendar';
-import { residentGround } from '../../lib/lanes';
-import { marketBeat, stallOfSeat } from '../../lib/outings/market';
+import { stallOfSeat } from '../../lib/outings/market';
 import type { Resident } from '../../lib/schema';
 import { AUTUMN, SPRING, SUMMER, WINTER, snowAt, seedFraction } from '../../lib/seasons';
 import { DAYS_PER_SEASON } from '../../lib/town-calendar';
-import { hash, project, unproject, type Point } from '../../lib/world';
+import { hash, unproject, type Point } from '../../lib/world';
 import type { DepthObject, DistrictPainter, DistrictScene } from '../district-art';
 import { tint } from '../houses';
 import { at, PX, TAU } from '../iso-paint';
@@ -1621,41 +1620,22 @@ const isMarketPlot = (id: string | null) =>
 const plotUnder = (p: Point) =>
   (p.y < (G.top + G.bottom) / 2 ? 'D' : 'E') + (p.x < (G.left + G.right) / 2 ? '14' : '15');
 
-/** Who is chatting this minute and at which stall, from the browsers at the square. */
-function chatsAt(scene: DistrictScene) {
+/** The stalls whose browser is chatting with the stallholder this minute (pose `chat`). */
+function chattingStalls(scene: DistrictScene) {
   const stalls = new Set<number>();
-  const browsers: { pt: Point; depth: number }[] = [];
-  const browsing = scene.residents.filter(
-    (resident) => resident.event?.id === 'market' && resident.event.phase === 'attending',
+  const chatting = scene.residents.filter(
+    (resident) =>
+      resident.event?.id === 'market' &&
+      resident.event.phase === 'attending' &&
+      resident.pose === 'chat',
   );
-  if (!browsing.length) return { stalls, browsers };
+  if (!chatting.length) return stalls;
   const plan = scene.plan();
-  for (const resident of browsing) {
+  for (const resident of chatting) {
     const trip = plan.get(resident.id)?.find((t) => t.event.outing === 'market');
-    if (!trip) continue;
-    const beat = marketBeat(resident.id, trip.seat, trip.arrive, scene.minutes, trip.leave);
-    if (!beat.chat || resident.greeting || resident.duckLove) continue;
-    stalls.add(stallOfSeat(trip.seat));
-    const ground = residentGround(resident);
-    browsers.push({ pt: project(ground.x, ground.y), depth: ground.x + ground.y + 1e-3 });
+    if (trip) stalls.add(stallOfSeat(trip.seat));
   }
-  return { stalls, browsers };
-}
-
-/**
- * How far up, in a figure's own px, a standing browser's chat bubble sits above the residents'
- * own (residents.ts), which is drawn over a seated chatter whose head is 5 px lower. Lifted by
- * that much, its tail ends on a hat's crown (-25) and clears a bare head (-22).
- */
-export const BUBBLE_LIFT = 5;
-/** A chat's bubble over a standing browser, as the figures draw their own (residents.ts). */
-export function paintBubble(ctx: Ctx, pt: Point) {
-  const r = painter(ctx);
-  const s = RESIDENT_SCALE;
-  const y = (v: number) => pt.y + (v - BUBBLE_LIFT) * s;
-  r(pt.x - 7 * s, y(-31), 15 * s, 9 * s, '#FCFAEF');
-  r(pt.x, y(-22), 2 * s, 2 * s, '#FCFAEF');
-  for (const x of [-4, 0, 4]) r(pt.x + x * s, y(-27), 2 * s, 2 * s, '#7B8A69');
+  return stalls;
 }
 
 /** The screen box of a stall, for clicks. */
@@ -1739,7 +1719,7 @@ export const marketPainter: DistrictPainter = {
     const art = marketArt(day, season.groundDay, night);
     const detail = zoom >= 0.6;
     const objects: DepthObject[] = [];
-    const chats = chatsAt(scene);
+    const chats = chattingStalls(scene);
     const moments = MARKET_STALL_GEOMETRY.map((stall) => stallAt(day, minutes, stall.k));
     for (const stall of MARKET_STALL_GEOMETRY) {
       // The box of its corners, and the awning's and the wares' few px past them.
@@ -1747,7 +1727,7 @@ export const marketPainter: DistrictPainter = {
       const middle = { x: (box.left + box.right) / 2, y: box.bottom };
       if (!visible(middle, (box.right - box.left) / 2 + 4, box.bottom - box.top + 4, 4)) continue;
       const m = moments[stall.k];
-      const turned = holderTurned(day, minutes, stall.k, chats.stalls.has(stall.k));
+      const turned = holderTurned(day, minutes, stall.k, chats.has(stall.k));
       objects.push({
         depth: stallDepth(stall),
         paint: () => paintStall(ctx, stall, art, m, night, turned, detail),
@@ -1788,8 +1768,6 @@ export const marketPainter: DistrictPainter = {
         depth: MARKET_BOARD.x + MARKET_BOARD.y,
         paint: () => paintBoard(ctx, art.kind, night),
       });
-    for (const { pt, depth } of chats.browsers)
-      if (visible(pt, 12, 46, 2)) objects.push({ depth, paint: () => paintBubble(ctx, pt) });
     return objects;
   },
   hit(point, scene) {

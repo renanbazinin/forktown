@@ -13,9 +13,11 @@ import {
   GROUND_REACH,
   harvestSpriteStats,
   HARVEST_PAIRS,
+  HARVEST_PALETTE,
   HARVEST_PIECES,
   harvestPainter,
   isFairGroundDay,
+  isStubbleGroundDay,
   LAMP_FADE,
   lampLight,
   LAMPS_OUT,
@@ -28,11 +30,14 @@ import {
   SPRITE_BUDGET,
   SPRITE_IDLE,
   SPRITE_MAX,
+  STUBBLE_FROM,
   STUBBLE_PATCH,
   TABLE_LAMP_LIGHTS,
   TABLE_LAMPS,
 } from '../src/city/district/harvest';
 import type { DistrictGroundScene, DistrictScene } from '../src/city/district-art';
+import { drawFarmGround } from '../src/city/farm';
+import { pick, SNOW } from '../src/city/season-palette';
 import { LIGHT } from '../src/city/glow';
 import { MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from '../src/city/lamplight';
 import { HARVEST_PROPS, SCARECROW_KEEP_OUT } from '../src/lib/district-places';
@@ -317,18 +322,22 @@ describe('The straw seats', () => {
 });
 
 describe('The stubble patch', () => {
-  it('is laid over bed 1 on Autumn 23–25 only, the same whenever it is painted', () => {
+  it('is laid over bed 1 from the last of the grain to spring, the same whenever it is painted', () => {
     expect([...Array(112).keys()].filter(isFairGroundDay)).toEqual([
       AUTUMN + 22,
       AUTUMN + 23,
       AUTUMN + 24,
     ]);
-    for (const day of [dayOf('Autumn', 22), dayOf('Autumn', 26), dayOf('Winter', 23)]) {
+    const days = [...Array(112).keys()].filter(isStubbleGroundDay);
+    expect(days[0]).toBe(STUBBLE_FROM);
+    expect(days).toEqual([...Array(112 - STUBBLE_FROM).keys()].map((d) => STUBBLE_FROM + d));
+    expect(days).toEqual(expect.arrayContaining([AUTUMN + 22, AUTUMN + 23, AUTUMN + 24]));
+    for (const day of [dayOf('Autumn', 21), dayOf('Spring', 1), dayOf('Summer', 20)]) {
       const off = capture();
       harvestPainter.ground!(off.ctx, groundOf(day, false));
       expect(off.calls).toHaveLength(0);
     }
-    for (const day of FAIR)
+    for (const day of [...FAIR, dayOf('Autumn', 22), dayOf('Autumn', 27), dayOf('Winter', 23)])
       for (const night of [false, true]) {
         const [a, b] = [capture(), capture()];
         harvestPainter.ground!(a.ctx, groundOf(day, night));
@@ -336,6 +345,71 @@ describe('The stubble patch', () => {
         expect(a.calls.length).toBeGreaterThan(50);
         expect(a.calls).toEqual(b.calls);
       }
+    // The loose straw lies where the fair stood, from its first day to the autumn's end.
+    const straw = (day: number) => {
+      const { ctx, draws } = capture();
+      harvestPainter.ground!(ctx, groundOf(day, false));
+      return draws.filter((draw) => draw.fill === HARVEST_PALETTE.wisp[0]).length;
+    };
+    expect(straw(dayOf('Autumn', 22))).toBe(0);
+    for (const day of [...FAIR, dayOf('Autumn', 28)]) expect(straw(day)).toBe(18);
+    expect(straw(dayOf('Winter', 1))).toBe(0);
+  });
+
+  it('agrees with the rest of the field: stubble from the last of the grain, frost and snow with it', () => {
+    /** The farm's grain plants cut to stubble on a day: 128 once all of it is in. */
+    const cut = (day: number) => {
+      const { ctx, calls } = recordingContext(1280, 720);
+      drawFarmGround(ctx, false, townSeasonAt(day, 600));
+      return calls.filter((call) => call.name === 'fillRect' && call.fillStyle === '#C6AD6A')
+        .length;
+    };
+    const laid = (day: number) => isStubbleGroundDay(townSeasonAt(day, 600).groundDay);
+    expect(cut(dayOf('Autumn', 21))).toBeLessThan(128);
+    expect(laid(dayOf('Autumn', 21))).toBe(false);
+    expect(cut(dayOf('Autumn', 22))).toBe(128);
+    expect(laid(dayOf('Autumn', 22))).toBe(true);
+    // The grain's stubble stands through the winter, and so does the patch; spring sows afresh.
+    expect(cut(dayOf('Winter', 28))).toBe(128);
+    expect(laid(dayOf('Winter', 28))).toBe(true);
+    expect(cut(dayOf('Spring', 1))).toBe(0);
+    expect(laid(dayOf('Spring', 1))).toBe(false);
+    /** The fills a painter gives bed 1's field and its eight furrows, found where they start. */
+    const fills = (paint: (ctx: CanvasRenderingContext2D) => void) => {
+      const { ctx, calls } = recordingContext(1280, 720);
+      paint(ctx);
+      const startsAt = (p: { x: number; y: number }) =>
+        calls.findIndex(
+          (call) =>
+            call.name === 'moveTo' &&
+            Math.hypot((call.args[0] as number) - p.x, (call.args[1] as number) - p.y) < 0.01,
+        );
+      const fillAfter = (i: number) =>
+        String(calls.slice(i).find((call) => call.name === 'fill')?.fillStyle);
+      const furrows = [74.35, 76.1, 77.9, 79.9].flatMap((row) =>
+        [0, 1].map((line) => fillAfter(startsAt(project(18.42, row + line * 0.36 + 0.13)))),
+      );
+      return { field: fillAfter(0), furrows };
+    };
+    let snowy = 0;
+    for (let date = 1; date <= 28; date++)
+      for (const night of [false, true]) {
+        const day = dayOf('Winter', date);
+        const farm = fills((ctx) => drawFarmGround(ctx, night, townSeasonAt(day, 600)));
+        const patch = fills((ctx) => harvestPainter.ground!(ctx, groundOf(day, night)));
+        const shade = pick(SNOW.shade, night);
+        expect(
+          patch.furrows.map((fill) => fill === shade),
+          `Winter ${date}`,
+        ).toEqual(farm.furrows.map((fill) => fill === shade));
+        snowy += patch.furrows.filter((fill) => fill === shade).length;
+        // Frosted together: the farm's field and the patch's trodden one.
+        const bare = fills((ctx) =>
+          drawFarmGround(ctx, night, townSeasonAt(dayOf('Autumn', 22), 600)),
+        ).field;
+        expect(patch.field !== pick(HARVEST_PALETTE.field, night)).toBe(farm.field !== bare);
+      }
+    expect(snowy).toBeGreaterThan(100);
   });
 
   it('covers every leafy green of bed 1, leaves and all', () => {

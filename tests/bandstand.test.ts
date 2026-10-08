@@ -4,17 +4,20 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { chairOut, playersAt, PLAYERS } from '../src/city/district/bandstand';
+import { BANDSTAND_NOTE, drawResident } from '../src/city/residents';
+import { pick } from '../src/city/season-palette';
 import BandstandInfo, { bandstandNow, listening } from '../src/components/district/BandstandInfo';
 import { bandOf, BANDS, OUTING_TIMES, starNight } from '../src/lib/district-calendar';
 import { BAND_COPY, PANEL_COPY } from '../src/lib/district-copy';
 import { BANDSTAND_FURNITURE } from '../src/lib/district-places';
 import { CHEER_WINDOW, HOLD, SETTLE } from '../src/lib/outings/bandstand';
 import { residentTrips, tripState, type ResidentTrip } from '../src/lib/resident-trips';
-import type { Place } from '../src/lib/schema';
+import { DEFAULT_RESIDENT, type Place } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
 import { BANDSTAND_TRACKS, composeBandstand } from '../src/music/bandstand-tracks';
 import { BEATS, compose, durationOf } from '../src/music/score';
 import { TOWNS, YEAR } from './district';
+import { recordingContext } from './recording-context';
 import { rosterTimeout } from './roster-timeout';
 
 const FRAME = 1 / 30;
@@ -141,6 +144,41 @@ describe('The Bandstand’s scenery', () => {
     expect(playersAt(1205)!.playing).toBe(false);
     expect(playersAt(PLAYERS.gone)).toBeUndefined();
     expect(PLAYERS.gone).toBeLessThanOrEqual(1215);
+  });
+});
+
+describe('The applause', () => {
+  it('raises the stand’s own notes, olive by day and pale at night, never the stage’s gold', () => {
+    /** The fills of a cheering listener over the stretch of its beat that shows a note. */
+    const cheer = (id: string, night: boolean) => {
+      const { ctx, calls } = recordingContext();
+      for (let walkPhase = 0; walkPhase < 0.3; walkPhase += 0.05)
+        drawResident(
+          ctx,
+          DEFAULT_RESIDENT,
+          0,
+          0,
+          1,
+          {
+            moving: false,
+            facing: 'ne',
+            walkPhase,
+            greeting: false,
+            pose: 'cheer',
+            event: { id, name: 'Anything', phase: 'attending' },
+          },
+          { night },
+        );
+      return calls.filter((call) => call.name === 'fillRect').map((call) => call.fillStyle);
+    };
+    for (const id of ['bandstand-tea', 'bandstand-sundown'])
+      for (const night of [false, true]) {
+        const fills = cheer(id, night);
+        expect(fills).toContain(pick(BANDSTAND_NOTE, night));
+        expect(fills).not.toContain('#E0B768');
+      }
+    // The stand's players play in the same colour.
+    expect(BANDSTAND_NOTE).toEqual(['#5F7155', '#C9D2C2']);
   });
 });
 

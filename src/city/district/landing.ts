@@ -7,15 +7,15 @@
 // Nobody teleports and nothing floats unattended.
 // No Math.random, Date.now or performance.now: everything runs on the town clock.
 import {
-  landingRowY,
   OUTING_TIMES,
   REGATTA_BOATS,
   REGATTA_LAUNCH_EVERY,
   REGATTA_NETTING,
   regattaBoat,
+  regattaHandover,
   type RegattaBoat,
 } from '../../lib/district-calendar';
-import { DISTRICT_SPOTS, LANDING_VENUE, REGATTA_COURSE } from '../../lib/district-places';
+import { LANDING_VENUE, REGATTA_COURSE } from '../../lib/district-places';
 import type { ResidentTrip } from '../../lib/resident-trips';
 import type { Place } from '../../lib/schema';
 import { groundFraction, snowAt, SUMMER } from '../../lib/seasons';
@@ -119,16 +119,6 @@ export function regattaGuestsOf(plan: Plan, places: readonly Place[]): (Guest | 
 // The boatwright: from the stage to each boat on the lawn's edge, and back to the water.
 
 const launchAt = (k: number) => OUTING_TIMES.regatta.start + REGATTA_LAUNCH_EVERY * k;
-/**
- * Where guest k sets their boat down as they arrive: at their own feet, a step toward the river
- * on their own row. For the even rows (the front column, at the gravel's edge) that is the frozen
- * handover point, REGATTA_COURSE.handoverX; the odd rows stand 0.55 tiles further in, so their
- * boats rest 0.55 tiles short of it, where their guests are (REQUESTS-C.md: a handover per row).
- */
-export const setDownAt = (k: number): Point => ({
-  x: DISTRICT_SPOTS.landing[k].x + 0.2,
-  y: landingRowY(k),
-});
 /** Where the boatwright sets a boat on the water: the stage's south tip. */
 const LAUNCH_STAND = { x: 62.2, y: 39.36 } as const;
 /** The road's lawn-side edge, clear of both of its walking lanes (x 61.28 and 61.72). */
@@ -138,7 +128,10 @@ const ROAD_EDGE = 61.05;
  * road's lawn-side edge for the front column, and in among the guests for the odd rows, along
  * the row's own approach, which keeps clear of every other guest (SPEC §2.3).
  */
-const pickAt = (k: number): Point => ({ x: setDownAt(k).x + 0.1, y: landingRowY(k) });
+const pickAt = (k: number): Point => {
+  const at = regattaHandover(k);
+  return { x: at.x + 0.1, y: at.y };
+};
 /** The boatwright's way from the stage to boat k: across the road, then in along its row. */
 export const boatwrightWay = (k: number): Point[] => {
   const pick = pickAt(k);
@@ -479,7 +472,7 @@ function ground(ctx: Ctx, scene: DistrictGroundScene) {
       box(ctx, Math.round(p.x), Math.round(p.y), tuft.w, tuft.h, tuft.fill);
     }
     // A gravel edge along the lawn's river side, where the boats are set down.
-    const edge = REGATTA_COURSE.handoverX - 0.13;
+    const edge = REGATTA_COURSE.handoverX[0] - 0.13;
     fill(
       ctx,
       [
@@ -661,11 +654,11 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
   for (const { k, guest, boat } of boats) {
     const where = boatAt(guests, k, minutes);
     if (where === 'ashore') {
-      // At the guest's feet from their arrival until the boatwright takes it up.
-      const at = setDownAt(k);
-      const p = iso(at.x, at.y);
+      // At its row's handover point, by the guest's feet, from their arrival until the
+      // boatwright takes it up (always before its launch, so regattaBoat has it ashore there).
+      const p = iso(boat.x, boat.y);
       if (!visible(p, 8, 10, 3)) continue;
-      out.push({ depth: at.x + at.y, paint: () => drawAshoreBoat(ctx, p, guest.band, night) });
+      out.push({ depth: boat.x + boat.y, paint: () => drawAshoreBoat(ctx, p, guest.band, night) });
       continue;
     }
     // In a hand, the boatwright's, the net or the basket: drawn with whoever holds it.

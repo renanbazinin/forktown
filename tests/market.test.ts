@@ -152,7 +152,7 @@ describe('A browser at their stall', () => {
     expect(chats / beats).toBeLessThan(0.45);
   });
 
-  it('stands throughout: chat is a seated pose, so the painter draws the bubble instead', () => {
+  it('chats on their feet, and only on a chat beat', () => {
     const plan = residentTrips(town, YEAR[8]);
     let checked = 0;
     for (const [id, trips] of plan)
@@ -169,7 +169,10 @@ describe('A browser at their stall', () => {
             arrive: trip.arrive,
             leave: trip.leave,
           };
-          expect(marketPose(context)).toBeUndefined();
+          const chat = marketBeat(id, trip.seat, trip.arrive, t, trip.leave).chat;
+          expect(marketPose(context)).toBe(chat ? 'chat' : undefined);
+          // The market is not a seated outing: no crouch leads into the chat.
+          expect(tripState(home, trip, t, YEAR[8]).pose).toBe(chat ? 'chat' : undefined);
           expect(marketFacing(context)).toBe(
             marketBeat(id, trip.seat, trip.arrive, t, trip.leave, trip.event.start).glance,
           );

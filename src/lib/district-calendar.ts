@@ -167,7 +167,10 @@ export const REGATTA_COURSE = {
   sway: 0.04, // boats keep to x 62.085–62.165
   boomY: 51,
   restGap: 0.14, // the cork boom, and the spacing of boats at rest
-  handoverX: 60.95, // where a guest sets their boat down, on their own row
+  // Where a guest sets their boat down, at their own feet: a step toward the river from their
+  // spot, on their own row. The even rows' (the front column, on the gravel's edge) and the odd
+  // rows' (0.55 tiles further in, among the guests).
+  handoverX: [60.95, 60.4],
 } as const;
 /** The Kingfisher bridge's mid-river pier; 0.215 clear of the course. */
 export const KINGFISHER_PIER = { x: 62.38, y: 47.5 } as const;
@@ -177,6 +180,11 @@ export const REGATTA_LAUNCH_EVERY = 6;
 export const REGATTA_BOATS = 10;
 /** The y of landing row k (its spot, and where its guest sets the boat down). */
 export const landingRowY = (k: number) => 38.15 + 0.31 * k;
+/** Where guest k sets their boat down on arrival: its row's handover point, by their feet. */
+export const regattaHandover = (k: number) => ({
+  x: REGATTA_COURSE.handoverX[k % 2],
+  y: landingRowY(k),
+});
 /** The scenery boatman nets the boats out, one every three minutes, 16:40–17:10. */
 export const REGATTA_NETTING = { from: 1000, every: 3, to: 1030 } as const;
 /** Minutes in one slow sway across the lane. */
@@ -202,8 +210,7 @@ export function regattaBoat(k: number, day: number, minutes: number): RegattaBoa
   const restAt = 930 + k + 0.5 * (hash(`boat:${d}:${k}`) % 2);
   const restY = REGATTA_COURSE.boomY - REGATTA_COURSE.restGap * k;
   if (minutes < OUTING_TIMES.regatta.depart || minutes >= REGATTA_NETTING.to) return undefined;
-  if (minutes < launch)
-    return { x: REGATTA_COURSE.handoverX, y: landingRowY(k), state: 'ashore', restAt };
+  if (minutes < launch) return { ...regattaHandover(k), state: 'ashore', restAt };
   const phase = seedFraction(`boat-sway:${d}:${k}`);
   const x =
     REGATTA_COURSE.laneX +

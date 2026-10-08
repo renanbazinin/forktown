@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { edgeTreeAt } from '../src/city/render';
+import { edgeTree, edgeTreeAt } from '../src/city/render';
+import { drawTownTree } from '../src/city/trees';
+import { drawTubes, type TubeScene } from '../src/city/tubes';
+import { REGATTA_COURSE } from '../src/lib/district-calendar';
+import { townSeasonAt } from '../src/lib/seasons';
 import { MAX_TRAVEL_SPEED_MULTIPLIER } from '../src/lib/walking';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { tubeParcels, tubeRides } from '../src/lib/tube-traffic';
@@ -10,6 +14,7 @@ import {
   TUBE_BOARD_STEPS,
   TUBE_CORNER,
   TUBE_PARCEL_ROUTE,
+  RIVERSIDE_TREE_GAPS,
   TUBE_PARCELS,
   TUBE_SAVING_SHARE,
   TUBE_SIGN_STATION,
@@ -31,8 +36,9 @@ import {
   tubeStation,
   type TubePoint,
 } from '../src/lib/tubes';
-import { unproject, WORLD_WIDTH, type Point } from '../src/lib/world';
+import { hash, project, unproject, WORLD_HEIGHT, WORLD_WIDTH, type Point } from '../src/lib/world';
 import { fullTown, readPlaces } from './full-town';
+import { matrixContext } from './matrix-context';
 
 // The Treeline's loop: seven halts round the west, north and river edges of town, one bore. Every
 // ride between any two halts is continuous, symmetric, honest about its minutes, clear of the
@@ -57,6 +63,52 @@ function offTrunk(p: Point) {
   return Math.min(...options);
 }
 const samePoint = (a: TubePoint, b: TubePoint) => a.x === b.x && a.y === b.y && a.h === b.h;
+
+/** Whether a point lies inside a polygon (even-odd). */
+function inside(p: Point, polygon: readonly Point[]) {
+  let within = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const a = polygon[i],
+      b = polygon[j];
+    if (a.y > p.y !== b.y > p.y && p.x < ((b.x - a.x) * (p.y - a.y)) / (b.y - a.y) + a.x)
+      within = !within;
+  }
+  return within;
+}
+/**
+ * The world-px polygons a drawing fills: its fillRects and its filled paths, with save, restore,
+ * translate and scale followed. Enough for drawTownTree, which uses nothing else.
+ */
+function paintedShapes(draw: (ctx: CanvasRenderingContext2D) => void) {
+  let m = { a: 1, d: 1, e: 0, f: 0 };
+  const stack: (typeof m)[] = [];
+  const shapes: Point[][] = [];
+  let path: Point[][] = [];
+  const at = (x: number, y: number) => ({ x: m.a * x + m.e, y: m.d * y + m.f });
+  const calls: Record<string, (...n: number[]) => void> = {
+    save: () => stack.push({ ...m }),
+    restore: () => (m = stack.pop() ?? m),
+    translate: (x, y) => (m = { ...m, e: m.e + m.a * x, f: m.f + m.d * y }),
+    scale: (x, y) => (m = { ...m, a: m.a * x, d: m.d * y }),
+    beginPath: () => (path = []),
+    moveTo: (x, y) => path.push([at(x, y)]),
+    lineTo: (x, y) => path.at(-1)!.push(at(x, y)),
+    fill: () => shapes.push(...path),
+    fillRect: (x, y, w, h) => shapes.push([at(x, y), at(x + w, y), at(x + w, y + h), at(x, y + h)]),
+  };
+  const ctx = new Proxy(
+    {},
+    {
+      get: (_, key) =>
+        typeof key === 'string' && !['fillStyle', 'globalAlpha'].includes(key)
+          ? (calls[key] ?? (() => undefined))
+          : undefined,
+      set: () => true,
+    },
+  ) as CanvasRenderingContext2D;
+  draw(ctx);
+  return shapes;
+}
 
 describe('The Treeline loop', () => {
   it('keeps its seven halts in line order, the sign at Hedgerow and the parcels on the old stretch', () => {
@@ -168,8 +220,8 @@ describe('The Treeline loop', () => {
       const gap = TUBE_TREE_GAPS[TUBE_STATIONS.indexOf(station)];
       const spur = [...loopSpur(station, 1), ...loopSpur(station, -1)].filter((p) => !onTrunk(p));
       let near = 0;
-      for (let x = gap.x - 2; x <= gap.x + 2; x++)
-        for (let y = gap.y - 2; y <= gap.y + 2; y++) {
+      for (let x = gap.x - 3; x <= gap.x + 3; x++)
+        for (let y = gap.y - 3; y <= gap.y + 3; y++) {
           const drawn = edgeTreeAt(x, y);
           if (!drawn) continue;
           near++;
@@ -179,9 +231,135 @@ describe('The Treeline loop', () => {
             if (d < 0.6) expect.fail(`${station.id}: the tree at ${x},${y} is ${d} from the spur`);
           }
         }
-      // The edge keeps its trees either side.
+      // The edge keeps its trees either side (at Kingfisher Halt, three rows off: the row south
+      // of its gap is one of the Riverside's, RIVERSIDE_TREE_GAPS).
       expect(near, station.id).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps the far bank’s trees from standing in front of its piers, the regatta and the Landing', () => {
+    // A row south of each bank halt's gap, and the launch's row by the Landing's stage.
+    expect(RIVERSIDE_TREE_GAPS).toEqual([
+      { x: 63, y: 12 },
+      { x: 63, y: 48 },
+      { x: 63, y: 72 },
+      { x: 63, y: 39 },
+    ]);
+    expect(RIVERSIDE_TREE_GAPS.at(-1)!.y).toBe(Math.floor(REGATTA_COURSE.launch.y));
+    for (const gap of RIVERSIDE_TREE_GAPS) {
+      expect(edgeTreeAt(gap.x, gap.y)).toBeUndefined();
+      // None is a Treeline gap: TUBE_TREE_GAPS keeps to the spurs' own tiles.
+      expect(TUBE_TREE_GAPS).not.toContainEqual(gap);
+    }
+    // They take three trees away; Bulrush Halt's row south grew none.
+    const grew = (gap: Point) => hash(`tree${gap.x},${gap.y}`) % 3 !== 0;
+    expect(RIVERSIDE_TREE_GAPS.filter(grew)).toEqual([
+      { x: 63, y: 12 },
+      { x: 63, y: 48 },
+      { x: 63, y: 39 },
+    ]);
+
+    const trees: { tile: Point; depth: number; shapes: Point[][] }[] = [];
+    for (let x = 0; x < WORLD_WIDTH; x++)
+      for (let y = 0; y < WORLD_HEIGHT; y++) {
+        const tree = edgeTree(x, y);
+        if (!tree) continue;
+        const { point, scale, seed } = tree;
+        // Its crown in full leaf, as render.ts draws it.
+        const shapes = paintedShapes((ctx) =>
+          drawTownTree(
+            ctx,
+            point.x,
+            point.y,
+            scale,
+            { leaf: '#557A46', leafLight: '#6F9A58' },
+            seed,
+          ),
+        );
+        trees.push({ tile: { x, y }, depth: tree.depth, shapes });
+      }
+    /** The trees that cover a pixel of `area` (a world-px polygon), of those drawn after `depth`. */
+    const covering = (area: Point[], depth: number) => {
+      const xs = area.map((p) => p.x),
+        ys = area.map((p) => p.y);
+      const found = new Set<string>();
+      for (let x = Math.floor(Math.min(...xs)); x < Math.max(...xs); x++)
+        for (let y = Math.floor(Math.min(...ys)); y < Math.max(...ys); y++) {
+          const pixel = { x: x + 0.5, y: y + 0.5 };
+          if (!inside(pixel, area)) continue;
+          for (const tree of trees)
+            if (tree.depth > depth && tree.shapes.some((shape) => inside(pixel, shape)))
+              found.add(`${tree.tile.x},${tree.tile.y}`);
+        }
+      return [...found];
+    };
+    const rectangle = (left: number, top: number, right: number, bottom: number) => [
+      { x: left, y: top },
+      { x: right, y: top },
+      { x: right, y: bottom },
+      { x: left, y: bottom },
+    ];
+
+    // Each bank halt's pier, its column and its stone foot, as the Treeline paints it.
+    const day = CALENDAR_EPOCH_DAY + 30;
+    const scene: TubeScene = {
+      minutes: 720,
+      day,
+      night: false,
+      season: townSeasonAt(day, 720),
+      zoom: 3,
+      emphasis: 'none',
+      station: null,
+      visible: () => true,
+      residents: [],
+      parcels: () => [],
+    };
+    const piers = drawTubes(matrixContext().ctx, scene).filter(
+      (object) => object.part === 'post' && tubeStation(object.station).edge === 'bank',
+    );
+    expect(piers).toHaveLength(3);
+    for (const pier of piers) {
+      const painted = matrixContext();
+      const own = drawTubes(painted.ctx, scene).find(
+        (object) => object.part === 'post' && object.station === pier.station,
+      )!;
+      const start = painted.points.length;
+      own.paint();
+      const points = painted.points.slice(start);
+      const xs = points.map((p) => p.x),
+        ys = points.map((p) => p.y);
+      const column = rectangle(Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys));
+      expect(Math.max(...ys) - Math.min(...ys), pier.station).toBeGreaterThan(20);
+      expect(covering(column, pier.depth), `${pier.station}'s pier`).toEqual([]);
+    }
+
+    // A boat drifting under the Kingfisher bridge: 8 px wide and up to 4 tall over its point.
+    const bridge = tubeStation('L15').dock.y;
+    for (let y = bridge - 0.5; y <= bridge + 0.5; y += 0.05)
+      for (const x of [62.085, REGATTA_COURSE.laneX, 62.165]) {
+        const p = project(x, y);
+        const boat = rectangle(p.x - 4, p.y - 4, p.x + 4, p.y + 1);
+        expect(covering(boat, x + y), `a boat at ${x}, ${y.toFixed(2)}`).toEqual([]);
+      }
+
+    // The stage, from the water to its piles' tops (cached ground, under every tree), and the
+    // boatwright standing at its south tip to set each boat on the water.
+    const { left, right, top, bottom } = REGATTA_COURSE.stage;
+    const lift = (p: Point, h: number) => ({ x: p.x, y: p.y - h });
+    const [north, east, south, west] = [
+      project(left, top),
+      project(right, top),
+      project(right, bottom),
+      project(left, bottom),
+    ];
+    const stage = [lift(north, 5), lift(east, 5), east, south, west, lift(west, 5)];
+    expect(covering(stage, -Infinity), 'the stage').toEqual([]);
+    const launch = project(REGATTA_COURSE.launch.x, REGATTA_COURSE.launch.y);
+    const figure = rectangle(launch.x - 10, launch.y - 40, launch.x + 10, launch.y);
+    expect(
+      covering(figure, REGATTA_COURSE.launch.x + REGATTA_COURSE.launch.y),
+      'the launch',
+    ).toEqual([]);
   });
 
   it(

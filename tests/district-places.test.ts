@@ -76,6 +76,7 @@ import {
   SEAT_ORDER,
   snowmenBuilderPose as builderFromRegistry,
   snowmenWatcherPose as watcherFromRegistry,
+  type SnowmenContext,
   type OutingFacing,
   type OutingPose,
   type SeatCall,
@@ -748,12 +749,9 @@ describe('The Riverside’s registries', () => {
     for (const outing of OUTINGS) expect(outing.facing, outing.id).toBe(facings[outing.id]);
     expect(builderFromRegistry).toBe(snowmenBuilderPose);
     expect(watcherFromRegistry).toBe(snowmenWatcherPose);
-    expectTypeOf(snowmenBuilderPose).toEqualTypeOf<
-      (seat: number, time: number, day: number) => EventPose | undefined
-    >();
-    expectTypeOf(snowmenWatcherPose).toEqualTypeOf<
-      (seat: number, time: number, day: number) => EventPose | undefined
-    >();
+    // The snowmen's two are called with the guest's visit and the lunch's own pose (SnowmenContext).
+    expectTypeOf(snowmenBuilderPose).toEqualTypeOf<(c: SnowmenContext) => EventPose | undefined>();
+    expectTypeOf(snowmenWatcherPose).toEqualTypeOf<(c: SnowmenContext) => EventPose | undefined>();
 
     const painters = {
       market: marketPainter,

@@ -12,8 +12,9 @@
 // arrives and sets off facing their stall. Someone early for their own hour glances only once it
 // has opened.
 //
-// `chat` is a seated pose in the figure (folded legs), so a browser never takes it: they stand,
-// and the market painter draws the chat's bubble over them (src/city/district/market.ts).
+// A browser chats on their feet: the figure draws the market's `chat` standing, its bubble over
+// the standing head for the whole chat (src/city/residents.ts). The market is not a seated
+// outing, so no crouch leads into it.
 import type { OutingFacing, OutingPose, PoseContext } from '../outings.ts';
 import { hash } from '../world.ts';
 import { DISTRICT_SPOTS, type Spot } from '../district-places.ts';
@@ -112,11 +113,11 @@ export function marketBeat(
 const beatOf = ({ home, trip, time }: PoseContext) =>
   marketBeat(home.id, trip.seat, trip.arrive, time, trip.leave, trip.event.start);
 
-/** A browser's pose: none, ever. They stand at their stall (see the header on `chat`). */
-export const marketPose: OutingPose = () => undefined;
+/** A browser's pose: `chat` while they chat with the stallholder, else none (they stand). */
+export const marketPose: OutingPose = (c) => (beatOf(c).chat ? 'chat' : undefined);
 
 /** Where a browser looks: a quarter turn to the next stall while a glance lasts, else their own. */
 export const marketFacing: OutingFacing = (c) => beatOf(c).glance;
 
-/** Whether a browser is chatting with their stallholder; the market painter draws the bubble. */
+/** Whether a browser is chatting with their stallholder (their pose is `chat`). */
 export const marketChat = (c: PoseContext) => beatOf(c).chat;

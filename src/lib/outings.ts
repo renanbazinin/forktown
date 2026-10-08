@@ -32,7 +32,12 @@ import { fairPose, tablePose } from './outings/harvest.ts';
 import { starPose } from './outings/stargazing.ts';
 
 // The snowmen are a lunch on the green, not an outing: the planner calls these on its own.
-export { snowmenBuilderPose, snowmenWatcherPose } from './outings/snowmen.ts';
+export {
+  snowmenBuilderFacing,
+  snowmenBuilderPose,
+  snowmenWatcherPose,
+  type SnowmenContext,
+} from './outings/snowmen.ts';
 
 /** What a guest carries on one leg of an outing: drawn by src/city/carry-items.ts. */
 export type CarryKind = 'paper-bag' | 'paper-boat' | 'dish';

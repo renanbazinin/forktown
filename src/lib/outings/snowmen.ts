@@ -1,10 +1,14 @@
 // Snowmen on the Lunch Green (agent E, SPEC §4.6): on a build day (variant `snowmen`) lunch seats 0
 // and 1 alternate `crouch` and `play` (each held at least a minute) from 14:00 to 15:45; seats 2–5
-// only `sit`, `chat` or `cheer`. The planner's attendingPose calls these on that variant only, and
-// they answer for the whole lunch: everyone sits before the building starts and after it is done.
+// only `sit`, `chat` or `cheer` until the last cheer. The planner's attendingPose calls these on
+// that variant only, with the guest's visit and the lunch's own pose at any minute (`lunch`).
+// Either side of the building the lunch keeps its own poses: the one a guest has a minute before
+// 14:00 holds until the building starts, and the one they will have a minute after it is done
+// starts as it ends, so no pose either side is held under a minute.
 // Import rule (SPEC §7.3): value-import only world, town-calendar, seasons, district-places and
 // district-calendar; never resident-trips, events or anything under src/city/.
 import type { EventPose } from '../events.ts';
+import type { PoseContext } from '../outings.ts';
 import { SNOWMAN_DAYS, SNOWMAN_STAGES, snowmanState } from '../district-calendar.ts';
 import { yearDayAt } from '../seasons.ts';
 import { hash } from '../world.ts';
@@ -40,14 +44,29 @@ export function builderSpells(seat: number, day: number): Spell[] {
   return spells;
 }
 
+/** What the planner hands the snowmen's poses: a lunch guest's visit and moment (PoseContext),
+ *  and the lunch's own pose for them at any minute, which changes on the lunch's own beat. */
+export type SnowmenContext = PoseContext & { lunch(time: number): EventPose | undefined };
+/** Minutes a pose is held at least (the planner's POSE_HOLD). */
+const HOLD = 1;
 /**
- * A builder's pose (lunch seats 0 and 1): building 14:00–15:45, and sat on their blanket the rest
- * of the lunch. Only the seats' own changes, all held a minute or more, so the lunch's beat (which
- * these glances cannot see) never cuts in just before or after the building.
+ * The lunch's own pose either side of a stretch [from, to) that the snowmen take: the pose a
+ * minute before `from` holds on until it, and the pose a minute after `to` starts at it. Each is
+ * a run of the lunch's own that already reached that far, so both are held a minute at least.
  */
-export function snowmenBuilderPose(seat: number, time: number, day: number): EventPose | undefined {
+function lunchAround({ lunch, time }: SnowmenContext, from: number, to: number) {
+  if (time < from) return lunch(time < from - HOLD ? time : from - HOLD);
+  return lunch(time < to + HOLD ? to + HOLD : time);
+}
+
+/**
+ * A builder's pose (lunch seats 0 and 1): building 14:00–15:45, from the crouch and back to it,
+ * and the lunch's own pose either side.
+ */
+export function snowmenBuilderPose(c: SnowmenContext): EventPose | undefined {
+  const { seat, time, day } = c;
   if (seat < 0 || seat > 1) return undefined;
-  if (time < base || time >= dressed) return 'sit';
+  if (time < base || time >= dressed) return lunchAround(c, base, dressed);
   return builderSpells(seat, day).find((spell) => time < spell.to)?.pose;
 }
 
@@ -59,7 +78,7 @@ export function snowmenBuilderPose(seat: number, time: number, day: number): Eve
 type Facing = 'ne' | 'nw' | 'se' | 'sw';
 export const BUILDER_FACING: readonly (readonly [Facing, Facing])[] = [
   ['se', 'se'],
-  ['ne', 'ne'],
+  ['se', 'ne'],
   ['se', 'se'],
   ['ne', 'ne'],
 ];
@@ -74,8 +93,8 @@ const TURN = 0.5;
  * A builder's facing while building (14:00–15:45): turned to the snowman they are making, so the
  * heap at their knees and the snowball in their hands are on its side. A builder whose snowman is
  * behind their blanket turns about by a quarter first, and back the same way, never in one frame.
- * Not called yet: the lunch is not an outing, so its facing needs a hook in the planner
- * (REQUESTS-E.md). Undefined keeps the blanket's own facing.
+ * The planner asks it while a builder attends (tripState); undefined keeps the blanket's own
+ * facing.
  */
 export function snowmenBuilderFacing(seat: number, time: number, day: number) {
   if (seat < 0 || seat > 1 || time < base || time >= dressed) return undefined;
@@ -103,14 +122,16 @@ const WATCH_CHAT = 2.5;
 const CHEER_CLEAR = 1;
 
 /**
- * A watcher's pose (lunch seats 2–5): sat on their blanket all lunch, chatting now and then while
- * the snowman goes up, and on their feet for the two cheers. Calm before 14:00 and after the last
- * cheer, so a guest settling in or getting up to go never changes pose within a minute of it.
+ * A watcher's pose (lunch seats 2–5): sat on their blanket while the snowman goes up, chatting now
+ * and then, and on their feet for the two cheers; the lunch's own pose before 14:00 and after the
+ * last cheer.
  */
-export function snowmenWatcherPose(seat: number, time: number, day: number): EventPose | undefined {
+export function snowmenWatcherPose(c: SnowmenContext): EventPose | undefined {
+  const { seat, time, day } = c;
   const last = WATCHER_CHEERS.at(-1)!;
   if (seat < 2 || seat > 5) return undefined;
-  if (time < base || time >= last.from + last.minutes + ripple(seat)) return 'sit';
+  const done = last.from + last.minutes + ripple(seat);
+  if (time < base || time >= done) return lunchAround(c, base, done);
   const cheers = WATCHER_CHEERS.map(({ from, minutes }) => ({
     from: from + ripple(seat),
     to: from + ripple(seat) + minutes,

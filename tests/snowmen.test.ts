@@ -23,6 +23,7 @@ import {
   snowmenStanding,
   snowmenWatcherPose,
   WATCHER_CHEERS,
+  type SnowmenContext,
 } from '../src/lib/outings/snowmen';
 import { residentTrips, tripState } from '../src/lib/resident-trips';
 import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
@@ -34,6 +35,14 @@ const label = (day: number) => {
   return `${season} ${date}`;
 };
 const dayOf = (name: string) => YEAR.find((day) => label(day) === name)!;
+/** A lunch guest's moment for the snowmen's poses, with the lunch's own pose (`sit` unless given). */
+const at = (
+  seat: number,
+  time: number,
+  day: number,
+  lunch: SnowmenContext['lunch'] = () => 'sit',
+): SnowmenContext =>
+  ({ seat, time, day, arrive: 770, leave: 975, lunch }) as unknown as SnowmenContext;
 /** The runs of one pose in a list of samples. */
 function runs(samples: { time: number; pose: string | undefined }[]) {
   const out: { pose: string | undefined; from: number; to: number }[] = [];
@@ -58,24 +67,32 @@ describe('The builders and the watchers', () => {
           if (i) expect(spell.from).toBe(spells[i - 1].to);
         }
         expect(spells.some((spell) => spell.pose === 'play')).toBe(true);
-        // Sat on the blanket the rest of the lunch.
-        expect(snowmenBuilderPose(seat, SNOWMAN_STAGES.base - 0.01, day)).toBe('sit');
-        expect(snowmenBuilderPose(seat, SNOWMAN_STAGES.dressed, day)).toBe('sit');
         for (let time = SNOWMAN_STAGES.base; time < SNOWMAN_STAGES.dressed; time += 0.25)
-          expect(['crouch', 'play']).toContain(snowmenBuilderPose(seat, time, day));
+          expect(['crouch', 'play']).toContain(snowmenBuilderPose(at(seat, time, day)));
+        // Either side, the lunch's own pose: the one a minute before 14:00 holds on until the
+        // building starts, and the one a minute after 15:45 starts as it ends.
+        const { base, dressed } = SNOWMAN_STAGES;
+        const lunch = (time: number) =>
+          time < base - 0.5 || time >= dressed + 0.5 ? 'sip' : 'read';
+        for (const time of [base - 30, base - 1.01, base - 0.5, base - 0.01])
+          expect(snowmenBuilderPose(at(seat, time, day, lunch))).toBe('sip');
+        for (const time of [dressed, dressed + 0.4, dressed + 1, dressed + 20])
+          expect(snowmenBuilderPose(at(seat, time, day, lunch))).toBe('sip');
       }
     // The two builders keep their own time.
     expect(builderSpells(0, BUILD_DAYS[0])).not.toEqual(builderSpells(1, BUILD_DAYS[0]));
     for (const seat of [2, 3, 4, 5, -1, 6])
-      expect(snowmenBuilderPose(seat, 900, BUILD_DAYS[0])).toBeUndefined();
+      expect(snowmenBuilderPose(at(seat, 900, BUILD_DAYS[0]))).toBeUndefined();
   });
 
   it('watches from seats 2–5: sat, chatting, and up on their feet as the head and the carrot go on', () => {
+    const { base } = SNOWMAN_STAGES;
+    const last = WATCHER_CHEERS.at(-1)!;
     for (const day of BUILD_DAYS)
       for (const seat of [2, 3, 4, 5]) {
         const samples = [];
-        for (let time = 830; time < 960; time += 0.05)
-          samples.push({ time, pose: snowmenWatcherPose(seat, time, day) });
+        for (let time = base; time < 960; time += 0.05)
+          samples.push({ time, pose: snowmenWatcherPose(at(seat, time, day)) });
         for (const { pose } of samples) expect(['sit', 'chat', 'cheer']).toContain(pose);
         const all = runs(samples);
         for (const run of all.slice(0, -1))
@@ -84,16 +101,21 @@ describe('The builders and the watchers', () => {
             `${seat} ${run.pose} at ${run.from}`,
           ).toBeGreaterThanOrEqual(1);
         for (const cheer of WATCHER_CHEERS)
-          expect(snowmenWatcherPose(seat, cheer.from + 0.5, day)).toBe('cheer');
-        expect(snowmenWatcherPose(seat, SNOWMAN_STAGES.base - 0.01, day)).toBe('sit');
-        expect(snowmenWatcherPose(seat, 960, day)).toBe('sit');
+          expect(snowmenWatcherPose(at(seat, cheer.from + 0.5, day))).toBe('cheer');
+        // The lunch's own pose either side, handed over a minute out.
+        const done = last.from + last.minutes + 0.3;
+        const lunch = (time: number) => (time < base - 0.5 || time >= done + 0.5 ? 'play' : 'read');
+        expect(snowmenWatcherPose(at(seat, base - 0.01, day, lunch))).toBe('play');
+        expect(snowmenWatcherPose(at(seat, 960, day, lunch))).toBe('play');
       }
     for (const seat of [0, 1, 6])
-      expect(snowmenWatcherPose(seat, 900, BUILD_DAYS[0])).toBeUndefined();
+      expect(snowmenWatcherPose(at(seat, 900, BUILD_DAYS[0]))).toBeUndefined();
   });
 
   it('gives every lunch guest on a build day poses held a minute at least, in the full town', () => {
-    let builders = 0;
+    let builders = 0,
+      ownPoses = 0;
+    const { base, dressed } = SNOWMAN_STAGES;
     for (const day of BUILD_DAYS) {
       const plans = residentTrips(TOWNS.full, day);
       for (const [id, trips] of plans)
@@ -101,24 +123,66 @@ describe('The builders and the watchers', () => {
           if (trip.event.variant !== 'snowmen') continue;
           const home = TOWNS.full.find((place) => place.id === id)!;
           const samples = [];
-          for (let time = 830; time < trip.leave; time += 0.05) {
+          for (let time = trip.arrive; time < trip.leave; time += 0.05) {
             const state = tripState(home, trip, time, day);
             if (state.event?.phase === 'attending') samples.push({ time, pose: state.pose });
           }
           const all = runs(samples);
+          // Between the crouch on sitting down and the crouch on getting up.
           for (const run of all.slice(1, -1))
             expect(
               run.to - run.from + 0.05,
               `${label(day)} seat ${trip.seat} ${run.pose} at ${run.from.toFixed(2)}`,
             ).toBeGreaterThanOrEqual(1);
           if (trip.seat < 2 && samples.some((s) => s.pose === 'play')) builders++;
+          // The lunch keeps its own poses either side of the building.
+          if (
+            samples.some(
+              (s) =>
+                (s.time < base || s.time >= dressed + 3) &&
+                ['sip', 'read', 'chat', 'play'].includes(s.pose ?? ''),
+            )
+          )
+            ownPoses++;
           // A builder goes from sitting to building and back by way of the crouch.
           if (trip.seat < 2)
             for (let i = 1; i < all.length; i++)
-              if (all[i].pose === 'play') expect(all[i - 1].pose).toBe('crouch');
+              if (all[i].pose === 'play' && all[i].from >= base && all[i].from < dressed)
+                expect(all[i - 1].pose).toBe('crouch');
         }
     }
     expect(builders).toBeGreaterThanOrEqual(BUILD_DAYS.length);
+    expect(ownPoses).toBeGreaterThanOrEqual(BUILD_DAYS.length);
+  });
+
+  it('turns the builders to their snowman while they build, a quarter at a time', () => {
+    const { base, dressed } = SNOWMAN_STAGES;
+    const opposite = { ne: 'sw', sw: 'ne', se: 'nw', nw: 'se' } as const;
+    let builders = 0;
+    for (const day of BUILD_DAYS) {
+      const plans = residentTrips(TOWNS.full, day);
+      for (const [id, trips] of plans)
+        for (const trip of trips) {
+          if (trip.event.variant !== 'snowmen' || trip.seat > 1) continue;
+          builders++;
+          const home = TOWNS.full.find((place) => place.id === id)!;
+          const blanket = EVENT_SPOTS.green[trip.seat].facing;
+          let before: keyof typeof opposite | undefined;
+          for (let time = trip.arrive; time < trip.leave; time += 0.05) {
+            const state = tripState(home, trip, time, day);
+            if (state.event?.phase !== 'attending') continue;
+            const building = time >= base && time < dressed;
+            const settled = time >= trip.arrive + 0.5 && time < trip.leave - 0.5;
+            if (settled)
+              expect(state.facing, `${label(day)} seat ${trip.seat} at ${time.toFixed(2)}`).toBe(
+                building ? snowmenBuilderFacing(trip.seat, time, day) : blanket,
+              );
+            if (before) expect(state.facing).not.toBe(opposite[before]);
+            before = state.facing;
+          }
+        }
+    }
+    expect(builders).toBe(2 * BUILD_DAYS.length);
   });
 });
 

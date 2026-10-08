@@ -29,6 +29,7 @@ import type {
 import { drawGlow } from '../glow';
 import { tint } from '../houses';
 import { MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from '../lamplight';
+import { BANDSTAND_NOTE } from '../residents';
 import { BLOSSOM, FALLEN_LEAVES, pick, SNOW, type Pair } from '../season-palette';
 import { groundTuft } from '../season-ground';
 
@@ -329,7 +330,7 @@ const P = {
   finial: ['#4E7766', '#314D45'],
   lampOff: ['#ECE5CA', '#7C8272'],
   shadow: ['#23341B26', '#0B171533'],
-  note: ['#5F7155', '#C9D2C2'],
+  note: BANDSTAND_NOTE,
   pot: ['#7FA39A', '#4F6A64'],
   potLid: ['#5F8278', '#3E5650'],
 } satisfies Record<string, Pair>;
