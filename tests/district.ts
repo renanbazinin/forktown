@@ -42,6 +42,22 @@ export const madeUpTown = (prefix: string, routineOf: (index: number) => Routine
 export const FROZEN_TOWN: Place[] = (
   JSON.parse(readFileSync('tests/fixtures/town-2026-10.json', 'utf8')) as unknown[]
 ).map((place) => placeSchema.parse(place));
+/**
+ * A neighbor out all day and for a night walk on `plot`, in a frozen copy of my-little-place (the
+ * builder's own example): the newcomer of a fixed scenario, which no roster change can move.
+ */
+export const outAllDay = (plot: string, id = 'a-new-home'): Place => {
+  const sample = FROZEN_TOWN.find((place) => place.id === 'my-little-place')!;
+  return placeSchema.parse({
+    ...sample,
+    id,
+    plot,
+    resident: {
+      ...sample.resident,
+      routine: { morning: 'stroll', afternoon: 'stroll', evening: 'stroll', night: 'stroll' },
+    },
+  });
+};
 /** The published roster as it is (in check:full-town, every house plot taken). */
 export const LIVE_TOWN = readPlaces();
 

@@ -1,7 +1,9 @@
 // Honest exemptions for tube riders in the walking tests: a traveller leaves the road only while
 // on the tube (the glass, or the short walk between a station door and its stack), and then only
 // along the line; nobody in the tube goes faster than the tube.
+import type { ResidentTrip } from '../src/lib/resident-trips';
 import type { ResidentState } from '../src/lib/simulation';
+import type { TubeRide } from '../src/lib/tube-traffic';
 import { TUBE_SPEED, TUBE_STATIONS, tubeInStack, tubeRoute } from '../src/lib/tubes';
 import { isRoad, type Point } from '../src/lib/world';
 
@@ -44,3 +46,21 @@ export const stepBound = (
 /** On the short walk between a station door and its stack (inside the fixed boarding/stepping-off minutes). */
 export const stationWalk = (state: Pick<ResidentState, 'transit'>) =>
   !!state.transit && state.transit.stage !== 'riding' && !tubeInStack(state.transit);
+/**
+ * The trip a ride belongs to among its rider's day: the one at its event's own start, since a
+ * neighbor can go to the same event twice in a day (the football, morning and afternoon). Throws
+ * unless exactly one trip matches.
+ */
+export function rideTrip(trips: readonly ResidentTrip[], ride: TubeRide): ResidentTrip {
+  const named = trips.filter(
+    (trip) => trip.event.id === ride.eventId && trip.event.start === ride.eventStart,
+  );
+  if (named.length !== 1)
+    throw new Error(
+      `${ride.residentId}'s ride to ${ride.eventId} at ${ride.eventStart} names ${named.length} trips.`,
+    );
+  return named[0];
+}
+/** The legs a ride is on: its trip's way there, or its way home. */
+export const rideLegs = (trip: ResidentTrip, ride: Pick<TubeRide, 'direction'>) =>
+  ride.direction === 'there' ? trip.legs : trip.returnLegs;

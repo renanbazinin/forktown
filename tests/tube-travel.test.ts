@@ -1,15 +1,19 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { placeSchema, type Place } from '../src/lib/schema';
-import { HOUSE_PLOTS, eventsForDay } from '../src/lib/events';
+import { EVENT_SPOTS, HOUSE_PLOTS, eventsForDay } from '../src/lib/events';
 import {
   eventRoute,
   eventTubeJourney,
+  footballVisit,
   planResidentTrips,
   residentTrips,
+  skatingVisit,
   tripState,
   type ResidentTrip,
+  type VisitEvent,
 } from '../src/lib/resident-trips';
+import { outingSpots } from '../src/lib/district-places';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { insideCinema } from '../src/lib/cinema';
@@ -24,11 +28,19 @@ import {
   tubeMinSaving,
   tubeStation,
 } from '../src/lib/tubes';
-import { fixedMinutes, legsMinutes, walkingPace } from '../src/lib/tube-journeys';
+import {
+  fixedMinutes,
+  legsMinutes,
+  paceLegs,
+  reverseLegs,
+  walkingPace,
+  type TripLeg,
+} from '../src/lib/tube-journeys';
 import { tubeParcels, tubeParcelsAt, tubeRides, tubeStatus } from '../src/lib/tube-traffic';
+import { FROZEN_TOWN, outAllDay } from './district';
 import { readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
-import { onRoadOrTube, riding, stationWalk, stepBound } from './tube-riders';
+import { onRoadOrTube, rideLegs, rideTrip, riding, stationWalk, stepBound } from './tube-riders';
 import { insideEventGround } from './event-ground';
 
 const places = readPlaces().sort((a, b) => a.plot.localeCompare(b.plot, 'en', { numeric: true }));
@@ -197,11 +209,8 @@ describe('Riding the Treeline over a whole year', () => {
       for (const ride of tubeRides(places, day)) {
         checked++;
         const home = places.find((place) => place.id === ride.residentId)!;
-        const trip = residentTrips(places, day)
-          .get(home.id)!
-          .find((t) => t.event.id === ride.eventId)!;
-        const legs = ride.direction === 'there' ? trip.legs! : trip.returnLegs!;
-        const pace = walkingPace(legs);
+        const trip = rideTrip(residentTrips(places, day).get(home.id)!, ride);
+        const pace = walkingPace(rideLegs(trip, ride)!);
         expect(pace).toBeGreaterThanOrEqual(WALK_SPEED - 1e-9);
         expect(pace).toBeLessThanOrEqual(WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER + 1e-9);
         const say = (t: number, what: string) =>
@@ -233,6 +242,85 @@ describe('Riding the Treeline over a whole year', () => {
     expect(wrong.slice(0, 5)).toEqual([]);
     expect(checked).toBeGreaterThan(300);
   }, 60_000);
+
+  it('names each ride’s own trip, even a second outing to the same event that day', () => {
+    // The frozen town and a neighbor out all day on D13 (a sweep's newcomer): on some days they
+    // walk to the morning football and ride to the afternoon's, where the event's id alone would
+    // name the walk, which has no legs.
+    const town = [...FROZEN_TOWN, outAllDay('D13')];
+    let checked = 0,
+      second = 0;
+    for (const day of YEAR) {
+      const plans = residentTrips(town, day);
+      for (const ride of tubeRides(town, day)) {
+        checked++;
+        const trips = plans.get(ride.residentId)!;
+        const trip = rideTrip(trips, ride);
+        const legs = rideLegs(trip, ride)!;
+        expect(walkingPace(legs)).toBeGreaterThanOrEqual(WALK_SPEED - 1e-9);
+        // The ride is the one these legs make: the boarding minute summed leg by leg, as the
+        // panel and the town both sum it.
+        let board = ride.direction === 'there' ? trip.depart : trip.leave;
+        for (const leg of legs) {
+          if (leg.kind === 'board') break;
+          board += leg.minutes;
+        }
+        expect(board).toBe(ride.board);
+        const first = trips.find((t) => t.event.id === ride.eventId)!;
+        if (first !== trip && !rideLegs(first, ride)) second++;
+      }
+    }
+    expect(checked).toBeGreaterThan(100);
+    expect(second).toBeGreaterThan(0);
+  });
+
+  it('builds whole tube journeys from every house plot to every seat of every venue', () => {
+    // Pure geometry, whoever lives in town: a newcomer on any free plot rides these legs.
+    const events = new Map<string, VisitEvent>();
+    for (const day of YEAR)
+      for (const event of eventsForDay(day))
+        events.set(`${event.outing ?? event.id}@${event.venue.kind}`, event);
+    events.set('football@morning', footballVisit('morning'));
+    events.set('football@afternoon', footballVisit('afternoon'));
+    events.set('millpond', skatingVisit);
+    const seats = (event: VisitEvent) =>
+      event.outing
+        ? outingSpots(event.outing).length
+        : event.venue.kind === 'football' || event.venue.kind === 'millpond'
+          ? 6 // the touchline's and the ice's half(6)
+          : (EVENT_SPOTS as Record<string, readonly unknown[]>)[event.venue.kind].length;
+    const wrong: string[] = [];
+    const whole = (legs: TripLeg[], what: string) => {
+      legs.forEach((leg, i) => {
+        if (leg.route.length < 2 || !(leg.minutes > 0) || !Number.isFinite(leg.minutes))
+          wrong.push(
+            `${what}: ${leg.kind} leg ${i} has ${leg.route.length} points, ${leg.minutes} min`,
+          );
+        const end = legs[i - 1]?.route.at(-1);
+        if (end && (end.x !== leg.route[0].x || end.y !== leg.route[0].y))
+          wrong.push(`${what}: ${leg.kind} leg ${i} starts away from the last one's end`);
+      });
+      if (legs.filter((leg) => leg.kind === 'board').length !== 1) wrong.push(`${what}: boardings`);
+      if (Math.abs(walkingPace(legs) - WALK_SPEED) > 1e-9) wrong.push(`${what}: walking pace`);
+      const brisk = walkingPace(paceLegs(legs, MAX_TRAVEL_SPEED_MULTIPLIER));
+      if (Math.abs(brisk - WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER) > 1e-9)
+        wrong.push(`${what}: brisk pace ${brisk}`);
+    };
+    let rode = 0;
+    for (const plot of HOUSE_PLOTS) {
+      const home = outAllDay(plot.id, `newcomer-${plot.id.toLowerCase()}`);
+      for (const [key, event] of events)
+        for (let seat = 0; seat < seats(event); seat++) {
+          const tube = eventTubeJourney(home, event, seat);
+          if (!tube) continue;
+          rode++;
+          whole(tube.legs, `${plot.id} to ${key} seat ${seat}`);
+          whole(reverseLegs(tube.legs), `${plot.id} home from ${key} seat ${seat}`);
+        }
+    }
+    expect(wrong.slice(0, 5)).toEqual([]);
+    expect(rode).toBeGreaterThan(10_000);
+  }, 20_000);
 
   // Every neighbor at every sampled minute of the year grows with the town, so the residents'
   // side gathers what it finds and asserts once.
@@ -417,7 +505,11 @@ describe('Riding the Treeline over a whole year', () => {
       (r) => r.eventId === 'zoo' && r.direction === 'there',
     )!;
     const back = tubeRides(places, day).find(
-      (r) => r.residentId === there.residentId && r.direction === 'home' && r.eventId === 'zoo',
+      (r) =>
+        r.residentId === there.residentId &&
+        r.direction === 'home' &&
+        r.eventId === 'zoo' &&
+        r.eventStart === there.eventStart,
     )!;
     const label = (t: number) =>
       residentActivityLabel(
@@ -464,7 +556,10 @@ describe('Riding the Treeline over a whole year', () => {
       expect(
         tubeRides(owls, 8).some(
           (ride) =>
-            ride.residentId === id && ride.eventId === trip.event.id && ride.direction === 'home',
+            ride.residentId === id &&
+            ride.eventId === trip.event.id &&
+            ride.eventStart === trip.event.start &&
+            ride.direction === 'home',
         ),
       ).toBe(false);
       const home = owls.find((owl) => owl.id === id)!;

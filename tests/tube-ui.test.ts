@@ -50,6 +50,7 @@ const ride = (board: number, from = FIRST, to = LAST, residentId = 'rider'): Tub
   return {
     residentId,
     eventId: 'zoo',
+    eventStart: 840,
     direction: from === FIRST ? 'there' : 'home',
     from,
     to,

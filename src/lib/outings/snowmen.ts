@@ -4,7 +4,11 @@
 // that variant only, with the guest's visit and the lunch's own pose at any minute (`lunch`).
 // Either side of the building the lunch keeps its own poses: the one a guest has a minute before
 // 14:00 holds until the building starts, and the one they will have a minute after it is done
-// starts as it ends, so no pose either side is held under a minute.
+// starts as it ends, so no pose either side is held under a minute. A guest who sits down or gets
+// up in the middle of it all (a late arrival from a far plot, an early leave) settles into the pose
+// they will have a minute later and keeps the one they had a minute before, so whoever is on the
+// guest list, no pose between the crouch on sitting down and the crouch on getting up is held
+// under a minute either.
 // Import rule: value-import only world, town-calendar, seasons, district-places and
 // district-calendar; never resident-trips, events or anything under src/city/.
 import type { EventPose } from '../events.ts';
@@ -47,8 +51,23 @@ export function builderSpells(seat: number, day: number): Spell[] {
 /** What the planner hands the snowmen's poses: a lunch guest's visit and moment (PoseContext),
  *  and the lunch's own pose for them at any minute, which changes on the lunch's own beat. */
 export type SnowmenContext = PoseContext & { lunch(time: number): EventPose | undefined };
-/** Minutes a pose is held at least (the planner's POSE_HOLD). */
+/** Minutes a pose is held at least, and a guest takes to sit down or get up (the planner's
+ *  POSE_HOLD and SEAT_SETTLE, restated: this file may not import resident-trips). */
 const HOLD = 1;
+const SETTLE = 0.4;
+/**
+ * The minute a guest's pose is read at: their own, kept a minute inside the stretch they are
+ * settled on the blanket (from sitting down, or the lunch's start for a guest who waited, to the
+ * crouch to get up). The pose they settle into is the one they will have a minute later and the
+ * last before getting up the one they had a minute before, so both are held a minute even when
+ * they arrive or leave mid-spell, mid-chat or mid-cheer. A stay under two minutes keeps its
+ * middle pose throughout, like the lunch's own beats.
+ */
+function settledTime({ time, arrive, leave, trip }: SnowmenContext) {
+  const from = Math.max(arrive, trip.event.start) + SETTLE,
+    to = leave - SETTLE;
+  return to - from >= 2 * HOLD ? Math.min(Math.max(time, from + HOLD), to - HOLD) : (from + to) / 2;
+}
 /**
  * The lunch's own pose either side of a stretch [from, to) that the snowmen take: the pose a
  * minute before `from` holds on until it, and the pose a minute after `to` starts at it. Each is
@@ -63,9 +82,10 @@ function lunchAround({ lunch, time }: SnowmenContext, from: number, to: number) 
  * A builder's pose (lunch seats 0 and 1): building 14:00–15:45, from the crouch and back to it,
  * and the lunch's own pose either side.
  */
-export function snowmenBuilderPose(c: SnowmenContext): EventPose | undefined {
+export function snowmenBuilderPose(context: SnowmenContext): EventPose | undefined {
+  if (context.seat < 0 || context.seat > 1) return undefined;
+  const c = { ...context, time: settledTime(context) };
   const { seat, time, day } = c;
-  if (seat < 0 || seat > 1) return undefined;
   if (time < base || time >= dressed) return lunchAround(c, base, dressed);
   return builderSpells(seat, day).find((spell) => time < spell.to)?.pose;
 }
@@ -126,10 +146,11 @@ const CHEER_CLEAR = 1;
  * and then, and on their feet for the two cheers; the lunch's own pose before 14:00 and after the
  * last cheer.
  */
-export function snowmenWatcherPose(c: SnowmenContext): EventPose | undefined {
+export function snowmenWatcherPose(context: SnowmenContext): EventPose | undefined {
+  if (context.seat < 2 || context.seat > 5) return undefined;
+  const c = { ...context, time: settledTime(context) };
   const { seat, time, day } = c;
   const last = WATCHER_CHEERS.at(-1)!;
-  if (seat < 2 || seat > 5) return undefined;
   const done = last.from + last.minutes + ripple(seat);
   if (time < base || time >= done) return lunchAround(c, base, done);
   const cheers = WATCHER_CHEERS.map(({ from, minutes }) => ({

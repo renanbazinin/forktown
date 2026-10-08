@@ -25,9 +25,16 @@ import {
   WATCHER_CHEERS,
   type SnowmenContext,
 } from '../src/lib/outings/snowmen';
-import { residentTrips, tripState } from '../src/lib/resident-trips';
+import {
+  residentTrips,
+  SEAT_SETTLE,
+  tripState,
+  type ResidentTrip,
+} from '../src/lib/resident-trips';
+import type { Place } from '../src/lib/schema';
 import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
-import { TOWNS, YEAR } from './district';
+import { FROZEN_TOWN, outAllDay, TOWNS, YEAR } from './district';
+import { fullTown } from './full-town';
 
 const BUILD_DAYS = SNOWMAN_DAYS.map((d) => CALENDAR_EPOCH_DAY + d);
 const label = (day: number) => {
@@ -35,14 +42,23 @@ const label = (day: number) => {
   return `${season} ${date}`;
 };
 const dayOf = (name: string) => YEAR.find((day) => label(day) === name)!;
-/** A lunch guest's moment for the snowmen's poses, with the lunch's own pose (`sit` unless given). */
+/** A lunch guest's moment for the snowmen's poses, with the lunch's own pose (`sit` unless given):
+ *  there from 12:50, before the lunch starts at 13:00, to 16:15. */
 const at = (
   seat: number,
   time: number,
   day: number,
   lunch: SnowmenContext['lunch'] = () => 'sit',
 ): SnowmenContext =>
-  ({ seat, time, day, arrive: 770, leave: 975, lunch }) as unknown as SnowmenContext;
+  ({
+    seat,
+    time,
+    day,
+    arrive: 770,
+    leave: 975,
+    trip: { event: { start: 780 } },
+    lunch,
+  }) as unknown as SnowmenContext;
 /** The runs of one pose in a list of samples. */
 function runs(samples: { time: number; pose: string | undefined }[]) {
   const out: { pose: string | undefined; from: number; to: number }[] = [];
@@ -53,6 +69,39 @@ function runs(samples: { time: number; pose: string | undefined }[]) {
   }
   return out;
 }
+/** Minutes between pose samples. */
+const STEP = 0.05;
+/**
+ * A lunch guest's poses at their spot from `from` to `to` (their whole stay unless given), sampled
+ * by index so the step never drifts, as runs: `all` of them, and the ones that must be `held` a
+ * minute. Only sitting down and getting up are shorter (the crouch, or a quarter turn at the
+ * spot), and a run cut off by a window's own end is not counted.
+ */
+function poseRuns(
+  home: Place,
+  trip: ResidentTrip,
+  day: number,
+  from = trip.arrive,
+  to = trip.leave,
+) {
+  const samples = [];
+  for (let i = 0, time = from; time < to; time = from + ++i * STEP) {
+    const state = tripState(home, trip, time, day);
+    if (state.event?.phase === 'attending') samples.push({ time, pose: state.pose });
+  }
+  const all = runs(samples);
+  const settled = Math.max(trip.arrive, trip.event.start) + SEAT_SETTLE;
+  const held = all.filter(
+    (run, i) =>
+      run.to >= settled &&
+      run.from < trip.leave - SEAT_SETTLE &&
+      !(i === 0 && from > trip.arrive) &&
+      !(i === all.length - 1 && to < trip.leave),
+  );
+  return { all, held };
+}
+/** A run shorter than a minute, as samples measure it. */
+const brief = (run: { from: number; to: number }) => run.to - run.from + STEP < 1 - 1e-6;
 
 describe('The builders and the watchers', () => {
   it('builds at seats 0 and 1: on the knees and up packing snow, turn about, 14:00–15:45', () => {
@@ -112,48 +161,101 @@ describe('The builders and the watchers', () => {
       expect(snowmenWatcherPose(at(seat, 900, BUILD_DAYS[0]))).toBeUndefined();
   });
 
-  it('gives every lunch guest on a build day poses held a minute at least, in the full town', () => {
-    let builders = 0,
-      ownPoses = 0;
+  it('gives every lunch guest on a build day poses held a minute at least, in the full town and frozen ones', () => {
     const { base, dressed } = SNOWMAN_STAGES;
-    for (const day of BUILD_DAYS) {
-      const plans = residentTrips(TOWNS.full, day);
-      for (const [id, trips] of plans)
-        for (const trip of trips) {
-          if (trip.event.variant !== 'snowmen') continue;
-          const home = TOWNS.full.find((place) => place.id === id)!;
-          const samples = [];
-          // Sampled by index from the arrival, so the step never drifts.
-          for (let i = 0, time = trip.arrive; time < trip.leave; time = trip.arrive + ++i * 0.05) {
-            const state = tripState(home, trip, time, day);
-            if (state.event?.phase === 'attending') samples.push({ time, pose: state.pose });
-          }
-          const all = runs(samples);
-          // Between the crouch on sitting down and the crouch on getting up.
-          for (const run of all.slice(1, -1))
-            expect(
-              run.to - run.from + 0.05,
-              `${label(day)} seat ${trip.seat} ${run.pose} at ${run.from.toFixed(2)}`,
-            ).toBeGreaterThanOrEqual(1 - 1e-6);
-          if (trip.seat < 2 && samples.some((s) => s.pose === 'play')) builders++;
-          // The lunch keeps its own poses either side of the building.
-          if (
-            samples.some(
-              (s) =>
-                (s.time < base || s.time >= dressed + 3) &&
-                ['sip', 'read', 'chat', 'play'].includes(s.pose ?? ''),
+    // Today's town filled up, and two frozen guest lists where a neighbor out all day on R11 once
+    // sent a watcher to the green mid-chat, to hold it under a minute: 14:01 on Winter 3 in the
+    // frozen town, 14:14 on Winter 15 with every other plot taken too.
+    const R11 = outAllDay('R11');
+    const towns: [string, Place[]][] = [
+      ['the full town', TOWNS.full],
+      ['the frozen town with R11 taken', [...FROZEN_TOWN, R11]],
+      ['the frozen town full with R11 taken', fullTown([...FROZEN_TOWN, R11])],
+    ];
+    for (const [name, town] of towns) {
+      let builders = 0,
+        ownPoses = 0,
+        midway = 0;
+      for (const day of BUILD_DAYS) {
+        const plans = residentTrips(town, day);
+        for (const [id, trips] of plans)
+          for (const trip of trips) {
+            if (trip.event.variant !== 'snowmen') continue;
+            const home = town.find((place) => place.id === id)!;
+            if (trip.arrive > base) midway++;
+            const { all, held } = poseRuns(home, trip, day);
+            // Between sitting down and getting up.
+            for (const run of held)
+              expect(
+                brief(run),
+                `${name}: ${label(day)} seat ${trip.seat} ${run.pose} at ${run.from.toFixed(2)}`,
+              ).toBe(false);
+            if (trip.seat < 2 && all.some((run) => run.pose === 'play')) builders++;
+            // The lunch keeps its own poses either side of the building.
+            if (
+              all.some(
+                (run) =>
+                  (run.from < base || run.to >= dressed + 3) &&
+                  ['sip', 'read', 'chat', 'play'].includes(run.pose ?? ''),
+              )
             )
-          )
-            ownPoses++;
-          // A builder goes from sitting to building and back by way of the crouch.
-          if (trip.seat < 2)
-            for (let i = 1; i < all.length; i++)
-              if (all[i].pose === 'play' && all[i].from >= base && all[i].from < dressed)
-                expect(all[i - 1].pose).toBe('crouch');
+              ownPoses++;
+            // A builder sat on the blanket as the building starts goes to it and back by way of
+            // the crouch (one walking in on it later never sat down).
+            if (trip.seat < 2 && trip.arrive < base)
+              for (let i = 1; i < all.length; i++)
+                if (all[i].pose === 'play' && all[i].from >= base && all[i].from < dressed)
+                  expect(all[i - 1].pose).toBe('crouch');
+          }
+      }
+      expect(builders, name).toBeGreaterThanOrEqual(BUILD_DAYS.length);
+      expect(ownPoses, name).toBeGreaterThanOrEqual(BUILD_DAYS.length);
+      // The frozen guest lists still send someone in once the building has begun.
+      if (name !== 'the full town') expect(midway, name).toBeGreaterThan(0);
+    }
+  });
+
+  it('holds every pose a minute whenever a lunch guest sits down or gets up', () => {
+    // A guest list only decides when each seat's guest arrives and leaves (a far plot, the
+    // headways, a newcomer taking a seat): so sweep both across the whole build, for every seat
+    // on every build day, with each lunch's own poses either side.
+    const { base } = SNOWMAN_STAGES;
+    const last = WATCHER_CHEERS.at(-1)!;
+    const until = last.from + last.minutes + 3;
+    const LUNCHES = ['picnic', 'books', 'games'];
+    const WINDOW = 5;
+    const town = TOWNS.eager;
+    const short: string[] = [];
+    let held = 0;
+    for (const day of BUILD_DAYS) {
+      const guests = [...residentTrips(town, day)].flatMap(([id, trips]) =>
+        trips
+          .filter((trip) => trip.event.variant === 'snowmen')
+          .map((trip) => ({ home: town.find((place) => place.id === id)!, trip })),
+      );
+      expect(guests.map(({ trip }) => trip.seat).sort()).toEqual([0, 1, 2, 3, 4, 5]);
+      for (const { home, trip } of guests)
+        for (let k = 0, edge = base - 3; edge < until; edge = base - 3 + ++k * 0.7) {
+          const event = { ...trip.event, id: LUNCHES[k % LUNCHES.length] };
+          // Sitting down at `edge` and staying on, or there early and getting up at `edge`.
+          const late = { ...trip, event, depart: edge - trip.duration, arrive: edge };
+          const early = { ...trip, event, leave: edge, homeBy: edge + trip.returnDuration };
+          for (const [guest, from, to] of [
+            [late, edge, edge + WINDOW],
+            [early, edge - WINDOW, edge],
+          ] as const)
+            for (const run of poseRuns(home, guest, day, from, to).held) {
+              held++;
+              if (brief(run))
+                short.push(
+                  `${label(day)} seat ${trip.seat} ${event.id}, ${guest === late ? 'in' : 'up'} at ${edge.toFixed(2)}: ${run.pose} at ${run.from.toFixed(2)}`,
+                );
+            }
         }
     }
-    expect(builders).toBeGreaterThanOrEqual(BUILD_DAYS.length);
-    expect(ownPoses).toBeGreaterThanOrEqual(BUILD_DAYS.length);
+    expect(short.slice(0, 5)).toEqual([]);
+    // Thousands of poses begun and ended inside a window (4,061 when written).
+    expect(held).toBeGreaterThan(3000);
   });
 
   it('turns the builders to their snowman while they build, a quarter at a time', () => {
