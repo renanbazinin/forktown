@@ -101,6 +101,12 @@ describe('The Riverside in the events list', () => {
       expect(ids.includes('harvest-fair')).toBe(harvestDay(day));
       expect(ids.includes('long-table')).toBe(harvestDay(day));
       expect(ids.includes('stargazing')).toBe(starNight(day));
+      // eventsForDay: today's five unchanged, then the Riverside's outings (SPEC §4.0.I).
+      for (const minutes of [100, 720]) {
+        const events = eventsForDay(day, minutes);
+        expect(events.slice(0, 5).every((event) => !event.outing)).toBe(true);
+        expect(events.slice(5)).toEqual(districtEvents(day, minutes));
+      }
     }
     // Before 06:00 the night's stargazing belongs to yesterday, like the film.
     expect(districtEvents(STARS + 1, 100).some((event) => event.id === 'stargazing')).toBe(true);
@@ -200,7 +206,9 @@ function cards(events: TownEvent[], minutes: number, day: number, attending?: Ma
 
 describe('The Riverside’s cards', () => {
   const day = PLAIN;
-  const all = (minutes: number) => [...eventsForDay(day, 720), ...districtEvents(day, minutes)];
+  /** Today's five (eventsForDay lists the Riverside's outings after them). */
+  const five = eventsForDay(day, 720).filter((event) => !event.outing);
+  const all = (minutes: number) => [...five, ...districtEvents(day, minutes)];
 
   it('shows both Bandstand sets on one card: the live one, else the next, else the teatime set', () => {
     const at = (minutes: number) =>
@@ -232,8 +240,8 @@ describe('The Riverside’s cards', () => {
     expect(marketAt).toBeGreaterThan(5);
     expect(labels.filter((label) => label.includes(BANDSTAND_VENUE.name))).toHaveLength(1);
     // Today's five keep their order.
-    const five = eventsForDay(day, 720).map((event) => event.name);
-    const order = five.map((name) => labels.findIndex((label) => label.endsWith(`: ${name}`)));
+    const names = five.map((event) => event.name);
+    const order = names.map((name) => labels.findIndex((label) => label.endsWith(`: ${name}`)));
     expect(order.every((index) => index > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
@@ -274,7 +282,8 @@ describe('The Riverside’s links', () => {
 });
 
 describe('The Bandstand’s music', () => {
-  const events = [...eventsForDay(PLAIN), ...districtEvents(PLAIN)];
+  // eventsForDay lists the Riverside's outings after today's five.
+  const events = eventsForDay(PLAIN);
   const band = BANDS.find((band) => BAND_COPY[band].name === districtEvents(PLAIN)[1].name)!;
 
   it('plays the day’s band only near the stand, and never over the stage', () => {
@@ -287,7 +296,13 @@ describe('The Bandstand’s music', () => {
     // Between the sets the town plays its own tune.
     expect(trackForTown(1060, events, { gain: 1 })).toBe('town');
     // Without the Riverside in the list, today's answers.
-    expect(trackForTown(1000, eventsForDay(PLAIN), { gain: 1 })).toBe('town');
+    expect(
+      trackForTown(
+        1000,
+        events.filter((event) => !event.outing),
+        { gain: 1 },
+      ),
+    ).toBe('town');
   });
 
   it('has a playable track for every band, today’s acoustic notes until its own', () => {

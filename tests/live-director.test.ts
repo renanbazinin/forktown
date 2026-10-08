@@ -15,6 +15,7 @@ import {
   liveEaseSeconds,
   liveLabelLift,
   liveDistrictShot,
+  liveDistrictShots,
 } from '../src/lib/live-director';
 import { districtEvents } from '../src/lib/events';
 import { OUTING_IDS } from '../src/lib/district-calendar';
@@ -35,6 +36,9 @@ import { readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
 
 const places = readPlaces();
+/** Whether the day's program may film the Morning Market (its district highlight). */
+const filmsTheMarket = (day: number) =>
+  liveDistrictShots(day).some((shot) => shot.outing === 'market');
 const shotAt = (day: number, minute: number) =>
   liveShotAt(liveProgram(places, day), minute, simulateResidents(places, minute, day));
 
@@ -268,8 +272,9 @@ describe('Live broadcast director', () => {
       },
     }));
     const sequences = new Set<string>();
-    for (let day = 0; day < 30; day++) {
-      if (!liveHighlights(day).includes('football')) continue;
+    for (let day = 0; day < 60; day++) {
+      // The third neighbor browses the market; on its live days the market's own shot films them.
+      if (!liveHighlights(day).includes('football') || filmsTheMarket(day)) continue;
       const program = liveProgram(homes, day);
       const ids = Array.from({ length: 6 }, (_, index) => {
         const time = 360 + index * FOLLOW_SECONDS;
@@ -295,15 +300,16 @@ describe('Live broadcast director', () => {
         } as const,
       },
     }));
-    for (const day of Array.from({ length: 10 }, (_, day) => day).filter((day) =>
-      liveHighlights(day).includes('football'),
+    for (const day of Array.from({ length: 20 }, (_, day) => day).filter(
+      (day) => liveHighlights(day).includes('football') && !filmsTheMarket(day),
     )) {
       const program = liveProgram(homes, day);
       const featured: string[] = [];
       for (let time = 360; time < 585; time += FOLLOW_SECONDS) {
         const residents = simulateResidents(homes, time, day);
+        // Two at the match; the third walks to the market, or browses there.
         if (time >= 540)
-          expect(residents.filter((r) => r.event?.phase !== 'attending')).toHaveLength(1);
+          expect(residents.filter((r) => r.event?.id !== 'football')).toHaveLength(1);
         const shot = liveShotAt(program, time, residents);
         expect(shot.kind).toBe('neighbor');
         expect(shot.residentId).not.toBe(featured.at(-1));

@@ -17,6 +17,8 @@ import {
   type ResidentState,
 } from '../src/lib/simulation';
 import { findPlotAt, getPlot, isRoad, plotEntrance } from '../src/lib/world';
+import { DISTRICT_COPY } from '../src/lib/district-copy';
+import { outingOf } from '../src/lib/outings';
 
 /** Away from events, a gesture only while still at a spot on their own lot (a seat, the beds). */
 const homePoseOnly = (state: ResidentState) =>
@@ -157,19 +159,30 @@ describe('Shared town events', () => {
           else expect(early.facing).toBe(trip.facing);
           expect(early.position).toEqual(at(event.start + 1).position);
           seen.add(event.venue.kind);
-          // The animals and the match are on all day: those guests join in straight away.
-          if (event.venue.kind === 'zoo' || event.venue.kind === 'football') {
+          // The animals and the match are on all day: those guests join in straight away, and so
+          // do the Riverside's browsers (the market, the regatta, the fair and the table).
+          const outing = event.outing && outingOf(event.outing);
+          if (event.venue.kind === 'zoo' || event.venue.kind === 'football' || outing?.underway) {
             expect(early.event?.phase).toBe('attending');
-            expect(residentActivityLabel(early)).toMatch(/^Watching /);
+            expect(residentActivityLabel(early)).toMatch(
+              outing ? DISTRICT_COPY[outing.id].labels.attending : /^Watching /,
+            );
             continue;
           }
           expect(early.event?.phase).toBe('waiting');
+          // A Riverside outing has its own words for the wait (SPEC §4.7).
           expect(residentActivityLabel(early)).toBe(
-            event.id === 'cinema' ? 'Waiting for the film to start' : `Waiting for ${event.name}`,
+            outing
+              ? DISTRICT_COPY[outing.id].labels.waiting
+              : event.id === 'cinema'
+                ? 'Waiting for the film to start'
+                : `Waiting for ${event.name}`,
           );
-          // A blanket or a cinema seat is sat on while the show gets ready. With under a minute to
-          // wait once settled, a guest takes up at once what they will do when it starts.
-          const seated = event.venue.kind === 'green' || event.venue.kind === 'cinema';
+          // A blanket, a cinema seat or a deckchair is sat on while the show gets ready. With
+          // under a minute to wait once settled, a guest takes up at once what they will do when
+          // it starts.
+          const seated =
+            event.venue.kind === 'green' || event.venue.kind === 'cinema' || !!outing?.seated;
           const brief = event.start - (trip.arrive + SEAT_SETTLE) < POSE_HOLD;
           const starting = at(event.start).pose;
           expect(early.pose).toBe(
@@ -177,13 +190,22 @@ describe('Shared town events', () => {
               ? undefined
               : !brief
                 ? 'sit'
-                : starting && ['sit', 'read', 'sip', 'chat'].includes(starting)
+                : starting && ['sit', 'read', 'sip', 'chat', 'perch', 'tea'].includes(starting)
                   ? starting
                   : undefined,
           );
           expect(at(event.start).event?.phase).toBe('attending');
         }
-    expect([...seen].sort()).toEqual(['cinema', 'football', 'green', 'stage', 'zoo']);
+    // Today's five venues, and the Riverside's the published town reaches in that week.
+    expect([...seen].sort()).toEqual([
+      'bandstand',
+      'cinema',
+      'football',
+      'green',
+      'market',
+      'stage',
+      'zoo',
+    ]);
   }, 20_000);
   it('caps the audience, assigns distinct spots, and does not depend on JSON ordering', () => {
     const crowd = HOUSE_PLOTS.slice(0, 20).map((plot, i) => ({
@@ -209,11 +231,11 @@ describe('Shared town events', () => {
       }));
       const first = simulateResidents(isolated, minute, 19);
       expect(simulateResidents([...isolated].reverse(), minute, 19).reverse()).toEqual(first);
+      // The lunch's guests at 15:30, the stage's at 20:00 (the Bandstand's sundown set seats its
+      // own eight across town).
+      const show = eventsForDay(19)[minute < 1080 ? 0 : 1];
       const attending = first.filter(
-        (state) =>
-          state.event?.phase === 'attending' &&
-          state.event.id !== 'football' &&
-          state.event.id !== 'zoo',
+        (state) => state.event?.phase === 'attending' && state.event.id === show.id,
       );
       expect(attending).toHaveLength(capacity);
       expect(new Set(attending.map((state) => JSON.stringify(state.position))).size).toBe(capacity);

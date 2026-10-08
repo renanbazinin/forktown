@@ -156,18 +156,22 @@ describe('Riding the Treeline over a whole year', () => {
 
   it('rides only when it saves ten unhurried minutes, and nearby trips stay on foot', () => {
     let rode = 0,
-      walked = 0;
+      walked = 0,
+      rodeToday = 0;
     for (const day of YEAR)
       for (const [id, trips] of residentTrips(places, day)) {
         const home = places.find((place) => place.id === id)!;
         for (const trip of trips) {
           const tube = eventTubeJourney(home, trip.event, trip.seat);
           expect(!!tube).toBe(rides(trip));
+          // The Riverside lies at the town's far edge, so most of its guests ride; today's
+          // outings are counted on their own.
           if (!tube) {
-            walked++;
+            if (!trip.event.outing) walked++;
             continue;
           }
           rode++;
+          if (!trip.event.outing) rodeToday++;
           // Unhurried, door to seat: the whole way on foot against the tube journey, which clears
           // its own pair's threshold (never less than ten minutes).
           const board = tube.legs.find((leg) => leg.kind === 'board')!;
@@ -181,7 +185,7 @@ describe('Riding the Treeline over a whole year', () => {
         }
       }
     expect(rode).toBeGreaterThan(200);
-    expect(walked).toBeGreaterThan(rode);
+    expect(walked).toBeGreaterThan(rodeToday);
   }, 60_000);
 
   // Every ride of half a year, sampled densely: it grows with the town, so the steps gather what
@@ -413,7 +417,7 @@ describe('Riding the Treeline over a whole year', () => {
       (r) => r.eventId === 'zoo' && r.direction === 'there',
     )!;
     const back = tubeRides(places, day).find(
-      (r) => r.residentId === there.residentId && r.direction === 'home',
+      (r) => r.residentId === there.residentId && r.direction === 'home' && r.eventId === 'zoo',
     )!;
     const label = (t: number) =>
       residentActivityLabel(

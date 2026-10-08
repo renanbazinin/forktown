@@ -17,11 +17,25 @@ import { zooRoute } from './zoo';
 import {
   districtApproach,
   DISTRICT_OUTINGS,
+  MARKET_VENUE,
   outingSpots,
   type DistrictVenue,
 } from './district-places';
-import { activeIndex } from './district-calendar';
-import { outingOf, snowmenBuilderPose, snowmenWatcherPose } from './outings';
+import {
+  activeIndex,
+  OUTING_TABLE,
+  OUTING_TIMES,
+  REGATTA_LAUNCH_EVERY,
+  type OutingId,
+} from './district-calendar';
+import {
+  outingOf,
+  SEAT_EXCLUDES,
+  snowmenBuilderPose,
+  snowmenWatcherPose,
+  type PoseContext,
+  type SeatCall,
+} from './outings';
 import { MILLPOND_VENUE, SKATING, millpondRoute, millpondSkatingDay, skateGlide } from './millpond';
 import {
   facingAlong,
@@ -155,14 +169,22 @@ export function eventApproach(event: Pick<VisitEvent, 'venue' | 'outing'>, seat:
  * Walking the whole way: road from the doorstep, then the venue's own approach, joined like a tube
  * leg's so nobody walks past the gate or the lane and back.
  */
-export function eventRoute(home: Place, event: VisitEvent, seat: number): Point[] {
+export function eventRoute(
+  home: Place,
+  event: Pick<VisitEvent, 'venue' | 'outing'>,
+  seat: number,
+): Point[] {
   const doorstep = plotEntrance(getPlot(home.plot)!);
   const approach = eventApproach(event, seat);
   return joinApproach(roadPath(doorstep, approach[0]), approach);
 }
 
 /** The unhurried tube journey to the event, or undefined when walking is as good. */
-export function eventTubeJourney(home: Place, event: VisitEvent, seat: number) {
+export function eventTubeJourney(
+  home: Place,
+  event: Pick<VisitEvent, 'venue' | 'outing'>,
+  seat: number,
+) {
   const doorstep = plotEntrance(getPlot(home.plot)!);
   const approach = eventApproach(event, seat);
   const choice = tubeChoice(doorstep, approach[0]);
@@ -321,7 +343,7 @@ export function residentTrips(places: Place[], day: number): Map<string, Residen
 }
 
 /** Football uses the same physical travel rules, with a morning or afternoon visit. */
-function footballVisit(period: 'morning' | 'afternoon'): VisitEvent {
+export function footballVisit(period: 'morning' | 'afternoon'): VisitEvent {
   const start = period === 'morning' ? 360 : 720;
   return {
     id: 'football',
@@ -336,7 +358,8 @@ function footballVisit(period: 'morning' | 'afternoon'): VisitEvent {
   };
 }
 
-const skatingVisit: VisitEvent = {
+/** Skating on the frozen Millpond, as the planner seats it. */
+export const skatingVisit: VisitEvent = {
   id: 'millpond',
   name: 'Skating on the Millpond',
   description: 'Skating on the frozen millpond',
@@ -366,6 +389,77 @@ export const previewNewcomers = (places: Place[]): ReadonlySet<string> =>
 /** Published neighbors only: town-owned rounds never select a builder's private preview. */
 export const publishedRoster = (places: Place[]): Place[] => previews.get(places)?.roster ?? places;
 
+/** How a day is planned; every option defaults to the town as it is. */
+export type PlanOptions = {
+  /** false: the same guests in the same seats, nobody rides, and no headways (each home alone). */
+  tube?: boolean;
+  /** false: none of the Riverside's outings (for tests: the town without them). */
+  outings?: boolean;
+  /** false: the Riverside's daily outings only, none of the four festivals (for tests). */
+  festivals?: boolean;
+};
+/** Minutes before its launch that the boatwright picks a regatta guest's boat up (SPEC §4.5). */
+export const REGATTA_HANDOVER = 1;
+/** The Riverside's outings that run on some days only: each seats first in its period. */
+const FESTIVALS: ReadonlySet<OutingId> = new Set([
+  'regatta',
+  'harvest-fair',
+  'long-table',
+  'stargazing',
+]);
+
+// ---- The market's own hours ---------------------------------------------------------------------
+
+/** Minutes between the market's thirteen browsing slots, 08:00 to 10:00. */
+const MARKET_SLOT = 10;
+const MARKET_SLOTS = 13;
+const marketWindows = new Map<string, { start: number; end: number }>();
+/**
+ * A browser's own hour at the market: a slot from 08:00 to 10:00 every ten minutes, and a stay of
+ * 60 to 90 minutes (never past 11:30), both from the home's id. The home keeps its own slot when
+ * its seat-0 trip (on foot or by tube, worth the walk, in its morning window) can make it, else
+ * takes one of the slots it can make, else the whole market (08:00–11:30).
+ */
+export function marketWindow(home: Place): { start: number; end: number } {
+  const { routine } = home.resident;
+  const key = `${home.id}|${home.plot}|${routine.morning}|${routine.afternoon}|${routine.evening}|${routine.night}`;
+  const cached = marketWindows.get(key);
+  if (cached) return cached;
+  const { depart, start, end } = OUTING_TIMES.market;
+  const market = { venue: MARKET_VENUE, outing: 'market' as const };
+  const tube = eventTubeJourney(home, market, 0);
+  const walkTiles = tube ? walkedTiles(tube.legs) : routeLength(eventRoute(home, market, 0));
+  const fixed = tube ? fixedMinutes(tube.legs) : 0;
+  const window = availableWindow(home, 'morning');
+  const stay = 60 + (hash(`market-stay:${home.id}`) % 31);
+  const at = (from: number) => ({ start: from, end: Math.min(end, from + stay) });
+  const fits = (from: number) =>
+    !!planJourney(
+      walkTiles,
+      fixed,
+      from,
+      at(from).end,
+      window.availableFrom,
+      window.availableUntil,
+      depart,
+      0,
+      WORTH_THE_WALK,
+    );
+  const slots = Array.from({ length: MARKET_SLOTS }, (_, j) => start + MARKET_SLOT * j);
+  const draw = hash(`market-browse:${home.id}`);
+  const own = slots[draw % MARKET_SLOTS];
+  const feasible = slots.filter(fits);
+  const result = fits(own)
+    ? at(own)
+    : feasible.length
+      ? at(feasible[draw % feasible.length])
+      : { start, end };
+  // A town's worth of homes, and a few drafts: start over rather than grow without end.
+  if (marketWindows.size >= 4096) marketWindows.clear();
+  marketWindows.set(key, result);
+  return result;
+}
+
 /**
  * The day's plan, uncached. Guests are drawn in a daily hash order, and a seat goes to the next
  * neighbor in line whenever someone ahead can't make it (too far to get there, on foot or by tube,
@@ -383,11 +477,19 @@ export const publishedRoster = (places: Place[]): Place[] => previews.get(places
  * own (no headways). That is not the town without the tube, whose lines would pass a rider's seat
  * on. It never holds an outing the tube plan lacks, because a guest is only seated when the tube
  * plan keeps every one of their outings.
+ *
+ * The calls go in the order of SEAT_ORDER (outings.ts): the film; the morning football; each
+ * period's festival first (the regatta and the Harvest Fair in the afternoon, the Long Table in
+ * the evening, stargazing at night); today's daily outings on their own hash lines; the
+ * Riverside's daily outings last of all, so on a day without a festival they never change who
+ * goes to anything else. Every Riverside outing and the disco seat on turn tickets.
+ * `outings: false` plans the town without any Riverside outing, `festivals: false` without the
+ * four festivals (for tests).
  */
 export function planResidentTrips(
   places: Place[],
   day: number,
-  options: { tube?: boolean } = {},
+  options: PlanOptions = {},
 ): Map<string, ResidentTrip[]> {
   const program = eventsForDay(day);
   // A previewed draft joins every line behind the whole town.
@@ -444,12 +546,15 @@ export function planResidentTrips(
   };
   /**
    * Seat guests in line order until the seats are full or nobody else can make it. `seats` counts
-   * the spots for a line of that many; newcomers get only the spots the town's line leaves.
+   * the spots for a line of that many; newcomers get only the spots the town's line leaves. With
+   * `personal`, each guest goes to their own version of the event (the market's own hour, the
+   * regatta's launch for that seat).
    */
   const seat = (
     event: VisitEvent,
     [line, late]: Place[][],
     seats: (entrants: number) => number,
+    personal?: (home: Place, seat: number) => VisitEvent,
   ) => {
     const guests: string[] = [];
     for (const [homes, spots] of [
@@ -458,13 +563,40 @@ export function planResidentTrips(
     ] as const)
       for (const home of homes) {
         if (guests.length >= spots) break;
-        if (invite(home, { event, seat: guests.length, period: event.period }))
+        const own = personal ? personal(home, guests.length) : event;
+        if (invite(home, { event: own, seat: guests.length, period: event.period }))
           guests.push(home.id);
       }
     return guests;
   };
   const all = (spots: number) => () => spots;
   const half = (spots: number) => (entrants: number) => Math.min(spots, Math.ceil(entrants / 2));
+  // Each call's guests so far, so a later call can leave them out (SEAT_EXCLUDES).
+  const seated = new Map<SeatCall, readonly string[]>();
+  const excluded = (call: SeatCall) => SEAT_EXCLUDES[call].flatMap((id) => seated.get(id) ?? []);
+  const daily = options.outings !== false,
+    festive = daily && options.festivals !== false;
+  /** A Riverside outing's call, on its own days: its ticket line, seats and personal times. */
+  const outing = (id: OutingId) => {
+    const event = program.find((candidate) => candidate.outing === id);
+    const spec = outingOf(id)!;
+    if (!event || !(FESTIVALS.has(id) ? festive : daily)) return;
+    const { cap, newcomerKey } = OUTING_TABLE[id];
+    seated.set(
+      id,
+      seat(
+        event,
+        ticketed(id, cap, spec.period, newcomerKey(day), excluded(id)),
+        (spec.seats.rule === 'all' ? all : half)(spec.seats.spots),
+        id === 'market'
+          ? (home) => ({ ...event, ...marketWindow(home) })
+          : id === 'regatta'
+            ? // A launch every six minutes: seat k's boat goes in at 14:00 + 6k.
+              (_, k) => ({ ...event, start: event.start + REGATTA_LAUNCH_EVERY * k })
+            : undefined,
+      ),
+    );
+  };
   // Cinema guests keep their seats whatever happens; their evening is planned around the film.
   const cinema = program.find((e) => e.id === 'cinema')!;
   const movieGuests = cinemaGuests(roster, day);
@@ -481,44 +613,82 @@ export function planResidentTrips(
     const home = places.find((place) => place.id === id);
     if (home && getPlot(home.plot)) invite(home, { event: cinema, seat, period: 'evening' });
   });
-  // The rest in time order, so an outing is planned around the ones earlier in the day.
-  seat(footballVisit('morning'), sorted('morning', `fans:${day}:morning`), half(6));
+  seated.set('cinema', movieGuests);
+  // The rest in the seat order, so an outing is planned around the ones before it.
+  seated.set(
+    'football-morning',
+    seat(
+      footballVisit('morning'),
+      sorted('morning', `fans:${day}:morning`, excluded('football-morning')),
+      half(6),
+    ),
+  );
+  // A festival comes first in its afternoon: rare days are the point.
+  outing('regatta');
+  outing('harvest-fair');
   const picnic = program[0];
-  const picnicIds = seat(
-    picnic,
-    sorted('afternoon', `${day}:${picnic.id}`),
-    all(EVENT_SPOTS.green.length),
+  seated.set(
+    'green',
+    seat(
+      picnic,
+      sorted('afternoon', `${day}:${picnic.id}`, excluded('green')),
+      all(EVENT_SPOTS.green.length),
+    ),
   );
-  const zooIds = seat(
-    program.find((e) => e.id === 'zoo')!,
-    sorted('afternoon', `zoo:${day}`, picnicIds),
-    half(EVENT_SPOTS.zoo.length),
+  seated.set(
+    'zoo',
+    seat(
+      program.find((e) => e.id === 'zoo')!,
+      sorted('afternoon', `zoo:${day}`, excluded('zoo')),
+      half(EVENT_SPOTS.zoo.length),
+    ),
   );
-  const fanIds = seat(
-    footballVisit('afternoon'),
-    sorted('afternoon', `fans:${day}:afternoon`, [...picnicIds, ...zooIds]),
-    half(6),
+  seated.set(
+    'football-afternoon',
+    seat(
+      footballVisit('afternoon'),
+      sorted('afternoon', `fans:${day}:afternoon`, excluded('football-afternoon')),
+      half(6),
+    ),
   );
   // Winter skating on the frozen Millpond, for afternoon strollers nobody else has claimed.
   if (millpondSkatingDay(day))
-    seat(
-      skatingVisit,
-      sorted('afternoon', `skate:${day}`, [...picnicIds, ...zooIds, ...fanIds]),
-      half(6),
+    seated.set(
+      'millpond',
+      seat(skatingVisit, sorted('afternoon', `skate:${day}`, excluded('millpond')), half(6)),
     );
+  outing('long-table');
   const concert = program[1];
-  seat(
-    concert,
-    sorted('evening', `${day}:${concert.id}`, movieGuests),
-    all(EVENT_SPOTS.stage.length),
+  seated.set(
+    'concert',
+    seat(
+      concert,
+      sorted('evening', `${day}:${concert.id}`, excluded('concert')),
+      all(EVENT_SPOTS.stage.length),
+    ),
   );
+  // On a new-moon night the stars come first; their guests don't dance as well.
+  outing('stargazing');
   // The disco takes turns: every home's ticket night comes round once a month or so.
   const party = program.find((e) => e.id === 'night-party')!;
-  seat(
-    party,
-    ticketed('night-party', EVENT_SPOTS.stage.length, 'night', `${day}:${party.id}`),
-    all(EVENT_SPOTS.stage.length),
+  seated.set(
+    'night-party',
+    seat(
+      party,
+      ticketed(
+        'night-party',
+        EVENT_SPOTS.stage.length,
+        'night',
+        `${day}:${party.id}`,
+        excluded('night-party'),
+      ),
+      all(EVENT_SPOTS.stage.length),
+    ),
   );
+  // The Riverside's daily outings last of all, on turn tickets.
+  outing('market');
+  outing('bandstand-tea');
+  outing('bandstand-sundown');
   const result = new Map<string, ResidentTrip[]>();
   for (const home of places) {
     if (!getPlot(home.plot)) continue;
@@ -697,6 +867,9 @@ export function planHome(
         leaveCap,
       };
     }
+    // A regatta guest sets their boat down before the boatwright comes for it, a minute before
+    // its launch: one who would be later passes the seat on.
+    if (event.outing === 'regatta' && plan.arrive > event.start - REGATTA_HANDOVER) continue;
     const legs = tube && paceLegs(tube.legs, plan.speedMultiplier);
     trips.push({
       route,
@@ -838,9 +1011,15 @@ export function tripState(
   } = trip;
   // Skaters step onto the ice at their loop's south point and glide from that moment on. Zoo
   // visitors and football fans likewise join in on arrival: the animals and the match are already
-  // there. Anyone early for a show waits at their spot until it starts.
+  // there, and so are the Riverside's browsing outings (OutingSpec.underway). Anyone early for a
+  // show waits at their spot until it starts.
+  const spec = event.outing ? outingOf(event.outing) : undefined;
   const skating = event.venue.kind === 'millpond';
-  const underway = skating || event.venue.kind === 'zoo' || event.venue.kind === 'football';
+  const underway =
+    skating ||
+    event.venue.kind === 'zoo' ||
+    event.venue.kind === 'football' ||
+    spec?.underway === true;
   const phase =
     time < arrive
       ? 'going'
@@ -861,6 +1040,11 @@ export function tripState(
   const lanes = phase === 'going' || phase === 'returning' ? tripLanes(trip, home.id) : undefined;
   const zoo =
     event.venue.kind === 'zoo' && phase === 'attending' && zooGlance(home.id, arrive, time, leave);
+  // Where a Riverside guest looks while it is on (the market's stalls), else their spot's way.
+  const looking =
+    spec?.facing && phase === 'attending'
+      ? spec.facing({ home, trip, time, day, seat, arrive, leave })
+      : undefined;
   const movement =
     phase === 'going'
       ? legs
@@ -873,11 +1057,13 @@ export function tripState(
         : {
             position: route.at(-1)!,
             moving: false,
-            facing: zoo ? zoo.facing : facing,
+            facing: zoo ? zoo.facing : (looking ?? facing),
             walkPhase: 0,
           };
-  // A blanket or a cinema seat is for sitting on while the show gets ready; the lawn stands.
-  const seatedVenue = event.venue.kind === 'green' || event.venue.kind === 'cinema';
+  // A blanket, a cinema seat or a deckchair is for sitting on while the show gets ready; the lawn
+  // stands.
+  const seatedVenue =
+    event.venue.kind === 'green' || event.venue.kind === 'cinema' || spec?.seated === true;
   // With under a minute to wait once settled, a guest takes up straight away what they will do
   // when it starts (sat down, or on their feet to play) instead of sitting for a moment first.
   const briefWait =
@@ -913,7 +1099,7 @@ export function tripState(
       (time >= leave - SPOT_TURN && opposite(movement.facing, startFacing(returnRoute))));
   const shown = settling ? 'crouch' : turning ? undefined : pose;
   // What a Riverside guest carries, on their outing's own leg only (OutingSpec.carry).
-  const carry = event.outing ? outingOf(event.outing)?.carry : undefined;
+  const carry = spec?.carry;
   const carrying = carry && carry.leg === phase;
   return {
     ...movement,
@@ -1058,11 +1244,18 @@ export const POSE_HOLD = 1;
  */
 function attendingPose(
   home: Place,
-  { event, seat, arrive, leave }: ResidentTrip,
+  trip: ResidentTrip,
   time: number,
   day: number,
   zoo: ReturnType<typeof zooGlance> | false,
 ): EventPose | undefined {
+  const { event, seat, arrive, leave } = trip;
+  // A Riverside outing's guests take the poses its own file gives them (src/lib/outings/*.ts).
+  const spec = event.outing ? outingOf(event.outing) : undefined;
+  if (spec) {
+    const context: PoseContext = { home, trip, time, day, seat, arrive, leave };
+    return spec.pose(context);
+  }
   const from = Math.max(arrive, event.start) + SEAT_SETTLE,
     to = (event.venue.kind === 'stage' ? Math.min(leave, event.end) : leave) - SEAT_SETTLE;
   const held =
@@ -1092,8 +1285,11 @@ function attendingPose(
   return (['sit', 'sip', 'chat', 'sit'] as const)[(beat + seat) % 4];
 }
 
-/** Poses the figure draws sitting down; the crouch leads into and out of them. */
-const SEATED_POSES: ReadonlySet<string> = new Set(['sit', 'read', 'sip', 'chat']);
+/**
+ * Poses the figure draws sitting down; the crouch leads into and out of them. `perch` and `tea`
+ * sit on a raised seat (the Bandstand's deckchairs).
+ */
+const SEATED_POSES: ReadonlySet<string> = new Set(['sit', 'read', 'sip', 'chat', 'perch', 'tea']);
 /** Minutes spent halfway down after reaching a seat, and again before getting up to leave. */
 export const SEAT_SETTLE = 0.4;
 

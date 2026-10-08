@@ -48,11 +48,14 @@ import {
 } from '../src/lib/district-places';
 import { HOUSE_PLOTS, VENUES, venueAt, EVENT_SPOTS, eventSpot } from '../src/lib/events';
 import { isFarmPlot } from '../src/lib/farm';
-import { joinApproach } from '../src/lib/tube-journeys';
+import { fixedMinutes, joinApproach, walkedTiles } from '../src/lib/tube-journeys';
+import { eventRoute, eventTubeJourney, marketWindow, strollRuns } from '../src/lib/resident-trips';
+import { placeSchema } from '../src/lib/schema';
+import { AFTER_HOURS as SAMPLE_HOME } from './fixtures';
 import { isTubePlot, TUBE_HALT_PLOTS, TUBE_STATIONS } from '../src/lib/tubes';
 import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
 import { MARKET_SITE, TOWN_SIZE } from '../src/lib/town-config';
-import { roadPath } from '../src/lib/walking';
+import { planJourney, roadPath, routeLength, WORTH_THE_WALK } from '../src/lib/walking';
 import {
   getPlot,
   hash,
@@ -816,5 +819,69 @@ describe('The Riverside’s registries', () => {
     ]);
     for (const buttons of Object.values(DISTRICT_BUTTONS))
       expect(Array.isArray(buttons)).toBe(true);
+  });
+});
+
+describe('The market’s own hours', () => {
+  it('gives every home a window its seat-0 trip can make, or the whole market when none can', () => {
+    const ACTIVITIES = ['stroll', 'work', 'home'] as const;
+    const market = { venue: MARKET_VENUE, outing: 'market' as const };
+    const { depart, start, end } = OUTING_TIMES.market;
+    let own = 0,
+      moved = 0,
+      nominal = 0;
+    // Every routine with a morning stroll, on every house plot.
+    for (const [k, afternoon, evening, night] of ACTIVITIES.flatMap((a, i) =>
+      ACTIVITIES.flatMap((e, j) =>
+        (['stroll', 'sleep'] as const).map((n, l) => [i * 6 + j * 2 + l, a, e, n] as const),
+      ),
+    ))
+      for (const plot of HOUSE_PLOTS) {
+        const home = placeSchema.parse({
+          ...SAMPLE_HOME,
+          id: `browser-${k}-${plot.id.toLowerCase()}`,
+          plot: plot.id,
+          resident: {
+            ...SAMPLE_HOME.resident,
+            routine: { morning: 'stroll', afternoon, evening, night },
+          },
+        });
+        const window = marketWindow(home);
+        expect(marketWindow(home)).toBe(window);
+        // The seat-0 trip, best of walk or tube, in the home's morning run.
+        const tube = eventTubeJourney(home, market, 0);
+        const walkTiles = tube ? walkedTiles(tube.legs) : routeLength(eventRoute(home, market, 0));
+        const fixed = tube ? fixedMinutes(tube.legs) : 0;
+        const run = strollRuns(home)[0];
+        const makes = (from: number, until: number) =>
+          !!planJourney(
+            walkTiles,
+            fixed,
+            from,
+            until,
+            run.start,
+            run.end,
+            depart,
+            0,
+            WORTH_THE_WALK,
+          );
+        expect(window.start).toBeGreaterThanOrEqual(start);
+        expect(window.end).toBeLessThanOrEqual(end);
+        if (makes(window.start, window.end)) {
+          const slot = start + 10 * (hash(`market-browse:${home.id}`) % 13);
+          if (window.start === slot) own++;
+          else moved++;
+          continue;
+        }
+        // Only when no slot of the thirteen can be made: then the whole market, 08:00–11:30.
+        nominal++;
+        expect(window).toEqual({ start, end });
+        const stay = 60 + (hash(`market-stay:${home.id}`) % 31);
+        for (let slot = start; slot <= start + 120; slot += 10)
+          expect(makes(slot, Math.min(end, slot + stay))).toBe(false);
+      }
+    expect(own).toBeGreaterThan(moved);
+    expect(moved).toBeGreaterThan(0);
+    expect(nominal).toBe(0);
   });
 });

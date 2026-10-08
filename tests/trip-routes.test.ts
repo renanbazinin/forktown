@@ -45,6 +45,7 @@ import { roadPath, routeLength, MAX_TRAVEL_SPEED_MULTIPLIER, WALK_SPEED } from '
 import { getPlot, plotEntrance, type Point } from '../src/lib/world';
 import { fullTown, fullTownHouse, readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
+import { outingOf } from '../src/lib/outings';
 
 const real = readPlaces();
 const everyone = fullTown(real);
@@ -100,7 +101,7 @@ function outings(town: Place[], days: number[]) {
     }),
   );
 }
-const SEATED = ['sit', 'read', 'sip', 'chat'];
+const SEATED = ['sit', 'read', 'sip', 'chat', 'perch', 'tea'];
 
 describe('Walking routes to the venues', () => {
   it(
@@ -518,10 +519,14 @@ describe('At the venue', () => {
   it('crouches for a moment sitting down on a blanket or a cinema seat, and getting up', () => {
     let seats = 0,
       players = 0;
-    for (const { home, trip, day } of outings(everyone, DAYS(4))) {
+    // A week of the full town: a morning at the market can make a games player late for the
+    // lunch, so a few days pass with no one waiting on the blanket to play.
+    for (const { home, trip, day } of outings(everyone, DAYS(8))) {
       const kind = trip.event.venue.kind;
       const pose = (t: number) => stateOn(home, trip, t, day).pose;
-      if (kind !== 'green' && kind !== 'cinema') {
+      // The Riverside's seated outings (the Bandstand's deckchairs, the stars' rugs) sit too.
+      const seatedOuting = !!trip.event.outing && outingOf(trip.event.outing)!.seated;
+      if (kind !== 'green' && kind !== 'cinema' && !seatedOuting) {
         for (const t of [trip.arrive + SEAT_SETTLE / 2, trip.leave - SEAT_SETTLE / 2])
           expect(pose(t)).not.toBe('crouch');
         continue;

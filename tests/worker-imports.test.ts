@@ -120,3 +120,19 @@ describe('The live page’s own modules', () => {
     }
   });
 });
+
+describe('The Riverside’s feature files', () => {
+  it('stay out of the cinema and music workers and the place schema', () => {
+    // The workers and the schema reach the frozen district data, never a feature's poses or art.
+    for (const entry of [
+      'src/music/cinema-worker.ts',
+      'src/music/render-worker.ts',
+      'src/lib/schema.ts',
+    ]) {
+      const reached = [...bundle(entry)].filter(
+        (file) => file.startsWith('src/lib/outings/') || file.startsWith('src/city/'),
+      );
+      expect(reached, entry).toEqual([]);
+    }
+  });
+});

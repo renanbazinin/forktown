@@ -1,0 +1,1180 @@
+[
+  {
+    "id": "after-hours",
+    "name": "After Hours Studio",
+    "creator": "forktown",
+    "plot": "C4",
+    "building": "studio",
+    "color": "#AD88AE",
+    "decoration": "tree",
+    "story": "An open studio for tiny experiments and big what-ifs. Come as you are. Make something a little weird.",
+    "design": {
+      "wall": "#E9D1BE",
+      "trim": "#715E51",
+      "floors": 2,
+      "roof": "classic",
+      "windows": "round",
+      "garden": "paving",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Juno",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#AD88AE",
+      "accessory": "hat",
+      "greeting": "Still a little awake?",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "home",
+        "evening": "stroll",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "AFTER HOURS STUDIO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "arts",
+    "name": "arts",
+    "creator": "renabazinin",
+    "plot": "E5",
+    "building": "observatory",
+    "color": "#789B76",
+    "decoration": "flowers",
+    "story": "A small corner of the internet, made with curiosity and a little courage.",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 3,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "New neighbor",
+      "skin": "#ffffff",
+      "hair": "#05ff8a",
+      "outfit": "#60838a",
+      "accessory": "hat",
+      "greeting": "Go with honor, friend!",
+      "routine": {
+        "morning": "home",
+        "afternoon": "home",
+        "evening": "stroll",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": "<div style=\"background-color: #291B38; text-align: center\">\n  <strong style=\"color: #FFACC5; font-size: 28px\">▄██▄ ▄██▄</strong>\n  <strong style=\"color: #FF729F; font-size: 28px\">▀███████▀</strong>\n  <strong style=\"color: #FFC296; font-size: 28px\">▀███▀</strong>\n</div>"
+    }
+  },
+  {
+    "id": "bazplace",
+    "name": "BazPlace",
+    "creator": "Sharpen6",
+    "plot": "E4",
+    "building": "studio",
+    "color": "#789B76",
+    "decoration": "bench",
+    "story": "Metal symphonic music",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "gable",
+      "windows": "round",
+      "garden": "vegetables",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Hazel",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": "<div style=\"background-color: #203B35; text-align: center\">\n  <strong style=\"color: #FFE7A3; font-size: 24px\">SHARPEN'S</strong>\n  <p style=\"color: #BFE2C2; font-size: 12px\">WELCOME HOME</p>\n</div>"
+    }
+  },
+  {
+    "id": "casino",
+    "name": "Casino",
+    "creator": "shaiyona336",
+    "plot": "F7",
+    "building": "observatory",
+    "color": "#C97878",
+    "decoration": "tree",
+    "story": "Gambling with no commission exclusive to the citizens of the village",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 1,
+      "roof": "flat",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Shai",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "Casino",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "clover-house",
+    "name": "Clover House",
+    "creator": "s0583232209",
+    "plot": "A4",
+    "building": "bookshop",
+    "color": "#D0AA65",
+    "decoration": "flowers",
+    "story": "Teh bookshop for all who loves old, yellow and falling apart books.",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "classic",
+      "windows": "shutters",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Remy",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "clover-nest",
+    "name": "Clover Nest",
+    "creator": "tehila7929-tech",
+    "plot": "Q1",
+    "building": "cottage",
+    "color": "#789B76",
+    "decoration": "tree",
+    "story": "I love the view.",
+    "design": {
+      "wall": "#dbc895",
+      "trim": "#a76e39",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "vegetables",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "it's me",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "hat",
+      "greeting": "SHALOM!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": "I am here!!"
+    }
+  },
+  {
+    "id": "coffe-power",
+    "name": "coffe power",
+    "creator": "odelia50872",
+    "plot": "G7",
+    "building": "cafe",
+    "color": "#C97878",
+    "decoration": "flowers",
+    "story": "Bon a petit!!",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Odelia",
+      "figure": "female",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hi!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HI",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "evergreen",
+    "name": "Evergreen House",
+    "creator": "forktown",
+    "plot": "D2",
+    "building": "greenhouse",
+    "color": "#7DAB95",
+    "decoration": "flowers",
+    "story": "A quiet place to grow something new. Water the plants, make a little progress, and remember to take a break.",
+    "design": {
+      "wall": "#E1E6CE",
+      "trim": "#687451",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "vegetables",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Fern",
+      "skin": "#A97652",
+      "hair": "#3F3735",
+      "outfit": "#7DAB95",
+      "accessory": "none",
+      "greeting": "Looking lovely today!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "EVERGREEN HOUSE",
+      "color": "#FFF4D4",
+      "background": "#735557",
+      "html": ""
+    }
+  },
+  {
+    "id": "faigy-house",
+    "name": "Faigy Rosenfelds House",
+    "creator": "Faigy-Rosenfeld",
+    "plot": "T3",
+    "building": "cottage",
+    "color": "#4a90e2",
+    "decoration": "flowers",
+    "story": "Faigy Rosenfelds House"
+  },
+  {
+    "id": "funky-fun",
+    "name": "funky fun",
+    "creator": "renabazinin",
+    "plot": "A2",
+    "building": "studio",
+    "color": "#789B76",
+    "decoration": "flowers",
+    "story": "A small corner of the internet, made with curiosity and a little courage.",
+    "design": {
+      "wall": "#625b5b",
+      "trim": "#4b3016",
+      "floors": 1,
+      "roof": "flat",
+      "windows": "cross",
+      "garden": "vegetables",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "bobo",
+      "skin": "#000000",
+      "hair": "#db9129",
+      "outfit": "#000000",
+      "accessory": "hat",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "stroll",
+        "evening": "stroll",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": "<div style=\"background-color: #192B40; text-align: center\">\n  <strong style=\"color: #FFD580; font-size: 28px\">MOON CLUB</strong>\n  <p style=\"color: #A8E6CF; font-size: 16px\">Night owls welcome</p>\n</div>"
+    }
+  },
+  {
+    "id": "hello-world",
+    "name": "Hello, World!",
+    "creator": "forktown",
+    "plot": "C2",
+    "building": "cottage",
+    "color": "#789B76",
+    "decoration": "mailbox",
+    "story": "Every adventure starts somewhere. This little cottage is a reminder that your first contribution belongs here.",
+    "design": {
+      "wall": "#F0DCB4",
+      "trim": "#795C58",
+      "floors": 2,
+      "roof": "gable",
+      "windows": "shutters",
+      "garden": "wildflowers",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Pip",
+      "skin": "#F0C9A8",
+      "hair": "#A46E45",
+      "outfit": "#789B76",
+      "accessory": "glasses",
+      "greeting": "Hello, world!",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "stroll",
+        "evening": "home"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO, WORLD!",
+      "color": "#FFF4D4",
+      "background": "#4C5E6C",
+      "html": ""
+    }
+  },
+  {
+    "id": "jons-arcade",
+    "name": "Arcade",
+    "creator": "SomeJon",
+    "plot": "E2",
+    "building": "studio",
+    "color": "#BE185D",
+    "decoration": "bench",
+    "story": "Downstairs is a retro arcade with neon duel stations and coin-op fighting games. Upstairs is Jon's cozy living loft.",
+    "design": {
+      "wall": "#FFFBEB",
+      "trim": "#D97706",
+      "floors": 2,
+      "roof": "flat",
+      "windows": "round",
+      "garden": "paving",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Jon",
+      "skin": "#D9B68B",
+      "hair": "#451A03",
+      "outfit": "#BE185D",
+      "accessory": "glasses",
+      "greeting": "Time to d-d-d-duel!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "ARCADE",
+      "color": "#F472B6",
+      "background": "#311333",
+      "html": "<div style=\"background-color: #311333; color: #F472B6; text-align: center\"><strong style=\"font-size: 24px\">🎮 ARCADE 🎮</strong><p style=\"font-size: 12px; color: #FBBF24\">Time to Duel!</p></div>"
+    }
+  },
+  {
+    "id": "little-workshop",
+    "name": "The Little Workshop",
+    "creator": "forktown",
+    "plot": "B4",
+    "building": "studio",
+    "color": "#BE8E68",
+    "decoration": "mailbox",
+    "story": "Where loose ideas become real things. Borrow a tool, ask a question, and leave the door open for the next person.",
+    "design": {
+      "wall": "#DDCFBE",
+      "trim": "#715E51",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "round",
+      "garden": "paving",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Otto",
+      "skin": "#885E45",
+      "hair": "#DBD0AA",
+      "outfit": "#BE8E68",
+      "accessory": "hat",
+      "greeting": "Made anything lately?",
+      "routine": {
+        "morning": "work",
+        "afternoon": "home",
+        "evening": "home"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "MADE HERE",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "moonbeam-cafe",
+    "name": "Moonbeam Café",
+    "creator": "forktown",
+    "plot": "B2",
+    "building": "cafe",
+    "color": "#C97878",
+    "decoration": "flowers",
+    "story": "Coffee for early birds, night owls, and anyone fixing one last bug. There's always a seat by the window.",
+    "design": {
+      "wall": "#F3E5CE",
+      "trim": "#687451",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "vegetables",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Milo",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#C97878",
+      "accessory": "none",
+      "greeting": "Coffee and a wander?",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "MOONBEAM",
+      "color": "#FFF4D4",
+      "background": "#735557",
+      "html": "<div style=\"background-color: #35554A; color: #FFF4D4\"><strong style=\"font-size: 24px\">MOONBEAM</strong><p style=\"font-size: 12px\">Coffee &amp; company</p></div>"
+    }
+  },
+  {
+    "id": "moss-nook",
+    "name": "Moss Nook",
+    "creator": "renanbazinin",
+    "plot": "G6",
+    "building": "cottage",
+    "color": "#789B76",
+    "decoration": "flowers",
+    "story": "A small corner of the internet, made with curiosity and a little courage.",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Eliza",
+      "skin": "#cfcfcf",
+      "hair": "#eb8900",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "mulu-s",
+    "name": "Mulu's",
+    "creator": "HayluMulu",
+    "plot": "F6",
+    "building": "cottage",
+    "color": "#789B76",
+    "decoration": "bench",
+    "story": "Everyone’s welcome at this extremely basic sweet home. \nPlease smoke on the balcony or the bench with friends.\nDO NOT STEP ON THE GRASS!!!!!!!!!!!.\nenjoy :)",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "gable",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Mulu",
+      "skin": "#785a36",
+      "hair": "#fffdcc",
+      "outfit": "#4bbcbe",
+      "accessory": "glasses",
+      "greeting": "Yo!",
+      "routine": {
+        "morning": "home",
+        "afternoon": "work",
+        "evening": "stroll",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": "<div style=\"background-color: #182B28; color: #FFD58A; text-align: center\"><strong style=\"font-size: 28px\">MULU'S</strong><br><strong style=\"font-size: 16px\">Smoke • Chill • Stay</strong><br></div>"
+    }
+  },
+  {
+    "id": "my-little-place",
+    "name": "My Little Place",
+    "creator": "renanbazinin",
+    "plot": "A1",
+    "building": "studio",
+    "color": "#b88e19",
+    "decoration": "bench",
+    "story": "A small corner of the internet, made with curiosity and a little courage.",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#795C58",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "shutters",
+      "garden": "wildflowers",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Renan",
+      "skin": "#A97652",
+      "hair": "#3F3735",
+      "outfit": "#b88e19",
+      "accessory": "glasses",
+      "greeting": "Hey, neighbor!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "MAKE SOMETHING",
+      "color": "#FFF4D4",
+      "background": "#4C5E6C",
+      "html": ""
+    }
+  },
+  {
+    "id": "olive-lodge",
+    "name": "Olive Lodge",
+    "creator": "yehudit-123",
+    "plot": "J5",
+    "building": "cottage",
+    "color": "#C97878",
+    "decoration": "flowers",
+    "story": "welcome everyone!",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "yuda",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#ff00ea",
+      "accessory": "hat",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "stroll",
+        "evening": "stroll",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "plot-twist",
+    "name": "Plot Twist Books",
+    "creator": "forktown",
+    "plot": "B3",
+    "building": "bookshop",
+    "color": "#759BAF",
+    "decoration": "bench",
+    "story": "A bookshop for unfinished stories and unexpected ideas. The best chapter is the one you haven't written yet.",
+    "design": {
+      "wall": "#DBCBDC",
+      "trim": "#715E51",
+      "floors": 2,
+      "roof": "gable",
+      "windows": "round",
+      "garden": "paving",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Nia",
+      "skin": "#F0C9A8",
+      "hair": "#A46E45",
+      "outfit": "#759BAF",
+      "accessory": "hat",
+      "greeting": "One more chapter?",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "home",
+        "evening": "home",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "PLOT TWIST BOOKS",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "rehovot-orchard",
+    "name": "Rehovot Orchard",
+    "creator": "Adi1231234",
+    "plot": "C6",
+    "building": "greenhouse",
+    "color": "#e08a3c",
+    "decoration": "tree",
+    "story": "A little greenhouse from Rehovot, where oranges grew long before the labs did. Take a lemon on your way out.",
+    "design": {
+      "wall": "#f4ead5",
+      "trim": "#5e7a4a",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "vegetables",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Adi",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#3b2a20",
+      "outfit": "#e08a3c",
+      "accessory": "none",
+      "greeting": "Shalom, neighbor!",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "work",
+        "evening": "stroll",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "REHOVOT",
+      "color": "#ffd58a",
+      "background": "#5e7a4a",
+      "html": ""
+    }
+  },
+  {
+    "id": "resting-place",
+    "name": "Resting Place",
+    "creator": "Rivka-Weinstock",
+    "plot": "T10",
+    "building": "cafe",
+    "color": "#BE8E68",
+    "decoration": "tree",
+    "story": "Wellcome to My place!!",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "classic",
+      "windows": "shutters",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Golda",
+      "figure": "female",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "hat",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "shiri-s-house",
+    "name": "shiri's house",
+    "creator": "shir-exe",
+    "plot": "J10",
+    "building": "cottage",
+    "color": "#759BAF",
+    "decoration": "mailbox",
+    "story": "cozy winter house",
+    "design": {
+      "wall": "#d7b4e4",
+      "trim": "#4a8765",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Avery",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "stargazer",
+    "name": "Stargazer Station",
+    "creator": "forktown",
+    "plot": "D4",
+    "building": "observatory",
+    "color": "#8392B1",
+    "decoration": "bench",
+    "story": "Looking up is a good way to find perspective. Tonight's forecast: a sky full of possibilities.",
+    "design": {
+      "wall": "#D1DDE0",
+      "trim": "#687451",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "vegetables",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Sol",
+      "skin": "#885E45",
+      "hair": "#DBD0AA",
+      "outfit": "#8392B1",
+      "accessory": "none",
+      "greeting": "Keep looking up.",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "stroll",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "STARGAZER STATION",
+      "color": "#FFF4D4",
+      "background": "#735557",
+      "html": ""
+    }
+  },
+  {
+    "id": "strange-people",
+    "name": "strange people",
+    "creator": "SaritNerya",
+    "plot": "I7",
+    "building": "greenhouse",
+    "color": "#ff0a0a",
+    "decoration": "tree",
+    "story": "strange people live",
+    "design": {
+      "wall": "#09c888",
+      "trim": "#a69108",
+      "floors": 2,
+      "roof": "gable",
+      "windows": "shutters",
+      "garden": "vegetables",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "strong",
+      "figure": "male",
+      "skin": "#c9924f",
+      "hair": "#fb185c",
+      "outfit": "#ffec1a",
+      "accessory": "hat",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "Goodbye",
+      "color": "#0ff5b0",
+      "background": "#174f03",
+      "html": ""
+    }
+  },
+  {
+    "id": "sunday-morning",
+    "name": "Sunday Morning",
+    "creator": "forktown",
+    "plot": "C3",
+    "building": "cottage",
+    "color": "#D0AA65",
+    "decoration": "tree",
+    "story": "Slow mornings, warm light, and absolutely no meetings. Leave a good thought in the mailbox on your way past.",
+    "design": {
+      "wall": "#F1DCBF",
+      "trim": "#795C58",
+      "floors": 1,
+      "roof": "classic",
+      "windows": "shutters",
+      "garden": "wildflowers",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Bea",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#D0AA65",
+      "accessory": "glasses",
+      "greeting": "Take your time.",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "stroll",
+        "evening": "home"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "SLOW DAYS",
+      "color": "#FFF4D4",
+      "background": "#4C5E6C",
+      "html": ""
+    }
+  },
+  {
+    "id": "tal-craft-studio",
+    "name": "Craft Studio",
+    "creator": "TalOrlanczyk",
+    "plot": "F2",
+    "building": "studio",
+    "color": "#7C3AED",
+    "decoration": "bench",
+    "story": "Downstairs is a bustling arts and crafts workshop filled with clay, paint, and handmade projects. Upstairs is Jon's cozy maker loft.",
+    "design": {
+      "wall": "#FFFBEB",
+      "trim": "#C084FC",
+      "floors": 2,
+      "roof": "flat",
+      "windows": "round",
+      "garden": "paving",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Jon",
+      "skin": "#D9B68B",
+      "hair": "#451A03",
+      "outfit": "#7C3AED",
+      "accessory": "glasses",
+      "greeting": "Let's make something!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "html",
+      "text": "CRAFT STUDIO",
+      "color": "#C084FC",
+      "background": "#2B213A",
+      "html": "<div style=\"background-color: #2B213A; color: #C084FC; text-align: center\"><strong style=\"font-size: 24px\">✨ CRAFT STUDIO ✨</strong><p style=\"font-size: 12px; color: #34D399\">Make • Mold • Inspire</p></div>"
+    }
+  },
+  {
+    "id": "vaxsius-markus",
+    "name": "Vaxsius Markus",
+    "creator": "amashi",
+    "plot": "A3",
+    "building": "observatory",
+    "color": "#759BAF",
+    "decoration": "tree",
+    "story": "The house was full and yet empty",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "flat",
+      "windows": "round",
+      "garden": "paving",
+      "feature": "none"
+    },
+    "resident": {
+      "name": "Droply",
+      "skin": "#D9B68B",
+      "hair": "#fffc41",
+      "outfit": "#5e30eb",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "?",
+      "color": "#FFF4D4",
+      "background": "#00c7fc",
+      "html": ""
+    }
+  },
+  {
+    "id": "willow-cottage",
+    "name": "Willow Cottage",
+    "creator": "r0533154639-arch",
+    "plot": "Q10",
+    "building": "cottage",
+    "color": "#C97878",
+    "decoration": "flowers",
+    "story": "Hi!!!!!!!!",
+    "design": {
+      "wall": "#48938e",
+      "trim": "#846C56",
+      "floors": 2,
+      "roof": "classic",
+      "windows": "shutters",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Elio",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  },
+  {
+    "id": "willow-lodge",
+    "name": "Willow Lodge",
+    "creator": "renanbazinin",
+    "plot": "Q3",
+    "building": "cottage",
+    "color": "#789B76",
+    "decoration": "flowers",
+    "story": "A small corner of the internet, made with curiosity and a little courage.",
+    "design": {
+      "wall": "#F0E5C8",
+      "trim": "#db924d",
+      "floors": 2,
+      "roof": "flat",
+      "windows": "shutters",
+      "garden": "paving",
+      "feature": "porch"
+    },
+    "resident": {
+      "name": "Emmett",
+      "figure": "female",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "gl hf",
+      "routine": {
+        "morning": "stroll",
+        "afternoon": "stroll",
+        "evening": "stroll",
+        "night": "stroll"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "gl hf",
+      "color": "#000000",
+      "background": "#dedede",
+      "html": ""
+    }
+  },
+  {
+    "id": "yael-s-home",
+    "name": "Yael's Home",
+    "creator": "YaelTamari",
+    "plot": "J6",
+    "building": "cottage",
+    "color": "#e12349",
+    "decoration": "mailbox",
+    "story": "Lots of love and warmth",
+    "design": {
+      "wall": "#f5e7c2",
+      "trim": "#72563b",
+      "floors": 2,
+      "roof": "classic",
+      "windows": "cross",
+      "garden": "wildflowers",
+      "feature": "balcony"
+    },
+    "resident": {
+      "name": "Gemma",
+      "figure": "male",
+      "skin": "#D9B68B",
+      "hair": "#675A48",
+      "outfit": "#789B76",
+      "accessory": "none",
+      "greeting": "Hello!",
+      "routine": {
+        "morning": "work",
+        "afternoon": "stroll",
+        "evening": "home",
+        "night": "sleep"
+      }
+    },
+    "sign": {
+      "mode": "text",
+      "text": "HELLO",
+      "color": "#FFF4D4",
+      "background": "#35554A",
+      "html": ""
+    }
+  }
+]

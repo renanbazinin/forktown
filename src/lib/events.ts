@@ -249,6 +249,8 @@ export function eventsForDay(day: number, minutes = 720): TownEvent[] {
       end: 1020,
       homeBy: 1320,
     },
+    // Then the Riverside's outings on this day (SPEC §4.0.I); today's five keep their places.
+    ...districtEvents(day, minutes),
   ];
 }
 /**
