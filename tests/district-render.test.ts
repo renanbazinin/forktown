@@ -1,11 +1,11 @@
 // The Riverside's shared render checks (SPEC §6.6), with every cap final: each district painter
-// draws nothing off-screen and keeps to its call cap, the cached ground never reads the minute,
-// nothing is amber by day, no light or awning flashes, a boat under the Kingfisher bridge stays in
-// sight, and the frames that matter (the test camera box, the real opening frame, the whole town,
-// the east live frames) stay within their budgets with every feature on, and the Bandstand lawn's
-// two features (the bands' deckchairs, the stargazers' rugs and telescope) keep out of each other's
-// way. Each feature agent adds its own checks in tests/district-render-<agent>.test.ts; none edits
-// this file.
+// draws nothing off-screen and keeps to its call cap at its year's busiest moments, the cached
+// ground never reads the minute, nothing is amber by day, no light or awning flashes, a boat under
+// the Kingfisher bridge stays in sight, and the frames that matter (the test camera box, the real
+// opening frame, the whole town, the east live frames) stay within their budgets with every
+// feature on, and the Bandstand lawn's two features (the bands' deckchairs, the stargazers' rugs
+// and telescope) keep out of each other's way. Each feature agent adds its own checks in
+// tests/district-render-<agent>.test.ts; none edits this file.
 import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
@@ -52,6 +52,14 @@ const PLAIN = dayOf('Spring', 9),
   HARVEST = dayOf('Autumn', 23),
   SNOWMEN = dayOf('Winter', 11),
   BUILT = dayOf('Winter', 16);
+// The busiest moments a sweep of the merged town's year found (every 2.5–5 minutes of each
+// feature's days, at zoom 1 and 2.4): the farmers' autumn market (also a star night), a winter
+// teatime set, the regatta's second day, the fair's second, the first winter star night and the
+// last snowman's build.
+const AUTUMN_1 = dayOf('Autumn', 1),
+  WINTER_1 = dayOf('Winter', 1),
+  WINTER_3 = dayOf('Winter', 3),
+  WINTER_15 = dayOf('Winter', 15);
 const isNight = (minutes: number) => minutes < 360 || minutes >= 1200;
 const everywhere = () => true;
 const nowhere = () => false;
@@ -180,13 +188,24 @@ describe('Each district painter', () => {
         ['harvest', HARVEST, 1235, 1_200],
         // Four snowmen.
         ['snowmen', BUILT, 720, 40],
+        // The busiest moment of each over the year, with the day's own guests where they are
+        // (measured 1,039 and 1,042; 437; 246; 874; 204; 38).
+        ['market', AUTUMN_1, 600, 1_100],
+        ['market', AUTUMN_1, 685, 1_100],
+        ['bandstand', WINTER_3, 960, 500],
+        ['landing', REGATTA, 995, 600],
+        ['harvest', HARVEST, 1195, 1_200],
+        ['stargazing', WINTER_1, 1342.5, 300],
+        ['snowmen', WINTER_15, 900, 40],
       ];
       for (const [id, day, minutes, cap] of caps)
         for (const zoom of [1, 2.4]) {
           const scene = sceneAt(day, minutes, everywhere, zoom);
           const calls = paintPainter(
             DISTRICT_PAINTERS[id],
-            id === 'market' ? { ...scene, residents: withEveryBrowser(scene) } : scene,
+            id === 'market' && minutes === 600
+              ? { ...scene, residents: withEveryBrowser(scene) }
+              : scene,
           ).calls.length;
           expect(calls, `${id} on ${day} at ${minutes}, zoom ${zoom}`).toBeLessThanOrEqual(cap);
         }
@@ -511,11 +530,20 @@ describe('The frames that matter, with every feature on', () => {
     'keeps the whole full town at fit, and every east live frame, within budget',
     () => {
       const whole = fitView(1440, 900, WORLD_BOUNDS);
-      for (const minutes of [720, 1205])
+      // Spring noon and evening; the busiest found, snow on the ground with all four snowmen
+      // (measured 142,653) and the Long Table with every dish out (136,796).
+      for (const [day, minutes] of [
+        [PLAIN, 720],
+        [PLAIN, 1205],
+        [BUILT, 720],
+        [HARVEST, 1195],
+      ])
         expect(
-          frameCalls({ width: 1440, height: 900, camera: whole, homes: town, day: PLAIN, minutes }),
-          `whole town at ${minutes}`,
+          frameCalls({ width: 1440, height: 900, camera: whole, homes: town, day, minutes }),
+          `whole town on ${day} at ${minutes}`,
         ).toBeLessThanOrEqual(150_000);
+      // One moment of each shot, then each shot's busiest over its days, every 2.5 minutes of
+      // its window (measured 17,068; 14,601; 15,100; 14,725; 13,941; 12,977).
       for (const [name, day, minutes] of [
         ['market', PLAIN, 600],
         ['bandstand', PLAIN, 980],
@@ -523,6 +551,12 @@ describe('The frames that matter, with every feature on', () => {
         ['regatta', REGATTA, 920],
         ['harvest', HARVEST, 920],
         ['harvest', HARVEST, 1234],
+        ['market', AUTUMN_1, 595],
+        ['bandstand', REGATTA, 997.5],
+        ['regatta', REGATTA + 1, 935],
+        ['harvest', HARVEST + 1, 927.5],
+        ['harvest', HARVEST + 1, 1224],
+        ['bandstand', AUTUMN_1, 1415],
       ] as const) {
         const frame = DISTRICT_FRAMES[name];
         expect(frame.width).toBeLessThanOrEqual(850);
