@@ -18,7 +18,7 @@ export const PlaceRow = memo(function PlaceRow({
 }) {
   return (
     <button className="browse-row place-row" onClick={() => onSelect(place.plot, true)}>
-      <BuildingPreview place={place} size={48} />
+      <BuildingPreview place={place} size={48} lazy />
       <span>
         <strong>{place.name}</strong>
         <small>

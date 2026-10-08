@@ -473,18 +473,29 @@ describe('The note in the Bandstand’s panel', () => {
     }
   });
 
-  it('shows in the Bandstand’s panel on a star night, under the band', () => {
-    const html = renderToStaticMarkup(
-      createElement(BandstandInfo, {
-        day: SUMMER_27,
-        minutes: 1380,
-        residents: [guest('Ada', 'attending')],
-        places: [],
-        onFollow: () => {},
-      }),
-    );
+  it('shows in the Bandstand’s panel on a star night, first once the band has gone', () => {
+    const panel = (minutes: number, selected: string | null = null) =>
+      renderToStaticMarkup(
+        createElement(BandstandInfo, {
+          day: SUMMER_27,
+          minutes,
+          residents: [guest('Ada', 'attending')],
+          places: [],
+          onFollow: () => {},
+          selected,
+        }),
+      );
+    const order = (html: string) =>
+      html.indexOf('<h3>Stargazing by the river.</h3>') - html.indexOf('<h3>The Bandstand.</h3>');
+    const html = panel(1380);
     expect(html).toContain('Stargazing by the river.');
     expect(html).toContain('Ada is out on the rugs.');
+    // At 23:00 the stars lead, and the band's day is marked over; at teatime the band leads.
+    expect(order(html)).toBeLessThan(0);
+    expect(html).toContain('FINISHED TODAY');
+    expect(order(panel(970))).toBeGreaterThan(0);
+    // Chosen from the stars' card, the note leads even while the band is on.
+    expect(order(panel(1020, 'stargazing'))).toBeLessThan(0);
     const note = renderToStaticMarkup(
       createElement(StargazingNote, { day: SUMMER_27, minutes: 1300, residents: [] }),
     );

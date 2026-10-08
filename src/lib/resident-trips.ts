@@ -1104,9 +1104,13 @@ export function tripState(
     there &&
     ((time < arrive + SPOT_TURN && opposite(endFacing(route), movement.facing)) ||
       (time >= leave - SPOT_TURN && opposite(movement.facing, startFacing(returnRoute))));
-  const shown = settling ? 'crouch' : turning ? undefined : pose;
   // What a Riverside guest carries, on their outing's own leg only (OutingSpec.carry).
   const carry = spec?.carry;
+  // Something carried there and set on the ground (the regatta's paper boat) is set down halfway
+  // down, through the turn to the spot's own way, waiting for the start or not.
+  const settingDown =
+    there && carry?.leg === 'going' && carry.setDown !== undefined && time < arrive + carry.setDown;
+  const shown = settling || settingDown ? 'crouch' : turning ? undefined : pose;
   const carrying = carry && carry.leg === phase;
   return {
     ...movement,

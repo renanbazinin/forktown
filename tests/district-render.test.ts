@@ -26,7 +26,7 @@ import { liveCamera } from '../src/lib/live-director';
 import { fitView } from '../src/lib/map-view';
 import { openingView } from '../src/lib/opening-view';
 import { residentTrips, tripState } from '../src/lib/resident-trips';
-import type { Place } from '../src/lib/schema';
+import { placeSchema, type Place } from '../src/lib/schema';
 import { townSeasonAt } from '../src/lib/seasons';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { BRAND } from '../src/lib/brand';
@@ -34,6 +34,7 @@ import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
 import { TUBE_PALETTE } from '../src/city/tubes';
 import { project, WORLD_BOUNDS, type Point } from '../src/lib/world';
 import { FROZEN_TOWN, LIVE_TOWN, TOWNS } from './district';
+import { fullTown } from './full-town';
 import { matrixContext, type MatrixPoint } from './matrix-context';
 import { recordingContext } from './recording-context';
 import { frameJumps } from './flash';
@@ -536,6 +537,11 @@ describe('The frames that matter, with every feature on', () => {
   it(
     'keeps the whole full town at fit, and every east live frame, within budget',
     () => {
+      // Measured on today's frozen 30 houses and a made-up house on every other plot, so the
+      // caps guard the code, never the roster: as contributors' heavier houses take the plots,
+      // the live town's count climbs with no change to the art. (The heaviest town is held to
+      // its own bound below.)
+      const frozen = fullTown(FROZEN_TOWN);
       const whole = fitView(1440, 900, WORLD_BOUNDS);
       // Spring noon and evening; the busiest found, snow on the ground with all four snowmen
       // (measured 142,653) and the Long Table with every dish out (136,796).
@@ -546,7 +552,7 @@ describe('The frames that matter, with every feature on', () => {
         [HARVEST, 1195],
       ])
         expect(
-          frameCalls({ width: 1440, height: 900, camera: whole, homes: town, day, minutes }),
+          frameCalls({ width: 1440, height: 900, camera: whole, homes: frozen, day, minutes }),
           `whole town on ${day} at ${minutes}`,
         ).toBeLessThanOrEqual(150_000);
       // One moment of each shot, then each shot's busiest over its days, every 2.5 minutes of
@@ -570,12 +576,57 @@ describe('The frames that matter, with every feature on', () => {
         expect(frame.height).toBeLessThanOrEqual(540);
         const camera = liveCamera({ id: name, kind: 'event', label: name, ...frame }, 1280, 720);
         expect(
-          frameCalls({ width: 1280, height: 720, camera, homes: town, day, minutes }),
+          frameCalls({ width: 1280, height: 720, camera, homes: frozen, day, minutes }),
           `${name} live at ${minutes}`,
         ).toBeLessThanOrEqual(20_000);
       }
     },
     rosterTimeout(0.5, 120_000),
+  );
+
+  it(
+    'keeps a whole town of the heaviest house within its own bound',
+    () => {
+      // The builder's heaviest house on every house plot: a café of two floors with a gable,
+      // shutters, a balcony, vegetables and a bench, a three-run HTML sign and a hat, at the
+      // busiest moment found (snow and all four snowmen). Measured 178,710. No roster moves it,
+      // and openingViewBudget's promise ("a town of the heaviest house at every size") holds for
+      // the whole town at fit too.
+      const sign = `<div style="background-color: #35554A; color: #FFF4D4; text-align: center">
+  <strong style="font-size: 24px">PLOT</strong>
+  <p style="font-size: 12px; color: #FFE7A3">A full town neighbor</p>
+  <span style="font-size: 16px; font-weight: bold">OPEN LATE</span>
+</div>`;
+      const heaviest = fullTown([]).map((place) =>
+        placeSchema.parse({
+          ...place,
+          building: 'cafe',
+          decoration: 'bench',
+          design: {
+            ...place.design,
+            floors: 2,
+            roof: 'gable',
+            windows: 'shutters',
+            feature: 'balcony',
+            garden: 'vegetables',
+          },
+          sign: { ...place.sign, mode: 'html', html: sign },
+          resident: { ...place.resident, accessory: 'hat' },
+        }),
+      );
+      const whole = fitView(1440, 900, WORLD_BOUNDS);
+      expect(
+        frameCalls({
+          width: 1440,
+          height: 900,
+          camera: whole,
+          homes: heaviest,
+          day: BUILT,
+          minutes: 720,
+        }),
+      ).toBeLessThanOrEqual(190_000);
+    },
+    rosterTimeout(0.3, 60_000),
   );
 });
 

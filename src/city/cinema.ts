@@ -1,5 +1,5 @@
 import { cinemaAt, CINEMA_GROUND, CINEMA_SEATS } from '../lib/cinema';
-import { project } from '../lib/world';
+import { project, type Point } from '../lib/world';
 import { snowAt, type TownSeason } from '../lib/seasons';
 import { drawCinemaAd, drawCinemaCard, drawCinemaFilm, loadReel } from './cinema-films';
 import {
@@ -37,6 +37,30 @@ export function cinemaScreenHit(point: { x: number; y: number }, reveal = 1) {
   const v = (point.y - (SCREEN_ORIGIN.y - 150) - u * SCREEN_SCALE * 0.5) / SCREEN_SCALE;
   return u >= -7 && u <= 327 && v >= 187 - 194 * reveal && v <= 194;
 }
+type Visible = (point: Point, rx: number, above: number, below: number) => boolean;
+const always: Visible = () => true;
+/** The ground's screen box, from its four projected corners, and above it the raised screen and
+ *  its masts (about 150 px over the ground's back corner). */
+const CINEMA_BOX = (() => {
+  const { left, right, top, bottom } = CINEMA_GROUND;
+  const corners = [
+    project(left, top),
+    project(right, top),
+    project(right, bottom),
+    project(left, bottom),
+  ];
+  const xs = corners.map((p) => p.x),
+    ys = corners.map((p) => p.y);
+  const l = Math.min(...xs),
+    r = Math.max(...xs),
+    t = Math.min(...ys),
+    b = Math.max(...ys);
+  return { foot: { x: (l + r) / 2, y: b }, rx: (r - l) / 2 + 12, above: b - t + 160, below: 12 };
+})();
+/** Whether any of the cinema's art reaches the view. */
+export const cinemaInView = (visible: Visible) =>
+  visible(CINEMA_BOX.foot, CINEMA_BOX.rx, CINEMA_BOX.above, CINEMA_BOX.below);
+
 export function drawCinema(
   ctx: Ctx,
   minutes: number,
@@ -44,7 +68,13 @@ export function drawCinema(
   night: boolean,
   selected = false,
   season?: TownSeason,
+  visible: Visible = always,
 ) {
+  const state = cinemaAt(minutes, day);
+  // Fetch the reel's pictures while the screen rises, half an hour before the first film, even
+  // with the cinema off the view: a pan or a cut to it then finds tonight's films ready.
+  if (state.screenReveal > 0) void loadReel();
+  if (!cinemaInView(visible)) return [];
   const { left, right, top, bottom } = CINEMA_GROUND;
   polygon(
     ctx,
@@ -82,9 +112,6 @@ export function drawCinema(
     ctx.fillStyle = '#E0CEAB';
     ctx.fillRect(p.x + 8, p.y - 2, 4, 5);
   }
-  const state = cinemaAt(minutes, day);
-  // Fetch the reel's pictures while the screen rises, half an hour before the first film.
-  if (state.screenReveal > 0) void loadReel();
   if (state.live) {
     polygon(
       ctx,

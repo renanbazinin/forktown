@@ -252,7 +252,7 @@ describe('The Riverside’s cards', () => {
     expect(labels.filter((label) => label.includes(BANDSTAND_VENUE.name))).toHaveLength(1);
     // Today's five keep their order.
     const names = five.map((event) => event.name);
-    const order = names.map((name) => labels.findIndex((label) => label.endsWith(`: ${name}`)));
+    const order = names.map((name) => labels.findIndex((label) => label.includes(`: ${name}, `)));
     expect(order.every((index) => index > 0)).toBe(true);
     expect(order).toEqual([...order].sort((a, b) => a - b));
   });
@@ -273,6 +273,12 @@ describe('The Riverside’s cards', () => {
     )!;
     expect(later.text).toContain('Later today · 08:00–11:30');
     expect(later.text).not.toMatch(/there/);
+    // The label says the card's status and times too, as words.
+    expect(later.label).toContain('later today, 08:00 to 11:30');
+    const finished = cards(all(1150), 1150, day, count).find((card) =>
+      card.label.includes(MARKET_VENUE.name),
+    )!;
+    expect(finished.label).toContain('finished today, 08:00 to 11:30');
   });
 });
 
@@ -369,8 +375,9 @@ describe('The Riverside on the live stream', () => {
     // the plan.
     for (const day of [REGATTA, HARVEST, STARS, PLAIN]) {
       const start = day * TOWN_DAY_MS;
+      // The day's own (a film night's stars before it may still run past midnight).
       const moments = protectedMoments(start, start + TOWN_DAY_MS, [sample]).filter(
-        (moment) => moment.kind === 'district',
+        (moment) => moment.kind === 'district' && moment.start >= start,
       );
       expect(moments.map((moment) => (moment.start - start) / 1000)).toEqual(
         liveDistrictShots(day).map((shot) => shot.from),
@@ -415,11 +422,13 @@ describe('The Riverside on the live stream', () => {
         if (first > shot.from) seen.late++;
       }
     }
-    // The year has every case: aired from the start, aired late, nobody planned, held off.
+    // The year has shots that air and days with nobody planned. Since the daily pick and the
+    // film night's windows keep every shot clear of what ranks higher (live-director), nothing
+    // planned is held off or airs late.
     expect(seen.aired).toBeGreaterThan(0);
-    expect(seen.late).toBeGreaterThan(0);
     expect(seen.nobody).toBeGreaterThan(0);
-    expect(seen.held).toBeGreaterThan(0);
+    expect(seen.late).toBe(0);
+    expect(seen.held).toBe(0);
   }, 60_000);
 });
 
@@ -690,6 +699,8 @@ describe('The Riverside on the map', () => {
     expect(app).not.toContain("import FarmInfo from './components/FarmInfo'");
     const city = readFileSync('src/components/City.tsx', 'utf8');
     expect(city).toContain('frameCamera(district, width, height)');
+    // On a harvest day the farm's panel opens on the fair (farmPanelFrame), read through a ref.
+    expect(city).toContain('farmPanelFrame(dayRef.current)');
     expect(city).toContain('bandstandListening(renderedCamera');
     const live = readFileSync('src/components/LiveStream.tsx', 'utf8');
     expect(live).toContain('bandstandListening(camera.current');

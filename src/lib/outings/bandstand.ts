@@ -50,9 +50,12 @@ function listen(c: PoseContext, poses: readonly EventPose[], calm: EventPose) {
   const poseOf = (k: number) =>
     k < 0 ? calm : poses[hash(`bandstand-pose:${day}:${home.id}:${k}`) % poses.length];
   const pose = poseOf(run);
-  // The last run before getting up keeps the pose it had, so every pose is held a minute.
-  if ((cheers && at + HOLD > up - SETTLE) || at + HOLD > leave - SETTLE) return poseOf(run - 1);
   const low = (p: EventPose) => p === 'sip';
+  // A run that changes height shows its pose only after the crouch: hold it a minute from then.
+  const shown = at + (low(pose) !== low(poseOf(run - 1)) ? SETTLE : 0);
+  // The last run before getting up keeps the pose it had, so every pose is held a minute.
+  if ((cheers && shown + HOLD > up - SETTLE) || shown + HOLD > leave - SETTLE)
+    return poseOf(run - 1);
   if (low(pose) !== low(poseOf(run - 1)) && time < at + SETTLE) return 'crouch';
   return pose;
 }

@@ -68,7 +68,7 @@ export const TUBE_HALT_NOTES: Readonly<Record<string, string>> = {
   N1: 'On the west edge, on the road to the zoo gate.',
   C1: 'The halt with the sign and the umbrella stand.',
   A9: 'The one halt on the north edge.',
-  C15: 'Across the duck street from the Market Square.',
+  C15: 'Across the duck street from Market Square.',
   L15: 'Its bridge spans the regatta course.',
   R15: 'The south-east end of the line, down the far bank.',
 };

@@ -1,7 +1,7 @@
 // The Riverside in the town's UI (SPEC §4.7, §7.0): each outing's events-list card and each
 // district venue's panel. TownEvents and App read these; a feature agent fills only its own panel
-// file. The keys and the imports here are frozen.
-import { lazy, type ComponentType, type LazyExoticComponent } from 'react';
+// file. The keys here are frozen.
+import type { ComponentType } from 'react';
 import {
   Music4,
   Sailboat,
@@ -15,6 +15,10 @@ import type { OutingId } from '../../lib/district-calendar';
 import type { DistrictKind } from '../../lib/district-places';
 import type { Place } from '../../lib/schema';
 import type { ResidentState } from '../../lib/simulation';
+import FarmInfo from '../FarmInfo';
+import BandstandInfo from './BandstandInfo';
+import LandingInfo from './LandingInfo';
+import MarketInfo from './MarketInfo';
 
 /** Every district panel gets the moment, who is out and how to follow them. */
 export type DistrictPanelProps = {
@@ -23,6 +27,8 @@ export type DistrictPanelProps = {
   residents: readonly ResidentState[];
   places: readonly Place[];
   onFollow: (id: string) => void;
+  /** The outing the visitor chose from its event card, which the panel puts first. */
+  selected?: string | null;
 };
 /** The stargazing note inside the Bandstand's panel on new-moon nights (agent E). */
 export type StargazingNoteProps = {
@@ -44,21 +50,16 @@ export const DISTRICT_CARDS: Record<OutingId, { icon: LucideIcon; group?: 'bands
   stargazing: { icon: Telescope },
 };
 
-type PanelModule = { default: ComponentType<DistrictPanelProps> };
-/** Where each district venue's panel lives: the harvest's is the farm's own panel. */
-export const DISTRICT_PANEL_FILES: Record<DistrictKind, () => Promise<PanelModule>> = {
-  market: () => import('./MarketInfo'),
-  bandstand: () => import('./BandstandInfo'),
-  landing: () => import('./LandingInfo'),
-  harvest: () => import('../FarmInfo'),
-};
-/** Each district venue's panel, loaded when it is first opened. */
-export const DISTRICT_PANELS: Record<
-  DistrictKind,
-  LazyExoticComponent<ComponentType<DistrictPanelProps>>
-> = {
-  market: lazy(DISTRICT_PANEL_FILES.market),
-  bandstand: lazy(DISTRICT_PANEL_FILES.bandstand),
-  landing: lazy(DISTRICT_PANEL_FILES.landing),
-  harvest: lazy(DISTRICT_PANEL_FILES.harvest),
+/**
+ * Each district venue's panel; the harvest's is the farm's own panel. Imported with the app, not
+ * lazily: the panels are a few kilobytes and share every module they use with the main chunk, so
+ * splitting them saved no first-load bytes, added requests, and a chunk lost to a deploy or a
+ * dropped connection took the whole app down with it. (Every import of this file from a panel is
+ * type-only, so there is no cycle at run time.)
+ */
+export const DISTRICT_PANELS: Record<DistrictKind, ComponentType<DistrictPanelProps>> = {
+  market: MarketInfo,
+  bandstand: BandstandInfo,
+  landing: LandingInfo,
+  harvest: FarmInfo,
 };

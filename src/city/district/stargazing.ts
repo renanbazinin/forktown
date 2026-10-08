@@ -30,8 +30,12 @@ export const eveningDay = (day: number, minutes: number) =>
 
 // ---- The rugs ----
 
-/** A rug's size in tiles, along x and along y: room for one neighbor sat in the middle. */
-export const RUG = { x: 0.52, y: 0.42 } as const;
+/**
+ * A rug's size in tiles, along x and along y: room for one neighbor sat in the middle. The front
+ * row's guests walk in down the gaps between the back row's rugs (the spots are 0.7 apart), so a
+ * rug is 0.42 across, leaving them 0.14 either side: nobody treads on a rug someone sits on.
+ */
+export const RUG = { x: 0.42, y: 0.42 } as const;
 /** Minutes a rug takes to unroll, and the gap between one rug and the next. */
 const UNROLL = 1.5;
 const STAGGER = 0.5;

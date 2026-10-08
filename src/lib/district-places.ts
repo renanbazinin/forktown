@@ -5,6 +5,7 @@
 import { MARKET_SITE } from './town-config.ts';
 import type { Point } from './world.ts';
 import {
+  harvestDay,
   KINGFISHER_PIER,
   landingRowY,
   REGATTA_BOATS,
@@ -208,13 +209,20 @@ export const DISTRICT_FRAMES: Record<
 > = {
   market: { center: { x: 1520, y: 1395 }, width: 640, height: 420 },
   bandstand: { center: { x: 608, y: 1922 }, width: 520, height: 370 },
-  regatta: { center: { x: 600, y: 2000 }, width: 740, height: 450 },
+  // Nearer the far bank than the river's middle (575, 1955; was 600, 2000), so the flat country
+  // beyond the bank is about a sixth of the frame, not a quarter, with the stage and the boom in.
+  regatta: { center: { x: 575, y: 1955 }, width: 740, height: 450 },
   harvest: { center: { x: -2261, y: 1785 }, width: 640, height: 420 },
 };
 export const MARKET_FRAME = DISTRICT_FRAMES.market;
 export const BANDSTAND_FRAME = DISTRICT_FRAMES.bandstand;
 export const REGATTA_FRAME = DISTRICT_FRAMES.regatta;
 export const HARVEST_FRAME = DISTRICT_FRAMES.harvest;
+/**
+ * The frame the farm's panel opens on: on a harvest day the fair and the Long Table at the west
+ * end (HARVEST_FRAME), else nothing, and the farm opens on its own whole-farm frame.
+ */
+export const farmPanelFrame = (day: number) => (harvestDay(day) ? HARVEST_FRAME : undefined);
 
 /**
  * When the Bandstand's furniture is out, town minutes on the evening's timeline: the deckchairs

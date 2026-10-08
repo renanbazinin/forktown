@@ -6,6 +6,7 @@
 // cap holds on the busiest morning of every market.
 import { describe, expect, it } from 'vitest';
 import {
+  CART_WOOD,
   COUNTER_FRONT,
   holderFacing,
   holderTurned,
@@ -253,6 +254,19 @@ describe('Market Square’s art', () => {
       const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];
       return r >= 0xe0 && g >= 0xb0 && g <= 0xea && b <= 0xb8 && r - b >= 0x40;
     };
+    // At night nothing warm outshines the cart's own night wood: a warm, bright patch reads as a
+    // lit window at the live zoom (a crate end once poked out past the cart's cover).
+    const sum = (colour: string) => {
+      const n = parseInt(colour.slice(1, 7), 16);
+      return (n >> 16) + ((n >> 8) & 255) + (n & 255);
+    };
+    const wood = Math.max(...CART_WOOD.map(([, night]) => sum(night)));
+    const litLike = (colour: string) => {
+      if (!/^#[0-9A-F]{6}/i.test(colour)) return false;
+      const n = parseInt(colour.slice(1, 7), 16);
+      const [r, , b] = [n >> 16, (n >> 8) & 255, n & 255];
+      return r - b >= 0x30 && sum(colour) > wood * 1.15;
+    };
     const glowing: string[] = [];
     for (const kind of ['farmers', 'flowers', 'books'] as const)
       for (const season of [0, 1, 2, 3])
@@ -286,7 +300,8 @@ describe('Market Square’s art', () => {
               visible: () => true,
             });
             for (const colour of draws)
-              if (amberLike(colour)) glowing.push(`${kind} ${season} ${minutes}: ${colour}`);
+              if (amberLike(colour) || (scene.night && litLike(colour)))
+                glowing.push(`${kind} ${season} ${minutes}: ${colour}`);
           }
     expect(glowing.slice(0, 12)).toEqual([]);
   });

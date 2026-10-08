@@ -373,6 +373,7 @@ export default function LiveStream() {
       <BreakOverlay active={shown} ms={ms} />
       <Soundtrack
         track={trackForTown(clock.minutes, events, bandstandField)}
+        bed={trackForTown(clock.minutes, events)}
         playing={clock.playing}
         football={football}
         listening={listening}

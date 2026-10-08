@@ -11,6 +11,7 @@ import {
   boatwrightAt,
   boatwrightWay,
   regattaGuestsOf,
+  settingDown,
   type RegattaGuest,
 } from '../src/city/district/landing';
 import LandingInfo, { atTheWater, regattaNow } from '../src/components/district/LandingInfo';
@@ -25,7 +26,7 @@ import {
 import { DISTRICT_COPY, PANEL_COPY } from '../src/lib/district-copy';
 import { DISTRICT_SPOTS, REGATTA_COURSE } from '../src/lib/district-places';
 import { LANE_SHIFT } from '../src/lib/lanes';
-import { REGATTA_CHEER, regattaCheer } from '../src/lib/outings/regatta';
+import { REGATTA_CHEER, regattaCheer, REGATTA_SET_DOWN } from '../src/lib/outings/regatta';
 import { residentTrips, tripState } from '../src/lib/resident-trips';
 import { DEFAULT_RESIDENT, type Place } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
@@ -65,6 +66,11 @@ describe('Regatta guests', () => {
             if (cheer && cheer.from === restAt && cheer.to === restAt + REGATTA_CHEER) cheered++;
             for (let t = trip.arrive + STEP; t < trip.leave; t += STEP) {
               const pose = tripState(home, trip, t, day).pose;
+              // Halfway down as they arrive, setting the boat on the grass.
+              if (t < trip.arrive + REGATTA_SET_DOWN) {
+                expect(pose, `${id} at ${t}`).toBe('crouch');
+                continue;
+              }
               const inside = !!cheer && t >= cheer.from && t < cheer.to;
               // Turning to go may drop a pose for a moment; nothing else stands in for it.
               if (inside && t < trip.leave - 0.25) expect(pose, `${id} at ${t}`).toBe('cheer');
@@ -190,6 +196,24 @@ describe('A paper boat’s afternoon', () => {
               Math.hypot(ground.x - hand.x, ground.y - hand.y),
               `boat ${trip.seat} on ${day}`,
             ).toBeLessThanOrEqual(22);
+            // And it goes there eased, frame by frame, from where the hand held it, while its
+            // guest crouches: never a pop.
+            let last = { x: hand.x, y: hand.y + 3 * SCALE };
+            for (let i = 0, t = trip.arrive; ; t = trip.arrive + ++i * FRAME) {
+              const moving = settingDown(trip.seat, trip.arrive, t);
+              const boat = moving
+                ? { x: moving.ground.x, y: moving.ground.y - moving.lift }
+                : { x: down.x, y: down.y };
+              const where = `boat ${trip.seat} on ${day} at ${t.toFixed(3)}`;
+              // The first frame picks it up where the hand was (the step's bob aside).
+              expect(Math.hypot(boat.x - last.x, boat.y - last.y), where).toBeLessThanOrEqual(
+                i === 0 ? 2 : 4,
+              );
+              last = boat;
+              if (!moving) break;
+              expect(tripState(homes.get(id)!, trip, t, day).pose, where).toBe('crouch');
+              expect(i * FRAME).toBeLessThan(REGATTA_SET_DOWN + 1e-9);
+            }
             checked++;
           }
       expect(checked).toBe(2 * 7 * REGATTA_BOATS);
@@ -309,6 +333,14 @@ describe('The Landing’s panel', () => {
     const html = render(day, 915);
     expect(html).toContain(DISTRICT_COPY.regatta.panelEyebrow!);
     expect(html).toContain(DISTRICT_COPY.regatta.description(day));
+    // In Regatta Week the regatta leads all day, above the lawn's own words.
+    for (const minutes of [600, 915, 1300]) {
+      const panel = render(day, minutes);
+      expect(panel.indexOf(DISTRICT_COPY.regatta.panelEyebrow!), `${minutes}`).toBeLessThan(
+        panel.indexOf(PANEL_COPY.landing.heading),
+      );
+    }
+    expect(html).toContain(PANEL_COPY.landing.here);
     const here = atTheWater(simulateResidents(TOWNS.full, 915, day));
     expect(here.length).toBeGreaterThan(0);
     for (const resident of here) expect(html).toContain(resident.resident.name);

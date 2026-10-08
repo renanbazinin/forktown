@@ -27,7 +27,7 @@ The guests stand and watch, facing the water. For a minute and a half from the m
 
 ## The panel
 
-`LandingInfo`: `PUBLIC SPACE · J15`, "The Boat Landing." and "A lawn by the river. Paper boats in summer." Out of Regatta Week it adds "Regatta Week is Summer 10–16." In Regatta Week a second block carries the outing's eyebrow, `REGATTA WEEK · SUMMER 10–16`, "Paper-boat regatta.", its line, where the boats are now ("Boats are going in, one every six minutes.", "The boats are drifting down to the boom.", "The boats are coming to rest at the boom.", "The boatman is netting the boats out.", and so on) and its hours, 14:00–16:30. Below it, the neighbors at the water, by name and only while they are there, each a row that follows them.
+`LandingInfo`: `PUBLIC SPACE · J15`. In Regatta Week the regatta leads all day: the outing's eyebrow, `REGATTA WEEK · SUMMER 10–16`, "Paper-boat regatta.", its line, where the boats are now ("Boats are going in, one every six minutes.", "The boats are drifting down to the boom.", "The boats are coming to rest at the boom.", "The boatman is netting the boats out.", and so on) and its hours, 14:00–16:30, then `AT THE WATER NOW` and the neighbors there, only while they are. Then "The Boat Landing." and "A lawn by the river. Paper boats in summer.", and out of Regatta Week "Regatta Week is Summer 10–16." The district panels list people in one row shape (see [The Bandstand](BANDSTAND.md#the-panel)).
 
 ## Drawing it
 

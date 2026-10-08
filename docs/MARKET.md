@@ -64,7 +64,7 @@ On the way home every browser carries a brown paper bag in the crook of the near
 
 ## The panel
 
-`PUBLIC SPACE · D14–E15 · 4 PLOTS`, then whether the market is later today, happening now or finished today, "Market Square.", today's market and its words, and "Open 08:00–11:30. Browsers walk home with a paper bag." The status runs on the clock, exactly as the market's event card says it (`eventStatus`): later today before 08:00, happening now until 11:30, finished today after. While anyone is browsing it lists them by name under "AT THE STALLS NOW", each a link that follows them, so an early browser at 07:50 or one lingering after 11:30 is named under the clock's status; with nobody there it says nothing about a crowd. From 11:30 it adds "Next market: tomorrow, 08:00."
+`PUBLIC SPACE · D14–E15 · 4 PLOTS`, then whether the market is later today, happening now or finished today, "Market Square.", today's market and its words, and "Open 08:00–11:30. Browsers walk home with a paper bag." The status runs on the clock, exactly as the market's event card says it (`eventStatus`): later today before 08:00, happening now until 11:30, finished today after. While anyone is browsing it lists them under "AT THE STALLS NOW", a row each with their figure that follows them (the district panels' one row shape, see [The Bandstand](BANDSTAND.md#the-panel)), so an early browser at 07:50 or one lingering after 11:30 is named under the clock's status; with nobody there it says nothing about a crowd. From 11:30 it adds "Next market: tomorrow, 08:00."
 
 ## Where it lives
 

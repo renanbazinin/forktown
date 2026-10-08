@@ -1,14 +1,6 @@
-/* The farm panel's Harvest Fair section (FarmInfo.tsx): who is at the fair or the table, by name,
-   each name a link that follows them, running on in the sentence. */
+/* The farm panel's Harvest Fair section (FarmInfo.tsx): each outing's times and status on a line
+   of their own. Who is there is the district panels' shared row list (district/NeighborList.tsx). */
 .harvest-outing strong {
   display: block;
   font-size: 13px;
-}
-.harvest-guests {
-  margin: 12px 0 0;
-}
-.harvest-guests .text-button {
-  display: inline;
-  min-height: 0;
-  font-size: inherit;
 }

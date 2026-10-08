@@ -19,6 +19,7 @@ import {
   BANDSTAND_VENUE,
   bandstandListening,
   DISTRICT_FRAMES,
+  farmPanelFrame,
   LANDING_VENUE,
   MARKET_PLOTS,
   type DistrictFrame,
@@ -27,6 +28,7 @@ import { project, WORLD_BOUNDS } from '../lib/world';
 import {
   clampZoom,
   fitView,
+  frameView,
   pinchView,
   resizeView,
   steadyListening,
@@ -129,6 +131,10 @@ const City = forwardRef<CityHandle, Props>(function City(
   const initialPlaces = useRef(places);
   const selectedRef = useRef(selectedPlot);
   selectedRef.current = selectedPlot;
+  // The framing closures outlive a render (the resize observer's is built once), so they read the
+  // day through a ref: a resize after the day rolls into or out of the fair frames the right one.
+  const dayRef = useRef(day);
+  dayRef.current = day;
   const cameraRef = useRef(camera);
   const tracked = residents.find((resident) => resident.id === followed);
   const trackedGround = tracked ? project(tracked.position.x, tracked.position.y) : null;
@@ -275,22 +281,8 @@ const City = forwardRef<CityHandle, Props>(function City(
     };
   };
   // Frames one of the Riverside's venues by its district frame (district-places.ts).
-  const frameCamera = (frame: DistrictFrame, width: number, height: number): Camera => {
-    const mobile = width < 600;
-    const zoom = Math.max(
-      0.05,
-      Math.min(
-        1.4,
-        (width - (mobile ? 24 : 400)) / frame.width,
-        (mobile ? height * 0.43 : height - 150) / frame.height,
-      ),
-    );
-    return {
-      x: (mobile ? width / 2 : (width - 370) / 2) - frame.center.x * zoom,
-      y: (mobile ? height * 0.29 : height * 0.5) - frame.center.y * zoom,
-      zoom,
-    };
-  };
+  const frameCamera = (frame: DistrictFrame, width: number, height: number): Camera =>
+    frameView(frame, width, height);
   const defaultCamera = useCallback((width: number, height: number): Camera => {
     const view = fitView(width, height, WORLD_BOUNDS);
     fit.current = view.zoom;
@@ -298,7 +290,11 @@ const City = forwardRef<CityHandle, Props>(function City(
   }, []);
   // Frames one plot: a venue's own view, or a house near the middle at a readable zoom.
   const plotCamera = (id: string, width: number, height: number, zoomFloor = 0) => {
-    if (isFarmPlot(id)) return farmCamera(width, height);
+    if (isFarmPlot(id)) {
+      // On a harvest day the farm opens on the fair and the Long Table, not the whole farm.
+      const fair = farmPanelFrame(dayRef.current);
+      return fair ? frameCamera(fair, width, height) : farmCamera(width, height);
+    }
     if (isZooPlot(id)) return zooCamera(width, height);
     if (isMillpondPlot(id)) return millpondCamera(width, height);
     if (isTubePlot(id)) return tubeCamera(width, height, id);

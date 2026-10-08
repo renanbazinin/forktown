@@ -15,7 +15,8 @@ import {
   regattaHandover,
   type RegattaBoat,
 } from '../../lib/district-calendar';
-import { LANDING_VENUE, REGATTA_COURSE } from '../../lib/district-places';
+import { DISTRICT_SPOTS, LANDING_VENUE, REGATTA_COURSE } from '../../lib/district-places';
+import { REGATTA_SET_DOWN } from '../../lib/outings/regatta';
 import type { ResidentTrip } from '../../lib/resident-trips';
 import type { Place } from '../../lib/schema';
 import { groundFraction, snowAt, SUMMER } from '../../lib/seasons';
@@ -372,12 +373,46 @@ function drawBoat(ctx: Ctx, p: Point, band: string, night: boolean, bob = 0) {
   box(ctx, x - 3, y + 1, 7, 1, pick(P.waterline, night));
 }
 /** A boat set down on the lawn's edge: the boat in hand, the same size, on its own shadow. */
-function drawAshoreBoat(ctx: Ctx, p: Point, band: string, night: boolean) {
+/**
+ * Where a regatta guest's boat is as they arrive, walking in along their row (`nw`, away from us),
+ * from their feet: the paper boat's grip in the near hand (carry/paper-boat.ts), mirrored, at the
+ * town's 1.25.
+ */
+const ARRIVING_HAND = { x: -7 * FIGURE_SCALE, y: -7 * FIGURE_SCALE } as const;
+/**
+ * Boat k on its way from its guest's hand to the grass, in the REGATTA_SET_DOWN minutes after
+ * they arrive (while they crouch): straight down and across to its row's handover point, eased,
+ * over its shadow, which comes in as it lowers. Undefined once it is down.
+ */
+export function settingDown(k: number, arrive: number, minutes: number) {
+  const f = smooth((minutes - arrive) / REGATTA_SET_DOWN);
+  if (f >= 1) return undefined;
+  const spot = DISTRICT_SPOTS.landing[k];
+  const at = regattaHandover(k);
+  const feet = iso(spot.x, spot.y),
+    p = iso(at.x, at.y);
+  const hand = { x: feet.x + ARRIVING_HAND.x, y: feet.y + ARRIVING_HAND.y };
+  const held = { x: hand.x + (p.x - hand.x) * f, y: hand.y + (p.y - hand.y) * f };
+  const ground = { x: held.x, y: feet.y + (p.y - feet.y) * f };
+  return {
+    ground,
+    lift: ground.y - held.y,
+    shadow: f,
+    // In front of the guest: from their arrival they have turned toward us (sw, then se), the
+    // boat in the near hand, and it comes down to the grass on their river side.
+    depth: at.x + at.y,
+  };
+}
+/** A boat on the grass at `p`, or `lift` px over it on its way down, its shadow coming in. */
+function drawAshoreBoat(ctx: Ctx, p: Point, band: string, night: boolean, lift = 0, shadow = 1) {
   const x = Math.round(p.x),
     y = Math.round(p.y);
+  const alpha = ctx.globalAlpha;
+  ctx.globalAlpha = alpha * shadow;
   box(ctx, x - 5, y - 1, 10, 2, pick(P.shadow, night));
+  ctx.globalAlpha = alpha;
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x, Math.round(p.y - lift));
   ctx.scale(FIGURE_SCALE, FIGURE_SCALE);
   paintPaperBoat((rx, ry, w, h, color) => box(ctx, rx, ry, w, h, color), 0, 0, band, night);
   ctx.restore();
@@ -656,9 +691,19 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
     if (where === 'ashore') {
       // At its row's handover point, by the guest's feet, from their arrival until the
       // boatwright takes it up (always before its launch, so regattaBoat has it ashore there).
+      // As they arrive, crouching, it comes down to there from their hand.
       const p = iso(boat.x, boat.y);
-      if (!visible(p, 8, 10, 3)) continue;
-      out.push({ depth: boat.x + boat.y, paint: () => drawAshoreBoat(ctx, p, guest.band, night) });
+      const down = settingDown(k, guest.arrive, minutes);
+      if (!visible(p, 8 + (down ? 18 : 0), 10 + (down ? 12 : 0), 3)) continue;
+      out.push(
+        down
+          ? {
+              depth: down.depth,
+              paint: () =>
+                drawAshoreBoat(ctx, down.ground, guest.band, night, down.lift, down.shadow),
+            }
+          : { depth: boat.x + boat.y, paint: () => drawAshoreBoat(ctx, p, guest.band, night) },
+      );
       continue;
     }
     // In a hand, the boatwright's, the net or the basket: drawn with whoever holds it.

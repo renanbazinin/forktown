@@ -34,6 +34,25 @@ export function rugsLine(names: readonly string[]) {
     : `${names[0]} and ${names[1]} are out on the rugs.`;
 }
 
+/**
+ * When the rugs come out next, after the evening a moment belongs to, counted from the reader's
+ * own calendar day: past midnight the coming evening is tonight's, the next one tomorrow night's.
+ * "tonight", "tomorrow night", "on Autumn 27", or "at the next new moon".
+ */
+export function nextStarNight(day: number, minutes: number) {
+  // A star night belongs to its evening, like the film: before 06:00 it is still last night's.
+  const evening = minutes < 360 ? Math.floor(day) - 1 : Math.floor(day);
+  const today = Math.floor(day);
+  const next = nextOutingDay('stargazing', evening + 1);
+  return next === today
+    ? 'tonight'
+    : next === today + 1
+      ? 'tomorrow night'
+      : next === undefined
+        ? 'at the next new moon'
+        : `on ${townCalendarAt(next).season} ${townCalendarAt(next).date}`;
+}
+
 /** The note's lines for a moment of a star night's day (the evening it belongs to). */
 export function stargazingLines(day: number, minutes: number, residents: readonly ResidentState[]) {
   // A star night belongs to its evening, like the film: before 06:00 it is still last night's.
@@ -46,28 +65,16 @@ export function stargazingLines(day: number, minutes: number, residents: readonl
   else if (time < end) status = rugsLine(onTheRugs(residents)) ?? `${hours} The sky is dark.`;
   else if (time < RUGS_UP)
     status = `Stargazing is over for tonight. The rugs come up by ${timeLabel(RUGS_UP)}.`;
-  else {
-    // Past midnight, as the reader counts it: the coming evening is tonight's, the next one
-    // tomorrow night's.
-    const today = Math.floor(day);
-    const next = nextOutingDay('stargazing', evening + 1);
-    const when =
-      next === today
-        ? 'tonight'
-        : next === today + 1
-          ? 'tomorrow night'
-          : next === undefined
-            ? 'at the next new moon'
-            : `on ${townCalendarAt(next).season} ${townCalendarAt(next).date}`;
-    status = `The rugs are rolled up. They come out again ${when}.`;
-  }
+  else status = `The rugs are rolled up. They come out again ${nextStarNight(day, minutes)}.`;
   return {
     eyebrow: PANEL_COPY.stars.eyebrow,
     heading: PANEL_COPY.stars.heading,
     body: DISTRICT_COPY.stargazing.description(evening),
     status,
+    // The meteors cross the sky band above the town, which the panel's own framing of the lawn
+    // leaves out: the line says where to see them.
     meteors: meteorNight(evening)
-      ? 'On a summer new moon a few slow meteors cross the sky. Keep looking up.'
+      ? 'On a summer new moon a few slow meteors cross the sky over the town. Zoom out to watch for them.'
       : undefined,
   };
 }

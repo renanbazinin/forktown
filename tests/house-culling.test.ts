@@ -1,4 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { drawCinema } from '../src/city/cinema';
+import { drawFootball } from '../src/city/football';
 import { drawHouse, houseReach, type HouseLife } from '../src/city/houses';
 import {
   LANE_SHIFT,
@@ -9,7 +11,10 @@ import {
 } from '../src/city/render';
 import { drawResident, residentReach } from '../src/city/residents';
 import { inTubeGlass, tubeCrowdOffsets } from '../src/city/tubes';
+import { CINEMA_GROUND } from '../src/lib/cinema';
+import { DISTRICT_FRAMES } from '../src/lib/district-places';
 import { eventsForDay } from '../src/lib/events';
+import { footballAt, GROUND as FOOTBALL_GROUND } from '../src/lib/football';
 import type { Place } from '../src/lib/schema';
 import { AUTUMN, WINTER, townSeasonAt } from '../src/lib/seasons';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
@@ -425,5 +430,78 @@ describe('Culling houses and walkers', () => {
     const behind = { x: -(feet.x + 300), y: 450 - feet.y, zoom: 1 };
     expect(drawn('a' + '\u{11363}'.repeat(19), behind)).toBe(true);
     expect(drawn('Hello!', behind)).toBe(false);
+  });
+});
+
+describe('The Meadow Ground and the cinema off the view', () => {
+  type Box = { left: number; top: number; right: number; bottom: number };
+  /** render.ts's own test of a screen box against the view (world px). */
+  const viewOf =
+    (view: Box) => (point: { x: number; y: number }, rx: number, above: number, below: number) =>
+      point.x + rx >= view.left &&
+      point.x - rx <= view.right &&
+      point.y + below >= view.top &&
+      point.y - above <= view.bottom;
+  const boxOf = (ground: Box) => {
+    const corners = [
+      project(ground.left, ground.top),
+      project(ground.right, ground.top),
+      project(ground.right, ground.bottom),
+      project(ground.left, ground.bottom),
+    ];
+    return {
+      left: Math.min(...corners.map((p) => p.x)),
+      right: Math.max(...corners.map((p) => p.x)),
+      top: Math.min(...corners.map((p) => p.y)),
+    };
+  };
+  const day = CALENDAR_EPOCH_DAY + 3;
+  const match = footballAt(700, day);
+  // The market's live frame, far from both: the shot the stream holds through a morning match.
+  const market = DISTRICT_FRAMES.market;
+  const riverside = viewOf({
+    left: market.center.x - market.width / 2,
+    right: market.center.x + market.width / 2,
+    top: market.center.y - market.height / 2,
+    bottom: market.center.y + market.height / 2,
+  });
+
+  it('paints nothing at all of either while the view is elsewhere', () => {
+    expect(match.live).toBe(true);
+    const football = recordingContext();
+    expect(drawFootball(football.ctx, match, true, false, 700, riverside)).toEqual([]);
+    expect(football.calls).toHaveLength(0);
+    const cinema = recordingContext();
+    expect(drawCinema(cinema.ctx, 1240, day, true, false, undefined, riverside)).toEqual([]);
+    expect(cinema.calls).toHaveLength(0);
+  });
+
+  it('still paints the masts and the raised screen when only their tops reach into the view', () => {
+    const ground = boxOf(FOOTBALL_GROUND);
+    // A strip above the ground's back corner: only the floodlight masts and the scoreboard rise
+    // into it.
+    const strip = viewOf({
+      left: ground.left,
+      right: ground.right,
+      top: ground.top - 90,
+      bottom: ground.top - 40,
+    });
+    const football = recordingContext();
+    const layers = drawFootball(football.ctx, match, true, false, 700, strip);
+    expect(layers.length).toBeGreaterThan(0);
+    for (const layer of layers) layer.paint();
+    expect(football.calls.length).toBeGreaterThan(0);
+    const lawn = boxOf(CINEMA_GROUND);
+    const above = viewOf({
+      left: lawn.left,
+      right: lawn.right,
+      top: lawn.top - 130,
+      bottom: lawn.top - 100,
+    });
+    const cinema = recordingContext();
+    const objects = drawCinema(cinema.ctx, 1240, day, true, false, undefined, above);
+    expect(objects.length).toBeGreaterThan(0);
+    for (const object of objects) object.paint();
+    expect(cinema.calls.length).toBeGreaterThan(0);
   });
 });

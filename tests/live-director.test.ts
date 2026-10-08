@@ -16,7 +16,12 @@ import {
   liveLabelLift,
   liveDistrictShot,
   liveDistrictShots,
+  liveDistrictHighlight,
+  FILM_NIGHT_SHOTS,
 } from '../src/lib/live-director';
+import { cinemaAt, cinemaProgram } from '../src/lib/cinema';
+import { harvestDay, regattaDay, starNight } from '../src/lib/district-calendar';
+import { FROZEN_TOWN, TOWNS, YEAR } from './district';
 import { districtEvents } from '../src/lib/events';
 import { OUTING_IDS } from '../src/lib/district-calendar';
 import { tubeRides } from '../src/lib/tube-traffic';
@@ -30,7 +35,7 @@ import { ducksAt } from '../src/lib/ducks';
 import { getPlot, isRoad, plotCenter, project } from '../src/lib/world';
 import { FORK_BOUNDS, FORK_PLOT } from '../src/lib/lanterns';
 import { SKATING, millpondSkatingDay } from '../src/lib/millpond';
-import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
+import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
 import { AFTER_HOURS, HOMES } from './fixtures';
 import { readPlaces } from './full-town';
 import { rosterTimeout } from './roster-timeout';
@@ -95,16 +100,19 @@ describe('Live broadcast director', () => {
             } else if (shot.kind === 'event') {
               if (shot.id.startsWith('district:')) {
                 // A Riverside shot: its outing is on, inside its own window, with someone there.
+                // A film night's stars run past midnight under their evening's id.
                 const [, shotDay, outing] = shot.id.split(':');
-                expect(Number(shotDay)).toBe(day);
+                const evening = Number(shotDay);
+                expect(minute < 360 ? [day, day - 1] : [day]).toContain(evening);
                 const district = liveDistrictShot(program, minute)!;
                 expect(district.outing).toBe(outing);
                 expect(minute).toBeGreaterThanOrEqual(district.from);
                 expect(minute).toBeLessThan(district.to);
                 // On that day, and under way (the Long Table's lamps outlast its 20:30 end).
-                const event = districtEvents(day).find((event) => event.id === outing)!;
-                expect(minute).toBeGreaterThanOrEqual(event.start);
-                expect(minute).toBeLessThan(event.homeBy);
+                const clock = evening === day ? minute : minute + 1440;
+                const event = districtEvents(evening).find((event) => event.id === outing)!;
+                expect(clock).toBeGreaterThanOrEqual(event.start);
+                expect(clock).toBeLessThan(event.homeBy);
               } else if (shot.id.startsWith('football:')) {
                 expect(program.highlights).toContain('football');
                 expect(footballAt(minute, day).live).toBe(true);
@@ -166,6 +174,8 @@ describe('Live broadcast director', () => {
           ['night', 1436],
         ] as const) {
           const shot = shotAt(day, minute);
+          // A film night's stars air from the end of the bill, whatever the lineup.
+          if (shot.id.startsWith('district:')) continue;
           expect(shot.kind === 'event' || shot.kind === 'ducks').toBe(
             highlights.includes(highlight),
           );
@@ -424,8 +434,9 @@ describe('Live broadcast director', () => {
   });
 
   it('frames the whole duck family on selected days and ends its clip on time', () => {
-    const day = Array.from({ length: 30 }, (_, day) => day).find((day) =>
-      liveHighlights(day).includes('ducks'),
+    // A day the market's shot (09:30–10:10, ranked first) leaves the whole walk to the ducks.
+    const day = Array.from({ length: 30 }, (_, day) => day).find(
+      (day) => liveHighlights(day).includes('ducks') && !filmsTheMarket(day),
     )!;
     for (const homes of [places, []]) {
       const program = liveProgram(homes, day);
@@ -567,4 +578,91 @@ describe('Live broadcast director', () => {
     expect(stepped.x).toBeCloseTo(next.x);
     expect(stepped.zoom).toBeCloseTo(next.zoom);
   });
+});
+
+describe('The Riverside on air', () => {
+  const festival = (day: number) => regattaDay(day) || harvestDay(day) || starNight(day);
+
+  it('films the market on an afternoon day and the Bandstand on any other', () => {
+    // The teatime set (16:00–16:40) lies inside an afternoon's zoo, which the director ranks
+    // first; the market at 09:30 meets no event. So the pick never lets the zoo take the shot.
+    const picks = { market: 0, bandstand: 0 };
+    for (let day = CALENDAR_EPOCH_DAY; day < CALENDAR_EPOCH_DAY + 3 * 112; day++) {
+      const pick = liveDistrictHighlight(day);
+      expect(pick, townCalendarAt(day).label).toBe(
+        liveHighlights(day).includes('afternoon') ? 'market' : 'bandstand',
+      );
+      if (!festival(day)) picks[pick]++;
+    }
+    // Still about an even split (SPEC §4.7): each gets 40–60% of the plain days.
+    const plain = picks.market + picks.bandstand;
+    for (const count of Object.values(picks)) {
+      expect(count / plain).toBeGreaterThan(0.4);
+      expect(count / plain).toBeLessThan(0.6);
+    }
+  });
+
+  it('moves a film night’s Long Table before lantern hour and its stars after the bill', () => {
+    let films = 0;
+    for (let day = CALENDAR_EPOCH_DAY; day < CALENDAR_EPOCH_DAY + 5 * 112; day++) {
+      const film = liveHighlights(day).includes('cinema');
+      for (const shot of liveDistrictShots(day)) {
+        if (shot.outing === 'long-table')
+          expect([shot.from, shot.to]).toEqual(
+            film
+              ? [FILM_NIGHT_SHOTS['long-table'].from, FILM_NIGHT_SHOTS['long-table'].to]
+              : [1224, 1244],
+          );
+        if (shot.outing !== 'stargazing') continue;
+        expect([shot.from, shot.to]).toEqual(
+          film ? [cinemaProgram(day).end, FILM_NIGHT_SHOTS.stargazing.to] : [1380, 1425],
+        );
+        if (film) films++;
+        // Never a minute of the window under the bill.
+        for (let minute = shot.from; minute < shot.to; minute += 0.25)
+          expect(film && cinemaAt(minute, day).live, `${day} at ${minute}`).toBe(false);
+      }
+    }
+    expect(films).toBeGreaterThan(5);
+  });
+
+  it(
+    'airs every planned district shot for its whole window, all year, in the real and full towns',
+    () => {
+      // The zoo once held the teatime set on most of its days and the film night's bill the
+      // stars: a planned shot now airs every minute of its window, a film night's stars past
+      // midnight under their evening's id.
+      for (const [name, town] of [
+        ['frozen', FROZEN_TOWN],
+        ['full', TOWNS.full],
+      ] as const) {
+        const seen = new Set<string>();
+        let overnight = 0;
+        for (const day of YEAR) {
+          const program = liveProgram(town, day);
+          for (const shot of program.district) {
+            seen.add(shot.outing);
+            for (let minute = Math.ceil(shot.from); minute < shot.to; minute++) {
+              const late = minute >= 1440;
+              const clock = late ? minute - 1440 : minute;
+              const on = liveShotAt(
+                late ? liveProgram(town, day + 1) : program,
+                clock,
+                simulateResidents(town, clock, late ? day + 1 : day),
+              );
+              expect(on.id, `${name}, ${townCalendarAt(day).label} at ${minute}`).toBe(
+                `district:${day}:${shot.outing}`,
+              );
+              if (late) overnight++;
+            }
+          }
+        }
+        expect([...seen].sort(), name).toEqual(
+          ['bandstand-tea', 'harvest-fair', 'long-table', 'market', 'regatta', 'stargazing'].sort(),
+        );
+        expect(overnight, name).toBeGreaterThan(0);
+      }
+    },
+    rosterTimeout(1, 120_000),
+  );
 });

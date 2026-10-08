@@ -1,6 +1,6 @@
 // The Boat Landing's panel (agent C, SPEC §4.5): the lawn by the river, and in Regatta Week the
-// day's regatta, where the boats are now and the neighbors at the water (names only while they are
-// there). It reports and never ranks: no winner, no times, no order.
+// day's regatta first, where the boats are now and the neighbors at the water (names only while
+// they are there). It reports and never ranks: no winner, no times, no order.
 import {
   OUTING_TIMES,
   REGATTA_BOATS,
@@ -10,8 +10,8 @@ import {
 } from '../../lib/district-calendar';
 import { DISTRICT_COPY, PANEL_COPY } from '../../lib/district-copy';
 import type { ResidentState } from '../../lib/simulation';
-import { ArrowRight } from 'lucide-react';
 import type { DistrictPanelProps } from './cards';
+import NeighborList from './NeighborList';
 
 const REGATTA = OUTING_TIMES.regatta;
 const clock = (minutes: number) =>
@@ -49,11 +49,7 @@ export default function LandingInfo({ day, minutes, residents, onFollow }: Distr
   return (
     <div className="venue-info">
       <span className="quiet-label">{PANEL_COPY.landing.eyebrow}</span>
-      <div className="venue-program">
-        <h3>{PANEL_COPY.landing.heading}</h3>
-        <p>{PANEL_COPY.landing.body}</p>
-        {!regatta && <p className="muted-copy">{PANEL_COPY.landing.week}</p>}
-      </div>
+      {/* In Regatta Week the regatta leads all day: it is what the visitor came for. */}
       {regatta && (
         <div className="venue-program">
           <span className="eyebrow">{copy.panelEyebrow}</span>
@@ -65,15 +61,17 @@ export default function LandingInfo({ day, minutes, residents, onFollow }: Distr
           </strong>
         </div>
       )}
-      {here.map((resident) => (
-        <button key={resident.id} className="resident-link" onClick={() => onFollow(resident.id)}>
-          <span>
-            <strong>{resident.resident.name}</strong>
-            <small>{copy.labels[resident.event!.phase]}</small>
-          </span>
-          <ArrowRight size={14} />
-        </button>
-      ))}
+      <NeighborList
+        eyebrow={PANEL_COPY.landing.here}
+        residents={here}
+        activity={(resident) => copy.labels[resident.event!.phase]}
+        onFollow={onFollow}
+      />
+      <div className="venue-program">
+        <h3>{PANEL_COPY.landing.heading}</h3>
+        <p>{PANEL_COPY.landing.body}</p>
+        {!regatta && <p className="muted-copy">{PANEL_COPY.landing.week}</p>}
+      </div>
     </div>
   );
 }

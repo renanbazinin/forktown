@@ -122,6 +122,20 @@ describe('The stargazing props', () => {
     expect(astronomer.at.x + astronomer.at.y).toBeGreaterThan(TELESCOPE.x + TELESCOPE.y);
   });
 
+  it('leaves the front row’s way in clear of the back row’s rugs', () => {
+    // The front row (y 44.15) walk in from the river side down their own x, between the back
+    // row's rugs (y 44.75): a body's half-width (0.1) and a little more clear either side.
+    const spots = DISTRICT_SPOTS.bandstand;
+    const front = spots.filter((spot) => spot.y < 44.5),
+      back = spots.filter((spot) => spot.y > 44.5);
+    expect(front).toHaveLength(4);
+    for (const way of front)
+      for (const rug of back)
+        expect(Math.abs(way.x - rug.x) - RUG.x / 2, `${way.x} by ${rug.x}`).toBeGreaterThanOrEqual(
+          0.13,
+        );
+  });
+
   it('keeps the telescope under 24 px', () => {
     const recorder = matrixContext(1280, 720);
     const scene = evening(SUMMER_27, 1400);

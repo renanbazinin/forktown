@@ -8,6 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { paperBagSprite, PAPER_BAG } from '../src/city/carry/paper-bag';
 import MarketInfo, { browsingNow, marketStatus } from '../src/components/district/MarketInfo';
+import { byNeighborName } from '../src/components/district/NeighborList';
 import { MARKET_KINDS, marketKind } from '../src/lib/district-calendar';
 import { DISTRICT_COPY, PANEL_COPY } from '../src/lib/district-copy';
 import { DISTRICT_SPOTS } from '../src/lib/district-places';
@@ -346,5 +347,29 @@ describe('The market’s panel', () => {
     expect(lingering).toContain('FINISHED TODAY');
     expect(lingering).toContain(PANEL_COPY.market.next);
     expect(lingering).toContain(home.resident.name);
+  });
+});
+
+describe('The district panels’ names', () => {
+  it('lists neighbors by name in English, whatever the viewer’s language, then by id', () => {
+    // Market Square, the Bandstand, the Landing and the farm all sort with byNeighborName.
+    const names = ['Jon', 'Ylva', 'Ivy', 'Chloe', 'Hugo', 'Aase', 'Zoe', 'yuda'];
+    const neighbors = names.map(
+      (name, i) => ({ id: `home-${i}`, resident: { name } }) as unknown as ResidentState,
+    );
+    const sorted = [...neighbors].sort(byNeighborName).map((neighbor) => neighbor.resident.name);
+    expect(sorted).toEqual(['Aase', 'Chloe', 'Hugo', 'Ivy', 'Jon', 'Ylva', 'yuda', 'Zoe']);
+    // These languages would each order the same names otherwise.
+    for (const locale of ['lt', 'da', 'cs', 'haw'])
+      expect(
+        [...names].sort((a, b) => a.localeCompare(b, locale)),
+        locale,
+      ).not.toEqual(sorted);
+    // Two neighbors with one name stay two rows, in id order.
+    const twins = [
+      { id: 'b', resident: { name: 'Jon' } },
+      { id: 'a', resident: { name: 'Jon' } },
+    ] as unknown as ResidentState[];
+    expect(twins.sort(byNeighborName).map((twin) => twin.id)).toEqual(['a', 'b']);
   });
 });

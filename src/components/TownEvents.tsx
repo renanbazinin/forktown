@@ -170,7 +170,9 @@ export default function TownEvents({
             className={`event-card ${live ? 'is-live' : ''}`}
             key={group ?? event.id}
             onClick={() => onVisit(event.venue.plot, event.id)}
-            aria-label={`Visit ${event.venue.name}: ${event.name}${there ? `, ${there} there` : ''}`}
+            // The label replaces the card's text, so it says all of it: the status and the times
+            // as words (the Millpond card's form), and who is there.
+            aria-label={`Visit ${event.venue.name}: ${event.name}, ${eventStatus(event, minutes).toLowerCase()}, ${timeLabel(event.start)} to ${timeLabel(event.end)}${there ? `, ${there} there` : ''}`}
           >
             <span className="event-symbol">
               <Icon size={20} />

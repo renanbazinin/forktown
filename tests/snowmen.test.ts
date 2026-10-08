@@ -123,7 +123,8 @@ describe('The builders and the watchers', () => {
           if (trip.event.variant !== 'snowmen') continue;
           const home = TOWNS.full.find((place) => place.id === id)!;
           const samples = [];
-          for (let time = trip.arrive; time < trip.leave; time += 0.05) {
+          // Sampled by index from the arrival, so the step never drifts.
+          for (let i = 0, time = trip.arrive; time < trip.leave; time = trip.arrive + ++i * 0.05) {
             const state = tripState(home, trip, time, day);
             if (state.event?.phase === 'attending') samples.push({ time, pose: state.pose });
           }
@@ -133,7 +134,7 @@ describe('The builders and the watchers', () => {
             expect(
               run.to - run.from + 0.05,
               `${label(day)} seat ${trip.seat} ${run.pose} at ${run.from.toFixed(2)}`,
-            ).toBeGreaterThanOrEqual(1);
+            ).toBeGreaterThanOrEqual(1 - 1e-6);
           if (trip.seat < 2 && samples.some((s) => s.pose === 'play')) builders++;
           // The lunch keeps its own poses either side of the building.
           if (
@@ -348,9 +349,11 @@ describe('The green’s panel line', () => {
     const html = (name: string, minutes: number) =>
       renderToStaticMarkup(createElement(GreenNote, { day: dayOf(name), minutes }));
     expect(html('Winter 16', 720)).toBe(
-      '<p class="muted-copy">Snowmen on the green: 4. They stay until the thaw.</p>',
+      '<p class="muted-copy">Snowmen on the green: 4. They stand until the thaw.</p>',
     );
-    expect(html('Winter 3', 946)).toContain('Snowmen on the green: 1.');
+    // On a build day the snowmen lunch's own card says they stand until the thaw: the count only.
+    expect(html('Winter 3', 946)).toBe('<p class="muted-copy">Snowmen on the green: 1.</p>');
+    expect(html('Winter 7', 1300)).toBe('<p class="muted-copy">Snowmen on the green: 2.</p>');
     expect(html('Winter 2', 720)).toBe('');
     expect(html('Summer 9', 720)).toBe('');
   });

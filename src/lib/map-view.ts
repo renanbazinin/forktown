@@ -5,6 +5,32 @@ export type View = { x: number; y: number; zoom: number };
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
 
+/**
+ * A venue's panel view of a frame (`{ center, width, height }`, world px): beside the desktop
+ * panel (370 px on the right), or above the phone's sheet (the top 29%), as large as fits up to
+ * zoom 1.4.
+ */
+export function frameView(
+  frame: { center: Point; width: number; height: number },
+  width: number,
+  height: number,
+): View {
+  const mobile = width < 600;
+  const zoom = Math.max(
+    0.05,
+    Math.min(
+      1.4,
+      (width - (mobile ? 24 : 400)) / frame.width,
+      (mobile ? height * 0.43 : height - 150) / frame.height,
+    ),
+  );
+  return {
+    x: (mobile ? width / 2 : (width - 370) / 2) - frame.center.x * zoom,
+    y: (mobile ? height * 0.29 : height * 0.5) - frame.center.y * zoom,
+    zoom,
+  };
+}
+
 /** How far the map zooms at a given whole-town fit: a little past the whole town, up to a sign. */
 export function zoomRange(fit: number) {
   return { min: fit * 0.65, max: Math.max(6, fit * 3.5) };

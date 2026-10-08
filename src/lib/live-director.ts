@@ -2,7 +2,7 @@ import { ZOO_FRAME } from './zoo';
 import type { Camera } from '../city/render';
 import { eventsForDay, isEventLive, type TownEvent } from './events';
 import { ducksAt } from './ducks';
-import { cinemaAt, CINEMA_FRAME } from './cinema';
+import { cinemaAt, CINEMA_FRAME, cinemaProgram } from './cinema';
 import { FOOTBALL_CENTER, footballAt } from './football';
 import { eveningDayAt, FORK_PLOT } from './lanterns';
 import type { Place } from './schema';
@@ -10,7 +10,14 @@ import { simulateResidents, type ResidentState } from './simulation';
 import { townCatAt, TOWN_CAT_NAME, TOWN_CAT_ID } from './town-cat';
 import { getPlot, hash, plotCenter, project, type Point } from './world';
 import { planResidentTrips, residentTrips, type ResidentTrip } from './resident-trips';
-import { harvestDay, OUTING_IDS, regattaDay, starNight, type OutingId } from './district-calendar';
+import {
+  harvestDay,
+  OUTING_IDS,
+  OUTING_TIMES,
+  regattaDay,
+  starNight,
+  type OutingId,
+} from './district-calendar';
 import { DISTRICT_COPY } from './district-copy';
 import {
   BANDSTAND_FRAME,
@@ -52,6 +59,9 @@ export type LiveProgram = {
   previousHighlights: Highlight[];
   /** The day's district shots with someone planned there in their window (SPEC §4.7). */
   district: DistrictShot[];
+  /** The day before's district shots that run past midnight (a film night's stars), on this
+   *  day's clock (`from` < 0), with someone planned there in what is left of their window. */
+  previousDistrict: DistrictShot[];
   /** When guests of the day's five away from the stage are planned to be attending, judged from
    *  the plan as `district` is, in event and time order (districtShotAirs). */
   attending: readonly { event: string; from: number; to: number }[];
@@ -89,10 +99,25 @@ export const DISTRICT_SHOTS = {
   'long-table': { from: 1224, to: 1244, frame: HARVEST_FRAME },
   stargazing: { from: 1380, to: 1425, frame: BANDSTAND_FRAME },
 } as const satisfies Partial<Record<OutingId, { from: number; to: number; frame: DistrictFrame }>>;
+/**
+ * On a night the lineup films the cinema, the bill holds the air from 20:30 until it ends
+ * (1428–1434), and the director ranks it before a festival (SPEC §4.7). A festival moment it
+ * would cover moves, so it airs whole: the Long Table to its supper before lantern hour, the
+ * stars to the end of the bill until the rugs are rolled up at 00:15 (the outing's end).
+ */
+export const FILM_NIGHT_SHOTS = {
+  'long-table': { from: LANTERN_SHOT.start - 20, to: LANTERN_SHOT.start },
+  stargazing: { to: OUTING_TIMES.stargazing.end },
+} as const;
 const isOutingId = (id: string): id is OutingId => (OUTING_IDS as readonly string[]).includes(id);
-/** On a day with no festival, the Riverside's one daily highlight. */
-export const liveDistrictHighlight = (day: number) =>
-  (['market', 'bandstand'] as const)[hash(`live-district:${day}`) % 2];
+/**
+ * On a day with no festival, the Riverside's one daily highlight. The teatime set (16:00–16:40)
+ * falls inside an afternoon's zoo (on air 16:00–17:00, after the Lunch Green), which ranks
+ * first; so an afternoon day films the market (09:30, clear of every event) and any other day
+ * the Bandstand, and neither is ever held off.
+ */
+export const liveDistrictHighlight = (day: number): 'market' | 'bandstand' =>
+  liveHighlights(day).includes('afternoon') ? 'market' : 'bandstand';
 /** Every district shot a day may film, before anyone is asked whether they will be there. */
 export function liveDistrictShots(day: number): DistrictShot[] {
   const shot = (outing: keyof typeof DISTRICT_SHOTS, festival: boolean): DistrictShot => ({
@@ -101,20 +126,36 @@ export function liveDistrictShots(day: number): DistrictShot[] {
     festival,
     label: DISTRICT_COPY[outing].name(day),
   });
+  const film = liveHighlights(day).includes('cinema');
   const festivals = [
     ...(regattaDay(day) ? [shot('regatta', true)] : []),
-    ...(harvestDay(day) ? [shot('harvest-fair', true), shot('long-table', true)] : []),
-    ...(starNight(day) ? [shot('stargazing', true)] : []),
+    ...(harvestDay(day)
+      ? [
+          shot('harvest-fair', true),
+          { ...shot('long-table', true), ...(film ? FILM_NIGHT_SHOTS['long-table'] : {}) },
+        ]
+      : []),
+    ...(starNight(day)
+      ? [
+          {
+            ...shot('stargazing', true),
+            ...(film ? { from: cinemaProgram(day).end, ...FILM_NIGHT_SHOTS.stargazing } : {}),
+          },
+        ]
+      : []),
   ];
   if (festivals.length) return festivals;
   return [shot(liveDistrictHighlight(day) === 'market' ? 'market' : 'bandstand-tea', false)];
 }
-/** The district shot on air at a town minute of the program's day, if one is. */
+/** The district shot on air at a town minute of the program's day, if one is: the day's own,
+ *  or before 06:00 one of the day before's still running past midnight. */
 export function liveDistrictShot(program: LiveProgram, time: number): DistrictShot | undefined {
-  return program.district.find((shot) => time >= shot.from && time < shot.to);
+  const on = (shot: DistrictShot) => time >= shot.from && time < shot.to;
+  return program.district.find(on) ?? (time < 360 ? program.previousDistrict.find(on) : undefined);
 }
 const districtLiveShot = (program: LiveProgram, shot: DistrictShot): LiveShot => ({
-  id: `district:${program.day}:${shot.outing}`,
+  // A shot that runs past midnight keeps its evening's id, so the stream never cuts at 00:00.
+  id: `district:${program.previousDistrict.includes(shot) ? program.day - 1 : program.day}:${shot.outing}`,
   kind: 'event',
   label: shot.label,
   center: shot.frame.center,
@@ -190,8 +231,31 @@ const attendance = (trip: ResidentTrip) => {
     to: trip.leave,
   };
 };
+/** The shots with someone planned to be there in their window. */
+const present = (shots: DistrictShot[], trips: readonly ResidentTrip[]) =>
+  shots.filter((shot) =>
+    trips.some(
+      (trip) => trip.event.id === shot.outing && trip.arrive < shot.to && trip.leave > shot.from,
+    ),
+  );
+/** The day before's shots that run past midnight, on this day's clock, with someone there: the
+ *  day before is planned only when it has one. */
+function overnight(day: number, tripsOf: (day: number) => readonly ResidentTrip[]) {
+  const late = liveDistrictShots(day - 1).filter((shot) => shot.to > 1440);
+  if (!late.length) return [];
+  return present(late, tripsOf(day - 1)).map((shot) => ({
+    ...shot,
+    from: shot.from - 1440,
+    to: shot.to - 1440,
+  }));
+}
 /** A day's program before its cast: the day's five, its highlights and its district shots. */
-function programOf(places: Place[], day: number, trips: readonly ResidentTrip[]): LiveProgram {
+function programOf(
+  places: Place[],
+  day: number,
+  trips: readonly ResidentTrip[],
+  previousDistrict: DistrictShot[],
+): LiveProgram {
   // Only today's five: the Riverside's outings are filmed through their own district shots.
   const events = eventsForDay(day).filter((event) => !event.outing);
   const away = new Set(
@@ -206,11 +270,8 @@ function programOf(places: Place[], day: number, trips: readonly ResidentTrip[])
     highlights: liveHighlights(day),
     previousHighlights: liveHighlights(day - 1),
     // A district shot goes on air only if someone is planned to be there in its window.
-    district: liveDistrictShots(day).filter((shot) =>
-      trips.some(
-        (trip) => trip.event.id === shot.outing && trip.arrive < shot.to && trip.leave > shot.from,
-      ),
-    ),
+    district: present(liveDistrictShots(day), trips),
+    previousDistrict,
     attending: trips
       .filter((trip) => away.has(trip.event.id))
       .map(attendance)
@@ -268,14 +329,16 @@ export function districtAiring(
   day: number,
   shot: DistrictShot,
 ): number | undefined {
+  // The day's own shots never need the day before's: an empty previousDistrict judges them.
   const program =
     programs.get(places)?.get(day) ??
-    programOf(places, day, [...planResidentTrips(places, day).values()].flat());
+    programOf(places, day, [...planResidentTrips(places, day).values()].flat(), []);
   return districtShotAirs(program, shot);
 }
 
 function planLiveProgram(places: Place[], day: number): LiveProgram {
-  const program = programOf(places, day, [...residentTrips(places, day).values()].flat());
+  const tripsOf = (day: number) => [...residentTrips(places, day).values()].flat();
+  const program = programOf(places, day, tripsOf(day), overnight(day, tripsOf));
   const { homes } = program;
   const appearances = new Map<string, number>();
   let previous: string | undefined;

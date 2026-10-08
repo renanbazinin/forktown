@@ -688,6 +688,7 @@ export function renderCity({
     night,
     isFootballPlot(selectedPlot ?? '') || isFootballPlot(hoveredPlot ?? ''),
     minutes,
+    visible,
   );
   objects.push(...drawFarm(ctx, minutes, day, night));
   objects.push(
@@ -709,6 +710,7 @@ export function renderCity({
       night,
       isCinemaPlot(selectedPlot ?? '') || isCinemaPlot(hoveredPlot ?? ''),
       season,
+      visible,
     ),
   );
   // The Millpond: flat water art now, under everyone on its banks; its uprights join the sort.

@@ -645,62 +645,74 @@ describe('The real town’s Riverside', () => {
   it(
     'seats as many stargazers as the night allows, and a dancer whenever an owl can dance',
     () => {
-      // The published roster as it is (every house plot taken in check:full-town).
-      const homes = LIVE_TOWN;
       const journeys = (home: Place, list: Candidate[]) =>
         new Map(list.map((c) => [c.event, eventTubeJourney(home, c.event, c.seat)]));
       const earlier = new Set<SeatCall>(SEAT_ORDER.slice(0, SEAT_ORDER.indexOf('stargazing')));
-      for (const day of YEAR) {
-        const plans = planResidentTrips(homes, day);
-        const guests = guestsOf(plans);
-        const film = new Set(cinemaGuests(homes, day));
-        const gazers = new Set((guests.get('stargazing') ?? []).map(([id]) => id));
-        const events = eventsForDay(day);
-        const stars = events.find((event) => event.outing === 'stargazing');
-        const owls = homes.filter(
-          (home) => home.resident.routine.night === 'stroll' && !film.has(home.id),
-        );
-        if (stars) {
-          // The stars' line: tonight's ticket holders by rank, then everyone else on the hash
-          // line. Down the line, a seat goes to each owl whose day, as planned before the stars,
-          // still has room for them in that seat.
-          const byId = (a: Place, b: Place) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-          const rank = (home: Place) => ticketRank('stargazing', 8, day, home.plot);
-          const key = OUTING_TABLE.stargazing.newcomerKey(day);
-          const line = [
-            ...owls
-              .filter((home) => rank(home) !== undefined)
-              .sort((a, b) => rank(a)! - rank(b)! || byId(a, b)),
-            ...owls
-              .filter((home) => rank(home) === undefined)
-              .sort((a, b) => hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) || byId(a, b)),
-          ];
-          const seats = Math.min(8, Math.ceil(owls.length / 2));
-          let seated = 0;
-          for (const home of line) {
-            if (seated >= seats) break;
-            const before: Candidate[] = (plans.get(home.id) ?? [])
-              .filter((trip) => earlier.has(callOf(trip)))
-              .map((trip) => ({
-                event: trip.event,
-                seat: trip.seat,
-                period: trip.event.id === 'cinema' ? 'evening' : trip.event.period,
-              }));
-            const list = [...before, { event: stars, seat: seated, period: 'night' as const }];
-            if (planHome(home, list, journeys(home, list)).length === list.length) seated++;
-          }
-          expect(gazers.size, `stargazers on ${day}`).toBe(seated);
-        } else expect(gazers.size).toBe(0);
-        // A dancer whenever an owl who is at neither the film nor the stars could dance alone.
-        const party = events.find((event) => event.id === 'night-party')!;
-        const free = owls.filter((home) => !gazers.has(home.id));
-        const canDance = free.some((owl) => {
-          const list: Candidate[] = [{ event: party, seat: 0, period: 'night' }];
-          return planHome(owl, list, journeys(owl, list)).length > 0;
-        });
-        if (canDance)
-          expect(guests.get('night-party')?.length ?? 0, `dancers on ${day}`).toBeGreaterThan(0);
-      }
+      // The replay below plans each owl's day without the other homes' door and gate minutes;
+      // the planner's invite plans it with them (SPEC §4.0) and drops a plan that cannot keep the
+      // two-minute headways. So the seat count is replayed exactly on the frozen town, whose
+      // minutes never move. On the published roster as it is (every house plot taken in
+      // check:full-town), any newcomer's trips can take a minute an owl needed, so only the
+      // headway-safe bounds hold there: the seat cap, and a stargazer whenever one fits.
+      for (const [homes, exact] of [
+        [TOWNS.real, true],
+        [LIVE_TOWN, false],
+      ] as const)
+        for (const day of YEAR) {
+          const plans = planResidentTrips(homes, day);
+          const guests = guestsOf(plans);
+          const film = new Set(cinemaGuests(homes, day));
+          const gazers = new Set((guests.get('stargazing') ?? []).map(([id]) => id));
+          const events = eventsForDay(day);
+          const stars = events.find((event) => event.outing === 'stargazing');
+          const owls = homes.filter(
+            (home) => home.resident.routine.night === 'stroll' && !film.has(home.id),
+          );
+          if (stars) {
+            // The stars' line: tonight's ticket holders by rank, then everyone else on the hash
+            // line. Down the line, a seat goes to each owl whose day, as planned before the stars,
+            // still has room for them in that seat.
+            const byId = (a: Place, b: Place) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+            const rank = (home: Place) => ticketRank('stargazing', 8, day, home.plot);
+            const key = OUTING_TABLE.stargazing.newcomerKey(day);
+            const line = [
+              ...owls
+                .filter((home) => rank(home) !== undefined)
+                .sort((a, b) => rank(a)! - rank(b)! || byId(a, b)),
+              ...owls
+                .filter((home) => rank(home) === undefined)
+                .sort((a, b) => hash(`${key}:${a.id}`) - hash(`${key}:${b.id}`) || byId(a, b)),
+            ];
+            const seats = Math.min(8, Math.ceil(owls.length / 2));
+            let seated = 0;
+            for (const home of line) {
+              if (seated >= seats) break;
+              const before: Candidate[] = (plans.get(home.id) ?? [])
+                .filter((trip) => earlier.has(callOf(trip)))
+                .map((trip) => ({
+                  event: trip.event,
+                  seat: trip.seat,
+                  period: trip.event.id === 'cinema' ? 'evening' : trip.event.period,
+                }));
+              const list = [...before, { event: stars, seat: seated, period: 'night' as const }];
+              if (planHome(home, list, journeys(home, list)).length === list.length) seated++;
+            }
+            if (exact) expect(gazers.size, `stargazers on ${day}`).toBe(seated);
+            else {
+              expect(gazers.size, `stargazers on ${day}`).toBeLessThanOrEqual(seats);
+              if (seated > 0) expect(gazers.size, `stargazers on ${day}`).toBeGreaterThanOrEqual(1);
+            }
+          } else expect(gazers.size).toBe(0);
+          // A dancer whenever an owl who is at neither the film nor the stars could dance alone.
+          const party = events.find((event) => event.id === 'night-party')!;
+          const free = owls.filter((home) => !gazers.has(home.id));
+          const canDance = free.some((owl) => {
+            const list: Candidate[] = [{ event: party, seat: 0, period: 'night' }];
+            return planHome(owl, list, journeys(owl, list)).length > 0;
+          });
+          if (canDance)
+            expect(guests.get('night-party')?.length ?? 0, `dancers on ${day}`).toBeGreaterThan(0);
+        }
     },
     rosterTimeout(0.3, 60_000),
   );

@@ -95,6 +95,8 @@ const AWNINGS: Record<MarketKind, { stripe: Pair; cream: Pair }> = {
   flowers: { stripe: ['#D08A94', '#7E5E66'], cream: ['#F3E9DD', '#A39D94'] },
   books: { stripe: ['#6E8396', '#45525E'], cream: ['#EEEADD', '#9C9F98'] },
 };
+/** The handcart's wood, [day, night]: at night nothing warm on the square is brighter. */
+export const CART_WOOD = [C.cart, C.cartShade, C.cartTop, C.cartInside] as const;
 
 // ---------------------------------------------------------------------------------------------
 // Geometry. A stall runs along its row's axis `s` (x on the north edge, y on the west edge) and
@@ -1212,11 +1214,13 @@ function paintCart(
       r(1, -3, long - 8, 1, C.fold[n]);
     }),
   );
-  // The load, three pieces, each going out to a stall or back from one.
+  // The load, three pieces, each going out to a stall or back from one. Under the cover it is
+  // gone from sight: the wares keep their day colours, and a crate end poking out past the
+  // cover's end would glow at night like a lit window.
   frame(ctx, row, y0 + 0.04, (qa + qb) / 2, low + 1, () => {
     ctx.scale(WARE_SCALE, WARE_SCALE);
     art.cart.forEach((ware, i) =>
-      faded(ctx, load[i], () => ware.paint(r, (i * (long - 3)) / 3 / WARE_SCALE)),
+      faded(ctx, load[i] * (1 - cover), () => ware.paint(r, (i * (long - 3)) / 3 / WARE_SCALE)),
     );
   });
   frame(ctx, row, y0, qb, 0, () => {

@@ -24,7 +24,7 @@ The Bandstand's peak lamp is not lit on a star night (the Bandstand's own art ke
 Up to eight night owls, seated first at night (see [Town events](TOWN_EVENTS.md)). Each sits on their own rug, facing `ne`, toward the stand and the sky over it. Nobody lies down: the town's figures have no lying pose, and the outing uses the poses there are.
 
 - **Poses** (`starPose`, `src/lib/outings/stargazing.ts`). `sit`, and now and then `chat`. The two on each pair of rugs (seats 0 and 1, 2 and 3, 4 and 5, 6 and 7) share a nine-minute beat, seeded by the night: on one beat in three they talk for three minutes. A chat is only taken up when all of it fits between the first calm minute and the last, so every pose is held for a minute at least. The minute after sitting down and the minute before getting up are always a plain `sit`; the planner's own crouch leads into and out of the seat.
-- **Rugs.** Plain wool tartans in four colourways (brick, slate, moss and oatmeal, the back row shifted two along so no column repeats), 0.52 × 0.42 tiles, with a fringe at each short end and a shade along the two edges toward the viewer. They are floor paint, so a sitter is always drawn on top. A rug unrolls along its length, its check showing as far as it has unrolled, with a fat roll of folded wool at the end still to go. On a snowy night (Winter 1, and late-winter nights before the thaw) the rugs lie on snow: four drifts and frosted tufts on the lawn by each rug, two along its back edge and one on each side, in the lawn's own tuft shapes (4 × 2 drifts of roof snow, 2 × 2 frost), each at its own seeded place (`rug-snow:${k}:${i}`). Each shows as its rug unrolls up to it, fading in over a third of the unrolling. Two of the rugs (seats 1 and 6) have a flask and a cup at their back corner.
+- **Rugs.** Plain wool tartans in four colourways (brick, slate, moss and oatmeal, the back row shifted two along so no column repeats), 0.42 × 0.42 tiles (narrow enough that the front row's guests walk in down the 0.28-tile gaps between the back row's rugs, never over them), with a fringe at each short end and a shade along the two edges toward the viewer. They are floor paint, so a sitter is always drawn on top. A rug unrolls along its length, its check showing as far as it has unrolled, with a fat roll of folded wool at the end still to go. On a snowy night (Winter 1, and late-winter nights before the thaw) the rugs lie on snow: four drifts and frosted tufts on the lawn by each rug, two along its back edge and one on each side, in the lawn's own tuft shapes (4 × 2 drifts of roof snow, 2 × 2 frost), each at its own seeded place (`rug-snow:${k}:${i}`). Each shows as its rug unrolls up to it, fading in over a third of the unrolling. Two of the rugs (seats 1 and 6) have a flask and a cup at their back corner.
 
 ### The telescope and the astronomer
 
@@ -50,7 +50,7 @@ On a star night the Bandstand's panel holds the stargazing note: `NEW MOON · TH
 - While the rugs are still on the lawn (00:15–00:35): "Stargazing is over for tonight. The rugs come up by 00:35."
 - Once they are up: "The rugs are rolled up. They come out again tonight." The next star night is counted from the reader's own calendar day, so after midnight Summer 28's rugs are tonight's. Otherwise it says "…tomorrow night." or "…on Autumn 27."
 
-On the three summer star nights it adds "On a summer new moon a few slow meteors cross the sky. Keep looking up." The note never counts the astronomer and never promises a crowd.
+On the three summer star nights it adds "On a summer new moon a few slow meteors cross the sky over the town. Zoom out to watch for them." The meteors cross the sky band above the town, which the Bandstand's close framing (the panel's and the live shot's) leaves out, so they are seen from a wider view. Off a star night the Bandstand's panel says when the next one is: "The next new moon brings stargazing to the lawn on Autumn 27, from 22:15." (or "tonight", "tomorrow night", counted the same way). The note never counts the astronomer and never promises a crowd.
 
 ## Snowmen on the Lunch Green
 
@@ -75,7 +75,7 @@ Snowman k stands at spot k, in tiles from the green's centre (19.5, 11.5): (1.15
 
 ### The panel line
 
-The green's panel adds one line while any snowman stands (finished and not yet melted away): "Snowmen on the green: 3. They stay until the thaw." It is history, not a score: it says how many are there, and nothing before the first is dressed or after the last has gone. A half-rolled snowman is not counted, nor the carrot and scarf left on the grass.
+The green's panel adds one line while any snowman stands (finished and not yet melted away): "Snowmen on the green: 3. They stand until the thaw." On a build day the panel already holds the snowmen lunch's card, which says so, and the line is only the count: "Snowmen on the green: 2." It is history, not a score: it says how many are there, and nothing before the first is dressed or after the last has gone. A half-rolled snowman is not counted, nor the carrot and scarf left on the grass.
 
 ## Budgets and rules
 

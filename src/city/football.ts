@@ -2598,13 +2598,47 @@ function confetti(ctx: Ctx, game: FootballState) {
 
 // ---------------------------------------------------------------------------------------------
 
+type Visible = (point: Point, rx: number, above: number, below: number) => boolean;
+const always: Visible = () => true;
+/**
+ * The ground's screen box, from its four projected corners: past its sides and foot by the
+ * floodlights' pools (125 px across, 62 down), above it by the 78-px masts, their heads and
+ * beams, and the scoreboard.
+ */
+const GROUND_BOX = (() => {
+  const corners = [
+    project(GROUND.left, GROUND.top),
+    project(GROUND.right, GROUND.top),
+    project(GROUND.right, GROUND.bottom),
+    project(GROUND.left, GROUND.bottom),
+  ];
+  const xs = corners.map((p) => p.x),
+    ys = corners.map((p) => p.y);
+  const left = Math.min(...xs),
+    right = Math.max(...xs),
+    top = Math.min(...ys),
+    bottom = Math.max(...ys);
+  return {
+    foot: { x: (left + right) / 2, y: bottom },
+    rx: (right - left) / 2 + 140,
+    above: bottom - top + 160,
+    below: 80,
+  };
+})();
+/** Whether any of the ground's art reaches the view. */
+export const footballInView = (visible: Visible) =>
+  visible(GROUND_BOX.foot, GROUND_BOX.rx, GROUND_BOX.above, GROUND_BOX.below);
+
 export function drawFootball(
   ctx: Ctx,
   game: FootballState,
   night: boolean,
   selected: boolean,
   minutes = game.elapsed,
+  visible: Visible = always,
 ): Layer[] {
+  // Off the view, nothing to paint (the match itself, its score and its sound run elsewhere).
+  if (!footballInView(visible)) return [];
   const time = minutes;
   const light = floodlightLevel(game, minutes);
   paintPitch(ctx, night);

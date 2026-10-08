@@ -69,7 +69,7 @@ export const BAND_COPY: Record<Band, { name: string; description: string }> = {
   strings: {
     name: 'A string trio by the river',
     description:
-      'Three chairs, three strings and the evening coming in. Deckchairs face the music.',
+      'Three chairs, three strings and the evening coming in. The river slows to listen.',
   },
 };
 
@@ -171,30 +171,51 @@ export const PANEL_COPY = {
     heading: 'Market Square.',
     hours: 'Open 08:00–11:30. Browsers walk home with a paper bag.',
     next: 'Next market: tomorrow, 08:00.',
+    /** Over the neighbors at the stalls (the district panels' one row shape). */
+    here: 'AT THE STALLS NOW',
   },
   bandstand: {
     eyebrow: 'PUBLIC SPACE · K15',
     heading: 'The Bandstand.',
     sets: 'Teatime set 16:00. Sundown set 18:15.',
     chairs: 'Eight deckchairs face the music.',
+    /** While a set plays: the band is heard only near the stand. */
+    listen: 'Zoom in close to hear the band.',
+    here: 'IN THE DECKCHAIRS NOW',
   },
   landing: {
     eyebrow: 'PUBLIC SPACE · J15',
     heading: 'The Boat Landing.',
     body: 'A lawn by the river. Paper boats in summer.',
     week: 'Regatta Week is Summer 10–16.',
+    here: 'AT THE WATER NOW',
   },
   harvest: {
     heading: 'Harvest Fair.',
     dates: 'Autumn 23–25.',
     next: 'Next: Autumn 23.',
+    /** Out of season: what the fair is, looking forward, never as if it were on. */
+    body: 'Each autumn the field is cut and the gate opens. Cider and bales by day, a long table by lamplight.',
+    fairHere: 'AT THE FAIR NOW',
+    tableHere: 'AT THE TABLE NOW',
   },
   stars: {
     eyebrow: 'NEW MOON · THE BANDSTAND LAWN',
     heading: 'Stargazing by the river.',
+    /** Off a star night, under the Bandstand's sets: "tonight", "tomorrow night", "on Autumn 27". */
+    next: (when: string) => `The next new moon brings stargazing to the lawn ${when}, from 22:15.`,
   },
   green: {
     /** History, not a score: how many snowmen stand on the green today. */
-    snowmen: (count: number) => `Snowmen on the green: ${count}. They stay until the thaw.`,
+    snowmen: (count: number) => `Snowmen on the green: ${count}. They stand until the thaw.`,
+    /** On a build day the lunch's own card already says they stand until the thaw. */
+    count: (count: number) => `Snowmen on the green: ${count}.`,
   },
+} as const;
+
+/** A district panel's status eyebrow, by the clock: uppercase, as every eyebrow (BRAND.md). */
+export const STATUS_EYEBROW = {
+  later: 'LATER TODAY',
+  open: 'HAPPENING NOW',
+  closed: 'FINISHED TODAY',
 } as const;

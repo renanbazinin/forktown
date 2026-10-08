@@ -102,7 +102,6 @@ import { dishSprite } from '../src/city/carry/dish';
 import { BANDSTAND_TRACKS, composeBandstand } from '../src/music/bandstand-tracks';
 import {
   DISTRICT_CARDS,
-  DISTRICT_PANEL_FILES,
   DISTRICT_PANELS,
   type DistrictPanelProps,
   type GreenNoteProps,
@@ -805,10 +804,9 @@ describe('The Riverside’s registries', () => {
       harvest: FarmInfo,
     };
     expect(Object.keys(DISTRICT_PANELS)).toEqual(Object.keys(owners));
-    for (const [kind, owner] of Object.entries(owners) as [DistrictKind, unknown][]) {
-      expect(DISTRICT_PANELS[kind].$$typeof, kind).toBe(Symbol.for('react.lazy'));
-      expect((await DISTRICT_PANEL_FILES[kind]()).default, kind).toBe(owner);
-    }
+    // Imported with the app (a lazy chunk saved no first-load bytes and could blank the page).
+    for (const [kind, owner] of Object.entries(owners) as [DistrictKind, unknown][])
+      expect(DISTRICT_PANELS[kind], kind).toBe(owner);
     expectTypeOf(StargazingNote).parameter(0).toEqualTypeOf<StargazingNoteProps>();
     expectTypeOf(GreenNote).parameter(0).toEqualTypeOf<GreenNoteProps>();
     expectTypeOf(FarmInfo).parameter(0).toEqualTypeOf<DistrictPanelProps>();

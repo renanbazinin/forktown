@@ -33,7 +33,9 @@ The Bandstand's three bands each play an arrangement of their own, in
 and the strings "Deckchairs at Dusk". See [The Bandstand](BANDSTAND.md).
 The music is local, like the cinema's: a live set plays only while the camera is near
 the Bandstand, louder as it zooms in and panned by where the stand sits on screen.
-A live stage show plays first. See [Town events](TOWN_EVENTS.md#bandstand-evenings).
+It plays over the town's own tune, which eases down as the band comes up (the cinema's
+curve) and comes back up, never restarted, when the set ends or the camera leaves: a band
+heard faintly from afar never leaves the town near silent. A live stage show plays first. See [Town events](TOWN_EVENTS.md#bandstand-evenings).
 
 # Football sounds
 

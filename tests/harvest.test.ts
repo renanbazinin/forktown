@@ -8,6 +8,9 @@ import { describe, expect, it } from 'vitest';
 import FarmInfo from '../src/components/FarmInfo';
 import { DISH_HEIGHT, DISHES, dishSprite, drawDish } from '../src/city/carry/dish';
 import { DISTRICT_COPY, PANEL_COPY } from '../src/lib/district-copy';
+import { farmPanelFrame, HARVEST_FRAME } from '../src/lib/district-places';
+import { frameView } from '../src/lib/map-view';
+import { project } from '../src/lib/world';
 import { harvestDay, OUTING_TIMES } from '../src/lib/district-calendar';
 import type { EventPose } from '../src/lib/events';
 import { outingOf, type PoseContext } from '../src/lib/outings';
@@ -256,20 +259,67 @@ describe('The farm panel', () => {
       resident: { name },
       event: { id: outing, name: outing, phase },
     }) as unknown as ResidentState;
-  const render = (day: number, minutes: number, residents: ResidentState[] = []) =>
+  const render = (
+    day: number,
+    minutes: number,
+    residents: ResidentState[] = [],
+    selected: string | null = null,
+  ) =>
     renderToStaticMarkup(
-      createElement(FarmInfo, { day, minutes, residents, places: [], onFollow: () => {} }),
+      createElement(FarmInfo, {
+        day,
+        minutes,
+        residents,
+        places: [],
+        onFollow: () => {},
+        selected,
+      }),
     );
+  const headings = (markup: string) =>
+    [...markup.matchAll(/<h3>(.*?)<\/h3>/g)].map(([, heading]) => heading);
+  const TABLE = `${DISTRICT_COPY['long-table'].name(A23)}.`;
 
   it('keeps the farm’s own line and says when the fair is out of season', () => {
-    const off = dayOf('Spring', 9);
-    expect(harvestDay(off)).toBe(false);
-    const markup = render(off, 600);
-    expect(markup).toContain('PUBLIC SPACE · S4–T9 · 12 PLOTS');
-    expect(markup).toContain(PANEL_COPY.harvest.heading);
-    expect(markup).toContain(PANEL_COPY.harvest.dates);
-    expect(markup).toContain(PANEL_COPY.harvest.next);
-    expect(markup).not.toContain('now:');
+    for (const off of [dayOf('Spring', 9), dayOf('Autumn', 10)]) {
+      expect(harvestDay(off)).toBe(false);
+      const markup = render(off, 600);
+      expect(markup).toContain('PUBLIC SPACE · S4–T9 · 12 PLOTS');
+      expect(markup).toContain(PANEL_COPY.harvest.heading);
+      expect(markup).toContain(PANEL_COPY.harvest.dates);
+      expect(markup).toContain(PANEL_COPY.harvest.next);
+      expect(markup).not.toContain('NOW</span>');
+      // One forward-looking line, never the fair's present tense beside a field still growing.
+      expect(markup).toContain(PANEL_COPY.harvest.body);
+      expect(markup).not.toContain(DISTRICT_COPY['harvest-fair'].description(off));
+      expect(markup).not.toContain(DISTRICT_COPY['long-table'].description(off));
+    }
+    const fair = render(A23, 600);
+    expect(fair).toContain(DISTRICT_COPY['harvest-fair'].description(A23));
+    expect(fair).toContain(DISTRICT_COPY['long-table'].description(A23));
+    expect(fair).not.toContain(PANEL_COPY.harvest.body);
+  });
+
+  it('opens the farm on the fair on its days, centred beside the panel or above the sheet', () => {
+    for (const [date, fair] of [
+      [22, false],
+      [23, true],
+      [24, true],
+      [25, true],
+      [26, false],
+    ] as const)
+      expect(farmPanelFrame(dayOf('Autumn', date)), `Autumn ${date}`).toBe(
+        fair ? HARVEST_FRAME : undefined,
+      );
+    // The table's middle sits where the panel view centres a frame.
+    const table = project(18, 77.5);
+    for (const [width, height, x, y] of [
+      [1440, 900, (1440 - 370) / 2, 450],
+      [390, 844, 195, 844 * 0.29],
+    ]) {
+      const view = frameView(HARVEST_FRAME, width, height);
+      const screen = { x: table.x * view.zoom + view.x, y: table.y * view.zoom + view.y };
+      expect(Math.hypot(screen.x - x, screen.y - y), `${width} × ${height}`).toBeLessThan(100);
+    }
   });
 
   it('gives the day’s program on a fair day, with names only while they are there', () => {
@@ -282,20 +332,34 @@ describe('The farm panel', () => {
     for (const id of ['harvest-fair', 'long-table'] as const)
       expect(markup).toContain(DISTRICT_COPY[id].panelEyebrow);
     // The fair's heading is the farm's own, the same all year; the table's is its name.
-    const headings = [...markup.matchAll(/<h3>(.*?)<\/h3>/g)].map(([, heading]) => heading);
-    expect(headings).toEqual([
-      PANEL_COPY.harvest.heading,
-      `${DISTRICT_COPY['long-table'].name(A23)}.`,
-    ]);
+    expect(headings(markup)).toEqual([PANEL_COPY.harvest.heading, TABLE]);
     expect(render(dayOf('Autumn', 20), 920)).toContain(`<h3>${PANEL_COPY.harvest.heading}</h3>`);
     expect(markup).toContain('13:00–17:00 · Happening now');
     expect(markup).toContain('18:30–20:30 · Later today');
-    expect(markup).toMatch(/At the fair now: .*Hazel.* and .*Renan.*\./);
+    // The district panels' one row shape: an eyebrow, then a row each (figure, name, doing).
+    expect(markup).toContain(PANEL_COPY.harvest.fairHere);
+    expect(markup).toMatch(/Hazel.*Renan/);
+    expect(markup).toContain(DISTRICT_COPY['harvest-fair'].labels.attending);
     expect(markup).not.toContain('Jon');
     expect(markup).not.toContain('Gemma');
-    expect(markup).not.toContain('At the table now');
+    expect(markup).not.toContain(PANEL_COPY.harvest.tableHere);
     // The next fair is tomorrow's, not next year's.
     expect(markup).not.toContain(PANEL_COPY.harvest.next);
+  });
+
+  it('leads with the outing chosen, else the one on now, then the one to come', () => {
+    expect(headings(render(A23, 920))).toEqual([PANEL_COPY.harvest.heading, TABLE]);
+    // After the fair, before and during supper, the table leads.
+    for (const minutes of [1080, 1215])
+      expect(headings(render(A23, minutes)), `${minutes}`).toEqual([
+        TABLE,
+        PANEL_COPY.harvest.heading,
+      ]);
+    // Chosen from its card, the table leads while the fair is still on.
+    expect(headings(render(A23, 920, [], 'long-table'))).toEqual([
+      TABLE,
+      PANEL_COPY.harvest.heading,
+    ]);
   });
 
   it('names the next fair once the last Long Table is over', () => {

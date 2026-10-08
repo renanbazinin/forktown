@@ -8,7 +8,7 @@ import { withPreview } from './lib/resident-trips';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
 import { tubeStatus } from './lib/tube-traffic';
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   ArrowRight,
@@ -386,7 +386,7 @@ export default function App() {
           ? 'Today in town'
           : 'Explore');
 
-  // The Riverside's venues and the farm open their own panels, each loaded when first opened.
+  // The Riverside's venues and the farm open their own panels.
   const districtPanel = selectedFarm
     ? DISTRICT_PANELS.harvest
     : selectedVenue && isDistrictVenue(selectedVenue)
@@ -398,6 +398,8 @@ export default function App() {
     residents,
     places: displayPlaces,
     onFollow: follow,
+    // The outing chosen from its card leads the panel (the panels order the rest by the clock).
+    selected: selectedEventId,
   };
 
   return (
@@ -510,6 +512,7 @@ export default function App() {
         </button>
         <Soundtrack
           track={trackForTown(clock.minutes, events, bandstandListening)}
+          bed={trackForTown(clock.minutes, events)}
           playing={clock.playing}
           football={football}
           listening={listening}
@@ -598,7 +601,9 @@ export default function App() {
                 <span className="quiet-label">PUBLIC SPACE · {selectedVenue.plot}</span>
                 {selectedProgram.map((event) => (
                   <div className="venue-program" key={event.id}>
-                    <span className="eyebrow">{eventStatus(event, clock.minutes)}</span>
+                    <span className="eyebrow">
+                      {eventStatus(event, clock.minutes).toUpperCase()}
+                    </span>
                     <h3>{event.name}</h3>
                     <p>{event.description}</p>
                     <strong>
@@ -925,14 +930,10 @@ export default function App() {
   );
 }
 
-/** A Riverside venue's panel (or the farm's), loaded on first open; nothing shows meanwhile. */
+/** A Riverside venue's panel (or the farm's). */
 function DistrictPanel({
   panel: Panel,
   ...props
 }: DistrictPanelProps & { panel: (typeof DISTRICT_PANELS)[keyof typeof DISTRICT_PANELS] }) {
-  return (
-    <Suspense fallback={null}>
-      <Panel {...props} />
-    </Suspense>
-  );
+  return <Panel {...props} />;
 }

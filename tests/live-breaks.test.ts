@@ -27,7 +27,12 @@ import {
   type ScheduledBreak,
   type WelcomeStep,
 } from '../src/lib/live-breaks';
-import { liveHighlights, liveProgram, liveShotAt } from '../src/lib/live-director';
+import {
+  liveDistrictShots,
+  liveHighlights,
+  liveProgram,
+  liveShotAt,
+} from '../src/lib/live-director';
 import { simulateResidents, timeLabel } from '../src/lib/simulation';
 import { townCalendarAt } from '../src/lib/town-calendar';
 import { TOWN_DAY_MS, townDayAt, townMinutesAt, UTC_DAY_MS } from '../src/lib/town-time';
@@ -161,8 +166,14 @@ describe('The schedule', () => {
       let label: string;
       if (minute === 0) {
         // A featured disco runs to 02:30 (minute 150): clear two seconds later, on the 5 s grid.
+        // A film night's stars run to 00:15 (live-director's FILM_NIGHT_SHOTS): 00:20.
         const disco = liveHighlights(day - 1).includes('night');
-        [delay, label] = disco ? [155, 'after the disco'] : [0, 'midnight'];
+        const stars = liveDistrictShots(day - 1).some((shot) => shot.to > 1440);
+        [delay, label] = disco
+          ? [155, 'after the disco']
+          : stars
+            ? [20, 'after the stars']
+            : [0, 'midnight'];
       } else if (minute === 360) {
         [delay, label] = [5, 'after the postcard'];
       } else if (minute === 720) {
@@ -184,6 +195,7 @@ describe('The schedule', () => {
     expect([...seen].sort()).toEqual(
       [
         'after the disco',
+        'after the stars',
         'midnight',
         'after the postcard',
         'noon',
@@ -280,6 +292,10 @@ describe('Coming up', () => {
     expect(rows.map((row) => row.title)).not.toContain('Midnight at the Little Stage');
     for (const row of rows) expect(townDayAt(row.startsAt)).toBe(day + 1);
     const tomorrow = liveHighlights(day + 1);
+    // Tomorrow's market (09:30) leads whenever the lineup films it and someone is there.
+    const market = liveDistrictShots(day + 1).find((shot) => shot.outing === 'market');
+    const shows = market && rows[0].title === market.label ? rows.slice(1) : rows;
+    if (shows !== rows) expect(rows[0].townTime).toBe('09:30');
     const opener = tomorrow.includes('ducks')
       ? '10:00'
       : tomorrow.includes('football')
@@ -289,7 +305,7 @@ describe('Coming up', () => {
           : tomorrow.includes('evening')
             ? '19:00'
             : '20:00';
-    expect(rows[0].townTime).toBe(opener);
+    expect(shows[0].townTime).toBe(opener);
   });
 
   it('lists only later moments, soonest first, and never the postcard', () => {

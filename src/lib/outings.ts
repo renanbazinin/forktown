@@ -27,7 +27,7 @@ import {
 } from './district-places.ts';
 import { marketFacing, marketPose } from './outings/market.ts';
 import { sundownPose, teaPose } from './outings/bandstand.ts';
-import { regattaPose } from './outings/regatta.ts';
+import { REGATTA_SET_DOWN, regattaPose } from './outings/regatta.ts';
 import { fairPose, tablePose } from './outings/harvest.ts';
 import { starPose } from './outings/stargazing.ts';
 
@@ -115,6 +115,8 @@ export type OutingSpec = {
     kind: CarryKind;
     leg: 'going' | 'returning';
     variant(day: number, homeId: string): number;
+    /** Minutes halfway down on arrival, setting it on the ground there (the regatta's boat). */
+    setDown?: number;
   };
   /** Feature-owned. */
   pose(c: PoseContext): EventPose | undefined;
@@ -143,7 +145,7 @@ function frozen(id: OutingId, venue: DistrictVenue, period: OutingSpec['period']
 export const OUTINGS: readonly OutingSpec[] = [
   {
     ...frozen('regatta', LANDING_VENUE, 'afternoon'),
-    carry: { kind: 'paper-boat', leg: 'going', variant: () => 0 },
+    carry: { kind: 'paper-boat', leg: 'going', variant: () => 0, setDown: REGATTA_SET_DOWN },
     pose: regattaPose,
   },
   { ...frozen('harvest-fair', HARVEST_VENUE, 'afternoon'), pose: fairPose },

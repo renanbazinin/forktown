@@ -14,7 +14,7 @@ The panel opens with the halt you chose: its name and plot, where it stands, and
 | Willow Halt     | On the west edge, on the road to the zoo gate.     | Barley Halt about 7, Hedgerow Halt about 9; on foot 63 and 150       |
 | Hedgerow Halt   | The halt with the sign and the umbrella stand.     | Willow Halt about 9, Hawthorn Halt about 10; on foot 150 and 125     |
 | Hawthorn Halt   | The one halt on the north edge.                    | Hedgerow Halt about 10, Watercress Halt about 9; on foot 125 and 100 |
-| Watercress Halt | Across the duck street from the Market Square.     | Hawthorn Halt about 9, Kingfisher Halt about 9; on foot 100 and 125  |
+| Watercress Halt | Across the duck street from Market Square.         | Hawthorn Halt about 9, Kingfisher Halt about 9; on foot 100 and 125  |
 | Kingfisher Halt | Its bridge spans the regatta course.               | Watercress Halt about 9, Bulrush Halt about 7; on foot 125 and 88    |
 | Bulrush Halt    | The south-east end of the line, down the far bank. | Kingfisher Halt about 7 minutes; on foot 88                          |
 

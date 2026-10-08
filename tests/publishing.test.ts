@@ -438,10 +438,11 @@ describe('A quiet first install and build', () => {
     expect((plugin.config as () => unknown)()).toEqual({
       build: { chunkSizeWarningLimit: CHUNK_WARNING_KB },
     });
-    // A full town's main chunk measured 1,403 kB, and 1,499 kB with the largest house on every
-    // free plot; the limit is the first and 8%. See scripts/chunk-budget.ts.
-    expect(CHUNK_WARNING_KB).toBeGreaterThanOrEqual(1500);
-    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1516);
+    // A full town's main chunk (all a page loads first) measured 1,590 kB, and 1,685 kB with the
+    // largest house on every free plot; the limit is the first and 8%. See
+    // scripts/chunk-budget.ts.
+    expect(CHUNK_WARNING_KB).toBeGreaterThanOrEqual(1686);
+    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1718);
   });
 });
 
