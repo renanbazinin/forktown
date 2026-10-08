@@ -10,8 +10,11 @@ import {
   previewNewcomers,
   residentTrips,
   strollRuns,
+  tripLanes,
   tripState,
   type ResidentTrip,
+  type TripLaneLookup,
+  type TripLanes,
 } from './resident-trips';
 import { tubeStation, type ResidentTransit } from './tubes';
 import {
@@ -217,9 +220,13 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
       residentTrips(places, eventDay + 1),
       residentErrands(places, eventDay + 1),
     ));
-  // The loops' lanes, planned once a day around everyone's walks, when a loop first asks.
-  let loops: ReadonlyMap<string, LanePath> | undefined;
-  const lanes = (key: string) => (loops ??= loopLanes(places, eventDay, itinerary)).get(key);
+  // Everyone's lanes (the trips', the rounds' and the loops'), planned together once a day, when
+  // a walker first asks.
+  let planned: DayLanes | undefined;
+  const dayPlan = () => (planned ??= dayLanes(places, eventDay, itinerary));
+  const lanes = (key: string) => dayPlan().loops.get(key);
+  const lanesOf: TripLaneLookup = (trip, homeId) =>
+    dayPlan().trips.get(trip) ?? tripLanes(trip, homeId);
   /** A neighbor's state at trip-time minute `at` of this plan day. */
   const stateAt = (home: Place, plot: Plot, at: number): ResidentState => {
     const trips = itinerary.get(home.id) ?? [];
@@ -235,7 +242,7 @@ export function simulateResidents(places: Place[], minutes: number, day = 0): Re
         facing: 'se',
         walkPhase: 0,
         greeting: false,
-        ...(chainTurn(home.id, trips, at) ?? tripState(home, trip, at, day)),
+        ...(chainTurn(home.id, trips, at, lanesOf) ?? tripState(home, trip, at, day, lanesOf)),
       };
     const errand = errands.get(home.id)?.find((trip) => at >= trip.depart && at < trip.homeBy);
     if (errand)
@@ -355,26 +362,36 @@ function runWindows(run: Run, trips: readonly Commitment[]): FreeWindow[] {
   return windows;
 }
 
-/** Each plan day's lanes for the loops round the blocks, by `${plan key}#${loop start}`. */
-const loopLaneDays = new WeakMap<Place[], Map<number, ReadonlyMap<string, LanePath>>>();
+/** A plan day's lanes: the loops' and the rounds' by key, and each trip's both ways. */
+type DayLanes = {
+  /** By `${plan key}#${loop start}` for a loop, errandLaneKey for a seasonal round's walk. */
+  loops: ReadonlyMap<string, LanePath>;
+  trips: WeakMap<ResidentTrip, TripLanes>;
+};
+/** Each plan day's lanes, by the day's trip plan (so a re-planned day plans its lanes afresh). */
+const dayLanePlans = new WeakMap<ReadonlyMap<string, ResidentTrip[]>, DayLanes>();
 /**
- * Lanes for every loop of the day, planned around the day's trips (which keep theirs) with
- * planLaneWalks, so neighbors out on the same loop at the same time walk it side by side. Pure
- * and cached by roster and plan day, like the trips.
+ * Lanes for every walk of the day, planned together with planLaneWalks: the outings' (both ways),
+ * the seasonal rounds' and the loops round the blocks. So any two neighbors who share a street at
+ * the same time, whatever each is out for, walk it side by side: each can make room for the
+ * other. The trips' own plan (tripLanes) is where the outings start from. Pure and cached by the
+ * day's trip plan, which is cached by roster and plan day.
  */
-function loopLanes(
+function dayLanes(
   places: Place[],
   planDay: number,
   itinerary: ReadonlyMap<string, ResidentTrip[]>,
-): ReadonlyMap<string, LanePath> {
-  const cached = loopLaneDays.get(places)?.get(planDay);
+): DayLanes {
+  const cached = dayLanePlans.get(itinerary);
   if (cached) return cached;
-  // The trips' walks, with the lanes they have, as fresh copies: the day's trip plan keeps its own.
-  const walks: LaneWalk[] = dayTripWalks(itinerary).map((walk) => ({
+  // The trips' walks as fresh copies, starting from the lanes the trips' own plan gave them (that
+  // plan keeps its own): `order` is twice the trip's index, plus one for the way home.
+  const tripWalks: LaneWalk[] = dayTripWalks(itinerary).map((walk) => ({
     ...walk,
-    fixed: true,
+    fixed: false,
     near: [],
   }));
+  const walks: LaneWalk[] = [...tripWalks];
   const keys = new Map<LaneWalk, string>();
   const newcomers = previewNewcomers(places);
   const errands = residentErrands(places, planDay);
@@ -426,21 +443,26 @@ function loopLanes(
       }
   }
   planLaneWalks(walks);
-  const lanes = new Map<string, LanePath>();
-  for (const [walk, key] of keys) lanes.set(key, walk.path!);
-  let days = loopLaneDays.get(places);
-  if (!days) loopLaneDays.set(places, (days = new Map()));
-  if (days.size >= 3) days.delete(days.keys().next().value!);
-  days.set(planDay, lanes);
+  const loops = new Map<string, LanePath>();
+  for (const [walk, key] of keys) loops.set(key, walk.path!);
+  const trips = new WeakMap<ResidentTrip, TripLanes>();
+  for (const walk of tripWalks) {
+    const trip = itinerary.get(walk.id)![walk.order >> 1];
+    const found = trips.get(trip) ?? { going: walk.path!, returning: walk.path! };
+    found[walk.order % 2 ? 'returning' : 'going'] = walk.path!;
+    trips.set(trip, found);
+  }
+  const lanes = { loops, trips };
+  dayLanePlans.set(itinerary, lanes);
   return lanes;
 }
 
 /**
- * Everything a town day's first frame plans ahead of its walkers: the trips, their lanes and the
- * loops' lanes (for planning while idle; the frame finds it all cached).
+ * Everything a town day's first frame plans ahead of its walkers: the trips and everyone's lanes
+ * (for planning while idle; the frame finds it all cached).
  */
 export function planTownDay(places: Place[], planDay: number) {
-  return loopLanes(places, planDay, residentTrips(places, planDay));
+  return dayLanes(places, planDay, residentTrips(places, planDay));
 }
 
 /** A run's first free window, which may be empty when a trip leaves the moment it begins. */

@@ -902,6 +902,11 @@ export function planHome(
 
 /** A trip's lanes on the way there and on the way home, -1..1 (laneAt reads them at a minute). */
 export type TripLanes = { going: LanePath; returning: LanePath };
+/**
+ * Where tripState and chainTurn read a trip's lanes: tripLanes (the trips' own plan) unless the
+ * caller has lanes planned with everyone else's walks too (the town's, in simulation.ts).
+ */
+export type TripLaneLookup = (trip: ResidentTrip, homeId: string) => TripLanes;
 type LanesDay = {
   plan: Map<string, ResidentTrip[]>;
   /** A previewed draft's neighbor, who takes whatever lanes the town leaves. */
@@ -996,6 +1001,7 @@ export function tripState(
   trip: ResidentTrip,
   time: number,
   day: number,
+  lanesOf: TripLaneLookup = tripLanes,
 ): Partial<ResidentState> {
   const {
     event,
@@ -1039,7 +1045,7 @@ export function tripState(
       event: { id: event.id, name: event.name, phase },
     };
   // Each walker keeps to a lane, apart from anyone walking with them, so they stay two.
-  const lanes = phase === 'going' || phase === 'returning' ? tripLanes(trip, home.id) : undefined;
+  const lanes = phase === 'going' || phase === 'returning' ? lanesOf(trip, home.id) : undefined;
   const zoo =
     event.venue.kind === 'zoo' && phase === 'attending' && zooGlance(home.id, arrive, time, leave);
   // Where a Riverside guest looks while it is on (the market's stalls), and where a snowman's
@@ -1152,7 +1158,12 @@ export const CHAIN_TURN_TILES = 0.05;
  * single frame. The walks keep their planned times: the stand takes only the minutes those last
  * and first steps would have taken. Undefined outside such a turn.
  */
-export function chainTurn(homeId: string, trips: readonly ResidentTrip[], time: number) {
+export function chainTurn(
+  homeId: string,
+  trips: readonly ResidentTrip[],
+  time: number,
+  lanesOf: TripLaneLookup = tripLanes,
+) {
   for (let i = 1; i < trips.length; i++) {
     const before = trips[i - 1],
       after = trips[i];
@@ -1181,12 +1192,12 @@ export function chainTurn(homeId: string, trips: readonly ResidentTrip[], time: 
     const drawnIn = walkAlong(
       back.route,
       (inLength - step) / inLength,
-      laneAt(tripLanes(before, homeId).returning, from),
+      laneAt(lanesOf(before, homeId).returning, from),
     ).laneOffset;
     const drawnOut = walkAlong(
       out.route,
       step / outLength,
-      laneAt(tripLanes(after, homeId).going, until),
+      laneAt(lanesOf(after, homeId).going, until),
     ).laneOffset;
     const shift = {
       x: (drawnIn?.x ?? 0) * (1 - f) + (drawnOut?.x ?? 0) * f,
