@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { clip, isHouse, isMaintainer, paginate } from './pr-policy.mjs';
+import { clip, isHouse, isMaintainer, paginate, withoutBom } from './pr-policy.mjs';
 
 // A PR whose only change is one new house, credited to its author, merges itself once every
 // other check has passed, as long as no house in town credits that author yet. Anyone who already
@@ -29,7 +29,7 @@ export function readTown(directory) {
   const creators = new Map();
   for (const name of readdirSync(join(directory, 'places')).sort()) {
     if (!name.endsWith('.json')) continue;
-    const house = JSON.parse(readFileSync(join(directory, 'places', name), 'utf8'));
+    const house = JSON.parse(withoutBom(readFileSync(join(directory, 'places', name), 'utf8')));
     if (typeof house?.creator !== 'string') throw new Error(`places/${name} has no creator.`);
     const key = house.creator.toLowerCase();
     creators.set(key, [...(creators.get(key) ?? []), name]);
@@ -67,10 +67,10 @@ function unfinishedChecks(checkRuns, statuses) {
 }
 
 // House content is untrusted data: parse it, never run it.
-function decode(blob) {
+export function decode(blob) {
   if (blob?.encoding !== 'base64' || !(blob.size <= 16384) || !blob.content) return undefined;
   try {
-    return JSON.parse(Buffer.from(blob.content, 'base64').toString('utf8'));
+    return JSON.parse(withoutBom(Buffer.from(blob.content, 'base64').toString('utf8')));
   } catch {
     return undefined;
   }

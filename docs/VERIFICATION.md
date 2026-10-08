@@ -60,3 +60,13 @@ The initial local allowance work passed 103 tests but was not deployed. Review f
 The September 20 observation covered a fixed 24-minute town day using sampled screenshots. Walking, greetings, indoor hiding, day/night lighting and the map appeared intact; no new console errors were observed. Town hours 18 and 21 were missed, the final check arrived late, and exact transitions/continuous frame rate were not established.
 
 Earlier sections are historical checks, including the former 25-plot layout and old controls. They are not claims about the current hosted UI. Since then the repository has gone public, and an outside contributor completed the fork trial on September 24, 2026 (issue #6).
+
+## Any newcomer, on any plot (October 8, 2026)
+
+The bigger town (20 × 15) was checked against the question "will the tests pass if someone builds a house on any plot?" A sweep committed one house, as the newest arrival, on each free plot of the 35-house town and ran the 74 test files that read the town. It found a tube-ride lookup crash with a newcomer on D13 and snowmen poses held under a minute with one on R11, both fixed. A review of the house pull request path found that the validator and the builder agree on the same 230 house plots, and that the rest needed help:
+
+- A house on a plot that became a public place, such as R1 and A9 for the Treeline's halts, is now told which place stands there and which open plots are nearest. A plot that isn't on the map is told the rows and columns there are, with a hint when only the letter's case is wrong.
+- A builder draft saved on such a plot moves to the nearest open plot instead of being thrown away.
+- A house file saved as UTF-8 with a byte-order mark now validates, builds and passes the policy and auto-merge checks.
+- `npm run check:full-town` gives its copy a Git history, so arrivals exist there, and a few of its made-up houses keep the builder's defaults or use every character the schema allows.
+- `npm run check:newcomers` keeps the sweep: today's town plus one builder-default house, committed as the newest arrival, on a sample of eight free plots (R2, A10, D13, H14, R11, S15, A15 and T1, or the nearest free plot to each), or on every free plot with `--all`. It runs every test file that reads the town, retries a failing file once on its own, and takes a few minutes a plot. CI doesn't run it; run it before merging a change to the simulation, the map or the venues.

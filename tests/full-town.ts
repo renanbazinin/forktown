@@ -9,6 +9,7 @@ import {
   type Place,
 } from '../src/lib/schema';
 import { hash } from '../src/lib/world';
+import { withoutBom } from '../scripts/place-files';
 
 // The town with every house plot taken: the real neighbors where they live, and a made-up house
 // on every plot that is still free. A made-up house is a pure function of its plot, so the same
@@ -28,7 +29,9 @@ export function readPlaces(directory = 'places'): Place[] {
   const places = readdirSync(directory)
     .filter((file) => file.endsWith('.json'))
     .sort()
-    .map((file) => placeSchema.parse(JSON.parse(readFileSync(`${directory}/${file}`, 'utf8'))));
+    .map((file) =>
+      placeSchema.parse(JSON.parse(withoutBom(readFileSync(`${directory}/${file}`, 'utf8')))),
+    );
   const madeUp = places.filter((place) => place.creator === FULL_TOWN_CREATOR);
   return [...madeUp, ...places.filter((place) => !madeUp.includes(place))];
 }

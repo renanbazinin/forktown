@@ -30,6 +30,7 @@
     "test:watch": "vitest",
     "check": "npm run test && npm run build",
     "check:full-town": "tsx scripts/full-town-check.ts",
+    "check:newcomers": "tsx scripts/newcomer-check.ts",
     "check:pr": "node scripts/check-pr-places.mjs",
     "render:intermission": "tsx scripts/render-intermission.ts",
     "format": "prettier --write .",
