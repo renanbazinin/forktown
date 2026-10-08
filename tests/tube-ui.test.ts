@@ -23,7 +23,9 @@ import {
 import {
   TUBE_ALIGHT,
   TUBE_BOARD,
+  TUBE_PARCEL_ROUTE,
   TUBE_SIGN,
+  TUBE_SIGN_STATION,
   TUBE_SPEED,
   TUBE_STATIONS,
   TUBE_VENUE,
@@ -34,8 +36,8 @@ import type { TubeStage } from '../src/lib/tube-journeys';
 import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../src/lib/town-calendar';
 
 const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like the fixtures
-const FIRST = TUBE_STATIONS[0].id;
-const LAST = TUBE_STATIONS.at(-1)!.id;
+// The panel's own stretch: the sign's halt and Willow Halt, where the parcels run.
+const [FIRST, LAST]: readonly string[] = TUBE_PARCEL_ROUTE;
 const NAMES = ['Eliza', 'Sol', 'Renan'];
 const STAGES: TubeStage[] = ['boarding', 'riding', 'alighting'];
 
@@ -215,13 +217,20 @@ describe('Treeline panel copy', () => {
   });
 
   it('tells the line honestly: minutes, parcels and the day’s rides', () => {
+    expect([FIRST, LAST]).toEqual(['C1', 'N1']);
+    expect(TUBE_SIGN_STATION).toBe('C1');
     const { tube, walk } = tubeLineMinutes(FIRST, LAST);
     expect([Math.round(tube), Math.round(walk)]).toEqual([9, 150]);
     const quiet = tubeCopy(status());
+    // The loop's two ends, and the sign's halt to Willow Halt by tube and on foot.
+    expect([TUBE_STATIONS[0].name, TUBE_STATIONS.at(-1)!.name]).toEqual([
+      'Barley Halt',
+      'Bulrush Halt',
+    ]);
     expect(quiet.blocks[0]).toEqual({
       eyebrow: 'QUIET ON THE LINE',
       heading: 'Nobody in the glass right now.',
-      body: 'Glass runs behind the northwest tree line, from Hedgerow Halt to Willow Halt in about 9 minutes. On foot it takes about 150.',
+      body: 'Glass runs round the edge of town, from Barley Halt to Bulrush Halt. Hedgerow Halt to Willow Halt takes about 9 minutes; on foot it takes about 150.',
       note: undefined,
     });
     expect(quiet.blocks[1]).toEqual({
@@ -234,7 +243,7 @@ describe('Treeline panel copy', () => {
     );
     expect(quiet.sign).toEqual({ caption: 'STATION SIGN · C1', text: TUBE_SIGN });
     expect(TUBE_SIGN_CAPTION).toBe('STATION SIGN · C1');
-    expect(TUBE_LABEL).toBe('PUBLIC SPACE · C1 / N1');
+    expect(TUBE_LABEL).toBe('PUBLIC SPACE · R1 / N1 / C1 / A9 / C15 / L15 / R15');
 
     const notes = [undefined, 'sending', 'riding', 'arrived'].map(
       (stage) => tubeCopy(status({ parcel: parcel(stage as TubeParcelStage) })).blocks[0].note,
@@ -309,33 +318,40 @@ describe('Treeline panel copy', () => {
   }, 60_000);
 
   it('never says one name twice when two neighbors share it', () => {
-    // Today's roster has two neighbors named Jon (E2 and F2), who ride to the zoo minutes apart
-    // on a few days a year. Every moment they share the line is checked, not a sample.
-    const names = new Map(places.map((place) => [place.id, place.resident.name.trim()]));
-    const same = (a: TubeRide, b: TubeRide) =>
-      a.residentId !== b.residentId &&
-      !!names.get(a.residentId) &&
-      names.get(a.residentId)!.toLowerCase() === names.get(b.residentId)!.toLowerCase();
+    // Two neighbors with one name share the line at every stage and on every stretch of it,
+    // in every case and spacing; a real day need not have them.
+    const rides = (a: string, b: string, from: string, to: string) =>
+      STAGES.flatMap((first) =>
+        STAGES.map((second) => [
+          { ...onLine(a, first, from, to, 700), residentId: 'jon-e2' },
+          { ...onLine(b, second, to, from, 701), residentId: 'jon-f2' },
+        ]),
+      );
     const headings = new Set<string>();
-    for (let day = YEAR; day < YEAR + DAYS_PER_YEAR; day++) {
-      const rides = tubeRides(places, day);
-      for (const a of rides)
-        for (const b of rides) {
-          if (a.board >= b.board || !same(a, b) || a.off <= b.board) continue;
-          const minute = (b.board + Math.min(a.off, b.off)) / 2;
-          // After midnight the plan is still this day's, read from the next day's clock.
-          const s =
-            minute < 1440
-              ? tubeStatus(places, minute, day)
-              : tubeStatus(places, minute - 1440, day + 1);
-          const heading = tubeCopy(s).blocks[0].heading;
-          headings.add(heading);
-          expect(heading).not.toMatch(/\b(\w+) and \1\b/i);
-          if (s.now.length === 2)
-            expect(heading).toBe(`Two neighbors named ${names.get(a.residentId)} are on the line.`);
+    for (const [a, b] of [
+      ['Jon', 'Jon'],
+      ['Jon', ' jon '],
+      ['JON', 'jon'],
+      ['Ana Lu', 'ana lu'],
+    ])
+      for (const from of TUBE_STATIONS)
+        for (const to of TUBE_STATIONS) {
+          if (from === to) continue;
+          for (const now of rides(a, b, from.id, to.id)) {
+            const s = status({ now, today: now });
+            const heading = tubeCopy(s).blocks[0].heading;
+            headings.add(heading);
+            expect(heading).not.toMatch(/\b(\w+) and \1\b/i);
+            expect(heading).toBe(`Two neighbors named ${a.trim()} are on the line.`);
+            expect(voiceProblems(tubeCopy(s), s, [a.trim()])).toEqual([]);
+          }
         }
-    }
     expect([...headings]).toContain('Two neighbors named Jon are on the line.');
+    // Two names that only share a stem are two neighbors.
+    expect(
+      tubeCopy(status({ now: [onLine('Jon', 'riding'), onLine('Jonas', 'riding')] })).blocks[0]
+        .heading,
+    ).toBe('Jon and Jonas are on the line.');
   });
 
   it('shows the rider in the card while they ride', () => {
@@ -360,7 +376,7 @@ describe('Treeline panel', () => {
     const markup = renderToStaticMarkup(createElement(TubeInfo, { status: status() }));
     expect(markup).toContain('venue-info');
     expect(markup).toContain('quiet-label');
-    expect(markup).toContain('PUBLIC SPACE · C1 / N1');
+    expect(markup).toContain('PUBLIC SPACE · R1 / N1 / C1 / A9 / C15 / L15 / R15');
     expect(markup).toContain('STATION SIGN · C1');
     expect(markup.split('People &amp; parcels. Please remove umbrella.')).toHaveLength(2);
   });

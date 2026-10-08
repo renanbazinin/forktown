@@ -1,4 +1,4 @@
-import { TUBE_LINE_NAME, TUBE_SIGN_LINES, TUBE_STATIONS } from '../../lib/tubes';
+import { TUBE_LINE_NAME, TUBE_SIGN_LINES, TUBE_SIGN_STATION, tubeStation } from '../../lib/tubes';
 import type { AdModule } from '../types';
 import {
   alpha,
@@ -55,8 +55,9 @@ export const PAT = 0.722;
 export const SPRING = 0.748;
 
 const LINE = TUBE_LINE_NAME.toUpperCase();
-const HEDGEROW = TUBE_STATIONS[0].name.toUpperCase();
-const WILLOW = TUBE_STATIONS[TUBE_STATIONS.length - 1].name.toUpperCase();
+// The sign's halt, where the umbrella is stowed, and Willow Halt, where the robin's ride ends.
+const HEDGEROW = tubeStation(TUBE_SIGN_STATION).name.toUpperCase();
+const WILLOW = tubeStation('N1').name.toUpperCase();
 
 // The Treeline’s own daytime colours (src/city/tubes.ts), at film scale.
 const GLASS = '#B9D8CE',

@@ -1,4 +1,12 @@
-import { TUBE_MIN_SAVING, TUBE_PLOTS, TUBE_SIGN, TUBE_STATIONS, tubeStation } from './tubes.ts';
+import {
+  TUBE_MIN_SAVING,
+  TUBE_PARCEL_ROUTE,
+  TUBE_PLOTS,
+  TUBE_SIGN,
+  TUBE_SIGN_STATION,
+  TUBE_STATIONS,
+  tubeStation,
+} from './tubes.ts';
 import { tubeLineMinutes } from './tube-journeys.ts';
 import type { TubeStatus } from './tube-traffic.ts';
 
@@ -9,7 +17,7 @@ import type { TubeStatus } from './tube-traffic.ts';
 // the neighbors on the line right now are ever named; future riders stay private.
 
 export const TUBE_LABEL = `PUBLIC SPACE · ${TUBE_PLOTS.join(' / ')}`;
-export const TUBE_SIGN_CAPTION = `STATION SIGN · ${TUBE_STATIONS[0].plot}`;
+export const TUBE_SIGN_CAPTION = `STATION SIGN · ${tubeStation(TUBE_SIGN_STATION).plot}`;
 
 export type TubeCopyBlock = { eyebrow: string; heading: string; body: string; note?: string };
 export type TubeCopy = {
@@ -24,9 +32,10 @@ const clock = (minutes: number) => {
   return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 };
 const station = (id: string) => tubeStation(id).name;
-/** End to end by tube and on foot, door to door (a road walk, so worked out once, on first use). */
+/** The sign's halt to the parcels' far halt, by tube and on foot, door to door (a road walk, so
+ * worked out once, on first use). */
 let line: { tube: number; walk: number } | undefined;
-const lineMinutes = () => (line ??= tubeLineMinutes(TUBE_STATIONS[0].id, TUBE_STATIONS.at(-1)!.id));
+const lineMinutes = () => (line ??= tubeLineMinutes(...TUBE_PARCEL_ROUTE));
 
 /** "Eliza is riding to Willow Halt.", "Eliza and Sol are on the line.", "Two neighbors named Jon
  * are on the line." (never "Jon and Jon"), "3 neighbors are on the line."; nothing for nobody. */
@@ -49,8 +58,10 @@ export function onTheLine(now: TubeStatus['now']): string | undefined {
 
 /** The line right now: who is on it, how long it takes, and the parcel on the pad or in the glass. */
 function lineBlock(status: TubeStatus): TubeCopyBlock {
+  // The loop's two ends, and the oldest stretch of it, Hedgerow Halt to Willow Halt.
   const first = TUBE_STATIONS[0],
     last = TUBE_STATIONS.at(-1)!;
+  const [from, to] = TUBE_PARCEL_ROUTE.map(station);
   const { tube, walk } = lineMinutes();
   const parcel = status.parcel;
   const note = !parcel
@@ -65,7 +76,7 @@ function lineBlock(status: TubeStatus): TubeCopyBlock {
   return {
     eyebrow: status.now.length ? 'ON THE LINE NOW' : 'QUIET ON THE LINE',
     heading: onTheLine(status.now) ?? 'Nobody in the glass right now.',
-    body: `Glass runs behind the northwest tree line, from ${first.name} to ${last.name} in about ${Math.round(tube)} minutes. On foot it takes about ${Math.round(walk)}.`,
+    body: `Glass runs round the edge of town, from ${first.name} to ${last.name}. ${from} to ${to} takes about ${Math.round(tube)} minutes; on foot it takes about ${Math.round(walk)}.`,
     note,
   };
 }

@@ -28,6 +28,7 @@ import { CINEMA_PROPS } from '../src/city/cinema-props';
 import { eventApproach } from '../src/lib/resident-trips';
 import { cityHit } from '../src/city/render';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS } from '../src/lib/town-time';
+import { onRoadOrTube } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const crowd = HOUSE_PLOTS.slice(0, 32).map((plot, index) => ({
@@ -323,9 +324,8 @@ describe('Starlight Cinema', () => {
       for (let t = trip.depart; t < trip.homeBy; t += 0.75) {
         const r = at(t).find((r) => r.id === id)!;
         expect(r.event?.id).toBe('cinema');
-        expect(
-          isRoad(Math.floor(r.position.x), Math.floor(r.position.y)) || insideCinema(r.position),
-        ).toBe(true);
+        // On the road, on the Treeline while riding it, or inside the cinema.
+        expect(onRoadOrTube(r) || insideCinema(r.position)).toBe(true);
         expect(r.greeting).toBe(false);
       }
       for (const boundary of [

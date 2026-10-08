@@ -17,7 +17,7 @@ import {
 } from '../src/films/ads/the-treeline';
 import { slateSeconds } from '../src/films/kit';
 import { CINEMA_ADS } from '../src/lib/cinema';
-import { TUBE_SIGN_LINES, TUBE_STATIONS } from '../src/lib/tubes';
+import { TUBE_SIGN_LINES, tubeStation } from '../src/lib/tubes';
 import { recordingContext } from './recording-context';
 
 const ad = CINEMA_ADS.find((spot) => spot.artwork === 'tube')!;
@@ -60,7 +60,8 @@ describe('The Treeline ad', () => {
   });
 
   it('reads the real sign, names both halts and keeps its one caption', () => {
-    const [first, last] = [TUBE_STATIONS[0], TUBE_STATIONS[TUBE_STATIONS.length - 1]];
+    // The umbrella is stowed at Hedgerow Halt, by the sign, and the ride ends at Willow Halt.
+    const [first, last] = [tubeStation('C1'), tubeStation('N1')];
     expect(text(3.5)).toEqual(expect.arrayContaining([...TUBE_SIGN_LINES]));
     expect(text(1)).toEqual(expect.arrayContaining(['THE TREELINE', first.name.toUpperCase()]));
     expect(text(((CUTS[1] + CUTS[2]) / 2) * ad.duration)).toEqual(

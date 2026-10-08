@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   clampZoom,
+  fitView,
+  neighborhoodView,
   pinchView,
   resizeView,
   steadyListening,
@@ -144,5 +146,36 @@ describe('What the camera hears', () => {
     expect(steadyListening(silent, { gain: 0, pan: 0.9 })).toBe(silent);
     const heard = { gain: 0.05, pan: 0.9 };
     expect(steadyListening(silent, heard)).toBe(heard);
+  });
+});
+
+describe('The map’s first views', () => {
+  const bounds = { left: -3192, right: 2432, bottom: 2812 };
+  it('fits the whole town, centred, with room for the controls', () => {
+    const view = fitView(1440, 900, bounds);
+    expect(view.zoom).toBeCloseTo(1388 / (bounds.right - bounds.left + 36), 12);
+    near(screen(view, { x: (bounds.left + bounds.right) / 2, y: 0 }), { x: 720, y: view.y });
+    expect(fitView(1, 1, bounds).zoom).toBe(0.01);
+  });
+
+  it('opens where people live, no further out than 0.35 (0.15 on a phone)', () => {
+    const overview = fitView(1120, 640, bounds);
+    expect(neighborhoodView([], 1120, 640, overview)).toEqual(overview);
+    // A cluster round the middle, and one far-off house that does not pull the view out.
+    const cluster = [0, 1, 2, 3, 4].flatMap((i) => [
+      { x: 100 * i, y: 50 * i },
+      { x: -100 * i, y: 50 * i },
+    ]);
+    const view = neighborhoodView([...cluster, { x: 2400, y: 2700 }], 1120, 640, overview);
+    expect(view.zoom).toBeGreaterThanOrEqual(0.35);
+    expect(view.zoom).toBeLessThanOrEqual(0.85);
+    expect(neighborhoodView(cluster, 1120, 640, overview)).toEqual(view);
+    // Every plot taken: the floor, not the whole-town fit.
+    const everywhere = Array.from({ length: 300 }, (_, i) => ({
+      x: -3000 + (i % 20) * 270,
+      y: Math.floor(i / 20) * 180,
+    }));
+    expect(neighborhoodView(everywhere, 1120, 640, overview).zoom).toBe(0.35);
+    expect(neighborhoodView(everywhere, 390, 440, fitView(390, 440, bounds)).zoom).toBe(0.15);
   });
 });

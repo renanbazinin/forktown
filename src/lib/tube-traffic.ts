@@ -7,9 +7,9 @@ import { residentTrips } from './resident-trips';
 import { townClock } from './simulation';
 import type { TripLeg } from './tube-journeys';
 import {
+  TUBE_PARCEL_ROUTE,
   TUBE_PARCELS,
   TUBE_SPEED,
-  TUBE_STATIONS,
   tubeAt,
   tubeLength,
   tubeParcelMinutes,
@@ -136,11 +136,9 @@ let parcelHours: { from: number; until: number } | undefined;
  *  nothing is planned (at night the town still follows yesterday's plan). */
 function parcelDaylight(time: number) {
   if (!parcelHours) {
-    const longest = Math.max(
-      ...TUBE_STATIONS.flatMap((a) =>
-        TUBE_STATIONS.filter((b) => b !== a).map((b) => tubeParcelMinutes(a.id, b.id)),
-      ),
-    );
+    // Parcels only ever run along their own route, both ways.
+    const [a, b] = TUBE_PARCEL_ROUTE;
+    const longest = Math.max(tubeParcelMinutes(a, b), tubeParcelMinutes(b, a));
     parcelHours = {
       from: TUBE_PARCELS.first - TUBE_PARCELS.wait,
       until: TUBE_PARCELS.last + TUBE_PARCELS.jitter + longest + TUBE_PARCELS.wait,

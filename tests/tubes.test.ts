@@ -33,10 +33,13 @@ import {
   TUBE_BOARD,
   TUBE_LINE_NAME,
   TUBE_MIN_SAVING,
+  TUBE_PARCEL_ROUTE,
   TUBE_PARCELS,
   TUBE_PLOTS,
+  TUBE_SAVING_SHARE,
   TUBE_SIGN,
   TUBE_SIGN_LINES,
+  TUBE_SIGN_STATION,
   TUBE_SPEED,
   TUBE_STACK_WALK,
   TUBE_STATIONS,
@@ -47,10 +50,12 @@ import {
   tubeFrame,
   tubeInStack,
   tubeLength,
+  tubeMinSaving,
   tubeParcelMinutes,
   tubeParcelSlots,
   tubeRoute,
   tubeStageTime,
+  tubeStation,
 } from '../src/lib/tubes';
 import {
   joinApproach,
@@ -81,16 +86,10 @@ const DESTINATIONS = {
 const [FIRST, LAST] = [TUBE_STATIONS[0].id, TUBE_STATIONS.at(-1)!.id];
 
 describe('The Treeline stations', () => {
-  it('reserves C1 and N1, and every halt of the loop, for the town', () => {
-    expect(TUBE_PLOTS).toEqual(['C1', 'N1']);
-    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(schemaHousePlots());
-    // The whole loop's halts are reserved already, while the line still runs C1 to N1.
+  it('reserves its seven halts round the edge of town, in line order', () => {
     expect(TUBE_HALT_PLOTS).toEqual(['R1', 'N1', 'C1', 'A9', 'C15', 'L15', 'R15']);
-    for (const plot of TUBE_HALT_PLOTS) {
-      expect(isTubePlot(plot)).toBe(true);
-      expect(HOUSE_PLOTS.some((p) => p.id === plot)).toBe(false);
-      expect(placeSchema.safeParse({ ...sample, plot }).success).toBe(false);
-    }
+    expect(TUBE_PLOTS).toEqual([...TUBE_HALT_PLOTS]);
+    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(schemaHousePlots());
     for (const plot of TUBE_PLOTS) {
       expect(isTubePlot(plot)).toBe(true);
       expect(venueAt(plot)).toBeUndefined();
@@ -106,32 +105,50 @@ describe('The Treeline stations', () => {
       expect(placeSchema.safeParse({ ...sample, plot }).success).toBe(true);
     }
     for (const place of readPlaces()) expect(TUBE_PLOTS).not.toContain(place.plot);
+    // One selection for the whole line, on the halt with the sign.
+    expect(TUBE_SIGN_STATION).toBe('C1');
     expect(TUBE_VENUE).toEqual({ id: 'tube', plot: 'C1', name: 'The Treeline', kind: 'tube' });
   });
-  it('lists the stations in order along the line, north to south, so the ends are first and last', () => {
-    // A new station goes in at its row, not at the end: [0] and at(-1) are the line's two ends.
-    for (let i = 1; i < TUBE_STATIONS.length; i++)
-      expect(TUBE_STATIONS[i].dock.y).toBeGreaterThan(TUBE_STATIONS[i - 1].dock.y);
-    expect([FIRST, LAST]).toEqual(['C1', 'N1']);
+  it('lists the stations in order along the loop, so the ends are first and last', () => {
+    // A new station goes in at its place on the loop, not at the end: [0] and at(-1) are the
+    // line's two ends, Barley Halt in the south-west and Bulrush Halt down the far bank.
+    expect([FIRST, LAST]).toEqual(['R1', 'R15']);
+    expect(TUBE_STATIONS.map((s) => s.edge)).toEqual([
+      'west',
+      'west',
+      'west',
+      'north',
+      'bank',
+      'bank',
+      'bank',
+    ]);
   });
   it('keeps every road and lamp: a one-plot station removes nothing', () => {
     for (const station of TUBE_STATIONS) {
       const plot = getPlot(station.plot)!;
       for (let d = -2; d <= 2; d++) {
-        expect(isRoad(1, plot.y + d)).toBe(true);
+        // The lane or the riverside road its spur crosses, and the road in front of it.
+        if (station.edge === 'west') expect(isRoad(1, plot.y + d)).toBe(true);
+        if (station.edge === 'north') expect(isRoad(plot.x + d, 1)).toBe(true);
+        if (station.edge === 'bank') expect(isRoad(61, plot.y + d)).toBe(true);
         expect(isRoad(plot.x + d, plot.y + 2)).toBe(true);
       }
     }
     expect(STREETLIGHTS.some((p) => p.x === 5 && p.y === 9)).toBe(true);
     expect(STREETLIGHTS.some((p) => p.x === 5 && p.y === 57)).toBe(true);
   });
-  it('puts the sign on the first station, word for word, and names the line in the house voice', () => {
+  it('puts the sign on Hedgerow Halt, word for word, and names the line in the house voice', () => {
     expect(TUBE_SIGN).toBe('People & parcels. Please remove umbrella.');
     expect(TUBE_SIGN_LINES).toHaveLength(3);
     expect(TUBE_SIGN_LINES.join(' ')).toBe(TUBE_SIGN);
     expect(TUBE_STATIONS.map((s) => [s.id, s.name])).toEqual([
-      ['C1', 'Hedgerow Halt'],
+      ['R1', 'Barley Halt'],
       ['N1', 'Willow Halt'],
+      ['C1', 'Hedgerow Halt'],
+      ['A9', 'Hawthorn Halt'],
+      ['C15', 'Watercress Halt'],
+      ['L15', 'Kingfisher Halt'],
+      ['R15', 'Bulrush Halt'],
     ]);
     expect(TUBE_LINE_NAME).toBe('The Treeline');
     for (const text of [
@@ -143,14 +160,20 @@ describe('The Treeline stations', () => {
       expect(text).not.toMatch(/forktown|!/i);
   });
   it('waits at the road door, stands its stack 0.7 tiles in, and turns at the plot centre', () => {
-    for (const [station, y] of [
-      [TUBE_STATIONS[0], 12.8],
-      [TUBE_STATIONS[1], 56.8],
+    for (const [id, x, y] of [
+      ['R1', 3.5, 72.8],
+      ['N1', 3.5, 56.8],
+      ['C1', 3.5, 12.8],
+      ['A9', 35.5, 4.8],
+      ['C15', 59.5, 12.8],
+      ['L15', 59.5, 48.8],
+      ['R15', 59.5, 72.8],
     ] as const) {
+      const station = tubeStation(id);
       const plot = getPlot(station.plot)!;
       expect(station.door).toEqual(plotEntrance(plot));
       expect(isRoad(Math.floor(station.door.x), Math.floor(station.door.y))).toBe(true);
-      expect(station.stack.x).toBeCloseTo(3.5, 12);
+      expect(station.stack.x).toBeCloseTo(x, 12);
       expect(station.stack.y).toBeCloseTo(y, 12);
       expect(distance(station.door, station.stack)).toBeCloseTo(TUBE_STACK_WALK, 12);
       expect(TUBE_STACK_WALK).toBe(0.7);
@@ -184,7 +207,7 @@ describe('The Treeline geometry', () => {
     expect([TUBE_BOARD, TUBE_SPEED, TUBE_ALIGHT, TUBE_MIN_SAVING]).toEqual([2, 10, 2, 10]);
     expect(tubeFixedMinutes('C1', 'N1')).toBe(4 + tubeLength('C1', 'N1') / 10);
     expect(tubeLineMinutes('C1', 'N1')).toEqual({ tube: tubeFixedMinutes('C1', 'N1'), walk: 150 });
-    expect(TUBE_ALTITUDE).toEqual({ spur: 39, trunk: 8, radius: 2.5 });
+    expect(TUBE_ALTITUDE).toEqual({ spur: 39, trunk: 8, bank: 5, radius: 2.5, bankRadius: 2 });
   });
   it('keeps the glass continuous, low behind the trees and clear of walkers over the lane', () => {
     for (const [from, to] of [
@@ -233,34 +256,32 @@ describe('Tube or walk', () => {
           const start = plotEntrance(plot);
           const choice = tubeChoice(start, end);
           if (choice) savings.push(choice.saving);
-          // The same pairs, re-derived: the walk against the best door-to-door ride.
+          // The same pairs, re-derived: the walk against the best door-to-door ride among the
+          // station pairs that each save their own threshold.
           const walk = routeLength(roadPath(start, end)) / WALK_SPEED;
-          const ride = Math.min(
-            ...TUBE_STATIONS.flatMap((a) =>
-              TUBE_STATIONS.filter((b) => b !== a).map(
-                (b) =>
-                  (routeLength(roadPath(start, a.door)) + routeLength(roadPath(b.door, end))) /
-                    WALK_SPEED +
-                  tubeFixedMinutes(a.id, b.id),
-              ),
-            ),
-          );
-          if (walk - ride >= TUBE_MIN_SAVING) {
+          const rides = TUBE_STATIONS.flatMap((a) =>
+            TUBE_STATIONS.filter((b) => b !== a).map((b) => ({
+              time:
+                (routeLength(roadPath(start, a.door)) + routeLength(roadPath(b.door, end))) /
+                  WALK_SPEED +
+                tubeFixedMinutes(a.id, b.id),
+              threshold: tubeMinSaving(a.id, b.id),
+            })),
+          ).filter((ride) => walk - ride.time >= ride.threshold);
+          if (rides.length) {
             riders++;
-            best = Math.min(best, walk - ride);
+            best = Math.min(best, walk - Math.min(...rides.map((ride) => ride.time)));
           }
         }
-      // Savings step by 12.5 minutes (one four-tile block): 12.5 − 9.45 = 3.05 is the best that walks.
       expect(savings.length).toBe(riders);
-      expect(riders).toBeGreaterThan(0);
+      expect(riders).toBeGreaterThan(HOUSE_PLOTS.length);
       expect(Math.min(...savings)).toBeCloseTo(best, 9);
-      expect(Math.min(...savings)).toBeCloseTo(25 - tubeFixedMinutes('C1', 'N1'), 9);
+      expect(Math.min(...savings)).toBeGreaterThanOrEqual(TUBE_MIN_SAVING);
       // Nearby trips stay on foot.
       for (const [plot, end] of [
         ['A1', DESTINATIONS.stage],
         ['C2', DESTINATIONS.green],
         ['E2', DESTINATIONS.football],
-        ['A7', DESTINATIONS.zoo],
         ['Q3', DESTINATIONS.millpond],
       ] as const)
         expect(tubeChoice(plotEntrance(getPlot(plot)!), end)).toBeUndefined();
@@ -268,17 +289,31 @@ describe('Tube or walk', () => {
         from: 'C1',
         to: 'N1',
       });
+      // From the far south-west, Barley Halt; from the north, Hawthorn Halt.
       expect(tubeChoice(plotEntrance(getPlot('Q3')!), DESTINATIONS.stage)).toMatchObject({
-        from: 'N1',
+        from: 'R1',
         to: 'C1',
       });
-      // Only walking hurries, so a tube plan never fails where the walking plan would succeed.
+      expect(tubeChoice(plotEntrance(getPlot('A7')!), DESTINATIONS.zoo)).toMatchObject({
+        from: 'A9',
+        to: 'N1',
+      });
+      // Only walking hurries, so a tube plan never fails where the walking plan would succeed:
+      // every pair's threshold is at least the share of its own fixed minutes that hurrying both
+      // walks to the full 1.4× could win back.
+      expect(TUBE_SAVING_SHARE).toBeCloseTo(MAX_TRAVEL_SPEED_MULTIPLIER - 1, 12);
+      for (const a of TUBE_STATIONS)
+        for (const b of TUBE_STATIONS)
+          if (a !== b)
+            expect(tubeMinSaving(a.id, b.id)).toBeGreaterThanOrEqual(
+              (MAX_TRAVEL_SPEED_MULTIPLIER - 1) * tubeFixedMinutes(a.id, b.id),
+            );
       const fixed = TUBE_STATIONS.flatMap((a) =>
         TUBE_STATIONS.filter((b) => b !== a).map((b) => tubeFixedMinutes(a.id, b.id)),
       );
-      expect(TUBE_MIN_SAVING).toBeGreaterThanOrEqual(
-        (MAX_TRAVEL_SPEED_MULTIPLIER - 1) * Math.max(...fixed),
-      );
+      expect(Math.abs(Math.max(...fixed) - 25.767)).toBeLessThanOrEqual(0.005);
+      // The longest ride is end to end, Barley Halt to Bulrush Halt.
+      expect(tubeFixedMinutes('R1', 'R15')).toBeCloseTo(Math.max(...fixed), 9);
     },
   );
   it('gives the same answer both ways and whatever was asked before', () => {
@@ -375,8 +410,8 @@ describe('Tube or walk', () => {
       }
       // Walking legs are exactly alongRoute.
       expect(journeyAt(legs, 0, walk / 2)).toEqual(alongRoute(legs[0].route, 0.5));
-      const c1 = TUBE_STATIONS[0],
-        n1 = TUBE_STATIONS[1];
+      const c1 = tubeStation('C1'),
+        n1 = tubeStation('N1');
       const walkingIn = journeyAt(legs, 0, walk + 0.8);
       expect(walkingIn.position.x).toBeCloseTo(3.5, 9);
       expect(walkingIn.position.y).toBeCloseTo(13.15, 9);
@@ -465,7 +500,7 @@ describe('Tube or walk', () => {
       }
     expect(checked).toBeGreaterThanOrEqual(100);
     // Stepping off at Willow Halt, a zoo visitor turns in at the zoo's own path, not past the gate.
-    const n1 = TUBE_STATIONS[1];
+    const n1 = tubeStation('N1');
     const zoo = VENUES.find((v) => v.kind === 'zoo')!;
     for (let seat = 0; seat < EVENT_SPOTS.zoo.length; seat++) {
       const approach = eventApproach({ venue: zoo }, seat);
@@ -489,7 +524,9 @@ describe('Parcels', () => {
         expect(slot.depart).toBeLessThanOrEqual(TUBE_PARCELS.last + TUBE_PARCELS.jitter);
         expect(Number.isInteger(slot.depart)).toBe(true);
       }
-      expect(new Set(slots.map((slot) => slot.from))).toEqual(new Set([FIRST, LAST]));
+      // Hedgerow Halt to Willow Halt and back: parcels never reach the river.
+      expect(new Set(slots.map((slot) => slot.from))).toEqual(new Set(TUBE_PARCEL_ROUTE));
+      expect(new Set(slots.map((slot) => slot.to))).toEqual(new Set(TUBE_PARCEL_ROUTE));
     }
     expect(TUBE_PARCELS.wait).toBe(0.5);
     expect(tubeParcelMinutes('C1', 'N1')).toBe(tubeLength('C1', 'N1') / 10);

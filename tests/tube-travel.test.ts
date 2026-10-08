@@ -24,6 +24,7 @@ import {
   TUBE_PARCELS,
   tubeAt,
   tubeFixedMinutes,
+  tubeMinSaving,
   tubeStation,
 } from '../src/lib/tubes';
 import { fixedMinutes, legsMinutes, walkingPace } from '../src/lib/tube-journeys';
@@ -173,10 +174,16 @@ describe('Riding the Treeline over a whole year', () => {
             continue;
           }
           rode++;
-          // Unhurried, door to seat: the whole way on foot against the tube journey.
+          // Unhurried, door to seat: the whole way on foot against the tube journey, which clears
+          // its own pair's threshold (never less than ten minutes).
+          const board = tube.legs.find((leg) => leg.kind === 'board')!;
+          if (board.kind !== 'board') throw new Error('A ride with no boarding leg.');
           const onFoot = routeLength(eventRoute(home, trip.event, trip.seat)) / WALK_SPEED;
-          expect(onFoot - legsMinutes(tube.legs)).toBeGreaterThanOrEqual(TUBE_MIN_SAVING);
-          expect(fixedMinutes(tube.legs)).toBeCloseTo(tubeFixedMinutes('C1', 'N1'), 9);
+          expect(onFoot - legsMinutes(tube.legs)).toBeGreaterThanOrEqual(
+            tubeMinSaving(board.from, board.to),
+          );
+          expect(tubeMinSaving(board.from, board.to)).toBeGreaterThanOrEqual(TUBE_MIN_SAVING);
+          expect(fixedMinutes(tube.legs)).toBeCloseTo(tubeFixedMinutes(board.from, board.to), 9);
         }
       }
     expect(rode).toBeGreaterThan(200);
@@ -423,13 +430,13 @@ describe('Riding the Treeline over a whole year', () => {
     expect(label(there.board + 0.5)).toBe('Boarding the tube to Willow Grove Zoo');
     expect(label(there.board + 1.9)).toBe('Boarding the tube to Willow Grove Zoo');
     expect(label(mid(there))).toBe('Riding the tube to Willow Grove Zoo');
-    expect(label(there.off - 0.5)).toBe('Stepping off the tube at Willow Halt');
+    expect(label(there.off - 0.5)).toBe(`Stepping off the tube at ${tubeStation(there.to).name}`);
     expect(label(there.off + 0.5)).toBe('Walking to Willow Grove Zoo');
     expect(label(back.board - 0.5)).toBe('Walking home from the zoo');
     expect(label(back.board + 0.5)).toBe('Boarding the tube home from the zoo');
     expect(label(back.board + 1.9)).toBe('Boarding the tube home from the zoo');
     expect(label(mid(back))).toBe('Riding the tube home from the zoo');
-    expect(label(back.off - 0.5)).toBe('Stepping off the tube at Hedgerow Halt');
+    expect(label(back.off - 0.5)).toBe(`Stepping off the tube at ${tubeStation(back.to).name}`);
     expect(label(back.off + 0.5)).toBe('Walking home from the zoo');
   });
 

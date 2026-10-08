@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { drawMeadow } from '../src/city/ambience';
 import { lampOn, MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from '../src/city/lamplight';
 import { drawSproutStake } from '../src/city/lantern-post';
+import { paintGroundLayer } from '../src/city/ground-cache';
 import { renderCity } from '../src/city/render';
 import { drawResident } from '../src/city/residents';
 import {
@@ -24,6 +25,7 @@ import {
   drawTubeTraffic,
   drawTubes,
   glassLod,
+  tubeMarkArea,
   tubePainterFor,
   type TubeObject,
   type TubePainter,
@@ -35,24 +37,41 @@ import { seedFraction, snowAt, townSeasonAt } from '../src/lib/seasons';
 import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { tubeParcelsAt, tubeRides, type TubeParcelState } from '../src/lib/tube-traffic';
+import { KINGFISHER_PIER } from '../src/lib/district-calendar';
 import {
+  TRUNK_ARCS,
   TUBE_ALIGHT,
   TUBE_ALIGHT_STEPS,
   TUBE_ALTITUDE,
+  TUBE_BANK_X,
   TUBE_BOARD,
   TUBE_BOARD_STEPS,
   TUBE_SIGN_LINES,
+  TUBE_SIGN_STATION,
   TUBE_STATIONS,
   TUBE_TRUNK_X,
+  TUBE_TRUNK_Y,
+  loopSpur,
+  stationTap,
+  trunkPoint,
   tubeAt,
   tubeLength,
   tubeRoute,
   tubeStation,
   type ResidentTransit,
 } from '../src/lib/tubes';
-import { WORLD_BOUNDS, getPlot, plotCenter, project, type Point } from '../src/lib/world';
+import {
+  WORLD_BOUNDS,
+  WORLD_WIDTH,
+  getPlot,
+  plotCenter,
+  project,
+  type Point,
+} from '../src/lib/world';
+import { VENUES } from '../src/lib/events';
+import { fitView, neighborhoodView } from '../src/lib/map-view';
 import { AFTER_HOURS } from './fixtures';
-import { readPlaces } from './full-town';
+import { FULL_TOWN_CREATOR, readPlaces } from './full-town';
 import { matrixContext, type MatrixPoint } from './matrix-context';
 import { recordingContext, type RecordedCall } from './recording-context';
 
@@ -65,6 +84,11 @@ vi.mock('../src/city/lantern-post', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../src/city/lantern-post')>();
   return { ...actual, drawSproutStake: vi.fn(actual.drawSproutStake) };
 });
+// The marks test reads the ground paint and the marks render.ts hands the ground cache.
+vi.mock('../src/city/ground-cache', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/city/ground-cache')>();
+  return { ...actual, paintGroundLayer: vi.fn(actual.paintGroundLayer) };
+});
 
 // The Treeline through the renderer's eyes: quiet in the opening view, within its call caps,
 // low, with no snow on the glass and amber only in a lit lamp, the sign word for word, every
@@ -73,7 +97,8 @@ vi.mock('../src/city/lantern-post', async (importOriginal) => {
 // kept, and the same frame every time.
 
 const places = readPlaces();
-const [C1, N1] = TUBE_STATIONS;
+const C1 = tubeStation('C1'),
+  N1 = tubeStation('N1');
 // Year 3, so no sampled date touches the calendar's epoch.
 const yearDay = (date: number) => CALENDAR_EPOCH_DAY + 224 + date;
 const SUMMER = yearDay(42);
@@ -85,6 +110,8 @@ const LENGTH = tubeLength(C1.id, N1.id);
 type Camera = { x: number; y: number; zoom: number };
 type Visible = TubeScene['visible'];
 const OPENING: Camera = { x: 720, y: 88, zoom: 0.7 };
+/** The whole town at fit: 150 calls a station (SPEC §3.7). */
+const WHOLE_CAP = 150 * 7;
 const WHOLE: Camera = (() => {
   const zoom = Math.min(
     (1440 - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
@@ -127,6 +154,7 @@ function sceneOf(extra: Partial<TubeScene> = {}): TubeScene {
     season: townSeasonAt(day, minutes),
     zoom: 3,
     emphasis: 'none',
+    station: null,
     visible: everywhere,
     residents: [],
     parcels: () => [],
@@ -360,18 +388,19 @@ describe('The Treeline in the opening view', () => {
     const none = paint(realScene(OPENING, 720, 3));
     expect(none.total).toBeGreaterThan(100);
     expect(none.total).toBeLessThanOrEqual(250);
-    expect(none.ground.calls.length).toBeLessThanOrEqual(60);
-    const selected = paint(realScene(OPENING, 720, 3, { emphasis: 'selected' }));
+    expect(none.ground.calls.length).toBeLessThanOrEqual(100);
+    const selected = paint(realScene(OPENING, 720, 3, { emphasis: 'selected', station: 'C1' }));
     expect(selected.total).toBeLessThanOrEqual(290);
     expect(selected.total).toBeGreaterThan(none.total);
-    const hover = paint(realScene(OPENING, 720, 3, { emphasis: 'hover' }));
+    const hover = paint(realScene(OPENING, 720, 3, { emphasis: 'hover', station: 'C1' }));
     expect(hover.total).toBe(none.total);
     const whole = paint(realScene(WHOLE, 720, 3));
     // The whole-town fit: the width term wins, 1388 / ((W + H) × 38 + 36) at 1440 × 900.
     expect(WHOLE.zoom).toBeCloseTo(1388 / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36), 9);
     expect(WHOLE.zoom).toBeCloseTo(0.245, 3);
-    expect(parts(whole, 'stack')).toHaveLength(2);
-    expect(whole.total).toBeLessThanOrEqual(420);
+    expect(parts(whole, 'stack')).toHaveLength(TUBE_STATIONS.length);
+    expect(TUBE_STATIONS).toHaveLength(7);
+    expect(whole.total).toBeLessThanOrEqual(WHOLE_CAP);
     expect(none.alpha).toBe(1);
   });
 
@@ -394,7 +423,9 @@ describe('The Treeline in the opening view', () => {
           for (const camera of [OPENING, WHOLE]) {
             const painted = paint(realScene(camera, minutes, SUMMER));
             most = Math.max(most, painted.total);
-            expect(painted.total, `${minutes}`).toBeLessThanOrEqual(camera === WHOLE ? 420 : 250);
+            expect(painted.total, `${minutes}`).toBeLessThanOrEqual(
+              camera === WHOLE ? WHOLE_CAP : 250,
+            );
             expect(painted.alpha).toBe(1);
           }
         }
@@ -425,16 +456,77 @@ describe('The Treeline in the opening view', () => {
         ],
       }),
     );
-    expect(painted.total).toBeLessThanOrEqual(420);
+    expect(painted.total).toBeLessThanOrEqual(WHOLE_CAP);
     expect(painted.alpha).toBe(1);
+  });
+
+  it(
+    'keeps the real opening frame within budget, on a desktop and on a phone',
+    { timeout: 20_000 },
+    () => {
+      // The view a visitor first sees: the published homes, the green and the stage framed by
+      // map-view's neighborhoodView, as City.tsx frames them (SPEC §2.4).
+      const published = places.filter((place) => place.creator !== FULL_TOWN_CREATOR);
+      const homes = [
+        ...published.map((place) => place.plot),
+        ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
+          (venue) => venue.plot,
+        ),
+      ].map((id) => plotCenter(getPlot(id)!));
+      const rides = tubeRides(published, SUMMER);
+      const moments = [
+        600,
+        720,
+        1210,
+        ...rides.flatMap((ride) => [ride.board + 1.7, ride.board + 1.95, ride.off - 1.9]),
+      ];
+      for (const [width, height] of [
+        [1120, 640],
+        [390, 440],
+      ]) {
+        const camera = neighborhoodView(homes, width, height, fitView(width, height, WORLD_BOUNDS));
+        let most = 0;
+        for (const minutes of moments) {
+          const painted = paint(
+            sceneOf({
+              minutes,
+              day: SUMMER,
+              zoom: camera.zoom,
+              visible: visibleFor(camera, width, height),
+              residents: simulateResidents(published, minutes, SUMMER),
+              parcels: () => tubeParcelsAt(published, minutes, SUMMER),
+            }),
+          );
+          most = Math.max(most, painted.total);
+          expect(painted.total, `${width}×${height} at ${minutes}`).toBeLessThanOrEqual(250);
+        }
+        expect(most, `${width}×${height}`).toBeGreaterThan(100);
+      }
+    },
+  );
+
+  it('keeps each bank halt within its own budget, and draws nothing of it off-screen', () => {
+    for (const id of ['C15', 'L15', 'R15']) {
+      const own = (scene: TubeScene) =>
+        callsOf(paint(scene).objects.filter((o) => o.object.station === id));
+      for (const zoom of [1, 3]) {
+        const camera = closeUp(id, zoom);
+        for (const emphasis of ['none', 'selected'] as const) {
+          const calls = own(sceneOf({ zoom, visible: visibleFor(camera), emphasis, station: id }));
+          expect(calls, `${id} ${zoom} ${emphasis}`).toBeGreaterThan(0);
+          expect(calls, `${id} ${zoom} ${emphasis}`).toBeLessThanOrEqual(150);
+        }
+      }
+      expect(own(sceneOf({ zoom: 3, visible: visibleFor(closeUp('C1')) }))).toBe(0);
+    }
   });
 });
 
 describe('The Treeline’s parts', () => {
   it('keeps every part within its call cap', { timeout: 20_000 }, () => {
-    for (const emphasis of ['none', 'selected'] as const) {
-      const painted = paint(sceneOf({ emphasis }));
+    for (const emphasis of ['none', 'selected'] as const)
       for (const station of TUBE_STATIONS) {
+        const painted = paint(sceneOf({ emphasis, station: station.id }));
         const glass = callsOf(parts(painted, 'spur', station.id));
         expect(glass).toBeGreaterThan(0);
         expect(glass).toBeLessThanOrEqual(emphasis === 'none' ? 90 : 110);
@@ -443,7 +535,6 @@ describe('The Treeline’s parts', () => {
         for (const post of parts(painted, 'post', station.id))
           expect(post.calls.length).toBeLessThanOrEqual(3);
       }
-    }
     // A winter night with the lamp lit: snow on the hood, the sign and the bucket.
     const winterNight = sceneOf({ day: WINTER, minutes: 1290 });
     expect(snowAt(winterNight.season.yearDay, seedFraction(`tube:${C1.id}`))).toBeGreaterThan(0);
@@ -500,9 +591,10 @@ describe('The Treeline’s parts', () => {
     const trunk = winter.ground.points.filter((p) => p.x < start.x - 1 && p.x > end.x + 1);
     expect(trunk.length).toBeGreaterThan(0);
     for (const p of trunk) expect(start.y - 0.5 * (p.x - start.x) - p.y).toBeLessThanOrEqual(11);
-    // Every glass fillRect is the 5-px tube, or its 8-px halo when selected.
+    // Every glass fillRect is the 5-px tube (4 px down the far bank), or its 8-px halo when
+    // selected.
     for (const emphasis of ['none', 'selected'] as const) {
-      const painted = paint(sceneOf({ emphasis }));
+      const painted = paint(sceneOf({ emphasis, station: 'C1' }));
       const glass = [
         ...painted.ground.log,
         ...parts(painted, 'spur').flatMap((o) => o.log),
@@ -512,14 +604,20 @@ describe('The Treeline’s parts', () => {
       for (const call of glass)
         expect(Math.abs(call.args[3] as number)).toBeLessThanOrEqual(emphasis === 'none' ? 5 : 8);
     }
-    // Walkers on the lane (x = 1.5, 31 px tall) pass under the glass: the whole straight, from
-    // the corner to the lane's west edge, is at full height.
+    // Walkers on the lane (x = 1.5, 31 px tall) or the riverside road (x = 61.5) pass under the
+    // glass: the whole straight, from the corner to the lane's or the road's far edge, is at full
+    // height; so is a north spur's leg, from its stack to the y = 1 lane's far edge.
     expect(TUBE_ALTITUDE.spur - TUBE_ALTITUDE.radius - 31).toBeGreaterThanOrEqual(5.5);
     for (const station of TUBE_STATIONS) {
-      const straight = ROUTE.filter(
-        (p) => p.y === station.dock.y && p.x >= 1.35 - 1e-9 && p.x <= station.dock.x,
+      const { edge, dock, stack } = station;
+      const straight = loopSpur(station, 1).filter((p) =>
+        edge === 'west'
+          ? p.y === dock.y && p.x >= 1.35 - 1e-9 && p.x <= dock.x
+          : edge === 'north'
+            ? p.x === dock.x && p.y >= 1.35 - 1e-9 && p.y <= stack.y
+            : p.y === dock.y && p.x >= dock.x && p.x <= WORLD_WIDTH - 2.35 + 1e-9,
       );
-      expect(straight.length).toBeGreaterThan(2);
+      expect(straight.length, station.id).toBeGreaterThan(2);
       for (const p of straight) expect(p.h).toBe(TUBE_ALTITUDE.spur);
     }
     for (const from of [C1.id, N1.id])
@@ -531,19 +629,49 @@ describe('The Treeline’s parts', () => {
   });
 
   it('stands its trunk posts every 4 tiles and none on the plots', () => {
-    expect(TUBE_TRUNK_POSTS.map((post) => post.y)).toEqual(
-      Array.from({ length: 10 }, (_, k) => 15.5 + 4 * k),
-    );
-    expect(TUBE_TRUNK_POSTS.every((post) => post.x === TUBE_TRUNK_X)).toBe(true);
-    // Mid-block, on the rows where a station between two others would put its T, and never on
-    // a station's own row.
+    const rows = (from: number, to: number, skip: number[]) =>
+      Array.from({ length: (to - from) / 4 + 1 }, (_, k) => from + 4 * k).filter(
+        (y) => !skip.includes(y),
+      );
+    const run = (name: string) => TUBE_TRUNK_POSTS.filter((post) => post.run === name);
+    // The west run: the middle row of every block from the north-west corner down to Barley Halt,
+    // never on a halt's own row (C1 11.5, N1 55.5).
+    expect(run('west').every((post) => post.x === TUBE_TRUNK_X)).toBe(true);
+    expect(run('west').map((post) => post.y)).toEqual(rows(3.5, 67.5, [11.5, 55.5]).reverse());
+    // The north run: every second plot column, never at Hawthorn Halt's.
+    expect(run('north').every((post) => post.y === TUBE_TRUNK_Y)).toBe(true);
+    expect(run('north').map((post) => post.x)).toEqual([7.5, 15.5, 23.5, 31.5, 39.5, 47.5, 55.5]);
+    // The bank run: every plot row down to Bulrush Halt, the first two as pilings in the head pool.
+    expect(run('bank').every((post) => post.x === TUBE_BANK_X)).toBe(true);
+    expect(run('bank').map((post) => post.y)).toEqual(rows(3.5, 67.5, [11.5, 47.5]));
+    expect(
+      run('bank')
+        .filter((post) => post.water)
+        .map((post) => post.y),
+    ).toEqual([3.5, 7.5]);
+    expect(TUBE_TRUNK_POSTS).toHaveLength(37);
     for (const post of TUBE_TRUNK_POSTS) {
-      expect((post.y - 3.5) % 4).toBe(0);
-      expect(TUBE_STATIONS.some((station) => station.dock.y === post.y)).toBe(false);
+      expect((post[post.run === 'north' ? 'x' : 'y'] - 3.5) % 4).toBe(0);
+      const halts = TUBE_STATIONS.filter((s) => s.edge === post.run);
+      expect(
+        halts.some((s) => (post.run === 'north' ? s.dock.x === post.x : s.dock.y === post.y)),
+      ).toBe(false);
+      expect(post.height).toBe(post.run === 'bank' ? 3 : 6);
     }
+    // One post or pier for each spur: in the tree-free edge tile of its row or column, or mid-river
+    // under a bank bridge.
     const posts = parts(paint(sceneOf()), 'post');
     expect(posts).toHaveLength(TUBE_STATIONS.length);
-    for (const post of posts) expect(post.object.ground.x).toBeLessThan(1);
+    for (const post of posts) {
+      const { edge, dock } = tubeStation(post.object.station);
+      const ground = post.object.ground;
+      if (edge === 'west') expect(ground).toEqual({ x: 0.62, y: dock.y });
+      if (edge === 'north') expect(ground).toEqual({ x: dock.x, y: 0.62 });
+      if (edge === 'bank') expect(ground).toEqual({ x: KINGFISHER_PIER.x, y: dock.y });
+    }
+    // A bank pier stands about 27 px tall, to the bridge's underside over the water.
+    for (const pier of posts.filter((o) => tubeStation(o.object.station).edge === 'bank'))
+      expect(Math.abs(heightOf(pier) - 27)).toBeLessThanOrEqual(2);
   });
 
   it('keeps the glass discoverable and never fades a rider', () => {
@@ -677,19 +805,19 @@ describe('The Treeline through the year', () => {
 });
 
 describe('The station sign', () => {
-  it('says it word for word at the first station only, in the same ink lit or not', () => {
+  it('says it word for word at Hedgerow Halt only, in the same ink lit or not', () => {
     for (const minutes of [720, 1205, 1290]) {
       const painted = paint(sceneOf({ minutes }));
       const signs = parts(painted, 'sign');
       expect(signs).toHaveLength(1);
-      expect(signs[0].object.station).toBe(C1.id);
+      expect(signs[0].object.station).toBe(TUBE_SIGN_STATION);
       const text = signs[0].log.filter((call) => call.name === 'fillText');
       expect(text.map((call) => call.args[0])).toEqual([...TUBE_SIGN_LINES]);
       for (const call of text) expect(call.font).toBe('bold 4px "Space Mono", monospace');
       expect(new Set(text.map((call) => call.fill))).toEqual(
         new Set([TUBE_PALETTE['PLATE.ink'][isNight(minutes) ? 1 : 0]]),
       );
-      const others = painted.objects.filter((o) => o.object.station === N1.id);
+      const others = painted.objects.filter((o) => o.object.station !== C1.id);
       expect(others.flatMap((o) => o.log).some((call) => call.name === 'fillText')).toBe(false);
     }
     expect(TUBE_SIGN_LINES.join(' ')).toBe('People & parcels. Please remove umbrella.');
@@ -710,22 +838,47 @@ describe('Riders and parcels in the glass', () => {
         ? `stack ${painter.station}`
         : 'traffic';
   it('hands every point of every ride to exactly one painter, in order along the line', () => {
+    // Hedgerow to Willow: Hedgerow's spur from its stack, the glass behind the trees, Willow's
+    // spur back to its stack, each piece once and in order.
+    const own = (station: string, reverse: boolean) => {
+      const list = TUBE_PIECES.flatMap((piece, i) =>
+        piece.layer === 'spur' && piece.station === station ? [`spur ${i}`] : [],
+      );
+      return reverse ? list.reverse() : list;
+    };
     const expected = [
       `stack ${C1.id}`,
-      ...TUBE_PIECES.map((piece, i) => (piece.layer === 'spur' ? `spur ${i}` : 'traffic')),
+      ...own(C1.id, false),
+      'traffic',
+      ...own(N1.id, true),
       `stack ${N1.id}`,
-    ].filter((k, i, list) => i === 0 || k !== list[i - 1]);
-    for (const [from, to] of [
-      [C1.id, N1.id],
-      [N1.id, C1.id],
-    ]) {
+    ];
+    const seenOf = (from: string, to: string) => {
       const seen: string[] = [];
-      for (let s = 0; s <= LENGTH + 1e-9; s += 0.01) {
+      for (let s = 0; s <= tubeLength(from, to) + 1e-9; s += 0.01) {
         const k = key(tubePainterFor(from, to, s));
         if (seen.at(-1) !== k) seen.push(k);
       }
-      expect(seen).toEqual(from === C1.id ? expected : [...expected].reverse());
-    }
+      return seen;
+    };
+    expect(seenOf(C1.id, N1.id)).toEqual(expected);
+    expect(seenOf(N1.id, C1.id)).toEqual([...expected].reverse());
+    // Every ride: its own stack, its own spur pieces, the glass behind the trees once, the other
+    // halt's spur pieces, its stack; never a piece twice.
+    const sorted = (list: string[]) => [...list].sort();
+    for (const a of TUBE_STATIONS)
+      for (const b of TUBE_STATIONS) {
+        if (a === b) continue;
+        const seen = seenOf(a.id, b.id);
+        expect(new Set(seen).size, `${a.id}>${b.id}`).toBe(seen.length);
+        const middle = seen.indexOf('traffic');
+        expect(seen[0]).toBe(`stack ${a.id}`);
+        expect(seen.at(-1)).toBe(`stack ${b.id}`);
+        expect(sorted(seen.slice(1, middle)), `${a.id}>${b.id}`).toEqual(sorted(own(a.id, false)));
+        expect(sorted(seen.slice(middle + 1, -1)), `${a.id}>${b.id}`).toEqual(
+          sorted(own(b.id, false)),
+        );
+      }
   });
 
   it('draws each rider once: on a spur inside its piece, on the trunk before the sort', () => {
@@ -816,6 +969,44 @@ describe('Riders and parcels in the glass', () => {
     }
     expect(boxes).toBeGreaterThan(1000);
     expect(furthest).toBeGreaterThan(2);
+    // Hedgerow to Kingfisher: round the north-west corner, along the north run, round the river's
+    // head (where the glass doubles back on screen) and over the river on the bridge.
+    const far = tubeRoute(C1.id, 'L15');
+    const farLine = far.map((p) => {
+      const g = project(p.x, p.y);
+      return { x: g.x, y: g.y - p.h };
+    });
+    const farLength = tubeLength(C1.id, 'L15');
+    const near = (s: number) => {
+      const p = tubeAt(C1.id, 'L15', s).position;
+      return (
+        s < 7 ||
+        s > farLength - 7 ||
+        (p.y < 2 && (p.x < 2 || p.x > WORLD_WIDTH - 3)) ||
+        Math.round(s * 100) % 100 === 0
+      );
+    };
+    let checked = 0;
+    for (let s = 0; s <= farLength; s += 0.02) {
+      if (!near(s)) continue;
+      const m = matrixContext();
+      const scene = sceneOf({
+        residents: [person('r', outfit, riding(C1.id, 'L15', s))],
+        parcels: () => [],
+      });
+      drawTubeTraffic(m.ctx, scene);
+      for (const object of drawTubes(m.ctx, scene))
+        if (object.part === 'spur' || object.part === 'stack') object.paint();
+      for (const p of m.points) {
+        if (p.call !== 'fillRect' || !sprite.has(String(m.calls[p.index].fillStyle))) continue;
+        checked++;
+        const off = offLine(p, farLine);
+        expect(off, `${s.toFixed(2)} ${String(m.calls[p.index].fillStyle)}`).toBeLessThanOrEqual(
+          3 + 1e-9,
+        );
+      }
+    }
+    expect(checked).toBeGreaterThan(1000);
   });
 
   it('keeps parcels on the pad, rising and dropping inside the stack', () => {
@@ -954,10 +1145,32 @@ describe('Depth', () => {
     ];
     expect(c1).toHaveLength(list.length);
     c1.forEach((depth, i) => expect(depth).toBeCloseTo(list[i], 3));
-    const south = [
-      55.475, 55.925, 56.375, 56.815, 57.245, 57.675, 58.105, 58.535, 58.942, 59.325, 59.708,
-    ];
-    n1.forEach((depth, i) => expect(depth).toBeCloseTo(south[i], 3));
+    // Willow Halt's spur, the same 44 rows further down the west run.
+    expect(n1).toHaveLength(list.length);
+    n1.forEach((depth, i) => expect(depth).toBeCloseTo(list[i] + 44, 3));
+    // Hawthorn's I-spur runs north at 35.5 + y; the bank bridges east along their rows, the river
+    // pieces behind the far-bank tree in front of them.
+    const a9 = spurs.filter((piece) => piece.station === 'A9').map((piece) => piece.depth);
+    expect(a9.length).toBeGreaterThan(0);
+    for (const depth of a9) expect(depth).toBeLessThan(35.5 + 4.8);
+    expect(Math.min(...a9)).toBeLessThan(35.5 + 1);
+    for (const id of ['C15', 'L15', 'R15']) {
+      const { dock } = tubeStation(id);
+      const bridge = spurs.filter((piece) => piece.station === id);
+      expect(bridge.length).toBeGreaterThan(0);
+      for (const piece of bridge.filter((piece) => piece.points[0].x > WORLD_WIDTH - 2))
+        expect(piece.depth).toBeLessThan(WORLD_WIDTH - 1 + dock.y + 1);
+      // Walkers on the riverside road (x 61.5) sort in front of the glass over them from the
+      // bridge's own row on, and behind it north of the row, as lane walkers do under a west spur.
+      const road = bridge.find((piece) =>
+        piece.points.some((p, i) => i > 0 && (piece.points[i - 1].x - 61.5) * (p.x - 61.5) <= 0),
+      )!;
+      expect([-0.45, 0, 0.45].map((dy) => 61.5 + dock.y + dy > road.depth)).toEqual([
+        false,
+        true,
+        true,
+      ]);
+    }
     // The column-0 pieces go behind the row-12 edge tree; lane walkers sort around 12.815.
     for (const piece of spurs.filter((piece) => piece.points[0].x < 1 && piece.station === C1.id))
       expect(piece.depth).toBeLessThan(12);
@@ -970,9 +1183,11 @@ describe('Depth', () => {
     expect(depth('stand')).toBeCloseTo(16.1, 9);
     expect(depth('bubble')).toBeCloseTo(14.8, 9);
     expect(depth('post')).toBeCloseTo(11.87, 9);
-    // Nothing behind the tree line is ever a depth object.
+    // Nothing behind the tree lines or on the far bank is ever a depth object.
     for (const piece of TUBE_PIECES)
-      expect(piece.layer === 'ground').toBe(piece.points.every((p) => p.x <= 0.001));
+      expect(piece.layer === 'ground').toBe(
+        piece.points.every((p) => p.x <= 0.001 || p.y <= 0.001 || p.x >= WORLD_WIDTH - 1.001),
+      );
     expect(parts(painted, 'spur')).toHaveLength(spurs.length);
     expect(painted.objects.every((o) => o.object.depth > 0)).toBe(true);
     // Pushed before the residents, so walkers win ties.
@@ -982,6 +1197,91 @@ describe('Depth', () => {
     expect(render.indexOf('drawTubes(ctx, tube)')).toBeLessThan(
       render.indexOf('for (const resident of residents)'),
     );
+  });
+});
+
+describe('Marking one halt', () => {
+  it('lights only the hovered or selected halt, and repaints only its rectangle', () => {
+    const frame = (selectedPlot: string | null, hoveredPlot: string | null) => {
+      vi.mocked(paintGroundLayer).mockClear();
+      renderCity({
+        ctx: recordingContext().ctx,
+        width: 1440,
+        height: 900,
+        camera: WHOLE,
+        places,
+        selectedPlot,
+        hoveredPlot,
+        night: false,
+        showPlots: false,
+        minutes: 720,
+        day: SUMMER,
+      });
+      const [, , paintGround, marks] = vi.mocked(paintGroundLayer).mock.lastCall!;
+      const m = matrixContext();
+      paintGround(m.ctx);
+      // Each ground call with where it lands, in world px. A fill or a stroke lands where its
+      // path does, and only the calls that paint carry their colour (a path is built under
+      // whatever colour the plot before it left).
+      const landing = m.calls.map((): MatrixPoint[] => []);
+      for (const point of m.points) landing[point.index]?.push(point);
+      const PAINTS = new Set(['fill', 'stroke', 'fillRect', 'strokeRect', 'fillText']);
+      let path: MatrixPoint[] = [];
+      const calls = m.calls.map(({ name, args, fillStyle }, index) => {
+        if (name === 'beginPath') path = [];
+        path.push(...landing[index]);
+        const points = name === 'fill' || name === 'stroke' ? [...path] : landing[index];
+        const colour = PAINTS.has(name) ? ` ${String(fillStyle)}` : '';
+        return { call: `${name}(${args.map(String).join(',')})${colour}`, points };
+      });
+      return { calls, marks: marks! };
+    };
+    const quiet = frame(null, null);
+    for (const [selected, hovered, id] of [
+      [null, 'C15', 'C15'],
+      ['A9', null, 'A9'],
+      ['R1', 'N1', 'R1'],
+    ] as const) {
+      const marked = frame(selected, hovered);
+      expect(marked.marks.key.trim().split(' ')).toContain(`tube:${id}`);
+      const area = tubeMarkArea(id);
+      const c = plotCenter(getPlot(id)!);
+      expect(area).toEqual({ left: c.x - 112, right: c.x + 112, top: c.y - 58, bottom: c.y + 58 });
+      expect(marked.marks.areas(marked.marks.key)).toContainEqual(area);
+      // The ground differs from the quiet one only inside the marked rectangles.
+      const areas = marked.marks.areas(marked.marks.key)!;
+      const outside = (list: typeof quiet.calls) =>
+        list
+          .filter(({ points }) =>
+            points.some(
+              (p) =>
+                !areas.some(
+                  (a) => p.x >= a.left && p.x <= a.right && p.y >= a.top && p.y <= a.bottom,
+                ),
+            ),
+          )
+          .map(({ call }) => call);
+      expect(outside(marked.calls)).toEqual(outside(quiet.calls));
+      expect(marked.calls.map(({ call }) => call)).not.toEqual(quiet.calls.map(({ call }) => call));
+    }
+    // A plain plot keeps its own rectangle; nothing marked, nothing to repaint.
+    const plain = frame('B1', null);
+    expect(plain.marks.areas(plain.marks.key)).toHaveLength(1);
+    expect(quiet.marks.areas(quiet.marks.key)).toEqual([]);
+  });
+
+  it('lights the marked halt’s own glass and stack, never another’s', () => {
+    for (const station of TUBE_STATIONS) {
+      const painted = paint(sceneOf({ emphasis: 'selected', station: station.id }));
+      const halo = (o: Painted) =>
+        o.log.some((call) => call.fill === TUBE_PALETTE['GLASS.halo'][0]);
+      expect(painted.objects.filter(halo).every((o) => o.object.station === station.id)).toBe(true);
+      expect(parts(painted, 'spur', station.id).some(halo)).toBe(true);
+      // The cached ground never lights: it repaints only inside the halt's rectangle.
+      expect(painted.ground.log.some((call) => call.fill === TUBE_PALETTE['GLASS.halo'][0])).toBe(
+        false,
+      );
+    }
   });
 });
 
@@ -1065,16 +1365,34 @@ describe('Growing the line', () => {
   });
 
   it('runs one unbroken trunk from the first station’s elbow to the last’s', () => {
-    const trunk = TUBE_PIECES.filter((piece) => piece.points.every((p) => p.x === TUBE_TRUNK_X));
-    // One run between each two stations, and one between a middle station's two elbows.
-    expect(trunk).toHaveLength(2 * TUBE_STATIONS.length - 3);
+    const { S_N0, S_N1, S_E0 } = TRUNK_ARCS;
+    const onRun = (p: Point) => p.x === TUBE_TRUNK_X || p.y === TUBE_TRUNK_Y || p.x === TUBE_BANK_X;
+    const inCorner = (p: Point) =>
+      (p.x < TUBE_TRUNK_X + 1 && p.y < TUBE_TRUNK_Y + 1) ||
+      (p.x > TUBE_BANK_X - 1 && p.y < TUBE_TRUNK_Y + 1);
+    const trunk = TUBE_PIECES.filter(
+      (piece) => piece.points.length > 1 && piece.points.every((p) => onRun(p) || inCorner(p)),
+    ).filter((piece) => onRun(piece.points[0]) && onRun(piece.points.at(-1)!));
+    // One run between each two consecutive taps, corners included; the ends at the first and
+    // last stations' elbows.
+    expect(trunk).toHaveLength(TUBE_STATIONS.length - 1);
     expect(trunk.every((piece) => piece.layer === 'ground')).toBe(true);
     trunk.slice(1).forEach((piece, i) => expect(piece.points[0]).toEqual(trunk[i].points.at(-1)));
-    const onTrunk = (from: string, to: string) =>
-      tubeRoute(from, to).find((p) => p.x === TUBE_TRUNK_X)!;
-    const last = TUBE_STATIONS.at(-1)!;
-    expect(trunk[0].points[0]).toEqual(onTrunk(C1.id, last.id));
-    expect(trunk.at(-1)!.points.at(-1)).toEqual(onTrunk(last.id, C1.id));
+    TUBE_STATIONS.slice(1, -1).forEach((station, i) => {
+      const at = trunkPoint(stationTap(station.id));
+      expect(trunk[i].points.at(-1)!.x).toBeCloseTo(at.x, 9);
+      expect(trunk[i].points.at(-1)!.y).toBeCloseTo(at.y, 9);
+    });
+    const first = TUBE_STATIONS[0],
+      last = TUBE_STATIONS.at(-1)!;
+    const elbowEnd = (from: string, to: string) => tubeRoute(from, to).find(onRun)!;
+    expect(trunk[0].points[0]).toEqual(elbowEnd(first.id, last.id));
+    expect(trunk.at(-1)!.points.at(-1)).toEqual(elbowEnd(last.id, first.id));
+    // Round both corners, which only the C1–A9 and A9–C15 runs pass.
+    const corners = trunk.filter((piece) => piece.points.some(inCorner));
+    expect(corners.map((piece) => piece.station)).toEqual(['C1', 'A9']);
+    for (const piece of corners) expect(piece.points.filter(inCorner)).toHaveLength(7);
+    expect([S_N0, S_N1, S_E0].every((s) => trunkPoint(s).h > 0)).toBe(true);
     // Every segment of every ride, outside the stack tops, lies on some piece.
     for (const a of TUBE_STATIONS)
       for (const b of TUBE_STATIONS) {

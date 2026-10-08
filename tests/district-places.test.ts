@@ -205,8 +205,8 @@ describe('The 20 × 15 town', () => {
       expect(isTubePlot(id)).toBe(true);
       expect(venueAt(id)).toBeUndefined();
     }
-    // The line itself still runs C1 to N1 until the loop is built.
-    expect(TUBE_STATIONS.map((station) => station.id)).toEqual(['C1', 'N1']);
+    // The loop runs through all seven, in line order.
+    expect(TUBE_STATIONS.map((station) => station.id)).toEqual([...TUBE_HALT_PLOTS]);
     expect([...MARKET_PLOTS]).toEqual(['D14', 'D15', 'E14', 'E15']);
     for (const id of MARKET_PLOTS) {
       expect(isDistrictPlot(id)).toBe(true);

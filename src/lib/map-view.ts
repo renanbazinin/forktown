@@ -37,6 +37,63 @@ export function resizeView(view: View, from: Size, to: Size, fit: number): View 
   return zoomAround(moved, clampZoom(view.zoom, fit), { x: to.width / 2, y: to.height / 2 });
 }
 
+/** The world's extent in world px (WORLD_BOUNDS): its left and right tips and its bottom tip. */
+export type Bounds = { left: number; right: number; bottom: number };
+
+/** The whole town at its fit zoom, centred, with room for the controls. */
+export function fitView(width: number, height: number, bounds: Bounds): View {
+  const zoom = Math.max(
+    0.01,
+    Math.min(
+      (width - 52) / (bounds.right - bounds.left + 36),
+      (height - 85) / (bounds.bottom + 98),
+    ),
+  );
+  return {
+    x: width / 2 - ((bounds.left + bounds.right) / 2) * zoom,
+    y: (height - bounds.bottom * zoom) / 2 + 28,
+    zoom,
+  };
+}
+
+/**
+ * The map's opening view: where people live, from the centres (world px) of the homes and the
+ * town's green and stage. A lone far-off house does not zoom it back out, and a town with every
+ * plot taken opens no further out than 0.35 (0.15 on a phone) rather than at whole-town fit,
+ * every house tiny; Reset still shows it all. With no points, the overview.
+ */
+export function neighborhoodView(
+  points: readonly Point[],
+  width: number,
+  height: number,
+  overview: View,
+): View {
+  if (!points.length) return overview;
+  const median = (values: number[]) => values.sort((a, b) => a - b)[values.length >> 1];
+  const mid = { x: median(points.map((p) => p.x)), y: median(points.map((p) => p.y)) };
+  const distance = (p: Point) => Math.hypot(p.x - mid.x, p.y - mid.y);
+  const typical = median(points.map(distance));
+  const near = points.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
+  const left = Math.min(...near.map((point) => point.x)) - 110;
+  const right = Math.max(...near.map((point) => point.x)) + 110;
+  const top = Math.min(...near.map((point) => point.y)) - 145;
+  const bottom = Math.max(...near.map((point) => point.y)) + 80;
+  const zoom = Math.max(
+    overview.zoom,
+    width < 600 ? 0.15 : 0.35,
+    Math.min(
+      0.85,
+      (width < 600 ? width * 1.6 : width - 150) / (right - left),
+      (height - 160) / (bottom - top),
+    ),
+  );
+  return {
+    x: width / 2 - ((left + right) / 2) * zoom,
+    y: height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom,
+    zoom,
+  };
+}
+
 const middle = ([a, b]: readonly [Point, Point]) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
 const spread = ([a, b]: readonly [Point, Point]) => Math.hypot(a.x - b.x, a.y - b.y);
 

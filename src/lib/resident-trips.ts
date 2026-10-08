@@ -29,7 +29,7 @@ import {
   type TravelPlan,
 } from './walking';
 import { nightBedtime } from './night-routine';
-import { TUBE_DOOR_HEADWAY, TUBE_MIN_SAVING } from './tubes';
+import { TUBE_DOOR_HEADWAY, tubeMinSaving } from './tubes';
 import {
   laneAt,
   laneWalk,
@@ -161,9 +161,9 @@ export function eventTubeJourney(home: Place, event: VisitEvent, seat: number) {
   const choice = tubeChoice(doorstep, approach[0]);
   if (!choice) return undefined;
   const legs = tubeLegs(choice, approach);
-  // The walk turns in at the gate as well: ride only while that still saves the minutes.
+  // The walk turns in at the gate as well: ride only while that still saves the pair's minutes.
   const walk = routeLength(eventRoute(home, event, seat)) / WALK_SPEED;
-  if (walk - legsMinutes(legs) < TUBE_MIN_SAVING) return undefined;
+  if (walk - legsMinutes(legs) < tubeMinSaving(choice.from, choice.to)) return undefined;
   return { route: legsRoute(legs), legs };
 }
 

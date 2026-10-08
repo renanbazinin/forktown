@@ -216,7 +216,7 @@
         { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR, townCalendarAt },
         { tubeRides, tubeStatus, tubeParcelsAt },
         { tubeCopy },
-        { TUBE_STATIONS },
+        { TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE },
       ] = await Promise.all(
         [
           '/src/city/render.ts',
@@ -237,7 +237,8 @@
       const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like scene.html
       const W = 1440,
         H = 900;
-      const [FIRST, LAST] = [TUBE_STATIONS[0].id, TUBE_STATIONS.at(-1).id];
+      // The sign's halt and Willow Halt: the views and the scripted rides use the oldest stretch.
+      const [FIRST, LAST] = [TUBE_SIGN_STATION, TUBE_PARCEL_ROUTE[1]];
       const VIEWS = ['c1', 'n1', 'trunk', 'opening', 'whole'];
       const EMPHASES = ['none', 'hover', 'selected'];
 

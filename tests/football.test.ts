@@ -39,6 +39,7 @@ import { roadPath, simulateResidents } from '../src/lib/simulation';
 import { cityHit } from '../src/city/render';
 import { footballSoundsBetween, renderFootballSound } from '../src/music/football-sound';
 import { townDayAt, townMinutesAt, TOWN_DAY_MS, UTC_DAY_MS } from '../src/lib/town-time';
+import { onRoadOrTube } from './tube-riders';
 
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
 const gameAtUtc = (timestamp: number) => footballAt(townMinutesAt(timestamp), townDayAt(timestamp));
@@ -586,8 +587,9 @@ describe('The Meadow Ground', () => {
     for (let minute = 360; minute <= 720; minute += 1.75)
       for (const state of simulateResidents(homes, minute, 3))
         if (state.event?.id === 'football') {
+          // On the road, on the Treeline while riding it, or on the near touchline.
           expect(
-            isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
+            onRoadOrTube(state) ||
               (insideFootball(state.position) && state.position.y > PITCH.bottom),
           ).toBe(true);
         }

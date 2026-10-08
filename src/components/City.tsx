@@ -1,7 +1,7 @@
 import { isZooPlot, ZOO_FRAME } from '../lib/zoo';
 import { FARM, FARM_FRAME, isFarmPlot } from '../lib/farm';
 import { isMillpondPlot, MILLPOND_FRAME, MILLPOND_VENUE } from '../lib/millpond';
-import { isTubePlot, tubeFrame, tubeStation, TUBE_LINE_NAME, TUBE_PLOTS } from '../lib/tubes';
+import { isTubePlot, tubeFrame, tubeStation, TUBE_LINE_NAME } from '../lib/tubes';
 import { places as publishedPlaces } from '../lib/places';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Crosshair, Minus, Plus, MapPin } from 'lucide-react';
@@ -18,6 +18,8 @@ import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/ci
 import { project, WORLD_BOUNDS } from '../lib/world';
 import {
   clampZoom,
+  fitView,
+  neighborhoodView,
   pinchView,
   resizeView,
   steadyListening,
@@ -241,27 +243,16 @@ const City = forwardRef<CityHandle, Props>(function City(
     };
   };
   const defaultCamera = useCallback((width: number, height: number): Camera => {
-    const zoom = Math.max(
-      0.01,
-      Math.min(
-        (width - 52) / (WORLD_BOUNDS.right - WORLD_BOUNDS.left + 36),
-        (height - 85) / (WORLD_BOUNDS.bottom + 98),
-      ),
-    );
-    fit.current = zoom;
-    return {
-      x: width / 2 - ((WORLD_BOUNDS.left + WORLD_BOUNDS.right) / 2) * zoom,
-      y: (height - WORLD_BOUNDS.bottom * zoom) / 2 + 28,
-      zoom,
-    };
+    const view = fitView(width, height, WORLD_BOUNDS);
+    fit.current = view.zoom;
+    return view;
   }, []);
   // Frames one plot: a venue's own view, or a house near the middle at a readable zoom.
   const plotCamera = (id: string, width: number, height: number, zoomFloor = 0) => {
     if (isFarmPlot(id)) return farmCamera(width, height);
     if (isZooPlot(id)) return zooCamera(width, height);
     if (isMillpondPlot(id)) return millpondCamera(width, height);
-    // A halt reserved for the loop frames like a plot until its station opens.
-    if (TUBE_PLOTS.includes(id)) return tubeCamera(width, height, id);
+    if (isTubePlot(id)) return tubeCamera(width, height, id);
     if (isCinemaPlot(id)) return cinemaCamera(width, height);
     if (isFootballPlot(id)) return footballCamera(width, height);
     const plot = getPlot(id);
@@ -289,46 +280,23 @@ const City = forwardRef<CityHandle, Props>(function City(
     framing.current = defaultCamera;
     setCamera(defaultCamera(size.width, size.height));
   }, [defaultCamera, size]);
+  // Frame where people live (map-view.ts): the homes, the green and the stage.
   const neighborhoodCamera = useCallback(
-    (width: number, height: number): Camera => {
-      const overview = defaultCamera(width, height);
-      const all = [
-        ...initialPlaces.current.map((place) => place.plot),
-        ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
-          (venue) => venue.plot,
-        ),
-      ].flatMap((id) => {
-        const plot = getPlot(id);
-        return plot ? [plotCenter(plot)] : [];
-      });
-      if (!all.length) return overview;
-      // Frame where people live. A lone far-off house should not zoom the opening view back out.
-      const median = (values: number[]) => values.sort((a, b) => a - b)[values.length >> 1];
-      const mid = { x: median(all.map((p) => p.x)), y: median(all.map((p) => p.y)) };
-      const distance = (p: { x: number; y: number }) => Math.hypot(p.x - mid.x, p.y - mid.y);
-      const typical = median(all.map(distance));
-      const points = all.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
-      const left = Math.min(...points.map((point) => point.x)) - 110;
-      const right = Math.max(...points.map((point) => point.x)) + 110;
-      const top = Math.min(...points.map((point) => point.y)) - 145;
-      const bottom = Math.max(...points.map((point) => point.y)) + 80;
-      // A town with every plot taken would open at whole-town fit, every house tiny: frame the
-      // middle of it no further out than 0.35 (0.15 on a phone). Reset still shows it all.
-      const zoom = Math.max(
-        overview.zoom,
-        width < 600 ? 0.15 : 0.35,
-        Math.min(
-          0.85,
-          (width < 600 ? width * 1.6 : width - 150) / (right - left),
-          (height - 160) / (bottom - top),
-        ),
-      );
-      return {
-        x: width / 2 - ((left + right) / 2) * zoom,
-        y: height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom,
-        zoom,
-      };
-    },
+    (width: number, height: number): Camera =>
+      neighborhoodView(
+        [
+          ...initialPlaces.current.map((place) => place.plot),
+          ...VENUES.filter((venue) => venue.kind === 'green' || venue.kind === 'stage').map(
+            (venue) => venue.plot,
+          ),
+        ].flatMap((id) => {
+          const plot = getPlot(id);
+          return plot ? [plotCenter(plot)] : [];
+        }),
+        width,
+        height,
+        defaultCamera(width, height),
+      ),
     [defaultCamera],
   );
   const stopFollowing = useCallback(() => {
@@ -628,9 +596,7 @@ const City = forwardRef<CityHandle, Props>(function City(
                   : isMillpondPlot(hover)
                     ? MILLPOND_VENUE.name
                     : isTubePlot(hover)
-                      ? TUBE_PLOTS.includes(hover)
-                        ? `${tubeStation(hover).name} · ${TUBE_LINE_NAME}`
-                        : TUBE_LINE_NAME
+                      ? `${tubeStation(hover).name} · ${TUBE_LINE_NAME}`
                       : PLOT_COPY.tooltip(hover))}
           </span>
         </div>

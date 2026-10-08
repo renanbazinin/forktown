@@ -48,8 +48,9 @@ import {
   inTubeGlass,
   tubeHit,
   tubeCrowdOffsets,
+  tubeMarkArea,
 } from './tubes';
-import { isTubePlot } from '../lib/tubes';
+import { isTubePlot, isTubeTreeGap } from '../lib/tubes';
 import { isDistrictPlot } from '../lib/district-places';
 import { tubeParcelsAt, type TubeParcelState } from '../lib/tube-traffic';
 import { insideCinema, isCinemaPlot, CINEMA_VENUE } from '../lib/cinema';
@@ -256,15 +257,30 @@ const terrain = Array.from({ length: WORLD_WIDTH * WORLD_HEIGHT }, (_, i) => {
   return { x, y, point: project(x + 0.5, y + 0.5), seed: hash(`${x},${y}`), road: isRoad(x, y) };
 });
 const venuePlots = VENUES.map((venue) => PLOTS.find((plot) => plot.id === venue.plot)!);
+/**
+ * Where the edge tile (x, y) grows its tree, in world px, if it grows one: the west and north
+ * edges, the two front rows and the far bank below the river's head, two tiles in three by hash,
+ * swayed up to 7 px either way, and never where a Treeline spur crosses the edge
+ * (TUBE_TREE_GAPS).
+ */
+export function edgeTreeAt(x: number, y: number): Point | undefined {
+  const seed = hash(`tree${x},${y}`);
+  if (
+    !(x === 0 || y === 0 || y >= WORLD_HEIGHT - 2 || (x === WORLD_WIDTH - 1 && y >= 9)) ||
+    seed % 3 === 0 ||
+    isTubeTreeGap(x, y)
+  )
+    return undefined;
+  const point = project(x + 0.5, y + 0.5);
+  return { x: point.x + (seed % 15) - 7, y: point.y };
+}
 const trees = terrain.flatMap(({ x, y, point }) => {
   const seed = hash(`tree${x},${y}`);
   const result: { point: Point; depth: number; scale: number; seed: number }[] = [];
-  if (
-    (x === 0 || y === 0 || y >= WORLD_HEIGHT - 2 || (x === WORLD_WIDTH - 1 && y >= 9)) &&
-    seed % 3 !== 0
-  )
+  const edge = edgeTreeAt(x, y);
+  if (edge)
     result.push({
-      point: { x: point.x + (seed % 15) - 7, y: point.y },
+      point: edge,
       depth: x + y,
       scale: 1 + (seed % 5) * 0.12,
       seed,
@@ -442,8 +458,8 @@ export function renderCity({
     season.groundDay,
   ].join(':');
   // The hover and selection marks stay out of the key: moving the pointer to another plot
-  // repaints just the plots it leaves and reaches. A station lights the whole Treeline, so it
-  // repaints the layer; the venues with their own art mark themselves outside it.
+  // repaints just the plots it leaves and reaches. A Treeline halt marks itself in its own
+  // tubeMarkArea; the venues with their own art mark themselves outside it.
   const mark = (id: string | null) => {
     const plot = getPlot(id ?? '');
     if (
@@ -455,26 +471,28 @@ export function renderCity({
       isMillpondPlot(plot.id)
     )
       return '';
-    return isTubePlot(plot.id) ? 'tube' : plot.id;
+    return isTubePlot(plot.id) ? `tube:${plot.id}` : plot.id;
   };
   const marks = {
     key: `${mark(selectedPlot)} ${mark(hoveredPlot)}`,
-    areas: (key: string) => {
-      const ids = key.split(' ').filter(Boolean);
-      if (ids.includes('tube')) return null;
-      return ids.map((id) => {
-        const pt = plotCenter(getPlot(id)!);
-        return { left: pt.x - 112, right: pt.x + 112, top: pt.y - 58, bottom: pt.y + 58 };
-      });
-    },
+    areas: (key: string) =>
+      key
+        .split(' ')
+        .filter(Boolean)
+        .map((id) => {
+          if (id.startsWith('tube:')) return tubeMarkArea(id.slice('tube:'.length));
+          const pt = plotCenter(getPlot(id)!);
+          return { left: pt.x - 112, right: pt.x + 112, top: pt.y - 58, bottom: pt.y + 58 };
+        }),
   };
-  // The Treeline: both station plots light up together, and its parcels are read at most once a
-  // frame, only if some of the line is in view.
-  const emphasis = isTubePlot(selectedPlot ?? '')
-    ? 'selected'
+  // The Treeline: a hover or a selection marks one halt, the selected one before the hovered one,
+  // and its parcels are read at most once a frame, only if some of the line is in view.
+  const station = isTubePlot(selectedPlot ?? '')
+    ? selectedPlot
     : isTubePlot(hoveredPlot ?? '')
-      ? 'hover'
-      : 'none';
+      ? hoveredPlot
+      : null;
+  const emphasis = !station ? 'none' : station === selectedPlot ? 'selected' : 'hover';
   let parcels: TubeParcelState[] | undefined;
   const tube = {
     minutes,
@@ -483,6 +501,7 @@ export function renderCity({
     season,
     zoom: camera.zoom,
     emphasis,
+    station,
     visible,
     residents,
     followed,
@@ -564,10 +583,11 @@ export function renderCity({
       const pt = plotCenter(plot);
       if (!near(pt, 110, 60, 60)) continue;
       const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
-      // A tube station keeps its meadow and loses only the stake, label and outline.
+      // A tube station keeps its meadow and loses only the stake, label and outline; a hover or a
+      // selection lights that halt's plot alone.
       const tubePlot = isTubePlot(plot.id);
-      const active = tubePlot ? isTubePlot(selectedPlot ?? '') : selectedPlot === plot.id;
-      const hover = tubePlot ? isTubePlot(hoveredPlot ?? '') : hoveredPlot === plot.id;
+      const active = selectedPlot === plot.id;
+      const hover = hoveredPlot === plot.id;
       if (occupied) {
         diamond(ctx, pt.x, pt.y, 105, 52.5, night ? '#577468' : '#BFD5A4');
         if (plot.id === FORK_PLOT) drawForkPlaza(ctx, pt.x, pt.y, night);

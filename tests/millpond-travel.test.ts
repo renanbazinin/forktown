@@ -22,6 +22,7 @@ import {
   millpondSkatingDay,
   skateGlide,
 } from '../src/lib/millpond';
+import { onRoadOrTube } from './tube-riders';
 
 // A roster-proof crowd: 36 synthetic homes on rows A–E who stroll all day.
 const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
@@ -229,7 +230,9 @@ describe('Skating on the Millpond', () => {
           const state = at(t);
           const p = state.position!;
           const phase = state.event!.phase;
-          expect(onRoad(p) || insideMillpond(p)).toBe(true);
+          expect(onRoadOrTube({ position: p, transit: state.transit }) || insideMillpond(p)).toBe(
+            true,
+          );
           if (insideWater(p)) expect(onTheirIce(p, trip.seat, phase)).toBe(true);
           // Skating from the moment they reach the loop until they step off it: no standing about.
           const attending = phase === 'attending';
@@ -285,8 +288,11 @@ describe('Skating on the Millpond', () => {
             expect(state.moving).toBe(false);
           }
           if (state.event?.id === 'millpond') {
-            expect(residentActivityLabel(state)).toContain('Millpond');
-            expect(onRoad(state.position) || insideMillpond(state.position)).toBe(true);
+            // Stepping off the tube names the halt; every other moment names the Millpond.
+            if (state.transit?.stage === 'alighting')
+              expect(residentActivityLabel(state)).toMatch(/^Stepping off the tube at .+ Halt$/);
+            else expect(residentActivityLabel(state)).toContain('Millpond');
+            expect(onRoadOrTube(state) || insideMillpond(state.position)).toBe(true);
           }
         }
       }
