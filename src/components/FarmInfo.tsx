@@ -44,7 +44,8 @@ function Outing({
   return (
     <div className="venue-program harvest-outing">
       <span className="eyebrow">{copy.panelEyebrow}</span>
-      <h3>{event.name}.</h3>
+      {/* The fair keeps the farm's own heading all year; the table is its event's name. */}
+      <h3>{event.outing === 'harvest-fair' ? PANEL_COPY.harvest.heading : `${event.name}.`}</h3>
       <p>{event.description}</p>
       <strong>
         {timeLabel(event.start)}–{timeLabel(event.end)} · {eventStatus(event, minutes)}

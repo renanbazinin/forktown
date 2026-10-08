@@ -17,7 +17,7 @@
 // Static pieces (bales, seats, the cart, the press, the bunting, each table segment, a lamp, a
 // jug) are painted once into a sprite per kind, season day and night at the map's device scale
 // and stamped from then on; without a document (node tests) or under a skew, they paint directly.
-import { harvestDay } from '../../lib/district-calendar';
+import { harvestDay, OUTING_TIMES } from '../../lib/district-calendar';
 import { DISTRICT_SPOTS, HARVEST_PROPS, type HarvestProp } from '../../lib/district-places';
 import type { EventPose } from '../../lib/events';
 import { eveningMinutes, FORK_PLOT, lampLightsAt } from '../../lib/lanterns';
@@ -84,6 +84,9 @@ export const HARVEST_PALETTE = {
   leaf: ['#6F8F4E', '#43584A'] as Pair,
   pumpkinDark: ['#B9773D', '#7F5A40'] as Pair,
   note: ['#F3EFDF', '#B9C2B4'] as Pair,
+  fiddle: ['#9A5536', '#5E4840'] as Pair,
+  fiddleLight: ['#BE7448', '#6E5448'] as Pair,
+  bow: ['#ECE6D3', '#A3A897'] as Pair,
   bunting: [
     ['#C99A8B', '#7A6560'],
     ['#A9B98F', '#66705F'],
@@ -108,6 +111,8 @@ const CART = prop('cart'),
   TABLE = prop('table'),
   FIDDLER = prop('fiddler');
 const BALES: readonly HarvestProp[] = HARVEST_PROPS.filter((p) => p.id.startsWith('bale-'));
+/** The last fair guest is home by then, so the last straw seat is long gone. */
+const FAIR_HOME_BY = OUTING_TIMES['harvest-fair'].homeBy;
 /** The table runs along y 77.5 from x 15 to 21, its top 7 px up; the lamps stand on it. */
 export const TABLE_TOP = { left: 15.0, right: 21.0, near: 77.78, far: 77.22, rise: 7 } as const;
 const TABLE_Y = 77.5;
@@ -144,6 +149,11 @@ export const TABLE_LAMP_LIGHTS = TABLE_LAMPS.map((x) => {
     MAX_LAMP_DISTANCE - MIN_LAMP_DISTANCE,
   );
 });
+/** How far (in depth) after its own segment a lit lamp's light is drawn: after the next segment
+ * east (+0.8) and its own south guest (+0.5), before the next south guest (+1.3). */
+export const LAMP_DEPTH = 0.81;
+/** The radius of a lit table lamp's pool of light, world px. */
+export const LAMP_GLOW = 28;
 /** Minutes a table lamp takes to come up, and to go out at LAMPS_OUT. */
 export const LAMP_RISE = 0.75;
 export const LAMPS_OUT = 1256;
@@ -197,6 +207,18 @@ export function propOut(item: HarvestProp, t: number) {
   if (item.id === 'presser' || item.id === 'fiddler') return span(t, item.from, item.to, 1);
   if (item.id === 'table') return t >= item.from && t < item.to ? 1 : 0;
   return span(t, item.from, item.to, 5);
+}
+/** Minutes a straw seat takes to go once its own guest has walked off. */
+export const SEAT_FADE = 3;
+/**
+ * How much of a fair spot's straw seat is out at minute t: it comes at dawn and goes with the
+ * bales, but never from under a guest still at the spot. With `leave`, the last minute a fair
+ * guest is at that spot that day, it stays until half a minute after they have gone.
+ */
+export function seatOut(t: number, leave?: number) {
+  const bales = propOut(PRESS, t);
+  if (leave === undefined || t < PRESS.from + 5) return bales;
+  return Math.max(bales, 1 - ramp(t, leave + 0.5, leave + 0.5 + SEAT_FADE));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -347,8 +369,27 @@ const BAR_REST = Math.PI / 2;
 // Sprites: static art painted once per kind, season day and night at the map's device scale.
 
 type Box = { left: number; top: number; width: number; height: number };
-type Layer = { scale: number; held: boolean; sprites: Map<string, HTMLCanvasElement> };
+type Sprite = { canvas: HTMLCanvasElement; used: number };
+/** One canvas's sprites, least recently stamped first; `pixels` is the device pixels they hold. */
+type Layer = {
+  scale: number;
+  held: boolean;
+  frame: number;
+  pixels: number;
+  sprites: Map<string, Sprite>;
+};
 const layers = new WeakMap<Ctx, Layer>();
+/** Device pixels the sprites of one canvas may hold (16 MB), as the house sprites' smallest
+ * budget, and one sprite at most (2 MB): a piece bigger than that, close up on a dense screen,
+ * is painted directly. */
+export const SPRITE_BUDGET = 4 * 1024 * 1024;
+export const SPRITE_MAX = 512 * 1024;
+/** How many sprites a canvas keeps at most (kinds × days × looks). */
+const SPRITE_LIMIT = 96;
+/** A sprite not stamped for this many frames, a few seconds, gives its memory back: the laying
+ * and clearing pieces once the table is laid or gone, everything once the fair is out of view. */
+export const SPRITE_IDLE = 300;
+
 /** The sprite store for this canvas, or undefined to paint directly (node, or a skewed transform).
  * Called once a frame: a new device scale (a zoom under way) paints directly until it holds. */
 function layerFor(ctx: Ctx): Layer | undefined {
@@ -356,23 +397,58 @@ function layerFor(ctx: Ctx): Layer | undefined {
   const t = ctx.getTransform();
   if (t.b || t.c || t.a <= 0 || t.d !== t.a) return undefined;
   let layer = layers.get(ctx);
-  if (!layer) layers.set(ctx, (layer = { scale: t.a, held: false, sprites: new Map() }));
+  if (!layer)
+    layers.set(ctx, (layer = { scale: t.a, held: false, frame: 0, pixels: 0, sprites: new Map() }));
   else if (layer.scale !== t.a) {
     releaseSprites(layer);
     layer.scale = t.a;
     layer.held = false;
   } else layer.held = true;
+  tick(layer);
   return layer;
 }
-function releaseSprites(layer: Layer) {
-  for (const canvas of layer.sprites.values()) canvas.width = canvas.height = 0;
-  layer.sprites.clear();
+/** A frame of this canvas's: the sprites left idle too long are freed. */
+function tick(layer: Layer) {
+  layer.frame++;
+  for (const [key, sprite] of layer.sprites) {
+    if (sprite.used >= layer.frame - SPRITE_IDLE) break;
+    free(layer, key, sprite);
+  }
 }
-/** How many sprites a canvas keeps before starting again (kinds × days × looks). */
-const SPRITE_LIMIT = 96;
+/** A frame with nothing of the fair's to draw on this canvas: its sprites only age. */
+function idle(ctx: Ctx) {
+  const layer = layers.get(ctx);
+  if (layer?.sprites.size) tick(layer);
+}
+function free(layer: Layer, key: string, sprite: Sprite) {
+  layer.pixels -= sprite.canvas.width * sprite.canvas.height;
+  // A zero-sized canvas hands its backing store back straight away.
+  sprite.canvas.width = sprite.canvas.height = 0;
+  layer.sprites.delete(key);
+}
+function releaseSprites(layer: Layer) {
+  for (const [key, sprite] of layer.sprites) free(layer, key, sprite);
+  layer.pixels = 0;
+}
+/** Frees the sprites stamped least recently until `need` more pixels fit; never one stamped this
+ * frame or the last (on screen), so when those fill the budget the rest are painted directly. */
+function makeRoom(layer: Layer, need: number) {
+  const fits = () => layer.pixels + need <= SPRITE_BUDGET && layer.sprites.size < SPRITE_LIMIT;
+  if (need > SPRITE_MAX) return false;
+  for (const [key, sprite] of layer.sprites) {
+    if (fits() || sprite.used >= layer.frame - 1) break;
+    free(layer, key, sprite);
+  }
+  return fits();
+}
+/** How many sprites a canvas holds, and the device pixels they take (for the tests). */
+export function harvestSpriteStats(ctx: Ctx) {
+  const layer = layers.get(ctx);
+  return { sprites: layer?.sprites.size ?? 0, pixels: layer?.pixels ?? 0 };
+}
 /**
  * Paints `paint` (drawing round its own origin) at world px (x, y): from the sprite `key` when
- * the layer holds, else straight onto the canvas.
+ * the layer holds and it fits the budget, else straight onto the canvas.
  */
 function stamp(
   ctx: Ctx,
@@ -383,32 +459,42 @@ function stamp(
   y: number,
   paint: (ctx: Ctx) => void,
 ) {
-  let canvas = layer?.held ? layer.sprites.get(key) : undefined;
-  if (layer?.held && !canvas) {
-    const made = document.createElement('canvas');
+  let sprite = layer?.held ? layer.sprites.get(key) : undefined;
+  if (layer?.held && !sprite) {
     const s = layer.scale;
-    made.width = Math.max(1, Math.ceil(box.width * s));
-    made.height = Math.max(1, Math.ceil(box.height * s));
-    const c = made.getContext('2d');
-    if (c) {
-      c.setTransform(s, 0, 0, s, -box.left * s, -box.top * s);
-      paint(c);
-      if (layer.sprites.size >= SPRITE_LIMIT) releaseSprites(layer);
-      layer.sprites.set(key, (canvas = made));
+    const width = Math.max(1, Math.ceil(box.width * s)),
+      height = Math.max(1, Math.ceil(box.height * s));
+    if (makeRoom(layer, width * height)) {
+      const made = document.createElement('canvas');
+      made.width = width;
+      made.height = height;
+      const c = made.getContext('2d');
+      if (c) {
+        c.setTransform(s, 0, 0, s, -box.left * s, -box.top * s);
+        paint(c);
+        layer.pixels += width * height;
+        layer.sprites.set(key, (sprite = { canvas: made, used: layer.frame }));
+      }
     }
   }
-  if (!canvas || !layer) {
+  if (!sprite || !layer) {
     ctx.save();
     ctx.translate(x, y);
     paint(ctx);
     ctx.restore();
     return;
   }
+  // Stamped now: to the back of the queue for freeing.
+  if (sprite.used !== layer.frame) {
+    sprite.used = layer.frame;
+    layer.sprites.delete(key);
+    layer.sprites.set(key, sprite);
+  }
   const t = ctx.getTransform();
   ctx.save();
   ctx.resetTransform();
   ctx.drawImage(
-    canvas,
+    sprite.canvas,
     Math.round(t.e + (x + box.left) * layer.scale),
     Math.round(t.f + (y + box.top) * layer.scale),
   );
@@ -845,11 +931,25 @@ export function dishesOnTable(scene: DistrictScene): readonly Dish[] {
   return dishesOf(scene).filter((dish) => scene.minutes >= dish.arrive);
 }
 
+const leaveCache = new WeakMap<ReadonlyMap<string, readonly ResidentTrip[]>, number[]>();
+/** The last minute a fair guest is at each fair spot today (undefined for a spot nobody took). */
+export function fairLeaves(scene: DistrictScene): readonly (number | undefined)[] {
+  const plan = scene.plan();
+  const known = leaveCache.get(plan);
+  if (known) return known;
+  const leaves: number[] = [];
+  for (const trips of plan.values())
+    for (const trip of trips)
+      if (trip.event.outing === 'harvest-fair')
+        leaves[trip.seat] = Math.max(leaves[trip.seat] ?? -Infinity, trip.leave);
+  leaveCache.set(plan, leaves);
+  return leaves;
+}
+
 // ---------------------------------------------------------------------------------------------
 // The fiddler: standing at the table's east end facing the guests, bow going, a note now and then.
 
 function paintFiddler(ctx: Ctx, x: number, y: number, t: number, night: boolean) {
-  const sway = Math.floor(t * 1.5) % 2;
   drawResident(
     ctx,
     FIDDLER_LOOK,
@@ -859,29 +959,32 @@ function paintFiddler(ctx: Ctx, x: number, y: number, t: number, night: boolean)
     { moving: false, facing: 'sw', walkPhase: 0, greeting: false },
     { night },
   );
-  // The fiddle under the chin and the bow across it, in the figure's own px (mirrored: sw).
+  // In the figure's own px, facing out (+x) toward the guests, mirrored as it is drawn (sw).
+  const ink = (colour: string) => (night ? tint(colour, NIGHT_DIM) : colour);
+  const outfit = ink(FIDDLER_LOOK.outfit),
+    skin = ink(FIDDLER_LOOK.skin);
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(-1.25, 1.25);
-  box(ctx, -2, -15, 5, 3, pick(P.woodDark, night));
-  box(ctx, -1, -15, 2, 1, pick(P.woodLight, night));
-  box(ctx, 3, -16, 4, 1, pick(P.woodDeep, night));
-  box(ctx, -4, -11, 3, 2, pick(P.woodDeep, night));
-  const bow = Math.sin(t * Math.PI * 2 * 1.2) * 3;
-  ctx.strokeStyle = pick(P.linenShade, night);
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(-6 + bow, -11 - sway);
-  ctx.lineTo(5 + bow, -17 - sway);
-  ctx.stroke();
-  box(
-    ctx,
-    -7 + Math.round(bow),
-    -11,
-    2,
-    2,
-    night ? tint(FIDDLER_LOOK.skin, NIGHT_DIM) : FIDDLER_LOOK.skin,
-  );
+  // The near arm comes up off her skirt, the elbow bent, to hold the fiddle's neck out in front.
+  box(ctx, 3, -7, 2, 3, outfit);
+  box(ctx, 4, -10, 2, 2, outfit);
+  box(ctx, 5, -11, 2, 2, outfit);
+  box(ctx, 7, -12, 2, 2, skin);
+  // The fiddle, tucked under her chin and pointing out, rising a little to the scroll.
+  box(ctx, 0, -13, 5, 1, pick(P.fiddle, night));
+  box(ctx, -1, -12, 7, 1, pick(P.fiddle, night));
+  box(ctx, 0, -11, 5, 1, pick(P.fiddle, night));
+  box(ctx, 0, -13, 3, 1, pick(P.fiddleLight, night));
+  box(ctx, -1, -12, 1, 1, pick(P.woodDeep, night));
+  box(ctx, 5, -13, 2, 1, pick(P.woodDeep, night));
+  box(ctx, 7, -14, 3, 1, pick(P.woodDeep, night));
+  box(ctx, 10, -15, 1, 2, pick(P.woodDeep, night));
+  // The bow across the strings by the bridge, a pixel a row from her hip to past her chin,
+  // drawn back and forth along itself.
+  const stroke = Math.round(Math.sin(t * Math.PI * 2 * 1.2) * 2);
+  for (let row = 0; row < 9; row++)
+    box(ctx, Math.round((row + stroke) * 0.7), -8 - row - stroke, 1, 2, pick(P.bow, night));
   ctx.restore();
   // A note drifts up from the strings for a moment every few minutes.
   const phase = (t / 2.5) % 1;
@@ -897,15 +1000,28 @@ function paintFiddler(ctx: Ctx, x: number, y: number, t: number, night: boolean)
 // ---------------------------------------------------------------------------------------------
 // The painter.
 
+/** The fair ground's middle, and how far round it (px either side, above, below) the objects and
+ * the shadows may reach, with room to spare: measured 250, 153 and 107 (a farmhand at either gate,
+ * the bunting's top, the south row's straw seats) and 146, 70 and 74 for the shadows. */
+export const GROUND_MID = project(18, 77.5);
+export const GROUND_REACH = [300, 200, 160] as const;
+export const FLOOR_REACH = [260, 90, 90] as const;
+
 /** Whether a tile point, reaching `rx` px either side, `above` and `below`, is in view. */
 type Seen = (x: number, y: number, rx: number, above: number, below: number) => boolean;
 
 function harvestObjects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
   const { day, minutes, night, season, visible } = scene;
-  if (!harvestDay(day) || minutes < 360 || minutes >= TABLE.to) return [];
   // The whole fair ground at once first: nothing to do when the farm's west end is out of view.
-  const mid = project(18, 77.5);
-  if (!visible(mid, 240, 130, 130)) return [];
+  if (
+    !harvestDay(day) ||
+    minutes < 360 ||
+    minutes >= TABLE.to ||
+    !visible(GROUND_MID, ...GROUND_REACH)
+  ) {
+    idle(ctx);
+    return [];
+  }
   const seen: Seen = (x, y, rx, above, below) => visible(project(x, y), rx, above, below);
   const objects: DepthObject[] = [];
   let layer: Layer | undefined;
@@ -1007,13 +1123,18 @@ function harvestObjects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
         ),
       );
     });
-    DISTRICT_SPOTS['harvest-fair'].forEach((spot) => {
+  }
+  // The straw seats go with the bales, but each waits for its own guest to leave first.
+  if (minutes < FAIR_HOME_BY) {
+    const leaves = minutes >= PRESS.to - 5 ? fairLeaves(scene) : undefined;
+    DISTRICT_SPOTS['harvest-fair'].forEach((spot, k) => {
+      const out = seatOut(minutes, leaves?.[k]);
       // Just behind the spot, so a guest standing at it stands in front of their seat.
       const y = spot.y + (spot.facing === 'sw' ? -SEAT_BACK : SEAT_BACK);
-      if (!seen(spot.x, y, 10, 12, 6)) return;
+      if (out <= 0 || !seen(spot.x, y, 10, 12, 6)) return;
       const p = project(spot.x, y);
       push(spot.x + spot.y - 0.01, () =>
-        fade(pressOut, () =>
+        fade(out, () =>
           stamp(ctx, store(), keyOf('seat', day0, night), SEAT_BOX, p.x, p.y, (c) =>
             paintSeat(c, night),
           ),
@@ -1050,6 +1171,18 @@ function harvestObjects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
       const mine = parts.things > 0 ? dishes.filter((dish) => dish.seat % 8 === k) : [];
       const item = CENTER[k];
       const lamp = item === 'lamp' ? lamps[TABLE_LAMPS.indexOf(c)] : 0;
+      // A lit lamp's glass and its pool of light come after the segment east of it, whose cloth
+      // would otherwise cut the pool off in a straight line, and before the next guest along the
+      // south side, who sits in front of the light.
+      if (lamp > 0 && parts.things > 0)
+        push(c + TABLE_Y + LAMP_DEPTH, () =>
+          fade(parts.things * lamp, () => {
+            const x = Math.round(p.x),
+              y = Math.round(p.y - TABLE_TOP.rise - 1);
+            pixels(ctx, LIT_ROWS, LIT, x, y);
+            drawGlow(ctx, x, y - 5, LAMP_GLOW, 0.42);
+          }),
+        );
       push(c + TABLE_Y, () => {
         const sprite = (part: string, paint: (c: Ctx) => void) =>
           stamp(
@@ -1095,11 +1228,6 @@ function harvestObjects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
               mid.y,
               (c) => pixels(c, LAMP_ROWS, lampColors(night), 0, 0),
             );
-            if (lamp > 0)
-              fade(lamp, () => {
-                pixels(ctx, LIT_ROWS, LIT, mid.x, mid.y);
-                drawGlow(ctx, mid.x, mid.y - 5, 28, 0.42);
-              });
           } else if (item === 'jug')
             stamp(
               ctx,
@@ -1160,7 +1288,7 @@ function harvestObjects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
 function harvestFloor(ctx: Ctx, scene: DistrictScene) {
   const { day, minutes, night, visible } = scene;
   if (!harvestDay(day) || minutes < 360 || minutes >= TABLE.to) return;
-  if (!visible(project(18, 77.5), 240, 60, 60)) return;
+  if (!visible(GROUND_MID, ...FLOOR_REACH)) return;
   const shade = pick(P.shadow, night);
   const out = propOut(PRESS, minutes);
   const before = ctx.globalAlpha;

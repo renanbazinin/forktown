@@ -7,6 +7,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   dishesOnTable,
   drawScarecrowExtras,
+  fairLeaves,
+  FLOOR_REACH,
+  GROUND_MID,
+  GROUND_REACH,
+  harvestSpriteStats,
   HARVEST_PAIRS,
   HARVEST_PIECES,
   harvestPainter,
@@ -17,7 +22,12 @@ import {
   presserAt,
   propOut,
   scripted,
+  SEAT_FADE,
+  seatOut,
   segmentParts,
+  SPRITE_BUDGET,
+  SPRITE_IDLE,
+  SPRITE_MAX,
   STUBBLE_PATCH,
   TABLE_LAMP_LIGHTS,
   TABLE_LAMPS,
@@ -26,6 +36,7 @@ import type { DistrictGroundScene, DistrictScene } from '../src/city/district-ar
 import { LIGHT } from '../src/city/glow';
 import { MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from '../src/city/lamplight';
 import { HARVEST_PROPS, SCARECROW_KEEP_OUT } from '../src/lib/district-places';
+import { fairPose } from '../src/lib/outings/harvest';
 import { FORK_PLOT, lampLightsAt } from '../src/lib/lanterns';
 import { residentTrips } from '../src/lib/resident-trips';
 import type { Place } from '../src/lib/schema';
@@ -50,7 +61,13 @@ const everywhere = () => true;
 const nowhere = () => false;
 const prop = (id: string) => HARVEST_PROPS.find((p) => p.id === id)!;
 
-function sceneAt(day: number, minutes: number, visible = everywhere, zoom = 1): DistrictScene {
+function sceneAt(
+  day: number,
+  minutes: number,
+  visible = everywhere,
+  zoom = 1,
+  places = town,
+): DistrictScene {
   return {
     day,
     minutes,
@@ -60,9 +77,9 @@ function sceneAt(day: number, minutes: number, visible = everywhere, zoom = 1): 
     visible,
     selected: null,
     hovered: null,
-    places: town,
+    places,
     residents: [],
-    plan: () => residentTrips(town, minutes < 360 ? day - 1 : day),
+    plan: () => residentTrips(places, minutes < 360 ? day - 1 : day),
   };
 }
 const groundOf = (day: number, night: boolean, visible = everywhere): DistrictGroundScene => ({
@@ -218,6 +235,84 @@ describe('The Harvest Fair’s day', () => {
     expect(scripted(steps, 11)!.moving).toBe(true);
     expect(scripted(steps, 11)!.facing).toBe('se');
     expect(scripted(steps, 12)).toBeUndefined();
+  });
+});
+
+describe('Culling', () => {
+  it(
+    'keeps every piece inside the boxes the fair is culled by as a whole',
+    () => {
+      const inside = (
+        points: readonly { x: number; y: number }[],
+        [rx, above, below]: readonly number[],
+        where: string,
+      ) => {
+        let side = 0,
+          top = Infinity,
+          bottom = -Infinity;
+        for (const p of points) {
+          side = Math.max(side, Math.abs(p.x - GROUND_MID.x));
+          top = Math.min(top, p.y);
+          bottom = Math.max(bottom, p.y);
+        }
+        expect(side, where).toBeLessThanOrEqual(rx);
+        if (!points.length) return;
+        expect(top, where).toBeGreaterThanOrEqual(GROUND_MID.y - above);
+        expect(bottom, where).toBeLessThanOrEqual(GROUND_MID.y + below);
+      };
+      let pieces = 0;
+      for (const day of FAIR)
+        for (
+          let minutes = 360;
+          minutes < 1275;
+          minutes += minutes < 1035 || minutes >= 1255 ? 2 : 0.5
+        ) {
+          // The farmhands' walks out through the gates are the widest reach.
+          if (minutes >= 1075 && minutes < 1255) minutes = 1255;
+          const scene = sceneAt(day, minutes);
+          const objects = matrixContext(1280, 720);
+          for (const object of harvestPainter.objects(objects.ctx, scene)) object.paint();
+          pieces += objects.points.length;
+          inside(objects.points, GROUND_REACH, `${day} at ${minutes}`);
+          const floor = matrixContext(1280, 720);
+          harvestPainter.floor!(floor.ctx, scene);
+          inside(floor.points, FLOOR_REACH, `floor ${day} at ${minutes}`);
+        }
+      expect(pieces).toBeGreaterThan(100_000);
+    },
+    rosterTimeout(0.3, 120_000),
+  );
+});
+
+describe('The straw seats', () => {
+  it('stay under every fair guest, sitting or standing, until they have gone, in both towns', () => {
+    const press = prop('press');
+    for (const places of [TOWNS.real, TOWNS.full])
+      for (const day of FAIR) {
+        const leaves = fairLeaves(sceneAt(day, 1030, everywhere, 1, places));
+        let sat = 0;
+        for (const [id, trips] of residentTrips(places, day))
+          for (const trip of trips) {
+            if (trip.event.outing !== 'harvest-fair') continue;
+            const home = places.find((place) => place.id === id)!;
+            const { arrive, leave, seat } = trip;
+            for (let t = arrive; t < leave + 0.5; t += 0.05) {
+              expect(seatOut(t, leaves[seat]), `${id} at ${t.toFixed(2)}`).toBe(1);
+              const pose = fairPose({ home, trip, time: t, day, seat, arrive, leave });
+              // Sitting, or on the way down or up, only while the press and bales are all there.
+              if (pose === undefined || t >= leave) continue;
+              sat++;
+              expect(propOut(press, t), `${id} at ${t.toFixed(2)}`).toBe(1);
+            }
+          }
+        expect(sat).toBeGreaterThan(1000);
+        // All gathered up long before the table's guests come.
+        for (let k = 0; k < 12; k++) expect(seatOut(1075, leaves[k])).toBe(0);
+      }
+    // A seat nobody took goes with the bales.
+    expect(seatOut(1027.5)).toBeCloseTo(propOut(press, 1027.5), 9);
+    expect(seatOut(1027.5, 1031)).toBe(1);
+    expect(seatOut(1031.5 + SEAT_FADE / 2, 1031)).toBeCloseTo(0.5, 9);
   });
 });
 
@@ -457,5 +552,107 @@ describe('Static art', () => {
     frame(A23, 1170);
     expect(made).toBe(3 * kinds + 10);
     expect(supper.length).toBeGreaterThan(0);
+  });
+  it('lights each lamp’s pool after the cloth round it, so no segment cuts it off', () => {
+    vi.stubGlobal('document', {
+      createElement: () => {
+        const sprite = recordingContext(64, 64);
+        return { width: 0, height: 0, getContext: () => sprite.ctx };
+      },
+    });
+    const ctx = recordingContext(1280, 720);
+    const map = capture(ctx);
+    // The first frame paints straight onto the map; the second stamps the sprites.
+    paint(sceneAt(A23 + 1, 1240), map);
+    const before = ctx.calls.length;
+    paint(sceneAt(A23 + 1, 1240), map);
+    type Rect = { index: number; x: number; y: number; w: number; h: number };
+    const images = ctx.calls
+      .slice(before)
+      .map((call, index) => ({ call, index }))
+      .filter(({ call }) => call.name === 'drawImage');
+    const rect = ({ call, index }: (typeof images)[number], w: number, h: number): Rect => ({
+      index,
+      x: call.args[1] as number,
+      y: call.args[2] as number,
+      w,
+      h,
+    });
+    const glows = images
+      .filter(({ call }) => call.args.length === 5)
+      .map((image) => rect(image, image.call.args[3] as number, image.call.args[4] as number));
+    // The table's segments are the 64-px-wide sprites.
+    const segments = images
+      .filter(({ call }) => call.args.length === 3)
+      .filter(({ call }) => (call.args[0] as { width: number }).width === 64)
+      .map((image) => rect(image, 64, (image.call.args[0] as { height: number }).height));
+    expect(glows).toHaveLength(4);
+    expect(segments).toHaveLength(8);
+    let overlaps = 0;
+    for (const glow of glows)
+      for (const segment of segments)
+        if (
+          segment.x < glow.x + glow.w &&
+          glow.x < segment.x + segment.w &&
+          segment.y < glow.y + glow.h &&
+          glow.y < segment.y + segment.h
+        ) {
+          overlaps++;
+          expect(segment.index).toBeLessThan(glow.index);
+        }
+    // Each pool falls on its own segment and the ones either side, the end lamps on two.
+    expect(overlaps).toBe(10);
+  });
+
+  it('keeps its sprites within a pixel budget, paints big ones directly and lets idle ones go', () => {
+    const made: { width: number; height: number }[] = [];
+    vi.stubGlobal('document', {
+      createElement: () => {
+        const sprite = recordingContext(64, 64);
+        const canvas = { width: 0, height: 0, getContext: () => sprite.ctx };
+        made.push(canvas);
+        return canvas;
+      },
+    });
+    /** A map canvas at `scale` device px a world px (the zoom times the screen's density). */
+    const scaled = (scale: number) => {
+      const target = recordingContext(1280, 720).ctx as unknown as Record<string, unknown>;
+      return new Proxy(target, {
+        get(object, key) {
+          if (key === 'getTransform') return () => ({ a: scale, b: 0, c: 0, d: scale, e: 0, f: 0 });
+          const value = object[key as string];
+          return typeof value === 'function' ? value.bind(object) : value;
+        },
+        set(object, key, value) {
+          object[key as string] = value;
+          return true;
+        },
+      }) as unknown as CanvasRenderingContext2D;
+    };
+    const frame = (ctx: CanvasRenderingContext2D, scene: DistrictScene) => {
+      for (const object of harvestPainter.objects(ctx, scene).sort((a, b) => a.depth - b.depth))
+        object.paint();
+    };
+    // Zoom 6 on a three-times screen: a laid segment would be 1152 × 828 px, so it is painted
+    // straight onto the map, and only the small pieces keep sprites.
+    const close = scaled(18);
+    for (const minutes of [1170, 1170, 1170.5]) frame(close, sceneAt(A23, minutes));
+    expect(harvestSpriteStats(close).sprites).toBeGreaterThan(0);
+    expect(made.length).toBeGreaterThan(0);
+    expect(made.every(({ width, height }) => width * height <= SPRITE_MAX)).toBe(true);
+    // Zoom 6 on a twice screen, through the laying and into supper: never over the budget.
+    const near = scaled(12);
+    for (let minutes = 1030; minutes < 1090; minutes += 0.5) {
+      frame(near, sceneAt(A23, minutes));
+      expect(harvestSpriteStats(near).pixels).toBeLessThanOrEqual(SPRITE_BUDGET);
+    }
+    // The laying's pieces are let go once the table is laid; everything once it is out of view.
+    for (let i = 0; i <= SPRITE_IDLE; i++) frame(near, sceneAt(A23, 1170));
+    const laid = harvestSpriteStats(near);
+    expect(laid.sprites).toBeGreaterThan(0);
+    // At most the cart, three spans of bunting, eight laid segments, a lamp and a jug.
+    expect(laid.sprites).toBeLessThanOrEqual(14);
+    for (let i = 0; i <= SPRITE_IDLE; i++) frame(near, sceneAt(A23, 1170, nowhere));
+    expect(harvestSpriteStats(near)).toEqual({ sprites: 0, pixels: 0 });
   });
 });

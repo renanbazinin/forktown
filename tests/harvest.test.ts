@@ -13,6 +13,7 @@ import type { EventPose } from '../src/lib/events';
 import { outingOf, type PoseContext } from '../src/lib/outings';
 import {
   FAIR_CALM,
+  FAIR_CLOSES,
   fairPose,
   fairSpells,
   HARVEST_HOLD,
@@ -100,19 +101,40 @@ describe('Harvest Fair guests', () => {
     rosterTimeout(0.2, 60_000),
   );
 
-  it('keeps every spell inside the visit, with a stand between', () => {
+  it('keeps every spell inside the visit and before the fair closes, with a stand between', () => {
     for (const stay of [20, 45, 120, 240])
-      for (const id of ['a', 'b', 'full-town-c4', 'renan']) {
-        const spells = fairSpells(id, stay);
-        spells.forEach(([from, to], i) => {
-          expect(from).toBeGreaterThanOrEqual(FAIR_CALM);
-          expect(to).toBeLessThanOrEqual(stay - FAIR_CALM);
-          expect(to - from).toBeGreaterThanOrEqual(2 * STRAW_SETTLE + HARVEST_HOLD);
-          if (i) expect(from - spells[i - 1][1]).toBeGreaterThanOrEqual(2);
-        });
-      }
+      for (const closes of [stay, stay - 10, 30])
+        for (const id of ['a', 'b', 'full-town-c4', 'renan']) {
+          const spells = fairSpells(id, stay, closes);
+          spells.forEach(([from, to], i) => {
+            expect(from).toBeGreaterThanOrEqual(FAIR_CALM);
+            expect(to).toBeLessThanOrEqual(stay - FAIR_CALM);
+            expect(to).toBeLessThanOrEqual(closes);
+            expect(to - from).toBeGreaterThanOrEqual(2 * STRAW_SETTLE + HARVEST_HOLD);
+            if (i) expect(from - spells[i - 1][1]).toBeGreaterThanOrEqual(2);
+          });
+        }
     // A stop of a few minutes is spent on their feet.
     expect(fairSpells('a', 4)).toEqual([]);
+  });
+
+  it('are all on their feet by 17:00, when the fair closes and the seats are gathered up', () => {
+    let late = 0;
+    for (const town of [TOWNS.real, TOWNS.full])
+      for (const day of FAIR_DAYS)
+        for (const [id, trips] of residentTrips(town, day))
+          for (const trip of trips) {
+            if (trip.event.outing !== 'harvest-fair') continue;
+            const home = town.find((place) => place.id === id)!;
+            if (trip.leave > FAIR_CLOSES) late++;
+            for (const [pose, from, to] of runs(fairPose, home, trip))
+              if (pose !== undefined) {
+                expect(from, `${id} on ${day}`).toBeLessThan(FAIR_CLOSES);
+                expect(to, `${id} on ${day}`).toBeLessThanOrEqual(FAIR_CLOSES + STEP);
+              }
+          }
+    // Some stay on past the close to say their goodbyes, standing.
+    expect(late).toBeGreaterThan(0);
   });
 });
 
@@ -257,10 +279,15 @@ describe('The farm panel', () => {
       resident('c', 'Renan', 'harvest-fair', 'attending'),
       resident('d', 'Gemma', 'long-table', 'going'),
     ]);
-    for (const id of ['harvest-fair', 'long-table'] as const) {
-      expect(markup).toContain(`${DISTRICT_COPY[id].name(A23)}.`);
+    for (const id of ['harvest-fair', 'long-table'] as const)
       expect(markup).toContain(DISTRICT_COPY[id].panelEyebrow);
-    }
+    // The fair's heading is the farm's own, the same all year; the table's is its name.
+    const headings = [...markup.matchAll(/<h3>(.*?)<\/h3>/g)].map(([, heading]) => heading);
+    expect(headings).toEqual([
+      PANEL_COPY.harvest.heading,
+      `${DISTRICT_COPY['long-table'].name(A23)}.`,
+    ]);
+    expect(render(dayOf('Autumn', 20), 920)).toContain(`<h3>${PANEL_COPY.harvest.heading}</h3>`);
     expect(markup).toContain('13:00–17:00 · Happening now');
     expect(markup).toContain('18:30–20:30 · Later today');
     expect(markup).toMatch(/At the fair now: .*Hazel.* and .*Renan.*\./);
