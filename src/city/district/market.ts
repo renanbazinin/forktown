@@ -1,11 +1,13 @@
 // Market Square (agent B, SPEC §4.1): six stalls, three per edge, with sage, rose or slate awnings
 // by the day's market (never amber), crates on the farm's calendar, the handcart and the low pump,
 // six scenery stallholders behind the counters, snow on the awnings in winter, and folded frames
-// under pale canvas at night. Render cap: 1,100 calls at 10:00 with 12 browsers (SPEC §6.6).
-// No Math.random, Date.now or performance.now: everything runs on the town clock.
+// under roped canvas once it shuts. Render cap: 1,100 calls at 10:00 with 12 browsers, floor and
+// objects (SPEC §6.6). No Math.random, Date.now or performance.now: everything runs on the clock.
 //
-// The square is paved in the cached ground layer (by night and the season's whole day), with the
-// shadows of everything that never moves. The stalls stand on its two back edges, the north and
+// The square is paved in the cached ground layer (by night and the season's whole day), with a
+// compass rose in its middle, the stones worn along the browsers' lanes, and the shadows of
+// everything that never moves. While it trades, a little litter gathers in front of the stalls
+// in the floor layer and is swept at noon. The stalls stand on its two back edges, the north and
 // the west, their fronts to the camera. Each stall is one depth object, painted back to front: the
 // frame, the striped awning over the back of the stall, the stallholder in front of it, then the
 // counter and the day's display. The awning sits behind the stallholder on purpose: with a stall
@@ -50,6 +52,7 @@ const C = {
   settAlt: ['#D3CBB2', '#788475'],
   settLight: ['#E3DDCA', '#859181'],
   joint: ['#C8BFA3', '#6E7A69'],
+  worn: ['#CDC5AB', '#76826F'],
   kerb: ['#B9B195', '#5F6B5C'],
   kerbLight: ['#CEC7AE', '#6F7B6C'],
   ring: ['#CAC2A6', '#717D6E'],
@@ -59,10 +62,12 @@ const C = {
   boardShade: ['#9A7550', '#5A5246'],
   boardTop: ['#CCA676', '#7A6F5A'],
   plank: ['#A07A52', '#5F5648'],
-  canvas: ['#D8CEB0', '#8C8F7E'],
-  canvasShade: ['#C2B795', '#7B7E70'],
-  canvasTop: ['#E2DAC1', '#979A89'],
-  fold: ['#B5AA8A', '#6F7366'],
+  // Oat canvas, a good shade under the paving so a shut stall never reads as a kerb or a bench.
+  canvas: ['#B9AC8A', '#7D7B66'],
+  canvasShade: ['#A69878', '#6E6C59'],
+  canvasTop: ['#CFC3A2', '#8F8E78'],
+  fold: ['#9C8F6E', '#636150'],
+  hem: ['#85785A', '#555242'],
   rope: ['#94805E', '#57534A'],
   shadow: ['#3C5A3C29', '#0C1B1C38'],
   iron: ['#4F6659', '#36463F'],
@@ -190,6 +195,8 @@ export const MARKET_TUBS: readonly Point[] = [
   { x: 57.3, y: 20.72 },
 ];
 export const MARKET_BOARD = { x: 60.82, y: 15.12 } as const;
+/** The rose of setts in the paving, in the middle of the open square, and its radius. */
+export const MARKET_ROSE = { x: 58.05, y: 17.95, r: 1.05 } as const;
 
 // ---------------------------------------------------------------------------------------------
 // The clock: who is where at a town minute. Everything here is a pure function of the day and
@@ -281,6 +288,7 @@ const W = {
   leafLight: '#93B866',
   leafDark: '#4E7438',
   lid: '#F1EADB',
+  lidShade: '#CFC8B8',
   gingham: '#C9545A',
   card: '#C9AE82',
   cardDark: '#A88D62',
@@ -351,32 +359,44 @@ const B = {
   geranium: '#C9485E',
 } as const;
 
+/**
+ * A box in a counter's frame, `h` px tall and `d` deep: its end in shade, its top stepping back
+ * a px at a time (in a counter's frame "back" is up and along), then its front.
+ */
+function box(
+  r: Paint,
+  u: number,
+  w: number,
+  h: number,
+  d: number,
+  [front, top, side]: readonly [string, string, string],
+) {
+  r(u + w, -h - d + 1, d, h + d - 1, side);
+  for (let i = 1; i <= d; i++) r(u + i, -h - i, w, 1, top);
+  r(u, -h, w, h, front);
+}
 /** A wooden crate heaped with round produce. */
 const crate = ([fruit, light]: readonly [string, string], w = 14): Item => ({
   w,
   paint: (r, u) => {
-    // A low slatted front, then the heap: a near row of fruit and a far row, two px further
-    // back (in a counter's frame "back" is up and along), each fruit with its own glint.
-    r(u + 2, -9, w - 3, 3, fruit);
-    r(u, -7, w, 3, fruit);
-    r(u, -4, w, 4, W.crate);
+    // The open top full of fruit, heaped a px higher toward the back, a glint here and there.
+    box(r, u, w, 4, 3, [W.crate, fruit, W.crateDark]);
     r(u, -4, w, 1, W.crateLight);
-    r(u, -2, w, 1, W.crateDark);
-    r(u + 2, -7, 2, 1, light);
-    r(u + w - 5, -7, 2, 1, light);
-    r(u + w / 2, -9, 1, 1, light);
+    r(u + 3, -8, w - 4, 1, fruit);
+    r(u + 2, -5, 2, 1, light);
+    r(u + w - 4, -6, 2, 1, light);
+    r(u + w / 2, -8, 1, 1, light);
   },
 });
 /** A wicker basket of produce, lower than a crate. */
 const basket = ([fruit, light]: readonly [string, string], w = 12): Item => ({
   w,
   paint: (r, u) => {
-    r(u + 2, -8, w - 4, 2, fruit);
-    r(u + 1, -6, w - 2, 2, fruit);
-    r(u, -4, w, 4, W.wicker);
+    box(r, u, w, 4, 3, [W.wicker, fruit, W.wickerDark]);
     r(u + 1, -2, w - 2, 1, W.wickerDark);
-    r(u + 2, -6, 2, 1, light);
-    r(u + 6, -8, 2, 1, light);
+    r(u + 3, -8, w - 5, 1, fruit);
+    r(u + 2, -5, 2, 1, light);
+    r(u + 6, -7, 2, 1, light);
   },
 });
 /** Bunches laid with their leafy tops: radishes, carrots, beets, parsnips. */
@@ -393,13 +413,14 @@ const bunch = ([root, light]: readonly [string, string], w = 12): Item => ({
 const heads = ([body, light]: readonly [string, string], w = 13): Item => ({
   w,
   paint: (r, u) => {
-    // Two round heads: a darker cup of outer leaves, a pale heart.
+    // Two round heads: a darker cup of outer leaves round the foot, a pale heart on top.
     r(u, -4, 6, 4, body);
     r(u + 1, -5, 4, 1, body);
     r(u + 6, -5, 7, 5, body);
     r(u + 7, -6, 5, 1, body);
-    r(u + 1, -4, 3, 2, light);
-    r(u + 8, -5, 3, 2, light);
+    r(u, -1, 13, 1, tint(body, -22));
+    r(u + 1, -5, 3, 2, light);
+    r(u + 8, -6, 3, 2, light);
   },
 });
 /** Long things laid in a row: leeks, rhubarb, courgettes, beans. */
@@ -415,11 +436,10 @@ const sticks = ([body, tip]: readonly [string, string], w = 12): Item => ({
 const punnets = ([fruit, light]: readonly [string, string], w = 11): Item => ({
   w,
   paint: (r, u) => {
-    r(u, -3, w, 3, W.lid);
-    r(u, -5, w, 2, fruit);
-    r(u + 1, -6, 3, 1, fruit);
-    r(u + 6, -6, 3, 1, fruit);
-    r(u + 2, -5, 1, 1, light);
+    box(r, u, w, 3, 2, [W.lid, fruit, W.lidShade]);
+    r(u + 2, -6, 3, 1, fruit);
+    r(u + 7, -6, 3, 1, fruit);
+    r(u + 3, -5, 1, 1, light);
     r(u + 5, -3, 1, 3, W.leaf);
   },
 });
@@ -427,34 +447,36 @@ const punnets = ([fruit, light]: readonly [string, string], w = 11): Item => ({
 const gourds = ([body, light]: readonly [string, string], w = 14): Item => ({
   w,
   paint: (r, u) => {
-    // Two round squashes, side by side, a glint on each and a stalk on the bigger.
+    // Two round squashes, side by side: shade round the foot, a rib down the bigger, a glint on
+    // each and a stalk.
+    const shade = tint(body, -26);
     r(u, -4, 7, 4, body);
     r(u + 1, -5, 5, 1, body);
     r(u + 7, -6, 7, 6, body);
     r(u + 8, -7, 5, 1, body);
+    r(u, -1, 14, 1, shade);
+    r(u + 10, -6, 1, 5, shade);
     r(u + 1, -4, 2, 1, light);
-    r(u + 8, -6, 3, 1, light);
-    r(u + 7, -1, 7, 1, W.rib);
+    r(u + 8, -6, 2, 1, light);
     r(u + 10, -8, 1, 1, W.stem);
   },
 });
 const eggs = (w = 11): Item => ({
   w,
   paint: (r, u) => {
-    r(u, -3, w, 3, W.card);
-    r(u + 1, -5, w - 2, 2, W.egg);
+    box(r, u, w, 3, 3, [W.card, W.egg, W.cardDark]);
     r(u + 3, -5, 2, 1, W.eggBrown);
-    r(u + 7, -5, 2, 1, W.eggBrown);
+    r(u + 7, -6, 2, 1, W.eggBrown);
+    r(u + 4, -6, 2, 1, W.egg);
   },
 });
 const tray = (w = 12): Item => ({
   w,
   paint: (r, u) => {
-    r(u, -3, w, 3, W.tray);
-    r(u + 1, -5, w - 2, 2, W.leaf);
-    r(u + 1, -6, 2, 1, W.leafLight);
-    r(u + 5, -6, 2, 1, W.leafLight);
-    r(u + 9, -6, 2, 1, W.leafLight);
+    box(r, u, w, 3, 3, [W.tray, W.leaf, W.tray]);
+    r(u + 2, -6, 2, 1, W.leafLight);
+    r(u + 6, -7, 2, 1, W.leafLight);
+    r(u + 10, -6, 2, 1, W.leafLight);
   },
 });
 /** Jars of jam, chutney and plum with cloth lids. */
@@ -545,7 +567,7 @@ const bundles = (w = 13): Item => ({
 const paperbacks = (seed: number, w = 14): Item => ({
   w,
   paint: (r, u) => {
-    r(u, -5, w, 5, W.card);
+    box(r, u, w, 5, 2, [W.card, W.cardDark, W.cardDark]);
     r(u, -2, w, 1, W.cardDark);
     for (let i = 0; i < 4; i++)
       r(
@@ -598,10 +620,12 @@ const gramophone = (w = 17): Item => ({
 const records = (w = 12): Item => ({
   w,
   paint: (r, u) => {
-    r(u, -5, w, 5, W.crate);
-    r(u + 1, -8, w - 2, 3, W.record);
-    r(u + 3, -7, 1, 1, F.apple[1]);
-    r(u + 7, -7, 1, 1, W.chinaBlue);
+    // Records on their edges in a crate, a sleeve or two standing out.
+    box(r, u, w, 5, 3, [W.crate, W.record, W.crateDark]);
+    r(u + 1, -8, w - 2, 2, W.record);
+    r(u + 3, -8, 2, 2, F.apple[1]);
+    r(u + 7, -9, 2, 2, W.chinaBlue);
+    r(u, -5, w, 1, W.crateLight);
   },
 });
 const picture = (w = 9): Item => ({
@@ -614,7 +638,7 @@ const picture = (w = 9): Item => ({
 });
 
 /** The item behind each name of a display spec (books take a seed from their place). */
-function item(name: string, seed: number): Item {
+export function item(name: string, seed: number): Item {
   const stems: Record<string, readonly string[]> = {
     tulips: [B.tulip, B.pink, B.tulip],
     daffodils: [B.daffodil, B.mustard, B.daffodil],
@@ -765,9 +789,9 @@ const WARES: Record<string, readonly string[]> = {
   books: [
     'paperbacks, paperbacks, stack | stack, teacups',
     'gramophone, records, stack | teacups, stack',
-    'paperbacks, picture, paperbacks | stack, stack | crate:onion',
+    'paperbacks, picture, paperbacks | stack, stack | records',
     'stack, paperbacks, records | teacups, stack',
-    'paperbacks, paperbacks, picture | stack, teacups | basket:parsnip',
+    'paperbacks, paperbacks, records | stack, teacups | picture',
     'stack, records, paperbacks | stack, stack',
   ],
 };
@@ -972,12 +996,13 @@ function paintStall(
         if (snow > 0) r(-1, -0.5, len + 2, 1, SNOW.top[n]);
       });
     });
-  // The stallholder, behind the counter, facing the browsers (or turned to the stock behind).
+  // The stallholder, behind the counter, facing the browsers, or turned a quarter along the
+  // counter to the stock: still facing the camera, never their back to it.
   if (m.holder > 0)
     faded(ctx, m.holder, () => {
       const holder = art.holders[k];
       const p = spot(row, (s0 + stall.s1) / 2 + holder.offset, Q.holder);
-      const facing = row === 'north' ? (turned ? 'ne' : 'sw') : turned ? 'nw' : 'se';
+      const facing = holderFacing(row, turned);
       drawResident(
         ctx,
         holder.look,
@@ -987,13 +1012,13 @@ function paintStall(
         { moving: false, facing, walkPhase: 0, greeting: false },
         { shadow: false, night },
       );
-      if (turned) return;
-      // An apron over the front, its strap round the neck.
+      // An apron over the front, its strap round the neck, mirrored with the figure.
+      const left = facing === 'sw' ? -1 : 0;
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.scale(RESIDENT_SCALE, RESIDENT_SCALE);
-      r(-2, -11, 5, 7, night ? tint(holder.apron, -35) : holder.apron);
-      r(-1, -13, 3, 1, tint(holder.apron, night ? -55 : -22));
+      r(-2 + left, -11, 5, 7, night ? tint(holder.apron, -35) : holder.apron);
+      r(-1 + left, -13, 3, 1, tint(holder.apron, night ? -55 : -22));
       ctx.restore();
     });
   // The counter: planks, a cloth runner in the awning's stripe, the top and the near end. The
@@ -1055,40 +1080,80 @@ function paintStall(
     rowOf(display.front, Q.front - 0.07, H.counter, 7);
     rowOf(display.ground, Q.ground, 0, 6);
   }
-  // Shut: the frame folded under pale canvas over the counter, roped down, poles showing as ridges.
+  // Shut: the frame folded on the counter under oat canvas, which tents over the poles in a low
+  // ridge and is roped down over it. Snow settles on the top, never more than 0.7 of it, so the
+  // cover stays canvas.
   if (m.cover > 0)
     faded(ctx, m.cover, () => {
-      const top = snow > 0 ? mixHex(C.canvasTop[n], SNOW.top[n], snow) : C.canvasTop[n];
+      const snowy = (color: string) => (snow > 0 ? mixHex(color, SNOW.top[n], snow * 0.7) : color);
       const deep = (Q.front - Q.counter + 0.08) * PX;
       const face = frontLit ? C.canvas[n] : C.canvasShade[n];
-      sheet(ctx, row, s0 - 0.04, Q.counter - 0.04, H.counter + 2, 0, () => {
-        r(0, 0, len + 3, deep, top);
-        r(1, deep * 0.3, len + 1, 1.5, C.fold[n]);
-        r(1, deep * 0.65, len + 1, 1.5, C.fold[n]);
-        // The folded poles' ends, out past the canvas.
-        r(len + 3, deep * 0.3 - 0.5, 3.5, 1.5, C.post[n]);
-        r(len + 3, deep * 0.65 - 0.5, 3.5, 1.5, C.post[n]);
+      // The back slope up to the ridge, 40% of the way in, and the front slope down from it.
+      const q0 = Q.counter - 0.04,
+        ridge = deep * 0.4,
+        peak = 3;
+      const ties = [3, len / 2 - 0.5, len - 2];
+      sheet(ctx, row, s0 - 0.04, q0, H.counter + 2, peak / ridge, () => {
+        r(0, 0, len + 3, ridge, snowy(C.canvasTop[n]));
+        for (const u of ties) r(u, 0, 1.5, ridge, C.rope[n]);
       });
+      sheet(
+        ctx,
+        row,
+        s0 - 0.04,
+        q0 + ridge / PX,
+        H.counter + 2 + peak,
+        -peak / (deep - ridge),
+        () => {
+          r(0, 0, len + 3, deep - ridge, snowy(tint(C.canvasTop[n], -8)));
+          r(0, 0, len + 3, 1, snowy(tint(C.canvasTop[n], 10)));
+          for (const u of ties) r(u, 0, 1.5, deep - ridge, C.rope[n]);
+        },
+      );
       frame(ctx, row, s0 - 0.04, Q.front + 0.04, 0, () => {
         r(0, -H.counter - 2, len + 3, H.counter - 1, face);
-        // The hem sags between the ties, and the cloth falls in folds.
+        // The hem sags between the ties, a darker seam along it, and the cloth falls in folds.
         r(2, -3, len / 2 - 3, 1.5, face);
         r(len / 2 + 2, -3, len / 2 - 3, 1.5, face);
+        r(0, -4, len + 3, 1, C.hem[n]);
+        r(2, -2, len / 2 - 3, 1, C.hem[n]);
+        r(len / 2 + 2, -2, len / 2 - 3, 1, C.hem[n]);
         r(9, -H.counter, 1, H.counter - 4, C.fold[n]);
         r(len - 10, -H.counter, 1, H.counter - 4, C.fold[n]);
         r(len / 2 - 0.5, -H.counter - 2, 1.5, H.counter - 1, C.rope[n]);
         r(3, -H.counter - 2, 1.5, H.counter - 2, C.rope[n]);
         r(len - 2, -H.counter - 2, 1.5, H.counter - 2, C.rope[n]);
       });
-      end(ctx, row, s0 + LEN + 0.04, Q.counter - 0.04, 0, () =>
-        r(0, -H.counter - 2, deep, H.counter - 1, frontLit ? C.canvasShade[n] : C.canvas[n]),
-      );
+      // The near end, up to the ridge.
+      end(ctx, row, s0 + LEN + 0.04, q0, 0, () => {
+        const side = frontLit ? C.canvasShade[n] : C.canvas[n];
+        r(0, -H.counter - 2, deep, H.counter - 1, side);
+        ctx.fillStyle = side;
+        ctx.beginPath();
+        ctx.moveTo(0, -H.counter - 2);
+        ctx.lineTo(ridge, -H.counter - 2 - peak);
+        ctx.lineTo(deep, -H.counter - 2);
+        ctx.fill();
+        r(0, -4, deep, 1, C.hem[n]);
+      });
+      // The folded poles' ends, out past the canvas under the ridge.
+      sheet(ctx, row, s0 - 0.04, q0 + ridge / PX - 0.03, H.counter + 1 + peak, 0, () => {
+        r(len + 3, 0, 4, 1.5, C.post[n]);
+        r(len + 3, 2, 4, 1.5, C.postLight[n]);
+      });
     });
 }
 
 /**
- * Whether a stallholder has turned to the crates behind them: now and then while stocking and
- * packing, and for about a minute every nine through the morning; never while chatting.
+ * Which way a stallholder faces: toward their browsers (south-west on the north row, south-east
+ * on the west row), or a quarter turn along the counter to the stock, the other of the two ways
+ * that face the camera. Never their back: the two are a quarter turn apart, never opposite.
+ */
+export const holderFacing = (row: Row, turned: boolean) =>
+  (row === 'north') === turned ? 'se' : 'sw';
+/**
+ * Whether a stallholder has turned along the counter to the stock: now and then while stocking
+ * and packing, and for about a minute every nine through the morning; never while chatting.
  */
 export function holderTurned(day: number, minutes: number, k: number, chatting: boolean) {
   if (chatting) return false;
@@ -1343,6 +1408,27 @@ function paintGround(ctx: Ctx, night: boolean, groundDay: number) {
     const u = i * PX + (j % 2 ? course : 0);
     r(u, j * course, PX, course, frost(h % 3 ? C.settAlt : C.settLight));
   }
+  // Feet have worn the stones a shade darker in front of the counters and along the browsers'
+  // two lanes (SPEC §2.3: y 16.2 behind the north spots, x 56.4 beside the west ones), most of
+  // them near the middle of the way and fewer toward its edges.
+  const worn = [
+    frost(C.worn),
+    frost([mixHex(C.sett[0], C.worn[0], 0.5), mixHex(C.sett[1], C.worn[1], 0.5)]),
+  ];
+  for (let j = 0; j < courses; j++)
+    for (let u = j % 2 ? -course : 0; u < side; u += PX) {
+      const x = G.left + (u + PX / 2) / PX,
+        y = G.top + ((j + 0.5) * course) / PX;
+      const lane = Math.min(
+        x > G.left + 1.1 ? Math.abs(y - 16) : 9,
+        y > G.top + 1.8 ? Math.abs(x - 56.1) : 9,
+      );
+      const h = hash(`market-worn:${j}:${u}`) % 100;
+      const shade = lane < 0.3 && h < 80 ? 0 : lane < 0.6 && h < 45 ? 1 : -1;
+      if (shade < 0) continue;
+      const from = Math.max(0, u);
+      r(from, j * course, Math.min(side, u + PX) - from, course, worn[shade]);
+    }
   const joint = frost(C.joint);
   for (let j = 1; j < courses; j++) r(0, j * course - 0.5, side, 1, joint);
   for (let j = 0; j < courses; j++)
@@ -1366,6 +1452,30 @@ function paintGround(ctx: Ctx, night: boolean, groundDay: number) {
   ctx.beginPath();
   ctx.ellipse(pump.u, pump.w, course * 1.45, course * 1.45, 0, 0, TAU);
   ctx.fill();
+  // In the middle of the open square a compass rose is set in the paving: four long points to
+  // the square's sides and four short ones between, each point half in shade, in a thin ring.
+  const rose = { u: (MARKET_ROSE.x - G.left) * PX, w: (MARKET_ROSE.y - G.top) * PX };
+  const R = MARKET_ROSE.r * PX;
+  ctx.strokeStyle = frost(C.ring);
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(rose.u, rose.w, R * 0.72, R * 0.72, 0, 0, TAU);
+  ctx.stroke();
+  const point = (angle: number, length: number, half: 1 | -1, color: string) => {
+    const side = angle + (half * Math.PI) / 4;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(rose.u, rose.w);
+    ctx.lineTo(rose.u + Math.cos(angle) * length, rose.w + Math.sin(angle) * length);
+    ctx.lineTo(rose.u + Math.cos(side) * R * 0.16, rose.w + Math.sin(side) * R * 0.16);
+    ctx.fill();
+  };
+  for (let k = 0; k < 8; k++) {
+    const angle = (k * Math.PI) / 4;
+    const length = k % 2 ? R * 0.6 : R;
+    point(angle, length, 1, frost(C.ring));
+    point(angle, length, -1, frost(C.kerb));
+  }
   // The shadows of the counters, the cart, the pump and the tubs, which never move.
   const shadow = C.shadow[n];
   for (const stall of MARKET_STALL_GEOMETRY) {
@@ -1444,6 +1554,67 @@ function paintGround(ctx: Ctx, night: boolean, groundDay: number) {
 // ---------------------------------------------------------------------------------------------
 // The painter.
 
+/**
+ * What the trading drops on the paving in front of each stall, by the market and the season:
+ * straw and a leaf at the farmers' stalls, petals and stems at the flowers, fir needles and a
+ * berry in winter, a paper scrap at the books.
+ */
+const LITTER: Record<string, readonly string[]> = {
+  'farmers:0': [W.straw, W.leaf, W.leafLight],
+  'farmers:1': [W.straw, W.leaf, F.strawberry[0]],
+  'farmers:2': [W.straw, '#B8693E', W.leafDark],
+  'farmers:3': [W.straw, W.leafDark, F.beet[0]],
+  'flowers:0': [B.tulip, B.white, W.stem],
+  'flowers:1': [B.sweetPea, B.rose, W.stem],
+  'flowers:2': [B.statice, B.lavender, W.straw],
+  'flowers:3': [W.fir, W.firDark, W.berry],
+  books: [W.pages, W.card],
+};
+/** Bits dropped in front of each stall over a morning; the books drop fewer. */
+export const MARKET_LITTER = { bits: 5, books: 2, first: 485, every: 24, fade: 2 } as const;
+/**
+ * The litter, in the floor layer under everyone: it builds up a bit at a time through the
+ * morning, each bit fading in over two minutes, and is swept up with the first crate packed.
+ */
+function paintLitter(ctx: Ctx, scene: DistrictScene) {
+  const { day, minutes, season } = scene;
+  if (minutes < MARKET_LITTER.first || minutes > 760) return;
+  const kind = marketKind(day);
+  const key = waresKey(kind, season.groundDay).split(':').slice(0, 2).join(':');
+  const colours = LITTER[key];
+  const count = kind === 'books' ? MARKET_LITTER.books : MARKET_LITTER.bits;
+  const origin = at(G.left, G.top);
+  let started = false;
+  for (const stall of MARKET_STALL_GEOMETRY) {
+    const swept = stallAt(day, minutes, stall.k).item(0);
+    if (swept <= 0) continue;
+    for (let i = 0; i < count; i++) {
+      const h = hash(`market-litter:${Math.floor(day)}:${stall.k}:${i}`);
+      const from = MARKET_LITTER.first + i * MARKET_LITTER.every + (h % 12);
+      const alpha = Math.min(swept, rise(minutes, from, MARKET_LITTER.fade));
+      if (alpha <= 0) continue;
+      if (!started) {
+        ctx.save();
+        // u along x and w along y, a px a px, as in the ground.
+        ctx.transform(1, 0.5, -1, 0.5, origin.x, origin.y);
+        started = true;
+      }
+      const s = stall.s0 + 0.12 + ((h >>> 4) % 100) * 0.0126;
+      const q = Q.front + 0.16 + ((h >>> 11) % 100) * 0.0032;
+      const p = tile(stall.row, s, q);
+      const [u, w] = [(p.x - G.left) * PX, (p.y - G.top) * PX];
+      const colour = colours[(h >>> 18) % colours.length];
+      // A wisp of straw lies along or across the way; anything else is a small flake.
+      const long = colour === W.straw;
+      const across = (h >>> 22) % 2 === 1;
+      faded(ctx, alpha, () =>
+        painter(ctx)(u, w, long && !across ? 4 : 2, long && across ? 4 : long ? 1 : 2, colour),
+      );
+    }
+  }
+  if (started) ctx.restore();
+}
+
 const isMarketPlot = (id: string | null) =>
   !!id && (MARKET_PLOTS as readonly string[]).includes(id);
 /** The plot of the square under a ground point. */
@@ -1471,13 +1642,20 @@ function chatsAt(scene: DistrictScene) {
   return { stalls, browsers };
 }
 
-/** A chat's bubble over a browser, as the figures draw their own (residents.ts). */
-function paintBubble(ctx: Ctx, pt: Point) {
+/**
+ * How far up, in a figure's own px, a standing browser's chat bubble sits above the residents'
+ * own (residents.ts), which is drawn over a seated chatter whose head is 5 px lower. Lifted by
+ * that much, its tail ends on a hat's crown (-25) and clears a bare head (-22).
+ */
+export const BUBBLE_LIFT = 5;
+/** A chat's bubble over a standing browser, as the figures draw their own (residents.ts). */
+export function paintBubble(ctx: Ctx, pt: Point) {
   const r = painter(ctx);
   const s = RESIDENT_SCALE;
-  r(pt.x - 7 * s, pt.y - 31 * s, 15 * s, 9 * s, '#FCFAEF');
-  r(pt.x, pt.y - 22 * s, 2 * s, 3 * s, '#FCFAEF');
-  for (const x of [-4, 0, 4]) r(pt.x + x * s, pt.y - 27 * s, 2 * s, 2 * s, '#7B8A69');
+  const y = (v: number) => pt.y + (v - BUBBLE_LIFT) * s;
+  r(pt.x - 7 * s, y(-31), 15 * s, 9 * s, '#FCFAEF');
+  r(pt.x, y(-22), 2 * s, 2 * s, '#FCFAEF');
+  for (const x of [-4, 0, 4]) r(pt.x + x * s, y(-27), 2 * s, 2 * s, '#7B8A69');
 }
 
 /** The screen box of a stall, for clicks. */
@@ -1499,14 +1677,49 @@ function stallBox(stall: MarketStall) {
 }
 const STALL_BOXES = MARKET_STALL_GEOMETRY.map(stallBox);
 
+/**
+ * How high a stall stands, px, at `q` tiles in from its row's edge this minute, or -1 where it
+ * has nothing: open, the posts, the awning and the stallholder at the back, the counter with its
+ * wares, and whatever stands on the paving in front; shut, only the covered counter.
+ */
+function stallHeight(q: number, m: StallMoment, display: Display) {
+  if (m.cover >= 0.5) return q >= Q.counter - 0.06 && q <= Q.front + 0.06 ? H.counter + 2 : -1;
+  const stocked = m.item(0) >= 0.5;
+  if (q >= Q.back - 0.04 && q < Q.counter) return MARKET_HEIGHTS.stall;
+  if (q >= Q.counter && q <= Q.front) return H.counter + (stocked ? 14 : 0);
+  if (q > Q.front && q <= Q.ground + 0.08 && stocked && display.ground.length) return 14;
+  return -1;
+}
+/**
+ * Whether a screen point lands on a stall's own shape, not its screen box: each height up the
+ * stall is unprojected to the paving under it, and the point is on the stall where something
+ * stands that high there. A head on the street behind, over the rail, is not.
+ */
+function onStall(point: Point, stall: MarketStall, m: StallMoment, display: Display) {
+  const box = STALL_BOXES[stall.k];
+  if (point.x < box.left || point.x > box.right || point.y < box.top || point.y > box.bottom)
+    return false;
+  // A shut stall's folded poles reach a little past its near end.
+  const reach = m.cover >= 0.5 ? 0.2 : 0.04;
+  for (let h = 0; h <= MARKET_HEIGHTS.stall; h += 0.5) {
+    const g = unproject(point.x, point.y + h);
+    const [s, q] = stall.row === 'north' ? [g.x, g.y - G.top] : [g.y, g.x - G.left];
+    if (s < stall.s0 - 0.05 || s > stall.s1 + reach) continue;
+    if (h <= stallHeight(q, m, display)) return true;
+  }
+  return false;
+}
+
 export const marketPainter: DistrictPainter = {
   ground(ctx, { night, groundDay, visible }) {
     if (!visible(SQUARE_MIDDLE, SQUARE_REACH.x, SQUARE_REACH.above, SQUARE_REACH.below)) return;
     paintGround(ctx, night, groundDay);
   },
-  floor(ctx, { selected, hovered, visible }) {
-    if (!isMarketPlot(selected) && !isMarketPlot(hovered)) return;
+  floor(ctx, scene) {
+    const { selected, hovered, visible } = scene;
     if (!visible(SQUARE_MIDDLE, SQUARE_REACH.x, SQUARE_REACH.above, SQUARE_REACH.below)) return;
+    paintLitter(ctx, scene);
+    if (!isMarketPlot(selected) && !isMarketPlot(hovered)) return;
     // The square's outline, like the zoo's and the Millpond's.
     ctx.save();
     ctx.strokeStyle = '#F2E2A1';
@@ -1529,9 +1742,10 @@ export const marketPainter: DistrictPainter = {
     const chats = chatsAt(scene);
     const moments = MARKET_STALL_GEOMETRY.map((stall) => stallAt(day, minutes, stall.k));
     for (const stall of MARKET_STALL_GEOMETRY) {
+      // The box of its corners, and the awning's and the wares' few px past them.
       const box = STALL_BOXES[stall.k];
       const middle = { x: (box.left + box.right) / 2, y: box.bottom };
-      if (!visible(middle, (box.right - box.left) / 2, box.bottom - box.top, 0)) continue;
+      if (!visible(middle, (box.right - box.left) / 2 + 4, box.bottom - box.top + 4, 4)) continue;
       const m = moments[stall.k];
       const turned = holderTurned(day, minutes, stall.k, chats.stalls.has(stall.k));
       objects.push({
@@ -1541,7 +1755,8 @@ export const marketPainter: DistrictPainter = {
     }
     // The cart's three loads go out as the stalls are stocked and come back at noon.
     const cartFoot = at(MARKET_CART.x1, MARKET_CART.y1);
-    if (visible(cartFoot, 45, 50, 20)) {
+    // The handles reach 46 px west of the wheel's corner.
+    if (visible(cartFoot, 49, 52, 20)) {
       const load = [0, 1, 2].map(
         (i) => 1 - Math.max(moments[2 * i].item(0), moments[2 * i + 1].item(0)),
       );
@@ -1552,15 +1767,17 @@ export const marketPainter: DistrictPainter = {
         paint: () => paintCart(ctx, art, night, load, cover, folded),
       });
     }
+    // The trough reaches 35 px west of the pump's foot.
     const pumpFoot = at(MARKET_PUMP.x, MARKET_PUMP.y);
-    if (visible(pumpFoot, 22, 30, 14))
+    if (visible(pumpFoot, 38, 30, 14))
       objects.push({
         depth: MARKET_PUMP.x + MARKET_PUMP.y + 0.2,
         paint: () => paintPump(ctx, night, art.snow[7]),
       });
     const seasonIndex = seasonOf(season.groundDay);
     MARKET_TUBS.forEach((tub, i) => {
-      if (visible(at(tub.x, tub.y), 10, 22, 2))
+      // The plants stand 23 px, a cap of snow 24.
+      if (visible(at(tub.x, tub.y), 10, 26, 2))
         objects.push({
           depth: tub.x + tub.y,
           paint: () => paintTub(ctx, tub, night, seasonIndex, art.snow[i]),
@@ -1572,16 +1789,17 @@ export const marketPainter: DistrictPainter = {
         paint: () => paintBoard(ctx, art.kind, night),
       });
     for (const { pt, depth } of chats.browsers)
-      if (visible(pt, 12, 42, 2)) objects.push({ depth, paint: () => paintBubble(ctx, pt) });
+      if (visible(pt, 12, 46, 2)) objects.push({ depth, paint: () => paintBubble(ctx, pt) });
     return objects;
   },
-  hit(point) {
-    // The stalls stand up over whatever lies behind them; the paving is under everything.
+  hit(point, scene) {
+    // The stalls stand up over whatever lies behind them, by their own shape this minute; the
+    // paving is under everything.
+    const { day, minutes, night, season } = scene;
+    const art = marketArt(day, season.groundDay, night);
     let best: { plot: string; depth: number } | undefined;
     for (const stall of MARKET_STALL_GEOMETRY) {
-      const box = STALL_BOXES[stall.k];
-      if (point.x < box.left || point.x > box.right || point.y < box.top || point.y > box.bottom)
-        continue;
+      if (!onStall(point, stall, stallAt(day, minutes, stall.k), art.displays[stall.k])) continue;
       const depth = stallDepth(stall);
       if (!best || depth > best.depth)
         best = { plot: plotUnder(tile(stall.row, (stall.s0 + stall.s1) / 2, 0.5)), depth };

@@ -11,6 +11,7 @@ import MarketInfo, { browsingNow, marketStatus } from '../src/components/distric
 import { MARKET_KINDS, marketKind } from '../src/lib/district-calendar';
 import { DISTRICT_COPY, PANEL_COPY } from '../src/lib/district-copy';
 import { DISTRICT_SPOTS } from '../src/lib/district-places';
+import { districtEvents, eventStatus } from '../src/lib/events';
 import { outingOf } from '../src/lib/outings';
 import {
   glanceFacing,
@@ -320,12 +321,27 @@ describe('The market’s panel', () => {
     expect(html(1400)).toContain(PANEL_COPY.market.next);
     expect(html(300)).not.toContain(PANEL_COPY.market.next);
     expect(html(600)).not.toContain(PANEL_COPY.market.next);
-    // A browser still at a stall after 11:30 keeps the market open until they set off.
-    expect(marketStatus(700, 1)).toBe('open');
-    expect(marketStatus(470, 1)).toBe('open');
-    expect(marketStatus(470, 0)).toBe('later');
     expect(html(300)).toContain('LATER TODAY');
     expect(html(600)).toContain('HAPPENING NOW');
     expect(html(700)).toContain('FINISHED TODAY');
+  });
+
+  it('runs its status on the clock, as the event card does, and names who is there', () => {
+    const market = districtEvents(day, 600).find((event) => event.id === 'market')!;
+    const card: Record<string, string> = {
+      'Later today': 'later',
+      'Happening now': 'open',
+      'Finished today': 'closed',
+    };
+    for (let minutes = 0; minutes < 1440; minutes += 5)
+      expect(marketStatus(minutes), `${minutes}`).toBe(card[eventStatus(market, minutes)]);
+    // An early browser at 07:48 and a lingering one at 11:40 are named, under the clock's status.
+    const early = text(468, [at('attending')]);
+    expect(early).toContain('LATER TODAY');
+    expect(early).toContain(home.resident.name);
+    const lingering = html(700, [at('attending')]);
+    expect(lingering).toContain('FINISHED TODAY');
+    expect(lingering).toContain(PANEL_COPY.market.next);
+    expect(lingering).toContain(home.resident.name);
   });
 });

@@ -6,7 +6,9 @@
 // cap holds on the busiest morning of every market.
 import { describe, expect, it } from 'vitest';
 import {
+  BUBBLE_LIFT,
   COUNTER_FRONT,
+  holderFacing,
   holderTurned,
   MARKET_CART,
   MARKET_HEIGHTS,
@@ -14,6 +16,7 @@ import {
   MARKET_STALL_GEOMETRY,
   marketArt,
   marketPainter,
+  paintBubble,
   stallAt,
   stallDepth,
   stallTimes,
@@ -183,6 +186,12 @@ describe('Market Square’s art', () => {
     expect(coloursOf(sceneAt(dayWith('farmers', 1), 600)).has('#C8364A')).toBe(true);
     expect(coloursOf(sceneAt(dayWith('farmers', 2, 15), 600)).has(PUMPKIN.body[0])).toBe(true);
     expect(coloursOf(sceneAt(dayWith('books', 0), 600)).has('#D2B57A')).toBe(true);
+    // Books and bric-a-brac only at the books: no onion, potato or parsnip anywhere, any day.
+    for (const date of [1, 4, 9, 15, 22]) {
+      const books = coloursOf(sceneAt(dayWith('books', 0, date), 600));
+      for (const produce of ['#C48A4E', '#CDB284', '#E2D6B0', '#D58F3E'])
+        expect(books.has(produce), `${date} ${produce}`).toBe(false);
+    }
     // Wreaths and fir in winter: the flowers' stall has no summer stems then.
     const winter = coloursOf(sceneAt(dayWith('flowers', 3, 5), 600));
     expect(winter.has('#46705A')).toBe(true);
@@ -201,11 +210,28 @@ describe('Market Square’s art', () => {
     expect(colours.has(SNOW.top[0])).toBe(true);
   });
 
-  it('is shut under pale canvas at night, with nobody behind the counters', () => {
+  it('drops a little litter by the stalls through the morning and sweeps it up at noon', () => {
+    const bits = (day: number, minutes: number) => {
+      const { ctx, calls } = recordingContext();
+      marketPainter.floor!(ctx, sceneAt(day, minutes));
+      return calls.filter((call) => call.name === 'fillRect').length;
+    };
+    const farmers = dayWith('farmers', 1),
+      books = dayWith('books', 1);
+    expect(bits(farmers, 470)).toBe(0);
+    expect(bits(farmers, 560)).toBeGreaterThan(0);
+    expect(bits(farmers, 640)).toBeGreaterThan(bits(farmers, 560));
+    expect(bits(farmers, 640)).toBeLessThanOrEqual(30);
+    expect(bits(books, 640)).toBeLessThan(bits(farmers, 640));
+    expect(bits(farmers, 730)).toBe(0);
+    expect(bits(farmers, 1300)).toBe(0);
+  });
+
+  it('is shut under canvas at night, with nobody behind the counters', () => {
     const day = dayWith('flowers', 0);
     for (const minutes of [100, 1300]) {
       const colours = coloursOf(sceneAt(day, minutes));
-      expect(colours.has('#8C8F7E')).toBe(true); // the canvas, by night
+      expect(colours.has('#7D7B66')).toBe(true); // the canvas, by night
       for (const stall of MARKET_STALL_GEOMETRY)
         expect(stallAt(day, minutes, stall.k)).toMatchObject({ holder: 0, cover: 1, roll: 0 });
     }
@@ -246,6 +272,7 @@ describe('Market Square’s art', () => {
               }) as unknown as CanvasRenderingContext2D;
               return { ctx: proxied, draws };
             })();
+            marketPainter.floor!(ctx, scene);
             for (const object of marketPainter.objects(ctx, scene)) object.paint();
             marketPainter.ground!(ctx, {
               night: scene.night,
@@ -292,16 +319,65 @@ describe('Market Square’s art', () => {
     expect(marketPainter.hit!(project(40, 40), scene)).toBeUndefined();
   });
 
-  it('turns a stallholder to the stock now and then, never while a browser chats', () => {
+  it('answers a click by a stall’s own shape, so a head on the street behind it is still clicked', () => {
+    const open = sceneAt(dayWith('farmers', 0), 600);
+    const stall = MARKET_STALL_GEOMETRY[1];
+    // A walker on the duck street behind stall 1 (depth 71.5, the stall's 72.65): their head
+    // shows over the rail, and a click there must not be the stall's.
+    for (const x of [57.6, 58.0, 58.3, 58.6]) {
+      const feet = project(x, 13.5);
+      for (const up of [20, 24, 28]) {
+        const hit = marketPainter.hit!({ x: feet.x, y: feet.y - up }, open);
+        expect(hit?.depth ?? -1, `${x} ${up}`).toBeLessThan(x + 13.5);
+      }
+    }
+    // The rail, the awning and the counter are the stall's.
+    const middle = (stall.s0 + stall.s1) / 2;
+    const rail = project(middle, 14 + 0.08);
+    expect(marketPainter.hit!({ x: rail.x, y: rail.y - 25 }, open)?.depth).toBe(stallDepth(stall));
+    const counter = project(middle, COUNTER_FRONT.north);
+    expect(marketPainter.hit!({ x: counter.x, y: counter.y - 8 }, open)?.depth).toBe(
+      stallDepth(stall),
+    );
+    // Shut, only the covered counter: the empty air over it is not the stall.
+    const shut = sceneAt(dayWith('farmers', 0), 1360);
+    const top = project(middle, COUNTER_FRONT.north - 0.1);
+    expect(marketPainter.hit!({ x: top.x, y: top.y - 12 }, shut)?.depth).toBe(stallDepth(stall));
+    expect(marketPainter.hit!({ x: top.x, y: top.y - 26 }, shut)?.depth ?? -1).toBeLessThan(
+      stallDepth(stall),
+    );
+  });
+
+  it('lifts a chat bubble clear of a standing browser’s head and hat', () => {
+    const recorder = matrixContext(1280, 720);
+    paintBubble(recorder.ctx, { x: 0, y: 0 });
+    const ys = recorder.points.map((p) => p.y);
+    // A standing figure's hair starts 22 px up and a hat's crown 25, in its own px at 1.25.
+    expect(Math.max(...ys)).toBeLessThanOrEqual(-25 * 1.25);
+    expect(BUBBLE_LIFT).toBe(5);
+  });
+
+  it('turns a stallholder a quarter to the stock now and then, never while a browser chats', () => {
     const day = dayWith('books', 2);
+    const OPPOSITE: Record<string, string> = { se: 'nw', sw: 'ne', ne: 'sw', nw: 'se' };
     for (const stall of MARKET_STALL_GEOMETRY) {
       let turned = 0,
         runs = 0,
         before = false,
-        since = 0;
-      for (let t = 480; t < 690; t += 0.05) {
+        since = 0,
+        facing = holderFacing(stall.row, false);
+      for (let t = 425; t < 725; t += 0.05) {
         const now = holderTurned(day, t, stall.k, false);
         expect(holderTurned(day, t, stall.k, true)).toBe(false);
+        // Always toward the camera, and never an about-face from one moment to the next.
+        const next = holderFacing(stall.row, now);
+        expect(['se', 'sw']).toContain(next);
+        expect(next).not.toBe(OPPOSITE[facing]);
+        facing = next;
+        if (t < 480 || t >= 690) {
+          before = now;
+          continue;
+        }
         if (now) turned++;
         if (now !== before) {
           // Each turn and each return is held a minute at least.
@@ -334,8 +410,10 @@ describe('Market Square’s art', () => {
               });
             }
         const residents = scene.residents.map((r) => browsing.get(r.id) ?? r);
+        // The floor (the litter) and every object, as the shared cap counts them.
         const count = (zoom: number) => {
           const { ctx, calls } = recordingContext();
+          marketPainter.floor!(ctx, { ...scene, residents, zoom });
           for (const object of marketPainter
             .objects(ctx, { ...scene, residents, zoom })
             .sort((a, b) => a.depth - b.depth))
@@ -361,5 +439,63 @@ describe('Market Square’s art', () => {
     });
     expect(objects.length).toBeGreaterThan(0);
     expect(objects.length).toBeLessThan(4);
+  });
+
+  it('still paints a piece with only its last px in view, at each edge of the screen', () => {
+    type Area = { left: number; right: number; top: number; bottom: number };
+    const within =
+      (area: Area): DistrictScene['visible'] =>
+      (p, rx, above, below) =>
+        p.x + rx >= area.left &&
+        p.x - rx <= area.right &&
+        p.y + below >= area.top &&
+        p.y - above <= area.bottom;
+    const far = 1e6;
+    const lost: string[] = [];
+    // Open and stocked, shut at night, and snowed on in deep winter (snow caps the tubs).
+    for (const [day, minutes] of [
+      [dayWith('books', 0), 600],
+      [dayWith('farmers', 2, 15), 600],
+      [dayWith('flowers', 3, 8), 1360],
+      [dayWith('farmers', 3, 8), 600],
+    ]) {
+      const scene = sceneAt(day, minutes);
+      const recorder = matrixContext(1280, 720);
+      const pieces = marketPainter.objects(recorder.ctx, scene).map((object) => {
+        const start = recorder.points.length;
+        object.paint();
+        const points = recorder.points.slice(start);
+        const xs = points.map((p) => p.x),
+          ys = points.map((p) => p.y);
+        return {
+          depth: object.depth,
+          left: Math.min(...xs),
+          right: Math.max(...xs),
+          top: Math.min(...ys),
+          bottom: Math.max(...ys),
+        };
+      });
+      expect(pieces.length).toBeGreaterThanOrEqual(10);
+      for (const piece of pieces) {
+        // A screen whose edge leaves only the piece's last half px in view, from each side.
+        const edges: Area[] = [
+          { left: -far, right: piece.left + 0.5, top: -far, bottom: far },
+          { left: piece.right - 0.5, right: far, top: -far, bottom: far },
+          { left: -far, right: far, top: -far, bottom: piece.top + 0.5 },
+          { left: -far, right: far, top: piece.bottom - 0.5, bottom: far },
+        ];
+        edges.forEach((area, side) => {
+          const { ctx } = recordingContext();
+          const kept = marketPainter
+            .objects(ctx, { ...scene, visible: within(area) })
+            .some((object) => object.depth === piece.depth);
+          if (!kept)
+            lost.push(
+              `${minutes} depth ${piece.depth} ${['left', 'right', 'top', 'bottom'][side]}`,
+            );
+        });
+      }
+    }
+    expect(lost).toEqual([]);
   });
 });
