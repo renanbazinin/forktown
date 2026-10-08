@@ -13,6 +13,9 @@ import {
   chairOut,
   PEAK_LAMP_LIGHTS,
   peakLamp,
+  PLAYERS,
+  restingAt,
+  sittersLow,
   STAND,
   STAND_DEPTH,
 } from '../src/city/district/bandstand';
@@ -29,7 +32,7 @@ import {
 } from '../src/lib/district-places';
 import { residentTrips } from '../src/lib/resident-trips';
 import { townSeasonAt } from '../src/lib/seasons';
-import { simulateResidents } from '../src/lib/simulation';
+import { simulateResidents, type ResidentState } from '../src/lib/simulation';
 import { CALENDAR_EPOCH_DAY, townCalendarAt } from '../src/lib/town-calendar';
 import { project } from '../src/lib/world';
 import { TOWNS } from './district';
@@ -225,6 +228,74 @@ describe('The Bandstand’s art', () => {
       });
       expect(moving.length).toBeLessThanOrEqual(1);
     }
+  });
+
+  it('lets a deckchair’s back down for a guest low in the canvas, at no cost in calls', () => {
+    const [first, second, third, fourth] = DISTRICT_SPOTS.bandstand;
+    const guest = (
+      spot: { x: number; y: number },
+      pose: ResidentState['pose'],
+      phase: 'waiting' | 'attending' | 'returning' = 'attending',
+      id = 'bandstand-sundown',
+    ) =>
+      ({
+        position: { x: spot.x, y: spot.y },
+        pose,
+        event: { id, name: '', phase },
+      }) as ResidentState;
+    const drops = sittersLow([
+      guest(first, 'sip'),
+      guest(second, 'perch'),
+      guest(third, 'crouch', 'attending', 'bandstand-tea'),
+      guest(fourth, 'sit', 'returning'),
+    ]);
+    // Sunk low with a drink: let down a notch. Perched: the back meets the shoulders. Halfway
+    // down: between. On the way home, or an empty chair: as it stands.
+    expect(drops.slice(0, 4)).toEqual([5, 0, 2, 0]);
+    expect(drops.slice(4).every((drop) => drop === 0)).toBe(true);
+    // The guests' poses move the backs, never add to the calls.
+    for (const minutes of [980, 1170]) {
+      const day = BAND_DAYS.folk;
+      const withGuests = paint(bandstandPainter, sceneAt(day, minutes)).calls.length;
+      const empty = paint(bandstandPainter, sceneAt(day, minutes, 1, false)).calls.length;
+      expect(withGuests).toBe(empty);
+    }
+  });
+
+  it('sets the instruments down in sight at tea, gently, and takes them up again', () => {
+    const { teaFrom, teaTo } = PLAYERS;
+    expect(restingAt(teaFrom)).toBe(0);
+    expect(restingAt(teaFrom + 0.2)).toBe(0);
+    expect(restingAt(teaFrom + 0.75)).toBe(1);
+    expect(restingAt((teaFrom + teaTo) / 2)).toBe(1);
+    expect(restingAt(teaTo - 0.2)).toBe(0);
+    expect(restingAt(teaTo + 5)).toBe(0);
+    let before = 0;
+    for (let minutes = teaFrom - 1; minutes < teaTo + 1; minutes += 1 / 30) {
+      const shown = restingAt(minutes);
+      expect(Math.abs(shown - before)).toBeLessThanOrEqual(0.08);
+      before = shown;
+    }
+  });
+
+  it('hangs the Regatta Week bunting as one unbroken line, and none out of the week', () => {
+    const rope = (day: number) => {
+      const { ctx, calls } = recordingContext(1280, 720);
+      for (const object of landingPainter.objects(ctx, sceneAt(day, 600, 1, false))) object.paint();
+      return calls
+        .filter((call) => call.name === 'fillRect' && String(call.fillStyle) === '#8C7A5E')
+        .map((call) => {
+          const [x, , w] = call.args as number[];
+          return [x + call.offset.x, x + call.offset.x + w] as const;
+        })
+        .sort((a, b) => a[0] - b[0]);
+    };
+    const runs = rope(REGATTA);
+    expect(runs.length).toBeGreaterThan(5);
+    // Each run of the line picks up where the last left off: no gaps, no dots.
+    for (let i = 1; i < runs.length; i++) expect(runs[i][0]).toBeLessThanOrEqual(runs[i - 1][1]);
+    expect(runs.at(-1)![1] - runs[0][0]).toBeGreaterThan(40);
+    expect(rope(PLAIN)).toEqual([]);
   });
 
   it('lights the peak lamp in the streetlamp wave until 06:00, never on a star night', () => {

@@ -16,6 +16,8 @@ import {
 } from '../../lib/district-places';
 import { eveningMinutes, FORK_PLOT, lampLightsAt } from '../../lib/lanterns';
 import { AUTUMN, groundFraction, SPRING, snowAt, WINTER } from '../../lib/seasons';
+import type { EventPose } from '../../lib/events';
+import type { ResidentState } from '../../lib/simulation';
 import { getPlot, project, type Point } from '../../lib/world';
 import type {
   DepthObject,
@@ -541,27 +543,43 @@ const BRASS = { body: '#C2A04E', dark: '#8F7337', light: '#DCCB94' } as const;
 const WOOD = { body: '#A3643E', dark: '#6E4129', light: '#C2875A' } as const;
 const BOW = '#E3D9C2';
 
-/** A tuba: the coil held in front, the bell up over the far shoulder. */
+/** A tuba's bell, turned up beside the player's head, and the pipe down behind the shoulder, in
+ *  the player's own px from `y`: low enough to show under the cap's valance (BANDSTAND_HEIGHT). */
+function tubaBell(r: FigureRect, x: number, y: number) {
+  r(x + 1, y - 19, 5, 1, BRASS.light);
+  r(x, y - 18, 7, 1, BRASS.light);
+  r(x + 1, y - 18, 5, 1, TUBA_THROAT);
+  r(x, y - 17, 7, 1, BRASS.light);
+  r(x + 1, y - 16, 5, 1, BRASS.body);
+  r(x + 2, y - 15, 3, 4, BRASS.body);
+  r(x + 4, y - 15, 1, 4, BRASS.dark);
+}
+/** A tuba's coil: a round body of brass with its tubing looped round in a U, and its valves. */
+function tubaCoil(r: FigureRect, x: number, y: number) {
+  r(x + 1, y - 13, 6, 1, BRASS.body);
+  r(x, y - 12, 8, 6, BRASS.body);
+  r(x + 1, y - 6, 6, 1, BRASS.body);
+  r(x + 2, y - 11, 1, 4, BRASS.dark);
+  r(x + 2, y - 8, 4, 1, BRASS.dark);
+  r(x + 5, y - 11, 1, 4, BRASS.dark);
+  r(x + 7, y - 12, 1, 5, BRASS.light);
+  r(x + 3, y - 15, 1, 2, BRASS.light);
+  r(x + 5, y - 15, 1, 2, BRASS.light);
+}
+const TUBA_THROAT = '#6E5528';
+/** A tuba: the coil held in front of the body, the bell turned up beside the head. */
 const tuba: Play = (beat, playing) => {
   const sway = playing && beat < 0.5 ? 1 : 0;
   return {
     behind: (r, look, bob) => {
-      const y = bob - sway;
-      r(-10, -28 + y, 9, 2, BRASS.light);
-      r(-9, -28 + y, 7, 1, BRASS.dark);
-      r(-9, -26 + y, 7, 2, BRASS.body);
-      r(-8, -24 + y, 4, 11, BRASS.body);
-      r(-5, -24 + y, 1, 11, BRASS.dark);
+      tubaBell(r, -11, bob - sway);
       r(-5, -15 + bob, 2, 3, tint(look.outfit, -24));
     },
     hands: (r, look, bob) => {
-      r(-2, -13 + bob, 8, 9, BRASS.body);
-      r(0, -11 + bob, 4, 5, BRASS.dark);
-      r(1, -10 + bob, 2, 3, BRASS.body);
-      r(-2, -13 + bob, 1, 9, BRASS.light);
-      r(3, -16 + bob, 1, 3, BRASS.dark);
+      tubaCoil(r, -2, bob);
+      r(3, -16 + bob, 2, 1, BRASS.dark);
       r(3, -11 + bob, 3, 2, look.outfit);
-      r(5, -12 + bob + (playing && beat < 0.25 ? 1 : 0), 2, 2, look.skin);
+      r(4, -16 + bob + (playing && beat < 0.25 ? 1 : 0), 2, 2, look.skin);
     },
   };
 };
@@ -582,19 +600,30 @@ const cornet: Play = (beat, playing) => {
     },
   };
 };
-/** A bass drum on its strap, the beater swinging in on the beat. */
+const DRUM = { hoop: '#A8524A', shell: '#7C3A34', skin: '#EFE6CF', cord: '#E3D9C2' } as const;
+/** A bass drum's near head, round: a red hoop round a cream skin, 8 px across, from (x, y). */
+function drumHead(r: FigureRect, x: number, y: number) {
+  r(x + 2, y, 4, 10, DRUM.hoop);
+  r(x + 1, y + 1, 6, 8, DRUM.hoop);
+  r(x, y + 2, 8, 6, DRUM.hoop);
+  r(x + 2, y + 1, 4, 8, DRUM.skin);
+  r(x + 1, y + 2, 6, 6, DRUM.skin);
+}
+/** A bass drum on its strap, its laced shell toward the body, the beater swinging in on the beat. */
 const drum: Play = (beat, playing) => {
   const up = playing ? (beat < 0.5 ? 3 : 0) : 1;
   return {
     hands: (r, look, bob) => {
-      r(0, -14 + bob, 2, 2, '#4A3A2E');
-      r(1, -13 + bob, 9, 10, '#A8524A');
-      r(2, -12 + bob, 7, 8, '#EFE6CF');
-      r(1, -9 + bob, 9, 1, '#7C3A34');
-      r(3, -11 + bob, 2, 2, look.outfit);
-      r(5, -11 + bob - up, 2, 2, look.skin);
-      r(6, -14 + bob - up, 1, 3, '#8C6A4A');
-      r(5, -15 + bob - up, 3, 2, '#EFE6CF');
+      r(-1, -16 + bob, 1, 4, '#4A3A2E');
+      r(-1, -12 + bob, 3, 7, DRUM.shell);
+      r(-1, -11 + bob, 1, 1, DRUM.cord);
+      r(0, -9 + bob, 1, 1, DRUM.cord);
+      r(-1, -7 + bob, 1, 1, DRUM.cord);
+      drumHead(r, 1, -14 + bob);
+      r(8, -11 + bob, 2, 2, look.outfit);
+      r(7, -16 + bob - up, 1, 5, '#8C6A4A');
+      r(6, -18 + bob - up, 3, 2, DRUM.skin);
+      r(6, -12 + bob - up, 2, 2, look.skin);
     },
   };
 };
@@ -749,48 +778,109 @@ export function playersAt(minutes: number) {
   return { alpha, playing, tea };
 }
 
-/** Each band's instruments set down at the players' places while they take tea, as rects in px
- *  from each place's foot: [x, y, w, h, colour]. */
-type Rest = readonly (readonly [number, number, number, number, string])[];
-const RESTING: Record<Band, readonly [Rest, Rest, Rest]> = {
+/** Where the instruments are set down while the band takes tea: at the deck's two ends, between
+ *  the side posts, and flat on its boards at the back, where the players on the front edge leave
+ *  them in sight. From the stand's centre, in tiles. */
+const REST_AT = {
+  left: { dx: -0.34, dy: 0.34 },
+  right: { dx: 0.34, dy: -0.34 },
+  back: { dx: -0.25, dy: -0.25 },
+  backLeft: { dx: -0.33, dy: -0.17 },
+  backRight: { dx: -0.17, dy: -0.33 },
+} as const;
+/** One instrument set down: where, and how it lies, as a painter from its foot on the deck. */
+type Rest = { at: keyof typeof REST_AT; paint: (r: FigureRect) => void };
+const lying =
+  (length: number, body: string, dark: string): Rest['paint'] =>
+  (r) => {
+    r(-Math.ceil(length / 2), -2, length, 2, body);
+    r(-Math.ceil(length / 2), -1, length, 1, dark);
+  };
+const RESTING: Record<Band, readonly Rest[]> = {
   brass: [
-    [
-      [-2, -9, 5, 9, BRASS.body],
-      [-3, -11, 7, 2, BRASS.light],
-      [-1, -7, 3, 1, BRASS.dark],
-    ],
-    [
-      [-3, -2, 6, 2, BRASS.body],
-      [2, -3, 2, 3, BRASS.light],
-    ],
-    [
-      [-4, -7, 8, 7, '#A8524A'],
-      [-3, -6, 6, 5, '#EFE6CF'],
-    ],
+    {
+      at: 'left',
+      paint: (r) => {
+        // Stood on its coil, the bell turned up.
+        tubaBell(r, -1, 5);
+        tubaCoil(r, -5, 6);
+      },
+    },
+    {
+      at: 'back',
+      paint: (r) => {
+        r(-3, -2, 6, 1, BRASS.body);
+        r(-3, -1, 6, 1, BRASS.dark);
+        r(3, -3, 2, 3, BRASS.light);
+      },
+    },
+    { at: 'right', paint: (r) => drumHead(r, -4, -10) },
   ],
   folk: [
-    [
-      [-3, -5, 6, 5, '#A84F45'],
-      [-2, -5, 4, 5, '#ECE3CA'],
-    ],
-    [
-      [-3, -2, 5, 2, WOOD.body],
-      [2, -1, 3, 1, '#3A2A20'],
-    ],
-    [
-      [-2, -6, 4, 6, '#B98A57'],
-      [-1, -12, 1, 6, '#5A3E2A'],
-    ],
+    {
+      at: 'left',
+      paint: (r) => {
+        r(-4, -6, 2, 6, '#A84F45');
+        r(-2, -5, 4, 5, '#ECE3CA');
+        r(-1, -5, 1, 5, '#C9BFA4');
+        r(1, -5, 1, 5, '#C9BFA4');
+        r(2, -6, 2, 6, '#A84F45');
+      },
+    },
+    {
+      at: 'back',
+      paint: (r) => {
+        lying(5, WOOD.body, WOOD.dark)(r);
+        r(3, -2, 3, 1, '#3A2A20');
+      },
+    },
+    {
+      at: 'right',
+      paint: (r) => {
+        r(-2, -6, 5, 6, '#B98A57');
+        r(-1, -7, 3, 1, '#B98A57');
+        r(0, -4, 1, 2, '#5A3E2A');
+        r(0, -13, 1, 6, '#5A3E2A');
+        r(-1, -14, 3, 2, '#3A2A20');
+      },
+    },
   ],
   strings: [
-    [[1, -11, 5, 2, WOOD.light]],
-    [[1, -11, 5, 2, WOOD.body]],
-    [
-      [-5, -4, 9, 4, '#8A4F32'],
-      [4, -3, 5, 1, '#3A2A20'],
-    ],
+    {
+      at: 'backLeft',
+      paint: (r) => {
+        lying(5, WOOD.light, WOOD.dark)(r);
+        r(3, -2, 2, 1, '#3A2A20');
+      },
+    },
+    {
+      at: 'backRight',
+      paint: (r) => {
+        lying(6, WOOD.body, WOOD.dark)(r);
+        r(4, -2, 2, 1, '#3A2A20');
+      },
+    },
+    {
+      at: 'right',
+      paint: (r) => {
+        r(-3, -9, 6, 9, '#8A4F32');
+        r(-2, -10, 4, 1, '#8A4F32');
+        r(-2, -5, 4, 1, '#6A3A24');
+        r(0, -16, 1, 6, '#3A2A20');
+        r(-1, -17, 2, 2, '#3A2A20');
+      },
+    },
   ],
 };
+/** Minutes an instrument takes to appear where it is set down, and to go when taken up. */
+const REST_FADE = 0.45;
+/** How far the set-down instruments show: once the players are halfway to the front edge, until
+ *  they are halfway back to their places (playersAt's `tea` at 0.5), fading in and out. */
+export function restingAt(minutes: number) {
+  const down = PLAYERS.teaFrom + STEP_DOWN / 2,
+    up = PLAYERS.teaTo - STEP_DOWN / 2;
+  return Math.min(clamp01((minutes - down) / REST_FADE), clamp01((up - minutes) / REST_FADE));
+}
 
 /** A teacup in the near hand, lifted now and then. */
 const teacup =
@@ -820,19 +910,28 @@ function drawPlayers(
     // Under the cap: the trio's chairs, and the instruments set down while the band takes tea.
     ctx.globalAlpha = alpha * state.alpha;
     PLAYERS_BY_BAND[band].forEach((player, i) => {
+      if (!player.seated) return;
       const slot = at(SLOTS[i].dx, SLOTS[i].dy, DECK);
       const x = Math.round(slot.x),
         y = Math.round(slot.y);
-      if (player.seated) {
-        // A seat behind the player's feet (they face left), and its back.
-        box(ctx, x, y - 9, 8, 2, pick(P.plank, night));
-        box(ctx, x + 1, y - 7, 1, 7, pick(P.plank, night));
-        box(ctx, x + 7, y - 19, 2, 19, pick(P.plank, night));
-      }
-      if (t > 0)
-        for (const [rx, ry, w, h, color] of RESTING[band][i])
-          box(ctx, x + rx, y + ry, w, h, night ? tint(color, -35) : color);
+      // A seat behind the player's feet (they face left), and its back.
+      box(ctx, x, y - 9, 8, 2, pick(P.plank, night));
+      box(ctx, x + 1, y - 7, 1, 7, pick(P.plank, night));
+      box(ctx, x + 7, y - 19, 2, 19, pick(P.plank, night));
     });
+    const shown = restingAt(minutes);
+    if (shown > 0) {
+      ctx.globalAlpha = alpha * state.alpha * shown;
+      for (const rest of RESTING[band]) {
+        const { dx, dy } = REST_AT[rest.at];
+        const foot = at(dx, dy, DECK);
+        const x = Math.round(foot.x),
+          y = Math.round(foot.y);
+        rest.paint((rx, ry, w, h, color) =>
+          box(ctx, x + rx, y + ry, w, h, night ? tint(color, -35) : color),
+        );
+      }
+    }
     ctx.globalAlpha = alpha;
   }
   if (t > 0.5 !== front) return;
@@ -849,8 +948,9 @@ function drawPlayers(
     const phase = beat - Math.floor(beat);
     const playing = state.playing && t === 0;
     const sip = settled && ((minutes + i * 2.3) / 3) % 1 < 0.3 ? 4 : 0;
-    const parts =
-      settled || stepping ? { hands: teacup(stepping ? 0 : sip) } : player.play(phase, playing);
+    // Down the deck with the instrument, set down halfway (restingAt), then a cup of tea; and
+    // the other way round going back up.
+    const parts = t >= 0.5 ? { hands: teacup(stepping ? 0 : sip) } : player.play(phase, playing);
     const x = Math.round(p.x),
       y = Math.round(p.y);
     drawFigure(ctx, x, y, {
@@ -869,8 +969,9 @@ function drawPlayers(
     });
   });
   if (front && t >= 1) {
-    // The teapot on the lower step between them.
-    const pot = at(0.55, 0.55, STEP);
+    // The teapot on the lower step, in the gap between the first two of them, over their feet.
+    const spot = onStand(0.9, -0.15);
+    const pot = at(spot.dx, spot.dy, STEP);
     ctx.globalAlpha = alpha * state.alpha;
     const x = Math.round(pot.x),
       y = Math.round(pot.y);
@@ -972,25 +1073,44 @@ const CANVAS_CREAM: Pair = ['#F2EBD6', '#9AA297'];
 const FRAME: Pair = ['#A5845E', '#625A4C'];
 const FRAME_DARK: Pair = ['#8C6E4C', '#544D42'];
 /** In tiles from the sitter's feet: half the width along x; the front bar ahead of the feet;
- *  the foot and the top of the back behind them along y, with their rise in px. */
+ *  the foot and the top of the back behind them along y, with their rise in px. The back's top
+ *  meets a perched sitter's shoulders (residents.ts draws `perch` and `tea` near standing height). */
 const CHAIR = {
   half: 0.17,
   front: -0.09,
   frontRise: 6,
   foot: 0.04,
   footRise: 3,
-  top: 0.1,
-  topRise: 15,
+  top: 0.12,
+  topRise: 20,
 } as const;
+/** Px the back is let down a notch for a sitter low in the canvas, or halfway down, so their head
+ *  and shoulders still show over it. */
+const SITTING_LOW: Partial<Record<EventPose, number>> = {
+  sit: 5,
+  sip: 5,
+  read: 5,
+  chat: 5,
+  crouch: 2,
+};
 
 /**
  * A deckchair facing the stand (ne), its sitter's feet at the spot, in two parts: the seat, its
  * front legs and its shadow under the sitter, and the striped back over them. From behind, we see
- * the canvas and the sitter's head and shoulders above it, as one sees a row of deckchairs.
+ * the canvas and the sitter's head and shoulders above it, as one sees a row of deckchairs; the
+ * back sits `drop` px lower for a sitter low in the canvas.
  */
-function drawChair(ctx: Ctx, spot: Point, color: Pair, night: boolean, part: 'seat' | 'back') {
+function drawChair(
+  ctx: Ctx,
+  spot: Point,
+  color: Pair,
+  night: boolean,
+  part: 'seat' | 'back',
+  drop = 0,
+) {
   const p = (dx: number, dy: number, rise: number) => iso(spot.x + dx, spot.y + dy, rise);
-  const { half, front, frontRise, foot, footRise, top, topRise } = CHAIR;
+  const { half, front, frontRise, foot, footRise, top } = CHAIR;
+  const topRise = CHAIR.topRise - drop;
   if (part === 'seat') {
     const shadow = p(0, 0, 0);
     box(ctx, Math.round(shadow.x) - 9, Math.round(shadow.y) - 1, 16, 3, pick(P.shadow, night));
@@ -1026,6 +1146,28 @@ function drawChair(ctx: Ctx, spot: Point, color: Pair, night: boolean, part: 'se
   box(ctx, width * 0.6, 0, width * 0.2, tall, pick(CANVAS_CREAM, night));
   box(ctx, -0.5, -0.5, width + 1, 1.5, pick(FRAME, night));
   ctx.restore();
+}
+
+/** The Bandstand's two sets: their guests sit in the deckchairs. */
+const SETS = new Set(['bandstand-tea', 'bandstand-sundown']);
+/**
+ * How far each deckchair's back is let down for whoever sits in it now (SITTING_LOW), by spot,
+ * read from the frame's residents: 0 for an empty chair or a perched, standing or cheering guest.
+ */
+export function sittersLow(residents: readonly ResidentState[]): number[] {
+  const drops = DISTRICT_SPOTS.bandstand.map(() => 0);
+  for (const resident of residents) {
+    const event = resident.event;
+    if (!event || !SETS.has(event.id) || (event.phase !== 'waiting' && event.phase !== 'attending'))
+      continue;
+    const k = DISTRICT_SPOTS.bandstand.findIndex(
+      (spot) =>
+        Math.abs(spot.x - resident.position.x) < 0.05 &&
+        Math.abs(spot.y - resident.position.y) < 0.05,
+    );
+    if (k >= 0 && resident.pose) drops[k] = SITTING_LOW[resident.pose] ?? 0;
+  }
+  return drops;
 }
 
 /** The chairs folded and stacked by the stand's east side, toward the road. */
@@ -1128,6 +1270,7 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
   }
   // The deckchairs, out on their spots for the sets and stacked by the stand otherwise.
   let stacked = 0;
+  const drops = sittersLow(scene.residents);
   DISTRICT_SPOTS.bandstand.forEach((spot, k) => {
     const shown = chairOut(k, minutes);
     stacked += 1 - shown;
@@ -1143,7 +1286,7 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
         paint: () => {
           const alpha = ctx.globalAlpha;
           ctx.globalAlpha = alpha * shown;
-          drawChair(ctx, spot, STRIPES[k % STRIPES.length], night, part);
+          drawChair(ctx, spot, STRIPES[k % STRIPES.length], night, part, drops[k]);
           ctx.globalAlpha = alpha;
         },
       });

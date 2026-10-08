@@ -11,23 +11,24 @@ type Facing = 'se' | 'sw' | 'ne' | 'nw';
 
 /**
  * A folded paper boat seen side on, in the carrier's own px: its peaked fold over a shallow hull,
- * a band of the folder's colour under the rim. Column 0 is x = −4 and the last row sits at the
- * hand (y = −1). `B` is the band; '.' stays clear.
+ * the hull's two rows in the folder's colour under the rim. Column 0 is x = −3 and the last row
+ * sits at the hand (y = −1). `B` is the band; '.' stays clear. At the town's 1.25 it is 9 px
+ * across, the size the Landing draws it on the grass and on the river (landing.ts), so a boat
+ * keeps its size from the hand to the water.
  */
 export const PAPER_BOAT = [
-  '....w....',
-  '...wWs...',
-  '..wWWss..',
-  'rrrrrrrrr',
-  '.BBBBBBB.',
-  '..ddddd..',
+  '...w...',
+  '..wWs..',
+  '.wWWss.',
+  'rrrrrrr',
+  '.BBBBB.',
+  '..BBB..',
 ] as const;
 const PAPER: Record<string, string> = {
   w: '#FFFFFB',
   W: '#F6F5EE',
   s: '#DADDD5',
   r: '#FBFBF6',
-  d: '#C9CEC6',
 };
 /** Paper dims at night like the figures that carry it, a touch less: it is white. */
 const NIGHT_DIM = -30;
@@ -51,7 +52,7 @@ export function paintPaperBoat(
       while (row[end] === key) end++;
       if (key !== '.') {
         const color = key === 'B' ? band : PAPER[key];
-        rect(x - 4 + start, top, end - start, 1, night ? tint(color, NIGHT_DIM) : color);
+        rect(x - 3 + start, top, end - start, 1, night ? tint(color, NIGHT_DIM) : color);
       }
       start = end;
     }

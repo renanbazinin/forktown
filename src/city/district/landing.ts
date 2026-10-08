@@ -15,7 +15,7 @@ import {
   regattaBoat,
   type RegattaBoat,
 } from '../../lib/district-calendar';
-import { LANDING_VENUE, REGATTA_COURSE } from '../../lib/district-places';
+import { DISTRICT_SPOTS, LANDING_VENUE, REGATTA_COURSE } from '../../lib/district-places';
 import type { ResidentTrip } from '../../lib/resident-trips';
 import type { Place } from '../../lib/schema';
 import { groundFraction, snowAt, SUMMER } from '../../lib/seasons';
@@ -36,6 +36,7 @@ import {
   clamp01,
   drawFigure,
   ease,
+  FIGURE_SCALE,
   fill,
   iso,
   smooth,
@@ -118,12 +119,38 @@ export function regattaGuestsOf(plan: Plan, places: readonly Place[]): (Guest | 
 // The boatwright: from the stage to each boat on the lawn's edge, and back to the water.
 
 const launchAt = (k: number) => OUTING_TIMES.regatta.start + REGATTA_LAUNCH_EVERY * k;
-/** Where the boatwright stands to set a boat on the water: the stage's south tip. */
+/**
+ * Where guest k sets their boat down as they arrive: at their own feet, a step toward the river
+ * on their own row. For the even rows (the front column, at the gravel's edge) that is the frozen
+ * handover point, REGATTA_COURSE.handoverX; the odd rows stand 0.55 tiles further in, so their
+ * boats rest 0.55 tiles short of it, where their guests are (REQUESTS-C.md: a handover per row).
+ */
+export const setDownAt = (k: number): Point => ({
+  x: DISTRICT_SPOTS.landing[k].x + 0.2,
+  y: landingRowY(k),
+});
+/** Where the boatwright sets a boat on the water: the stage's south tip. */
 const LAUNCH_STAND = { x: 62.2, y: 39.36 } as const;
-/** Where they stand to pick boat k up from the lawn's edge, a step east of it on the road. */
-const pickAt = (k: number) => ({ x: REGATTA_COURSE.handoverX + 0.17, y: landingRowY(k) });
-/** Tiles a minute: a brisk step, more than twice a neighbor's stroll; quicker when a guest is late. */
-const BRISK = 0.75;
+/** The road's lawn-side edge, clear of both of its walking lanes (x 61.28 and 61.72). */
+const ROAD_EDGE = 61.05;
+/**
+ * Where the boatwright stoops to pick boat k up: a step east of it on its own row. That is the
+ * road's lawn-side edge for the front column, and in among the guests for the odd rows, along
+ * the row's own approach, which keeps clear of every other guest (SPEC §2.3).
+ */
+const pickAt = (k: number): Point => ({ x: setDownAt(k).x + 0.1, y: landingRowY(k) });
+/** The boatwright's way from the stage to boat k: across the road, then in along its row. */
+export const boatwrightWay = (k: number): Point[] => {
+  const pick = pickAt(k);
+  return pick.x < ROAD_EDGE - 1e-9
+    ? [LAUNCH_STAND, { x: ROAD_EDGE, y: pick.y }, pick]
+    : [LAUNCH_STAND, pick];
+};
+const lengthOf = (way: readonly Point[]) =>
+  way.slice(1).reduce((sum, b, i) => sum + Math.hypot(b.x - way[i].x, b.y - way[i].y), 0);
+/** Tiles a minute: a brisk step, more than twice a neighbor's stroll. Rows 7 and 9, far down the
+ *  lawn and in among the guests, take a little more (at most 0.96), and so would a late guest. */
+const BRISK = 0.78;
 /** Minutes halfway down, picking a boat up or setting it on the water. */
 const STOOP = 0.3;
 /** The boatwright's hours on a regatta day. */
@@ -132,6 +159,19 @@ const BOATWRIGHT = { in: 825, out: 996 } as const;
 type Leg = { from: number; to: number; a: Point; b: Point; carry?: number; stoop?: boolean };
 type Errand = { k: number; legs: Leg[]; ashoreUntil: number };
 const errandsByGuests = new WeakMap<object, Errand[]>();
+/** A walk along `way` from `from` to `to`: a leg a stretch, each its share of the minutes. */
+function walk(way: readonly Point[], from: number, to: number, carry?: number): Leg[] {
+  const total = lengthOf(way);
+  let at = from;
+  return way.slice(1).map((b, i) => {
+    const a = way[i];
+    const end =
+      i === way.length - 2 ? to : at + ((to - from) * Math.hypot(b.x - a.x, b.y - a.y)) / total;
+    const leg: Leg = { from: at, to: end, a, b, carry };
+    at = end;
+    return leg;
+  });
+}
 /**
  * The boatwright's round, one boat at a time in launch order: walk from the stage to the boat
  * (once its guest has set it down), stoop and pick it up, carry it back, stoop and set it on the
@@ -146,20 +186,24 @@ function boatwrightRound(guests: readonly (Guest | undefined)[]): Errand[] {
     const guest = guests[k];
     if (!guest) continue;
     const launch = launchAt(k);
-    const pick = pickAt(k);
-    const d = Math.hypot(pick.x - LAUNCH_STAND.x, pick.y - LAUNCH_STAND.y);
+    const way = boatwrightWay(k);
+    const pick = way.at(-1)!;
+    const d = lengthOf(way);
     const carryEnd = launch - STOOP;
-    // Picked up in good time for a brisk walk back, but never before the guest has set it down.
-    const pickedUp = Math.max(guest.arrive + 0.2 + STOOP, carryEnd - d / BRISK);
+    // A brisk walk each way; for the farthest rows, a little quicker, the same both ways, when
+    // the last launch leaves no more time for the round.
+    const walking = Math.min(d / BRISK, (launch - free - 2 * STOOP) / 2);
+    // Picked up in good time for the walk back, but never before the guest has set it down.
+    const pickedUp = Math.max(guest.arrive + 0.2 + STOOP, carryEnd - walking);
     const reached = pickedUp - STOOP;
-    const leave = Math.max(free, reached - d / BRISK);
+    const leave = Math.max(free, reached - walking);
     errands.push({
       k,
       ashoreUntil: pickedUp - STOOP / 2,
       legs: [
-        { from: leave, to: reached, a: LAUNCH_STAND, b: pick },
+        ...walk(way, leave, reached),
         { from: reached, to: pickedUp, a: pick, b: pick, stoop: true, carry: pickedUp - STOOP / 2 },
-        { from: pickedUp, to: carryEnd, a: pick, b: LAUNCH_STAND, carry: pickedUp },
+        ...walk([...way].reverse(), pickedUp, carryEnd, pickedUp),
         {
           from: carryEnd,
           to: launch,
@@ -231,9 +275,10 @@ export function boatwrightAt(
 const BOATMAN = { in: 995, out: REGATTA_NETTING.to + 1 } as const;
 /** Minutes of one scoop: out over the boat, up with it, and over into the basket. */
 const SCOOP = 0.9;
-/** Where the boatman stands to reach boat k at rest: on the road's edge, beside it. */
+/** Where the boatman stands to reach boat k at rest: on the bank's edge beside it, clear of the
+ *  road's river-side walking lane (x 61.72). */
 const netStand = (k: number) => ({
-  x: 61.84,
+  x: 61.9,
   y: REGATTA_COURSE.boomY - REGATTA_COURSE.restGap * k + 0.04,
 });
 const nettedAt = (k: number) => REGATTA_NETTING.from + REGATTA_NETTING.every * k;
@@ -297,42 +342,52 @@ const BOATWRIGHT_LOOK: Look = { skin: '#C99B74', hair: '#5A5048', outfit: '#6F8A
 const BOATMAN_LOOK: Look = { skin: '#B98563', hair: '#8C857C', outfit: '#7E8B5C' };
 
 /**
- * A paper boat on the water or the grass, small and low: its fold, its rim, the band in its
- * folder's colour and the shaded hull, as [row, from x, to x, part] in px from the boat's point.
- * Nothing rises more than 4 px over that point, so a boat slipping under the Kingfisher bridge
- * stays clear of the glass above it.
+ * A paper boat afloat, sitting low: its fold, its rim and the two rows of its hull in the
+ * folder's colour, as [row, from x, to x, part] in px from the boat's point. It is as wide as
+ * the boat in hand (paper-boat.ts at the town's 1.25), its fold lower on the water. Nothing rises
+ * more than 4 px over that point, so a boat slipping under the Kingfisher bridge stays clear of
+ * the glass above it (REQUESTS-C.md 2).
  */
 const BOAT_ROWS = [
   [-4, -1, 0, 'fold'],
   [-3, -2, 1, 'fold'],
   [-2, -4, 3, 'rim'],
   [-1, -3, 2, 'band'],
-  [0, -2, 1, 'hull'],
+  [0, -2, 1, 'band'],
 ] as const;
 const BOAT_PAPER = {
   fold: ['#FFFFFB', '#B9C2BD'],
   rim: ['#F6F5EE', '#B1BAB6'],
-  hull: ['#C9CEC6', '#8C9590'],
 } satisfies Record<string, Pair>;
 /**
- * The boat side on along its way: `along` the town's y (down the river, its bow to the south-west
- * on screen) or x (from the lawn toward the river, its bow to the south-east), sheared to the iso
- * slope. Its fold bobs a pixel on the river's swell.
+ * The boat side on down the river, its bow to the south-west on screen, sheared to the iso slope.
+ * Its fold bobs a pixel on the river's swell.
  */
-function drawBoat(ctx: Ctx, p: Point, along: 'x' | 'y', band: string, night: boolean, bob = 0) {
+function drawBoat(ctx: Ctx, p: Point, band: string, night: boolean, bob = 0) {
   const x = Math.round(p.x),
     y = Math.round(p.y);
   ctx.save();
   ctx.translate(x, y);
-  ctx.transform(1, along === 'y' ? -0.5 : 0.5, 0, 1, 0, 0);
+  ctx.transform(1, -0.5, 0, 1, 0, 0);
   for (const [row, from, to, part] of BOAT_ROWS) {
     ctx.fillStyle =
       part === 'band' ? (night ? tint(band, -30) : band) : pick(BOAT_PAPER[part], night);
     ctx.fillRect(from, row + (part === 'fold' ? bob : 0), to - from + 1, 1);
   }
   ctx.restore();
-  // The water's darker line along the hull, or its shadow on the grass.
-  box(ctx, x - 3, y + 1, 7, 1, pick(along === 'y' ? P.waterline : P.shadow, night));
+  // The water's darker line along the hull.
+  box(ctx, x - 3, y + 1, 7, 1, pick(P.waterline, night));
+}
+/** A boat set down on the lawn's edge: the boat in hand, the same size, on its own shadow. */
+function drawAshoreBoat(ctx: Ctx, p: Point, band: string, night: boolean) {
+  const x = Math.round(p.x),
+    y = Math.round(p.y);
+  box(ctx, x - 5, y - 1, 10, 2, pick(P.shadow, night));
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(FIGURE_SCALE, FIGURE_SCALE);
+  paintPaperBoat((rx, ry, w, h, color) => box(ctx, rx, ry, w, h, color), 0, 0, band, night);
+  ctx.restore();
 }
 
 /** The stage: a slim timber landing stage along the near bank, on low piles. Cached ground. */
@@ -496,23 +551,28 @@ function bunting(ctx: Ctx, night: boolean) {
   }
   const [a, b] = tops;
   // The line sags between the poles; the flags hang from it.
-  const along = (f: number) => ({
-    x: a.x + (b.x - a.x) * f,
-    y: a.y + (b.y - a.y) * f + Math.sin(f * Math.PI) * 4,
-  });
+  const sag = (f: number) => a.y + (b.y - a.y) * f + Math.sin(f * Math.PI) * 4;
+  // The line, a pixel at a time across the screen, one rect for each run on the same row.
   ctx.fillStyle = pick(P.rope, night);
-  for (let i = 0; i < 12; i++) {
-    const p = along(i / 12),
-      q = along((i + 1) / 12);
-    ctx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(1, Math.round(q.x - p.x)), 1);
-  }
+  const left = Math.round(Math.min(a.x, b.x)),
+    right = Math.round(Math.max(a.x, b.x));
+  const rowAt = (x: number) => Math.round(sag((x - a.x) / (b.x - a.x)));
+  for (let x = left, from = left; x <= right; x++)
+    if (x === right || rowAt(x + 1) !== rowAt(from)) {
+      ctx.fillRect(from, rowAt(from), x - from + 1, 1);
+      from = x + 1;
+    }
+  // Pennants, cream and sage by turns, each a little triangle hanging point down.
   for (let i = 1; i < 8; i++) {
-    const p = along(i / 8);
-    const color = pick(i % 2 ? P.flagCream : P.flagSage, night);
-    const x = Math.round(p.x) - 1,
-      y = Math.round(p.y) + 1;
-    box(ctx, x, y, 3, 2, color);
-    box(ctx, x + 1, y + 2, 1, 2, color);
+    const x = Math.round(a.x + (b.x - a.x) * (i / 8));
+    const y = rowAt(x) + 1;
+    ctx.fillStyle = pick(i % 2 ? P.flagCream : P.flagSage, night);
+    ctx.beginPath();
+    ctx.moveTo(x - 2, y);
+    ctx.lineTo(x + 2, y);
+    ctx.lineTo(x, y + 4);
+    ctx.closePath();
+    ctx.fill();
   }
 }
 
@@ -601,10 +661,11 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
   for (const { k, guest, boat } of boats) {
     const where = boatAt(guests, k, minutes);
     if (where === 'ashore') {
-      // On the lawn's edge from the guest's arrival until the boatwright takes it up.
-      const p = iso(boat.x, boat.y);
+      // At the guest's feet from their arrival until the boatwright takes it up.
+      const at = setDownAt(k);
+      const p = iso(at.x, at.y);
       if (!visible(p, 8, 10, 3)) continue;
-      out.push({ depth: boat.x + boat.y, paint: () => drawBoat(ctx, p, 'x', guest.band, night) });
+      out.push({ depth: at.x + at.y, paint: () => drawAshoreBoat(ctx, p, guest.band, night) });
       continue;
     }
     // In a hand, the boatwright's, the net or the basket: drawn with whoever holds it.
@@ -614,7 +675,7 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
     const bob = Math.sin((minutes + k * 0.7) * 2.1) > 0.6 ? -1 : 0;
     out.push({
       depth: boat.x + boat.y,
-      paint: () => drawBoat(ctx, p, 'y', guest.band, night, boat.state === 'drifting' ? bob : 0),
+      paint: () => drawBoat(ctx, p, guest.band, night, boat.state === 'drifting' ? bob : 0),
     });
   }
   if (wright) {
@@ -658,8 +719,9 @@ function objects(ctx: Ctx, scene: DistrictScene): DepthObject[] {
             y = Math.round(p.y);
           const alpha = ctx.globalAlpha;
           ctx.globalAlpha = alpha * crew.alpha;
-          // The basket at the boatman's feet, a white fold for every boat in it.
-          const b = iso(crew.at.x - 0.14, crew.at.y + 0.05);
+          // The basket beside him on the bank, on the water's side of the road and a step up
+          // the river, a white fold for every boat in it.
+          const b = iso(crew.at.x + 0.05, crew.at.y - 0.17);
           box(ctx, Math.round(b.x) - 4, Math.round(b.y) - 5, 8, 5, pick(P.basket, night));
           box(ctx, Math.round(b.x) - 4, Math.round(b.y) - 5, 8, 1, pick(P.basketDark, night));
           for (let i = 0; i < Math.min(crew.netted, 6); i++)

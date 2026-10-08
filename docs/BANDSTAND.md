@@ -12,17 +12,17 @@ The stand sits in a ring of pale gravel on its own tended lawn, with a few tufts
 
 The players are scenery. They are never neighbors, never named and never counted.
 
-| Band    | Left                         | Middle             | Right                   |
-| ------- | ---------------------------- | ------------------ | ----------------------- |
-| brass   | tuba, bell over the shoulder | cornet, held level | bass drum on a strap    |
-| folk    | squeezebox                   | fiddle             | guitar                  |
-| strings | violin, on a chair           | viola, on a chair  | cello between the knees |
+| Band    | Left                       | Middle             | Right                   |
+| ------- | -------------------------- | ------------------ | ----------------------- |
+| brass   | tuba, bell beside the head | cornet, held level | bass drum on a strap    |
+| folk    | squeezebox                 | fiddle             | guitar                  |
+| strings | violin, on a chair         | viola, on a chair  | cello between the knees |
 
 The brass band wears navy with peaked caps; the squeezebox player a flat cap. Everyone faces the lawn (`sw`) along the front of the deck, where the cap's valance falls just above their heads. In winter each wears a scarf.
 
 - **15:45** they fade in at their places and tune up: instruments in hand, nothing played.
 - **16:00–17:30** the teatime set. They play in time with their own arrangement's tempo (`BAND_BPM`: brass 96, folk 104, strings 84): the tuba's bell sways, the cornet tips up at the end of the beat, the beater swings in on it, bows draw and the squeezebox breathes. Small pixel notes rise from the cap, three in the air at a time, fading in and out over two minutes. They are olive by day and pale at night, never amber.
-- **17:30–18:15** tea on the steps. Each player walks down to the front edge in half a minute and sits there with a cup, lifting it now and then; a teapot stands on the lower step. Their instruments wait at their places on the deck.
+- **17:30–18:15** tea on the steps. Each player walks down to the front edge in half a minute and sits there with a cup, lifting it now and then; a teapot stands on the lower step between the first two. Their instruments wait where the players on the front edge leave them in sight: at the deck's two ends between the side posts, and flat on the boards at the back. They come into view as the players reach the front edge, and go as the players take them up again.
 - **18:15–20:00** the sundown set.
 - **20:00–20:15** they pack up, and fade out by 20:15.
 
@@ -30,7 +30,7 @@ The brass band wears navy with peaked caps; the squeezebox player a flat cap. Ev
 
 Eight striped deckchairs, sage, rose and sky with cream, stand on the lawn's eight spots facing the stand. They are out from 15:35 to 20:20 (`BANDSTAND_FURNITURE.chairs`), every day: one at a time from 15:26, each over most of a minute, and gathered in one at a time from 20:20. The rest of the day they lie folded in a stack by the stand's east side. Every listener of the year arrives after 15:35 and has gone by 20:20, so a guest never sits in a chair that is not fully there (tested over the full town's year).
 
-Each chair is drawn in two parts: its seat, front legs and shadow just under its guest (depth − 0.01), and its striped back just over them (depth + 0.01). From behind, as we see them, a row of deckchairs shows the canvas with each guest's head and shoulders over it.
+Each chair is drawn in two parts: its seat, front legs and shadow just under its guest (depth − 0.01), and its striped back just over them (depth + 0.01). From behind, as we see them, a row of deckchairs shows the canvas with each guest's head and shoulders over it. The back's top meets a perched guest's shoulders (20 px up); for a guest sunk low in the canvas (`sip`, or the waiting `sit`) it is let down 5 px, and 2 px while they are halfway down (`crouch`), so their head still shows. It reads the frame's residents for that, and adds no draw calls.
 
 ## The listeners
 

@@ -8,7 +8,9 @@ import { boatBand, paperBoatSprite } from '../src/city/carry/paper-boat';
 import {
   boatAt,
   boatwrightAt,
+  boatwrightWay,
   regattaGuestsOf,
+  setDownAt,
   type RegattaGuest,
 } from '../src/city/district/landing';
 import LandingInfo, { atTheWater, regattaNow } from '../src/components/district/LandingInfo';
@@ -20,11 +22,13 @@ import {
   regattaDay,
 } from '../src/lib/district-calendar';
 import { DISTRICT_COPY, PANEL_COPY } from '../src/lib/district-copy';
-import { REGATTA_COURSE } from '../src/lib/district-places';
+import { DISTRICT_SPOTS, REGATTA_COURSE } from '../src/lib/district-places';
+import { LANE_SHIFT } from '../src/lib/lanes';
 import { REGATTA_CHEER, regattaCheer } from '../src/lib/outings/regatta';
 import { residentTrips, tripState } from '../src/lib/resident-trips';
 import { DEFAULT_RESIDENT, type Place } from '../src/lib/schema';
 import { simulateResidents } from '../src/lib/simulation';
+import { project, type Point } from '../src/lib/world';
 import { TOWNS, YEAR } from './district';
 import { recordingContext } from './recording-context';
 import { rosterTimeout } from './roster-timeout';
@@ -133,12 +137,89 @@ describe('A paper boat’s afternoon', () => {
           const now = boatwrightAt(guests, t);
           if (before && now) {
             const step = Math.hypot(now.at.x - before.at.x, now.at.y - before.at.y);
-            // 0.75 tiles a minute: brisk, a little over twice a neighbor's stroll.
-            expect(step / 0.02).toBeLessThanOrEqual(0.8);
+            // 0.78 tiles a minute: brisk, a little over twice a neighbor's stroll; the farthest
+            // rows, fetched in among the guests between two launches, a little more.
+            expect(step / 0.02).toBeLessThanOrEqual(1);
           }
           before = now;
         }
       }
+  });
+
+  it('is set down at its guest’s own feet, a step toward the river on their own row', () => {
+    DISTRICT_SPOTS.landing.forEach((spot, k) => {
+      const at = setDownAt(k);
+      expect(at.y).toBe(spot.y);
+      expect(at.x - spot.x).toBeCloseTo(0.2, 9);
+      // The front column's is the frozen handover point on the gravel.
+      if (k % 2 === 0) expect(at.x).toBeCloseTo(REGATTA_COURSE.handoverX, 9);
+    });
+  });
+
+  it(
+    'leaves the hand for the ground at the guest’s feet, never jumping across the lawn',
+    () => {
+      // The town's figures stand 1.25 times their own px; the boat's middle is 3 own px up.
+      const SCALE = 1.25;
+      const FRAME = 1 / 30;
+      let checked = 0;
+      for (const town of [TOWNS.real, TOWNS.full])
+        for (const { day, trips, homes } of regattas(town))
+          for (const { id, trip } of trips) {
+            const before = tripState(homes.get(id)!, trip, trip.arrive - FRAME, day);
+            expect(before.carry?.kind).toBe('paper-boat');
+            const facing = before.facing ?? 'se';
+            const { anchor } = paperBoatSprite.grip(facing, before.walkPhase ?? 0);
+            const mirror = facing === 'sw' || facing === 'nw' ? -1 : 1;
+            const feet = project(before.position!.x, before.position!.y);
+            const hand = {
+              x: feet.x + mirror * anchor.x * SCALE,
+              y: feet.y + (anchor.y - 3) * SCALE,
+            };
+            const down = project(setDownAt(trip.seat).x, setDownAt(trip.seat).y);
+            const ground = { x: down.x, y: down.y - 3 * SCALE };
+            // From the hand to the ground by the feet, less than a figure's own height; set down
+            // at the old handover point, an odd row's boat moved 45 px across the lawn.
+            expect(
+              Math.hypot(ground.x - hand.x, ground.y - hand.y),
+              `boat ${trip.seat} on ${day}`,
+            ).toBeLessThanOrEqual(22);
+            checked++;
+          }
+      expect(checked).toBe(2 * 7 * REGATTA_BOATS);
+    },
+    rosterTimeout(0.6, 120_000),
+  );
+
+  it('is fetched along the guest’s own row, clear of every other guest and of the road’s lanes', () => {
+    const clearance = (p: Point, a: Point, b: Point) => {
+      const dx = b.x - a.x,
+        dy = b.y - a.y;
+      const f = Math.max(
+        0,
+        Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)),
+      );
+      return Math.hypot(p.x - (a.x + dx * f), p.y - (a.y + dy * f));
+    };
+    for (let k = 0; k < REGATTA_BOATS; k++) {
+      const way = boatwrightWay(k);
+      const pick = way.at(-1)!;
+      // A step east of the boat, on its row, and off the riverside road's walking lanes.
+      expect(pick.y).toBe(setDownAt(k).y);
+      expect(pick.x).toBeGreaterThan(setDownAt(k).x);
+      expect(pick.x).toBeLessThanOrEqual(61.5 - LANE_SHIFT - 0.2);
+      for (let i = 1; i < way.length; i++)
+        DISTRICT_SPOTS.landing.forEach((spot, j) => {
+          if (j === k) return;
+          expect(
+            clearance(spot, way[i - 1], way[i]),
+            `boat ${k} past seat ${j}`,
+          ).toBeGreaterThanOrEqual(0.3);
+          // The boats still ashore: every boat before this one is already on the water.
+          if (j > k)
+            expect(clearance(setDownAt(j), way[i - 1], way[i])).toBeGreaterThanOrEqual(0.3);
+        });
+    }
   });
 
   it('has no boat for an empty seat', () => {
