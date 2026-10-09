@@ -9,6 +9,7 @@ import type { Playable } from '../lib/break-cards';
 
 export default function Soundtrack({
   track,
+  upcoming,
   playing,
   football,
   listening,
@@ -20,6 +21,8 @@ export default function Soundtrack({
   hideControls = false,
 }: {
   track: TrackId;
+  /** The town's tune a little later (townTuneAt), rendered ahead so its turn starts on time. */
+  upcoming?: TrackId;
   playing: boolean;
   football: FootballState;
   listening: { gain: number; pan: number };
@@ -65,6 +68,10 @@ export default function Soundtrack({
   useEffect(() => {
     if (enabled && prepare) player.current?.cinemaPrepare(prepare);
   }, [enabled, prepare]);
+  useEffect(() => {
+    if (enabled && playing && !hidden && upcoming && upcoming !== track)
+      player.current?.prepare(upcoming);
+  }, [enabled, playing, hidden, upcoming, track]);
   useEffect(() => {
     if (
       !enabled ||

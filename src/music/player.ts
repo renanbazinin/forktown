@@ -1,16 +1,32 @@
-import type { TrackId } from './score';
+import { durationOf, isTownTune, phraseOf, type TrackId } from './score';
 import { renderFootballTakes, renderTrack } from './synth';
 import { FOOTBALL_SOUND_TAKES, renderFootballSound } from './football-sound';
 import type { FootballSound } from '../lib/football';
 import { CinemaPlayer, type CinemaPlayback } from './cinema-player';
 import type { Playable } from '../lib/break-cards';
 
+/** A looping track on air. */
+type Playing = {
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+  track: TrackId;
+  /** The context time of the loop's first beat: still ahead while it waits for a phrase end. */
+  startedAt: number;
+};
+/**
+ * How one of the town's tunes gives way to the next: at the end of the playing tune's phrase of
+ * four bars, so a melody is never cut off mid-line, or at once (the listening room's picks).
+ */
+export type Handoff = 'phrase' | 'now';
+/** Seconds the outgoing tune fades over, ending as its phrase ends. */
+const PHRASE_FADE = 0.9;
+
 export class TownPlayer {
   private context: AudioContext;
   private output: GainNode;
   private music: GainNode;
   private cinema: CinemaPlayer;
-  private current?: { source: AudioBufferSourceNode; gain: GainNode; track: TrackId };
+  private current?: Playing;
   private cache = new Map<TrackId, Promise<AudioBuffer>>();
   private revision = 0;
   private disposed = false;
@@ -119,47 +135,115 @@ export class TownPlayer {
       0.06,
     );
   }
-  async play(track: TrackId) {
-    if (this.disposed) return;
-    const revision = ++this.revision;
-    if (this.current?.track === track) return;
+  private render(track: TrackId) {
     let rendering = this.cache.get(track);
     if (!rendering) {
       rendering = renderTrack(track);
       this.cache.set(track, rendering);
-      // At most three stereo loops retained (roughly 30 MB).
+      // At most three stereo loops retained (up to about 60 MB with the longest tunes).
       if (this.cache.size > 3) this.cache.delete(this.cache.keys().next().value!);
     }
-    let buffer: AudioBuffer;
-    try {
-      buffer = await rendering;
-    } catch (error) {
+    return rendering.catch((error: unknown) => {
       this.cache.delete(track);
       throw error;
-    }
-    if (this.disposed || revision !== this.revision) return;
+    });
+  }
+  /** Renders a track ahead (the next tune of the hour), so its turn starts on time. */
+  prepare(track: TrackId) {
+    if (!this.disposed) this.render(track).catch(() => {});
+  }
+  /** Where the current loop is: seconds into it, of its whole length. */
+  get position() {
+    const playing = this.current;
+    if (!playing) return undefined;
+    const duration = playing.source.buffer?.duration || durationOf(playing.track);
+    const seconds = Math.max(0, this.context.currentTime - playing.startedAt) % duration;
+    return { track: playing.track, seconds, duration };
+  }
+  /** Seconds until a tune waiting for the end of a phrase comes in; 0 when none is waiting. */
+  get handoff() {
+    return this.current ? Math.max(0, this.current.startedAt - this.context.currentTime) : 0;
+  }
+  /**
+   * Starts a looping track, fading in over 1.5 s. With `at`, it waits until then and comes in
+   * quickly instead, as the tune before it fades.
+   */
+  private start(track: TrackId, buffer: AudioBuffer, at?: number): Playing {
     const time = this.context.currentTime;
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = buffer;
     source.loop = true;
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(1, time + 1.5);
-    source.connect(gain).connect(this.music);
-    const old = this.current;
-    if (old) {
-      old.gain.gain.cancelAndHoldAtTime(time);
-      old.gain.gain.linearRampToValueAtTime(0, time + 1.5);
-      old.source.stop(time + 1.6);
+    if (at === undefined) gain.gain.linearRampToValueAtTime(1, time + 1.5);
+    else {
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(1, at + 0.25);
     }
+    source.connect(gain).connect(this.music);
     source.onended = () => {
       source.disconnect();
       gain.disconnect();
       this.active.delete(source);
     };
     this.active.set(source, gain);
-    source.start(time);
-    this.current = { source, gain, track };
+    source.start(at ?? time);
+    return { source, gain, track, startedAt: at ?? time };
+  }
+  private fadeOut(playing: Playing) {
+    const time = this.context.currentTime;
+    // A tune still waiting for its turn is simply never started.
+    if (playing.startedAt > time) {
+      playing.source.stop(time);
+      return;
+    }
+    playing.gain.gain.cancelAndHoldAtTime(time);
+    playing.gain.gain.linearRampToValueAtTime(0, time + 1.5);
+    playing.source.stop(time + 1.6);
+  }
+  /** Fades a tune out over the last PHRASE_FADE seconds before `end`, then stops it. */
+  private fadeOutAt(playing: Playing, end: number) {
+    const gain = playing.gain.gain;
+    gain.cancelAndHoldAtTime(this.context.currentTime);
+    gain.setTargetAtTime(0, end - PHRASE_FADE, PHRASE_FADE / 3);
+    playing.source.stop(end + 1.5);
+  }
+  /**
+   * When a playing tune's current phrase of four bars ends (its loop's end is a phrase end too),
+   * leaving it time to fade first. A tune still waiting for its turn hands over where it would
+   * have come in.
+   */
+  private phraseEnd(playing: Playing) {
+    const now = this.context.currentTime;
+    if (playing.startedAt > now) return playing.startedAt;
+    const phrase = phraseOf(playing.track);
+    const loop = playing.source.buffer?.duration || durationOf(playing.track);
+    const into = (now - playing.startedAt) % loop;
+    const lead = PHRASE_FADE + 0.1;
+    let end = Math.ceil((into + lead) / phrase) * phrase;
+    if (end > loop) end = loop - into >= lead ? loop : loop + phrase;
+    return now + end - into;
+  }
+  /**
+   * Plays a track, crossfading from what plays now. One of the town's own tunes gives way to the
+   * next at the end of its phrase (`handoff`), so the hour's change never cuts a melody.
+   */
+  async play(track: TrackId, handoff: Handoff = 'phrase') {
+    if (this.disposed) return;
+    const revision = ++this.revision;
+    if (this.current?.track === track) return;
+    const buffer = await this.render(track);
+    if (this.disposed || revision !== this.revision) return;
+    const old = this.current;
+    const at =
+      handoff === 'phrase' && old && isTownTune(old.track) && isTownTune(track)
+        ? this.phraseEnd(old)
+        : undefined;
+    if (old) {
+      if (at !== undefined && old.startedAt <= this.context.currentTime) this.fadeOutAt(old, at);
+      else this.fadeOut(old);
+    }
+    this.current = this.start(track, buffer, at);
   }
   stop() {
     this.silenceEffects();
