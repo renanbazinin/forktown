@@ -1,0 +1,41 @@
+{
+  "id": "sunny-cottage",
+  "name": "Sunny Cottage",
+  "creator": "eti-329",
+  "plot": "I2",
+  "building": "cottage",
+  "color": "#D0AA65",
+  "decoration": "mailbox",
+"story": "Error 404: Story not found.🫤",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#6b5643",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Esti",
+    "figure": "female",
+    "skin": "#ead8c3",
+    "hair": "#675A48",
+    "outfit": "#d22d2d",
+    "accessory": "glasses",
+"greeting": "Yo, stranger!",   
+ "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "YOU FOUND ME",
+    "color": "#e01f45",
+    "background": "#282a29",
+    "html": ""
+  }
+}

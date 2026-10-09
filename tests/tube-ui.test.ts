@@ -134,6 +134,7 @@ const texts = (copy: TubeCopy) => [
   ...copy.blocks.flatMap((block) => [block.eyebrow, block.heading, block.body, block.note ?? '']),
 ];
 const escape = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const repeatsRiderName = (heading: string) => /^(.+) and \1 are on the line\.$/i.test(heading);
 /** The brand's copy rules plus the line's own: quiet, honest, and only today's riders named. */
 function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly string[]) {
   const problems: string[] = [];
@@ -142,17 +143,10 @@ function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly stri
   if (copy.label !== TUBE_LABEL) problems.push(`label ${copy.label}`);
   if (copy.sign.text !== TUBE_SIGN) problems.push(`sign ${copy.sign.text}`);
   if (copy.blocks.length !== 2) problems.push(`${copy.blocks.length} blocks`);
-  // Two neighbors can share a name; the heading never says it twice ("Jon and Jon", whatever the
-  // case). Whole names only: "New neighbor and Neighbor L3" names two different neighbors.
-  const riders = [...new Set(status.now.map((ride) => ride.name.trim()).filter(Boolean))];
-  const twice = riders.map(
-    (name) =>
-      new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)} and ${escape(name)}(?![\\p{L}\\p{N}])`, 'iu'),
-  );
   for (const block of copy.blocks) {
     if (!block.heading.endsWith('.')) problems.push(`heading "${block.heading}"`);
-    if (twice.some((pattern) => pattern.test(block.heading)))
-      problems.push(`heading "${block.heading}"`);
+    // Two neighbors can share a name; the heading never says it twice ("Jon and Jon").
+    if (repeatsRiderName(block.heading)) problems.push(`heading "${block.heading}"`);
     if (!/^[A-Z0-9 ·/’&–-]+$/.test(block.eyebrow)) problems.push(`eyebrow "${block.eyebrow}"`);
     if (!block.body.trim()) problems.push(`empty body under "${block.heading}"`);
   }
@@ -184,6 +178,23 @@ function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly stri
 }
 
 describe('Treeline panel copy', () => {
+  it('checks complete rider names, allowing different names to share words', () => {
+    const s = status({
+      now: [onLine('New neighbor', 'riding'), onLine('Neighbor L3', 'riding')],
+    });
+    const copy = tubeCopy(s);
+    expect(copy.blocks[0].heading).toBe('New neighbor and Neighbor L3 are on the line.');
+    expect(voiceProblems(copy, s, ['New neighbor', 'Neighbor L3'])).toEqual([]);
+
+    for (const name of ['Jon', 'New neighbor']) {
+      const same = status({ now: [onLine(name, 'riding'), onLine(name, 'boarding')] });
+      const wrong = tubeCopy(same);
+      const heading = `${name} and ${name.toLowerCase()} are on the line.`;
+      wrong.blocks[0].heading = heading;
+      expect(voiceProblems(wrong, same, [name])).toContain(`heading "${heading}"`);
+    }
+  });
+
   it('names who is on the line, and only them', () => {
     expect(onTheLine([])).toBeUndefined();
     expect(onTheLine([onLine('Eliza', 'boarding')])).toBe('Eliza is boarding at Hedgerow Halt.');
@@ -330,7 +341,7 @@ describe('Treeline panel copy', () => {
               : tubeStatus(places, minute - 1440, day + 1);
           const heading = tubeCopy(s).blocks[0].heading;
           headings.add(heading);
-          expect(heading).not.toMatch(/\b(\w+) and \1\b/i);
+          expect(repeatsRiderName(heading)).toBe(false);
           if (s.now.length === 2)
             expect(heading).toBe(`Two neighbors named ${names.get(a.residentId)} are on the line.`);
         }
