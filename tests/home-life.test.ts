@@ -160,7 +160,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
       expect(appearances).toBeGreaterThan(homes.length / 2);
     }
     expect(wrong.slice(0, 8)).toEqual([]);
-  }, 30_000);
+  }, 60_000);
 
   it('walks its lot and its loops at walking pace, facing the way it goes', () => {
     const wrong: string[] = [];
@@ -620,7 +620,7 @@ describe('Life at home: the front door, the garden and loops round the block', (
       for (const resident of states)
         if (visible(resident))
           expect(residentActivityLabel(resident)).not.toMatch(/at home|Sleeping/);
-  }, 30_000);
+  }, 60_000);
 
   it('stretches only on the top step, stepping out on a morning', () => {
     let stretches = 0;

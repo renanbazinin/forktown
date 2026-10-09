@@ -16,6 +16,7 @@ import { booPolitelyScore } from './boo-politely';
 import { cardboardRocketScore } from './cardboard-rocket';
 import { duelAtDuskScore } from './duel-at-dusk';
 import { helloDownstreamScore } from './hello-downstream';
+import { inTimeScore } from './in-time';
 import { lanternsOnTheCliffScore } from './lanterns-on-the-cliff';
 import { mailForTheAnglerfishScore } from './mail-for-the-anglerfish';
 import { mirrorSignalPanicScore } from './mirror-signal-panic';
@@ -23,14 +24,18 @@ import { misoAndTheMoonScore } from './miso-and-the-moon';
 import { nightBusScore } from './night-bus';
 import { nightCourierScore } from './night-courier';
 import { replyAllScore } from './reply-all';
+import { statuesScore } from './statues';
+import { tallOrderScore } from './tall-order';
 import { theGreatPieHeistScore } from './the-great-pie-heist';
 import { theLastDucklingScore } from './the-last-duckling';
 import { theLongTableScore } from './the-long-table';
 import { theMittenScore } from './the-mitten';
 import { theRainOrchestraScore } from './the-rain-orchestra';
+import { theReturnJobScore } from './the-return-job';
 import { theRunawayPopcornScore } from './the-runaway-popcorn';
 import { theSleeperTrainScore } from './the-sleeper-train';
 import { theTinyGrandPrixScore } from './the-tiny-grand-prix';
+import { theWaspConcertoScore } from './the-wasp-concerto';
 import { visitorsOverForktownScore } from './visitors-over-forktown';
 import { whiteoutScore } from './whiteout';
 import type { AdModule, FilmModule } from './types';
@@ -62,6 +67,11 @@ export const REEL_SCORES: Record<FilmArtwork, FilmModule['score']> = {
   whiteout: whiteoutScore,
   replyall: replyAllScore,
   roadtest: mirrorSignalPanicScore,
+  snowmen: statuesScore,
+  towers: tallOrderScore,
+  wasp: theWaspConcertoScore,
+  skiff: inTimeScore,
+  wren: theReturnJobScore,
 };
 export const AD_SCORES: Record<AdArtwork, AdModule['score']> = {
   snacks: snackBarAdScore,

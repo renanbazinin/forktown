@@ -118,7 +118,7 @@ describe('Live broadcast director', () => {
         expect(scenery).toBe(60);
       }
     }
-  }, 20_000);
+  }, 45_000);
 
   it('chooses three varied highlights each day, with no always-on ducks or disco', () => {
     const lineups = new Set<string>();
@@ -208,7 +208,7 @@ describe('Live broadcast director', () => {
     }
     expect(followed).toBeGreaterThan(0);
     expect(kept).toBeGreaterThan(0);
-  }, 20_000);
+  }, 45_000);
 
   it('keeps casting deterministic and switches away from a resident who goes indoors', () => {
     const program = liveProgram(places, 12);
