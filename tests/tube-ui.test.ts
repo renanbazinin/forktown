@@ -253,6 +253,23 @@ function voiceProblems(
 }
 
 describe('Treeline panel copy', () => {
+  it('checks complete rider names, allowing different names to share words', () => {
+    const s = status({
+      now: [onLine('New neighbor', 'riding'), onLine('Neighbor L3', 'riding')],
+    });
+    const copy = tubeCopy(s);
+    expect(copy.blocks[0].heading).toBe('New neighbor and Neighbor L3 are on the line.');
+    expect(voiceProblems(copy, s, ['New neighbor', 'Neighbor L3'])).toEqual([]);
+
+    for (const name of ['Jon', 'New neighbor']) {
+      const same = status({ now: [onLine(name, 'riding'), onLine(name, 'boarding')] });
+      const wrong = tubeCopy(same);
+      const heading = `${name} and ${name.toLowerCase()} are on the line.`;
+      wrong.blocks[0].heading = heading;
+      expect(voiceProblems(wrong, same, [name])).toContain(`heading "${heading}"`);
+    }
+  });
+
   it('names who is on the line, and only them', () => {
     expect(onTheLine([])).toBeUndefined();
     expect(onTheLine([onLine('Eliza', 'boarding')])).toBe('Eliza is boarding at Hedgerow Halt.');
