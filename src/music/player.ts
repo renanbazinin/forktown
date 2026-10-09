@@ -1,4 +1,4 @@
-import { isBandTrack, type TrackId } from './score';
+import { durationOf, isBandTrack, isTownTune, phraseOf, type TrackId } from './score';
 import { renderFootballTakes, renderTrack } from './synth';
 import { FOOTBALL_SOUND_TAKES, renderFootballSound } from './football-sound';
 import type { FootballSound } from '../lib/football';
@@ -11,7 +11,16 @@ type Playing = {
   gain: GainNode;
   track: TrackId;
   panner?: StereoPannerNode;
+  /** The context time of the loop's first beat: still ahead while it waits for a phrase end. */
+  startedAt: number;
 };
+/**
+ * How one of the town's tunes gives way to the next: at the end of the playing tune's phrase of
+ * four bars, so a melody is never cut off mid-line, or at once (the listening room's picks).
+ */
+export type Handoff = 'phrase' | 'now';
+/** Seconds the outgoing tune fades over, ending as its phrase ends. */
+const PHRASE_FADE = 0.9;
 /**
  * The town's tune under a band at the gain the band is heard at: barely touched by a band heard
  * from afar, almost gone when the camera is at the stand (the cinema's curve on `music`).
@@ -173,7 +182,7 @@ export class TownPlayer {
     if (!rendering) {
       rendering = renderTrack(track);
       this.cache.set(track, rendering);
-      // At most three stereo loops retained (roughly 30 MB).
+      // At most three stereo loops retained (up to about 60 MB with the longest tunes).
       if (this.cache.size > 3) this.cache.delete(this.cache.keys().next().value!);
     }
     return rendering.catch((error: unknown) => {
@@ -181,15 +190,38 @@ export class TownPlayer {
       throw error;
     });
   }
-  /** Starts a looping track, fading in over 1.5 s to `level`; a band through its own pan. */
-  private start(track: TrackId, buffer: AudioBuffer, level: number): Playing {
+  /** Renders a track ahead (the next tune of the hour), so its turn starts on time. */
+  prepare(track: TrackId) {
+    if (!this.disposed) this.render(track).catch(() => {});
+  }
+  /** Where the current loop is: seconds into it, of its whole length. */
+  get position() {
+    const playing = this.current;
+    if (!playing) return undefined;
+    const duration = playing.source.buffer?.duration || durationOf(playing.track);
+    const seconds = Math.max(0, this.context.currentTime - playing.startedAt) % duration;
+    return { track: playing.track, seconds, duration };
+  }
+  /** Seconds until a tune waiting for the end of a phrase comes in; 0 when none is waiting. */
+  get handoff() {
+    return this.current ? Math.max(0, this.current.startedAt - this.context.currentTime) : 0;
+  }
+  /**
+   * Starts a looping track, fading in over 1.5 s to `level`; a band through its own pan. With
+   * `at`, it waits until then and comes in quickly instead, as the tune before it fades.
+   */
+  private start(track: TrackId, buffer: AudioBuffer, level: number, at?: number): Playing {
     const time = this.context.currentTime;
     const source = this.context.createBufferSource();
     const gain = this.context.createGain();
     source.buffer = buffer;
     source.loop = true;
     gain.gain.setValueAtTime(0, time);
-    gain.gain.linearRampToValueAtTime(level, time + 1.5);
+    if (at === undefined) gain.gain.linearRampToValueAtTime(level, time + 1.5);
+    else {
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + 0.25);
+    }
     const panner = isBandTrack(track) ? this.context.createStereoPanner() : undefined;
     if (panner) {
       panner.pan.value = this.pans.get(track) ?? 0;
@@ -202,22 +234,51 @@ export class TownPlayer {
       this.active.delete(source);
     };
     this.active.set(source, gain);
-    source.start(time);
-    return { source, gain, track, panner };
+    source.start(at ?? time);
+    return { source, gain, track, panner, startedAt: at ?? time };
   }
   private fadeOut(playing: Playing) {
     const time = this.context.currentTime;
+    // A tune still waiting for its turn is simply never started.
+    if (playing.startedAt > time) {
+      playing.source.stop(time);
+      return;
+    }
     playing.gain.gain.cancelAndHoldAtTime(time);
     playing.gain.gain.linearRampToValueAtTime(0, time + 1.5);
     playing.source.stop(time + 1.6);
+  }
+  /** Fades a tune out over the last PHRASE_FADE seconds before `end`, then stops it. */
+  private fadeOutAt(playing: Playing, end: number) {
+    const gain = playing.gain.gain;
+    gain.cancelAndHoldAtTime(this.context.currentTime);
+    gain.setTargetAtTime(0, end - PHRASE_FADE, PHRASE_FADE / 3);
+    playing.source.stop(end + 1.5);
+  }
+  /**
+   * When a playing tune's current phrase of four bars ends (its loop's end is a phrase end too),
+   * leaving it time to fade first. A tune still waiting for its turn hands over where it would
+   * have come in.
+   */
+  private phraseEnd(playing: Playing) {
+    const now = this.context.currentTime;
+    if (playing.startedAt > now) return playing.startedAt;
+    const phrase = phraseOf(playing.track);
+    const loop = playing.source.buffer?.duration || durationOf(playing.track);
+    const into = (now - playing.startedAt) % loop;
+    const lead = PHRASE_FADE + 0.1;
+    let end = Math.ceil((into + lead) / phrase) * phrase;
+    if (end > loop) end = loop - into >= lead ? loop : loop + phrase;
+    return now + end - into;
   }
   /**
    * Plays a track, crossfading from what plays now. A Bandstand band plays over `bed`, the town's
    * own tune (trackForTown without the band), which keeps playing under it at bedLevel: a band
    * heard faintly from afar never leaves the town near silent. Going back to that tune fades the
-   * band and brings the tune back up without restarting it.
+   * band and brings the tune back up without restarting it. One of the town's own tunes gives way
+   * to the next at the end of its phrase (`handoff`), so the hour's change never cuts a melody.
    */
-  async play(track: TrackId, bed?: TrackId) {
+  async play(track: TrackId, bed?: TrackId, handoff: Handoff = 'phrase') {
     if (this.disposed) return;
     const revision = ++this.revision;
     const under = isBandTrack(track) && bed !== undefined && bed !== track ? bed : undefined;
@@ -245,10 +306,25 @@ export class TownPlayer {
     if (this.disposed || revision !== this.revision) return;
     const keepBed = under !== undefined ? playing(under) : undefined;
     const keepBand = playing(track);
+    const outgoing = this.current;
+    const at =
+      handoff === 'phrase' &&
+      outgoing &&
+      !keepBand &&
+      under === undefined &&
+      this.bed === undefined &&
+      isTownTune(outgoing.track) &&
+      isTownTune(track)
+        ? this.phraseEnd(outgoing)
+        : undefined;
     for (const old of [this.current, this.bed])
-      if (old && old !== keepBed && old !== keepBand) this.fadeOut(old);
+      if (old && old !== keepBed && old !== keepBand) {
+        if (at !== undefined && old === outgoing && old.startedAt <= this.context.currentTime)
+          this.fadeOutAt(old, at);
+        else this.fadeOut(old);
+      }
     this.bed = under !== undefined ? (keepBed ?? this.start(under, bedBuffer!, 1)) : undefined;
-    this.current = keepBand ?? this.start(track, buffer!, this.levels.get(track) ?? 1);
+    this.current = keepBand ?? this.start(track, buffer!, this.levels.get(track) ?? 1, at);
     this.duck();
   }
   stop() {

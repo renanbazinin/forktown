@@ -55,7 +55,7 @@ import CalendarClock from './components/CalendarClock';
 import CinemaInfo from './components/CinemaInfo';
 import { cinemaAt } from './lib/cinema';
 import { footballAt, isFootballPlot, FOOTBALL_VENUE } from './lib/football';
-import { trackForTown } from './music/score';
+import { townTuneAt, trackForTown } from './music/score';
 import {
   HOUSE_PLOTS,
   eventsForDay,
@@ -513,6 +513,7 @@ export default function App() {
         <Soundtrack
           track={trackForTown(clock.minutes, events, bandstandListening)}
           bed={trackForTown(clock.minutes, events)}
+          upcoming={townTuneAt(clock.minutes + 30)}
           playing={clock.playing}
           football={football}
           listening={listening}
