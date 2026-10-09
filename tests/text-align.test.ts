@@ -4,6 +4,7 @@ import { eventsForDay } from '../src/lib/events';
 import { ZOO_FRAME } from '../src/lib/zoo';
 import { places } from './house-variety';
 import { recordingContext } from './recording-context';
+import { isSignFont } from './their-words';
 
 // Words on the map set their own alignment. One that borrowed the last object's would shift as
 // culling or a new neighbor changed what was drawn before it.
@@ -21,7 +22,9 @@ function alignments(start: CanvasTextAlign, minutes: number, camera = OPENING) {
       const value = Reflect.get(target, key);
       if (key !== 'fillText') return value;
       return (text: string, ...rest: number[]) => {
-        if (text in WORDS) seen.push(`${text} ${target.textAlign}`);
+        // The map's own words only: a neighbor's sign may read "♪" or "toString" too.
+        if (Object.hasOwn(WORDS, text) && !isSignFont(target.font))
+          seen.push(`${text} ${target.textAlign}`);
         return value(text, ...rest);
       };
     },

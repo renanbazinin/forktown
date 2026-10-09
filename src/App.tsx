@@ -1,6 +1,7 @@
 import ZooInfo from './components/ZooInfo';
-import FarmInfo from './components/FarmInfo';
 import { FARM, isFarmPlot } from './lib/farm';
+import { DISTRICT_PANELS, type DistrictPanelProps } from './components/district/cards';
+import GreenNote from './components/district/GreenNote';
 import MillpondInfo from './components/MillpondInfo';
 import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
 import { withPreview } from './lib/resident-trips';
@@ -61,6 +62,7 @@ import {
   venueAt,
   eventStatus,
   eventAtVenue,
+  isDistrictVenue,
   isEventLive,
 } from './lib/events';
 import { isFoundingPlace, latestArrival, places, repositoryUrl } from './lib/places';
@@ -151,6 +153,7 @@ export default function App() {
   const football = useMemo(() => footballAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const [cinemaListening, setCinemaListening] = useState({ gain: 0, pan: 0 });
+  const [bandstandListening, setBandstandListening] = useState({ gain: 0, pan: 0 });
   const cinema = useMemo(() => cinemaAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const selectedFootball = isFootballPlot(selectedPlot ?? '');
   const selectedFarm = isFarmPlot(selectedPlot ?? '');
@@ -178,6 +181,13 @@ export default function App() {
   const skaters = residents
     .filter((r) => r.event?.id === 'millpond' && r.event.phase === 'attending')
     .map((r) => r.resident.name);
+  // How many neighbors are at each event right now, for the live cards' counts.
+  const attending = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const { event } of residents)
+      if (event?.phase === 'attending') counts.set(event.id, (counts.get(event.id) ?? 0) + 1);
+    return counts;
+  }, [residents]);
   const selected = displayPlaces.find((place) => place.plot === selectedPlot);
   const selectedResident = residents.find((resident) => resident.id === selected?.id);
   const selectedVenue = selectedPlot ? venueAt(selectedPlot) : undefined;
@@ -194,14 +204,19 @@ export default function App() {
         ),
       ]
     : [];
-  const available = HOUSE_PLOTS.filter(
-    (plot) => !displayPlaces.some((place) => place.plot === plot.id),
-  );
-  const filteredPlaces = displayPlaces.filter((place) =>
-    `${place.name} ${place.creator} ${place.resident.name} ${place.plot}`
-      .toLowerCase()
-      .includes(search.toLowerCase()),
-  );
+  // Worked out once per roster and search, not on every clock tick: a full town has hundreds.
+  const available = useMemo(() => {
+    const taken = new Set(displayPlaces.map((place) => place.plot));
+    return HOUSE_PLOTS.filter((plot) => !taken.has(plot.id));
+  }, [displayPlaces]);
+  const filteredPlaces = useMemo(() => {
+    const query = search.toLowerCase();
+    return displayPlaces.filter((place) =>
+      `${place.name} ${place.creator} ${place.resident.name} ${place.plot}`
+        .toLowerCase()
+        .includes(query),
+    );
+  }, [displayPlaces, search]);
   const filteredPlots = available.filter((plot) =>
     plot.id.toLowerCase().includes(search.toLowerCase()),
   );
@@ -371,6 +386,22 @@ export default function App() {
           ? 'Today in town'
           : 'Explore');
 
+  // The Riverside's venues and the farm open their own panels.
+  const districtPanel = selectedFarm
+    ? DISTRICT_PANELS.harvest
+    : selectedVenue && isDistrictVenue(selectedVenue)
+      ? DISTRICT_PANELS[selectedVenue.kind]
+      : undefined;
+  const districtProps: DistrictPanelProps = {
+    day: clock.day,
+    minutes: clock.minutes,
+    residents,
+    places: displayPlaces,
+    onFollow: follow,
+    // The outing chosen from its card leads the panel (the panels order the rest by the clock).
+    selected: selectedEventId,
+  };
+
   return (
     <main className={`town-app ${night ? 'town-app-night' : ''}`}>
       <h1 className="sr-only">{TITLE}</h1>
@@ -388,6 +419,7 @@ export default function App() {
         football={football}
         onListening={setListening}
         onCinemaListening={setCinemaListening}
+        onBandstandListening={setBandstandListening}
         followed={followed}
         onStopFollowing={() => setFollowed(null)}
         onResidentSelect={follow}
@@ -479,12 +511,14 @@ export default function App() {
           {(liveEvent || football.live) && <i className="event-indicator" />}
         </button>
         <Soundtrack
-          track={trackForTown(clock.minutes, events)}
+          track={trackForTown(clock.minutes, events, bandstandListening)}
+          bed={trackForTown(clock.minutes, events)}
           playing={clock.playing}
           football={football}
           listening={listening}
           cinema={cinema}
           cinemaListening={cinemaListening}
+          bandstand={bandstandListening}
         />
       </nav>
 
@@ -524,12 +558,15 @@ export default function App() {
             </button>
           </div>
           <div className="town-panel-content">
-            {selectedFarm ? (
-              <FarmInfo />
+            {districtPanel ? (
+              <DistrictPanel panel={districtPanel} {...districtProps} />
             ) : selectedMillpond ? (
               <MillpondInfo minutes={clock.minutes} day={clock.day} skaters={skaters} />
             ) : selectedTube ? (
-              <TubeInfo status={tubeStatus(displayPlaces, clock.minutes, clock.day)} />
+              <TubeInfo
+                status={tubeStatus(displayPlaces, clock.minutes, clock.day)}
+                station={selectedPlot}
+              />
             ) : selectedVenue?.kind === 'zoo' ? (
               <ZooInfo
                 minutes={clock.minutes}
@@ -564,7 +601,9 @@ export default function App() {
                 <span className="quiet-label">PUBLIC SPACE · {selectedVenue.plot}</span>
                 {selectedProgram.map((event) => (
                   <div className="venue-program" key={event.id}>
-                    <span className="eyebrow">{eventStatus(event, clock.minutes)}</span>
+                    <span className="eyebrow">
+                      {eventStatus(event, clock.minutes).toUpperCase()}
+                    </span>
                     <h3>{event.name}</h3>
                     <p>{event.description}</p>
                     <strong>
@@ -573,6 +612,9 @@ export default function App() {
                   </div>
                 ))}
                 <p className="muted-copy">Reserved for everyone. A new lineup each town day.</p>
+                {selectedVenue.kind === 'green' && (
+                  <GreenNote day={clock.day} minutes={clock.minutes} />
+                )}
               </div>
             ) : selected ? (
               <div className="home-info">
@@ -685,6 +727,7 @@ export default function App() {
                 places={places}
                 onFollow={follow}
                 events={events}
+                attending={attending}
                 minutes={clock.minutes}
                 day={clock.day}
                 skaters={skaters.length}
@@ -885,4 +928,12 @@ export default function App() {
       )}
     </main>
   );
+}
+
+/** A Riverside venue's panel (or the farm's). */
+function DistrictPanel({
+  panel: Panel,
+  ...props
+}: DistrictPanelProps & { panel: (typeof DISTRICT_PANELS)[keyof typeof DISTRICT_PANELS] }) {
+  return <Panel {...props} />;
 }

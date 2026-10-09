@@ -9,6 +9,7 @@ import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../src/lib/town-calendar';
 import { withPreview } from '../src/lib/resident-trips';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import type { Place } from '../src/lib/schema';
+import { unescapeHtml } from './markup';
 
 const YEAR = CALENDAR_EPOCH_DAY + 2 * DAYS_PER_YEAR;
 const noop = () => {};
@@ -56,7 +57,8 @@ describe('seasonal errand card', () => {
       expect(copy.body).toBe(`${name} is ${carried[trip.ritual.kind]}.`);
       expect(copy.route).toBe(`${trip.ritual.pickup.name} → ${trip.ritual.delivery.name}`);
       const html = render(time, day);
-      expect(html).toContain(`Follow ${name}`);
+      // Decoded, as a reader hears it: React escapes a carrier named "D'Arcy & Bea".
+      expect(unescapeHtml(html)).toContain(`Follow ${name}`);
       expect(html).toContain('Happening now');
       expect(html).toContain('is-live');
       expect(html).toContain(`Visit ${trip.ritual.delivery.name}`);

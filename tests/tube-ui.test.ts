@@ -8,7 +8,9 @@ import { places } from '../src/lib/places';
 import {
   onTheLine,
   tubeCopy,
+  TUBE_HALT_NOTES,
   TUBE_LABEL,
+  TUBE_LOOP_LINE,
   TUBE_SIGN_CAPTION,
   type TubeCopy,
 } from '../src/lib/tube-copy';
@@ -23,7 +25,9 @@ import {
 import {
   TUBE_ALIGHT,
   TUBE_BOARD,
+  TUBE_PARCEL_ROUTE,
   TUBE_SIGN,
+  TUBE_SIGN_STATION,
   TUBE_SPEED,
   TUBE_STATIONS,
   TUBE_VENUE,
@@ -32,10 +36,11 @@ import {
 } from '../src/lib/tubes';
 import type { TubeStage } from '../src/lib/tube-journeys';
 import { CALENDAR_EPOCH_DAY, DAYS_PER_YEAR } from '../src/lib/town-calendar';
+import { unescapeHtml } from './markup';
 
 const YEAR = CALENDAR_EPOCH_DAY + DAYS_PER_YEAR * 2; // Year 3, like the fixtures
-const FIRST = TUBE_STATIONS[0].id;
-const LAST = TUBE_STATIONS.at(-1)!.id;
+// The panel's own stretch: the sign's halt and Willow Halt, where the parcels run.
+const [FIRST, LAST]: readonly string[] = TUBE_PARCEL_ROUTE;
 const NAMES = ['Eliza', 'Sol', 'Renan'];
 const STAGES: TubeStage[] = ['boarding', 'riding', 'alighting'];
 
@@ -46,6 +51,7 @@ const ride = (board: number, from = FIRST, to = LAST, residentId = 'rider'): Tub
   return {
     residentId,
     eventId: 'zoo',
+    eventStart: 840,
     direction: from === FIRST ? 'there' : 'home',
     from,
     to,
@@ -134,46 +140,115 @@ const texts = (copy: TubeCopy) => [
   ...copy.blocks.flatMap((block) => [block.eyebrow, block.heading, block.body, block.note ?? '']),
 ];
 const escape = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const repeatsRiderName = (heading: string) => /^(.+) and \1 are on the line\.$/i.test(heading);
-/** The brand's copy rules plus the line's own: quiet, honest, and only today's riders named. */
-function voiceProblems(copy: TubeCopy, status: TubeStatus, roster: readonly string[]) {
+/**
+ * The line's own words: every string tube-copy.ts writes (its copy draws on nothing else but the
+ * halts' names and the clock), comments left out. A neighbor named like one of them ("Nobody",
+ * "Everyone", "Two") cannot be told from the copy, so the naming rules leave that name alone;
+ * every other name is held to them.
+ */
+const COPY_WORDS = (
+  readFileSync('src/lib/tube-copy.ts', 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/^\s*\/\/.*$/gm, ' ')
+    .match(/'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`/g) ?? []
+).join(' ');
+const copyWords = new Map<string, boolean>();
+/** Whether a name is, whole, one of the line's own words; worked out once a name. */
+const isCopyWord = (name: string) => {
+  if (!copyWords.has(name)) {
+    const whole = new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, 'u');
+    copyWords.set(name, whole.test(COPY_WORDS));
+  }
+  return copyWords.get(name)!;
+};
+/** The block about who is on the line now. */
+const lineNow = (copy: TubeCopy) => copy.blocks.find((block) => /ON THE LINE/.test(block.eyebrow))!;
+/** The brand's copy rules plus the line's own: quiet, honest, and only today's riders named. With a
+ * halt chosen on the map, its own block comes first. */
+function voiceProblems(
+  copy: TubeCopy,
+  status: TubeStatus,
+  roster: readonly string[],
+  chosen?: string,
+) {
   const problems: string[] = [];
   // The sign is the user's own words; the voice rules are for the town's.
   const text = texts(copy).join(' ');
   if (copy.label !== TUBE_LABEL) problems.push(`label ${copy.label}`);
   if (copy.sign.text !== TUBE_SIGN) problems.push(`sign ${copy.sign.text}`);
-  if (copy.blocks.length !== 2) problems.push(`${copy.blocks.length} blocks`);
+  if (copy.blocks.length !== (chosen ? 3 : 2)) problems.push(`${copy.blocks.length} blocks`);
+  if (!lineNow(copy)) return [...problems, 'no line-now block'];
+  if (!/^RIDES TO(DAY|NIGHT)$/.test(copy.blocks.at(-1)!.eyebrow)) problems.push('rides last');
+  // Two neighbors can share a name; the heading never says it twice ("Jon and Jon", whatever the
+  // case). Only a name two riders share can be: "Jon and Jon Smith" names two neighbors, and so
+  // does "New neighbor and Neighbor L3". Whole names only.
+  const riders = status.now.map((ride) => ride.name.trim().toLowerCase()).filter(Boolean);
+  const shared = [...new Set(riders)].filter(
+    (name) => riders.indexOf(name) !== riders.lastIndexOf(name),
+  );
+  const twice = shared.map(
+    (name) =>
+      new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)} and ${escape(name)}(?![\\p{L}\\p{N}])`, 'iu'),
+  );
   for (const block of copy.blocks) {
     if (!block.heading.endsWith('.')) problems.push(`heading "${block.heading}"`);
-    // Two neighbors can share a name; the heading never says it twice ("Jon and Jon").
-    if (repeatsRiderName(block.heading)) problems.push(`heading "${block.heading}"`);
+    if (twice.some((pattern) => pattern.test(block.heading)))
+      problems.push(`heading "${block.heading}"`);
     if (!/^[A-Z0-9 ·/’&–-]+$/.test(block.eyebrow)) problems.push(`eyebrow "${block.eyebrow}"`);
     if (!block.body.trim()) problems.push(`empty body under "${block.heading}"`);
   }
-  if (text.includes('!')) problems.push('exclamation mark');
-  if (/forktown/i.test(text)) problems.push('says forktown');
-  if ((text.match(/\blittle\b/gi) ?? []).length > 1) problems.push('"little" more than once');
-  const crowd = text.match(/crowd|packed|busy|dozens|lots of/i);
-  if (crowd) problems.push(`crowd "${crowd[0]}"`);
-  if (/neighbour/i.test(text)) problems.push('British "neighbour"');
+  // The riders' own names are theirs to spell; the rules read the copy around them.
   const named = new Set(status.now.map((ride) => ride.name.trim()).filter(Boolean));
   let unnamed = text;
-  for (const name of named) unnamed = unnamed.replace(new RegExp(escape(name), 'g'), '');
+  for (const name of [...named].sort((a, b) => b.length - a.length))
+    unnamed = unnamed.replace(new RegExp(escape(name), 'g'), ' ');
+  if (unnamed.includes('!')) problems.push('exclamation mark');
+  if (/forktown/i.test(unnamed)) problems.push('says forktown');
+  if ((unnamed.match(/\blittle\b/gi) ?? []).length > 1) problems.push('"little" more than once');
+  const crowd = unnamed.match(/crowd|packed|busy|dozens|lots of/i);
+  if (crowd) problems.push(`crowd "${crowd[0]}"`);
+  if (/neighbour/i.test(unnamed)) problems.push('British "neighbour"');
   if (unnamed.includes("'")) problems.push('straight apostrophe');
+  /** A whole name, never part of a longer word: Nia is not in "Niamh". */
+  const whole = (name: string, flags = 'u') =>
+    new RegExp(`(?<![\\p{L}\\p{N}])${escape(name)}(?![\\p{L}\\p{N}])`, flags);
+  // The riders' names and the halts' go first, longest first, so a neighbor named Nia is not
+  // found inside a rider named Nia Rose, nor one named Willow inside Willow Halt. The name being
+  // checked stays when it is a rider's own.
+  const longest = [...named, ...TUBE_STATIONS.map((station) => station.name)].sort(
+    (a, b) => b.length - a.length,
+  );
+  const spoken = (words: string, keep?: string) =>
+    longest.reduce(
+      (left, name) => (name === keep ? left : left.replace(whole(name, 'gu'), ' ')),
+      words,
+    );
   for (const name of roster) {
-    const pattern = new RegExp(`\\b${escape(name)}\\b`);
+    const pattern = whole(name);
+    if (isCopyWord(name)) continue;
     if (!named.has(name)) {
-      if (pattern.test(text)) problems.push(`names ${name}, who is not on the line`);
+      if (pattern.test(spoken(text))) problems.push(`names ${name}, who is not on the line`);
       continue;
     }
-    const others = texts({ ...copy, blocks: copy.blocks.slice(1) }).join(' ');
-    if (pattern.test(others) || pattern.test(copy.blocks[0].body + (copy.blocks[0].note ?? '')))
+    const now = lineNow(copy);
+    const others = texts({ ...copy, blocks: copy.blocks.filter((block) => block !== now) }).join(
+      ' ',
+    );
+    if (
+      pattern.test(spoken(others, name)) ||
+      pattern.test(spoken(now.body + (now.note ?? ''), name))
+    )
       problems.push(`names ${name} outside the line-now heading`);
   }
+  // The loop in one line, and the oldest stretch timed once: in the line-now block, or in the
+  // chosen halt's own block when it is Hedgerow or Willow Halt.
+  if (!lineNow(copy).body.startsWith(TUBE_LOOP_LINE)) problems.push('loop line');
   const { tube, walk } = tubeLineMinutes(FIRST, LAST);
-  if (!copy.blocks[0].body.includes(`about ${Math.round(tube)} minutes`))
-    problems.push('tube minutes');
-  if (!copy.blocks[0].body.includes(`about ${Math.round(walk)}.`)) problems.push('walk minutes');
+  const stretch = [FIRST, LAST].includes(chosen ?? '') ? copy.blocks[0].body : lineNow(copy).body;
+  const minutes = (n: number) => new RegExp(`\\b${Math.round(n)}\\b`, 'g');
+  if (!minutes(tube).test(stretch)) problems.push('tube minutes');
+  if (!minutes(walk).test(stretch)) problems.push('walk minutes');
+  if ((text.match(minutes(walk)) ?? []).length !== 1) problems.push('stretch timed twice');
   return problems;
 }
 
@@ -226,15 +301,23 @@ describe('Treeline panel copy', () => {
   });
 
   it('tells the line honestly: minutes, parcels and the day’s rides', () => {
+    expect([FIRST, LAST]).toEqual(['C1', 'N1']);
+    expect(TUBE_SIGN_STATION).toBe('C1');
     const { tube, walk } = tubeLineMinutes(FIRST, LAST);
     expect([Math.round(tube), Math.round(walk)]).toEqual([9, 150]);
     const quiet = tubeCopy(status());
+    // The loop's two ends, and the sign's halt to Willow Halt by tube and on foot.
+    expect([TUBE_STATIONS[0].name, TUBE_STATIONS.at(-1)!.name]).toEqual([
+      'Barley Halt',
+      'Bulrush Halt',
+    ]);
     expect(quiet.blocks[0]).toEqual({
       eyebrow: 'QUIET ON THE LINE',
       heading: 'Nobody in the glass right now.',
-      body: 'Glass runs behind the northwest tree line, from Hedgerow Halt to Willow Halt in about 9 minutes. On foot it takes about 150.',
+      body: 'Seven halts round the edge of town, one bore. Hedgerow Halt to Willow Halt takes about 9 minutes; on foot it takes about 150.',
       note: undefined,
     });
+    expect(TUBE_LOOP_LINE).toBe('Seven halts round the edge of town, one bore.');
     expect(quiet.blocks[1]).toEqual({
       eyebrow: 'RIDES TODAY',
       heading: 'No rides today.',
@@ -245,7 +328,7 @@ describe('Treeline panel copy', () => {
     );
     expect(quiet.sign).toEqual({ caption: 'STATION SIGN · C1', text: TUBE_SIGN });
     expect(TUBE_SIGN_CAPTION).toBe('STATION SIGN · C1');
-    expect(TUBE_LABEL).toBe('PUBLIC SPACE · C1 / N1');
+    expect(TUBE_LABEL).toBe('PUBLIC SPACE · R1 / N1 / C1 / A9 / C15 / L15 / R15');
 
     const notes = [undefined, 'sending', 'riding', 'arrived'].map(
       (stage) => tubeCopy(status({ parcel: parcel(stage as TubeParcelStage) })).blocks[0].note,
@@ -302,6 +385,64 @@ describe('Treeline panel copy', () => {
     expect(wrong.slice(0, 5)).toEqual([]);
   });
 
+  it('opens with the chosen halt: where it stands, and its minutes either side', () => {
+    const quiet = status();
+    expect(Object.keys(TUBE_HALT_NOTES)).toEqual(TUBE_STATIONS.map((s) => s.id));
+    const first = Object.fromEntries(
+      TUBE_STATIONS.map((s) => [s.id, tubeCopy(quiet, s.id).blocks[0]]),
+    );
+    expect(first.L15).toEqual({
+      eyebrow: 'KINGFISHER HALT · L15',
+      heading: 'Its bridge spans the regatta course.',
+      body: 'Watercress Halt is about 9 minutes away by glass, Bulrush Halt about 7. On foot they take about 125 and 88.',
+    });
+    expect(first.R1).toEqual({
+      eyebrow: 'BARLEY HALT · R1',
+      heading: 'The south-west end of the line.',
+      body: 'Willow Halt is about 7 minutes away by glass. On foot it takes about 63.',
+    });
+    expect(first.C1.body).toBe(
+      'Willow Halt is about 9 minutes away by glass, Hawthorn Halt about 10. On foot they take about 150 and 125.',
+    );
+    // Hedgerow and Willow Halt time the oldest stretch themselves, so the line-now block keeps
+    // only the loop; every other halt leaves it there.
+    expect(tubeCopy(quiet, 'C1').blocks[1].body).toBe(TUBE_LOOP_LINE);
+    expect(tubeCopy(quiet, 'N1').blocks[1].body).toBe(TUBE_LOOP_LINE);
+    expect(tubeCopy(quiet, 'A9').blocks[1].body).toBe(tubeCopy(quiet).blocks[0].body);
+    TUBE_STATIONS.forEach((here, i) => {
+      const copy = tubeCopy(quiet, here.id);
+      expect(copy.blocks).toHaveLength(3);
+      const either = [TUBE_STATIONS[i - 1], TUBE_STATIONS[i + 1]].filter(Boolean);
+      for (const other of either) {
+        const { tube, walk } = tubeLineMinutes(here.id, other.id);
+        expect(copy.blocks[0].body).toContain(other.name);
+        expect(copy.blocks[0].body).toMatch(new RegExp(`about ${Math.round(tube)}\\b`));
+        expect(copy.blocks[0].body).toMatch(new RegExp(`\\b${Math.round(walk)}[ .]`));
+      }
+      expect(voiceProblems(copy, quiet, NAMES, here.id)).toEqual([]);
+    });
+    // A plot that is not a halt, or nothing chosen, opens with the line as before.
+    expect(tubeCopy(quiet, 'B1')).toEqual(tubeCopy(quiet));
+    expect(tubeCopy(quiet, null)).toEqual(tubeCopy(quiet));
+  });
+
+  it('keeps the brand voice for every status with every halt chosen', () => {
+    const wrong: string[] = [];
+    let checked = 0;
+    let n = 0;
+    for (const s of statuses()) {
+      // Every ninth status, with each halt in turn.
+      if (n++ % 9) continue;
+      for (const halt of TUBE_STATIONS) {
+        const problems = voiceProblems(tubeCopy(s, halt.id), s, NAMES, halt.id);
+        checked++;
+        if (problems.length) wrong.push(`${halt.id} ${JSON.stringify(s)}: ${problems}`);
+      }
+    }
+    expect(checked).toBeGreaterThan(10_000);
+    expect(wrong.slice(0, 5)).toEqual([]);
+  });
+
   it('keeps the brand voice through a real year, naming only the neighbors on the line', () => {
     const roster = [...new Set(places.map((place) => place.resident.name.trim()))].filter(Boolean);
     const wrong: string[] = [];
@@ -320,33 +461,66 @@ describe('Treeline panel copy', () => {
   }, 60_000);
 
   it('never says one name twice when two neighbors share it', () => {
-    // Today's roster has two neighbors named Jon (E2 and F2), who ride to the zoo minutes apart
-    // on a few days a year. Every moment they share the line is checked, not a sample.
-    const names = new Map(places.map((place) => [place.id, place.resident.name.trim()]));
-    const same = (a: TubeRide, b: TubeRide) =>
-      a.residentId !== b.residentId &&
-      !!names.get(a.residentId) &&
-      names.get(a.residentId)!.toLowerCase() === names.get(b.residentId)!.toLowerCase();
+    // Two neighbors with one name share the line at every stage and on every stretch of it,
+    // in every case and spacing; a real day need not have them.
+    const rides = (a: string, b: string, from: string, to: string) =>
+      STAGES.flatMap((first) =>
+        STAGES.map((second) => [
+          { ...onLine(a, first, from, to, 700), residentId: 'jon-e2' },
+          { ...onLine(b, second, to, from, 701), residentId: 'jon-f2' },
+        ]),
+      );
     const headings = new Set<string>();
-    for (let day = YEAR; day < YEAR + DAYS_PER_YEAR; day++) {
-      const rides = tubeRides(places, day);
-      for (const a of rides)
-        for (const b of rides) {
-          if (a.board >= b.board || !same(a, b) || a.off <= b.board) continue;
-          const minute = (b.board + Math.min(a.off, b.off)) / 2;
-          // After midnight the plan is still this day's, read from the next day's clock.
-          const s =
-            minute < 1440
-              ? tubeStatus(places, minute, day)
-              : tubeStatus(places, minute - 1440, day + 1);
-          const heading = tubeCopy(s).blocks[0].heading;
-          headings.add(heading);
-          expect(repeatsRiderName(heading)).toBe(false);
-          if (s.now.length === 2)
-            expect(heading).toBe(`Two neighbors named ${names.get(a.residentId)} are on the line.`);
+    for (const [a, b] of [
+      ['Jon', 'Jon'],
+      ['Jon', ' jon '],
+      ['JON', 'jon'],
+      ['Ana Lu', 'ana lu'],
+    ])
+      for (const from of TUBE_STATIONS)
+        for (const to of TUBE_STATIONS) {
+          if (from === to) continue;
+          for (const now of rides(a, b, from.id, to.id)) {
+            const s = status({ now, today: now });
+            const heading = tubeCopy(s).blocks[0].heading;
+            headings.add(heading);
+            expect(heading).not.toMatch(/\b(\w+) and \1\b/i);
+            expect(heading).toBe(`Two neighbors named ${a.trim()} are on the line.`);
+            expect(voiceProblems(tubeCopy(s), s, [a.trim()])).toEqual([]);
+          }
         }
-    }
     expect([...headings]).toContain('Two neighbors named Jon are on the line.');
+    // A rider whose name holds another's whole name is a different neighbor, and so is a
+    // neighbor named like a halt: neither is read as said twice or named off the line.
+    for (const stage of STAGES) {
+      const s = status({ now: [onLine('Jon', 'riding'), onLine('Jon Smith', stage)] });
+      expect(voiceProblems(tubeCopy(s), s, ['Jon', 'Jon Smith', 'Willow', 'Eliza'])).toEqual([]);
+    }
+    const nia = status({ now: [onLine('Nia Rose', 'riding')] });
+    expect(voiceProblems(tubeCopy(nia), nia, ['Nia', 'Nia Rose', 'Willow'])).toEqual([]);
+    // Two names that only share a stem are two neighbors.
+    expect(
+      tubeCopy(status({ now: [onLine('Jon', 'riding'), onLine('Jonas', 'riding')] })).blocks[0]
+        .heading,
+    ).toBe('Jon and Jonas are on the line.');
+  });
+
+  it('holds the line’s own words to the rules, never a neighbor’s name', () => {
+    // A neighbor may be called anything the builder takes: "!", a straight apostrophe, the
+    // town's name, a word the copy uses. On the line, their name is theirs; off it, a name that
+    // is one of the line's own words ("Nobody in the glass right now.") is not them being named.
+    const names = ["Yay! Forktown's", 'Busy Little Neighbour', 'Little Jon', "D'Arcy & Bea"];
+    for (const stage of STAGES)
+      for (const crew of [names.slice(0, 1), names.slice(1, 3), names.slice(2)]) {
+        const s = status({ now: crew.map((name) => onLine(name, stage)) });
+        expect(voiceProblems(tubeCopy(s), s, [...names, 'Nobody', 'Two']), crew.join()).toEqual([]);
+      }
+    const quiet = status();
+    expect(tubeCopy(quiet).blocks[0].heading).toContain('Nobody');
+    expect(voiceProblems(tubeCopy(quiet), quiet, ['Nobody', 'Everyone', 'Eliza'])).toEqual([]);
+    // Off the line, any other name is still caught.
+    const named = { ...tubeCopy(quiet), footer: 'Eliza rode earlier.' };
+    expect(voiceProblems(named, quiet, ['Eliza'])).toContain('names Eliza, who is not on the line');
   });
 
   it('shows the rider in the card while they ride', () => {
@@ -361,7 +535,8 @@ describe('Treeline panel copy', () => {
       first.residentId,
       'riding',
     ]);
-    const markup = renderToStaticMarkup(createElement(TubeInfo, { status: s }));
+    // Decoded, as a reader sees it: React escapes a rider named "D'Arcy & Bea".
+    const markup = unescapeHtml(renderToStaticMarkup(createElement(TubeInfo, { status: s })));
     expect(markup).toContain(s.now.length === 1 ? `${name} is riding to ` : ' are on the line.');
   });
 });
@@ -371,15 +546,34 @@ describe('Treeline panel', () => {
     const markup = renderToStaticMarkup(createElement(TubeInfo, { status: status() }));
     expect(markup).toContain('venue-info');
     expect(markup).toContain('quiet-label');
-    expect(markup).toContain('PUBLIC SPACE · C1 / N1');
+    expect(markup).toContain('PUBLIC SPACE · R1 / N1 / C1 / A9 / C15 / L15 / R15');
     expect(markup).toContain('STATION SIGN · C1');
     expect(markup.split('People &amp; parcels. Please remove umbrella.')).toHaveLength(2);
+    // The halt chosen on the map opens the panel.
+    const chosen = renderToStaticMarkup(
+      createElement(TubeInfo, { status: status(), station: 'L15' }),
+    );
+    expect(chosen.indexOf('KINGFISHER HALT · L15')).toBeGreaterThan(-1);
+    expect(chosen.indexOf('KINGFISHER HALT · L15')).toBeLessThan(
+      chosen.indexOf('QUIET ON THE LINE'),
+    );
+    expect(chosen).toContain('Its bridge spans the regatta course.');
+    expect(chosen).toContain('Seven halts round the edge of town, one bore.');
   });
 
   it('is wired into the app, the map and the live view', () => {
     const app = readFileSync('src/App.tsx', 'utf8');
     expect(readDeepLink('#venue=tube', [])).toEqual({ plot: TUBE_VENUE.plot });
     expect(linkHash(TUBE_VENUE.plot, [])).toBe('#venue=tube');
+    // Each halt opens its own panel, so each shares a link back to it; an unknown halt chooses
+    // Hedgerow Halt rather than a missing venue.
+    for (const station of TUBE_STATIONS) {
+      const hash = linkHash(station.plot, []);
+      expect(hash, station.id).toMatch(/^#venue=tube(&halt=|$)/);
+      expect(readDeepLink(hash, []), station.id).toEqual({ plot: station.plot });
+    }
+    expect(linkHash('L15', [])).toBe('#venue=tube&halt=L15');
+    expect(readDeepLink('#venue=tube&halt=Z9', [])).toEqual({ plot: TUBE_VENUE.plot });
     // The app reads and writes the address through those two.
     expect(app).toContain('readDeepLink(window.location.hash, places)');
     expect(app).toContain('linkHash(plotId, places)');

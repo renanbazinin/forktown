@@ -1,6 +1,5 @@
 import { residentTrips } from '../src/lib/resident-trips';
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { placeSchema, type Place } from '../src/lib/schema';
 import {
   eventAtVenue,
@@ -15,10 +14,12 @@ import { BENCH_SEAT, FRONT_STEP, PORCH_CHAIR, plotDoor } from '../src/lib/home-l
 import { insideCinema } from '../src/lib/cinema';
 import { nightBedtime } from '../src/lib/night-routine';
 import { MAX_TRAVEL_SPEED_MULTIPLIER, routeLength, WALK_SPEED } from '../src/lib/walking';
+import { legsMinutes, walkingPace } from '../src/lib/tube-journeys';
 import { readPlaces } from './full-town';
-import { stepBound } from './tube-riders';
+import { onRoadOrTube, stepBound } from './tube-riders';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const owls: Place[] = HOUSE_PLOTS.slice(0, 32).map((plot, index) => ({
   ...sample,
   id: `night-owl-${index}`,
@@ -190,12 +191,16 @@ describe('Night owls and the midnight party', () => {
         expect(next.leave - next.arrive).toBeGreaterThanOrEqual(15);
         expect(next.returnRoute.at(-1)).toEqual(plotEntrance(getPlot(home.plot)!));
         expect(routeLength(next.route) / next.duration).toBeCloseTo(WALK_SPEED);
-        expect(routeLength(next.returnRoute) / next.returnDuration).toBeCloseTo(WALK_SPEED);
+        // Home at an unhurried pace: on foot, or walking the legs either side of a ride.
+        if (next.returnLegs) {
+          expect(walkingPace(next.returnLegs)).toBeCloseTo(WALK_SPEED, 9);
+          expect(next.returnDuration).toBeCloseTo(legsMinutes(next.returnLegs), 9);
+        } else expect(routeLength(next.returnRoute) / next.returnDuration).toBeCloseTo(WALK_SPEED);
         for (let minute = next.depart; minute < next.homeBy; minute += 1.7) {
           const state = at(minute).find((state) => state.id === home.id)!;
           expect(state.event?.id).toBe('night-party');
           expect(
-            isRoad(Math.floor(state.position.x), Math.floor(state.position.y)) ||
+            onRoadOrTube(state) ||
               insideCinema(state.position) ||
               insideVenue(party.venue, state.position),
           ).toBe(true);
@@ -240,7 +245,12 @@ describe('Night owls and the midnight party', () => {
       const states = at(minute);
       states.forEach((state, index) =>
         expect(distance(state.position, previous[index].position)).toBeLessThanOrEqual(
-          WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER * 0.5 + 0.001,
+          stepBound(
+            state,
+            previous[index],
+            0.5,
+            WALK_SPEED * MAX_TRAVEL_SPEED_MULTIPLIER * 0.5 + 0.001,
+          ),
         ),
       );
       previous = states;

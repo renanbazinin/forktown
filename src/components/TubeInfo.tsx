@@ -3,16 +3,20 @@ import type { TubeStatus } from '../lib/tube-traffic';
 
 export default function TubeInfo({
   status,
+  station,
 }: {
   /** The line now, from the same plans the residents follow. */
   status: TubeStatus;
+  /** The halt selected on the map: the panel opens with where it stands and its minutes to the
+   *  halts either side. */
+  station?: string | null;
 }) {
-  const copy = tubeCopy(status);
+  const copy = tubeCopy(status, station);
   return (
     <div className="venue-info">
       <span className="quiet-label">{copy.label}</span>
-      {copy.blocks.map((block, index) => (
-        <div className="venue-program" key={index}>
+      {copy.blocks.map((block) => (
+        <div className="venue-program" key={block.eyebrow}>
           <span className="eyebrow">{block.eyebrow}</span>
           <h3>{block.heading}</h3>
           <p>{block.body}</p>

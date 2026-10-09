@@ -48,8 +48,12 @@ import {
   inTubeGlass,
   tubeHit,
   tubeCrowdOffsets,
+  tubeMarkArea,
 } from './tubes';
-import { isTubePlot } from '../lib/tubes';
+import { isRiversideTreeGap, isTubePlot, isTubeTreeGap } from '../lib/tubes';
+import { isDistrictPlot } from '../lib/district-places';
+import { DISTRICT_PAINTERS, type DistrictPainter, type DistrictScene } from './district-art';
+import { residentTrips, type ResidentTrip } from '../lib/resident-trips';
 import { tubeParcelsAt, type TubeParcelState } from '../lib/tube-traffic';
 import { insideCinema, isCinemaPlot, CINEMA_VENUE } from '../lib/cinema';
 import { ducksAt } from '../lib/ducks';
@@ -255,19 +259,44 @@ const terrain = Array.from({ length: WORLD_WIDTH * WORLD_HEIGHT }, (_, i) => {
   return { x, y, point: project(x + 0.5, y + 0.5), seed: hash(`${x},${y}`), road: isRoad(x, y) };
 });
 const venuePlots = VENUES.map((venue) => PLOTS.find((plot) => plot.id === venue.plot)!);
+/** Every plot a venue or the Riverside holds, for keeping the block trees off them. */
+const reservedPlots = [...venuePlots, ...PLOTS.filter((plot) => isDistrictPlot(plot.id))];
+/** The plan day a town minute reads: before 06:00 the night belongs to yesterday. */
+const planDayAt = (minutes: number, day: number) =>
+  ((minutes % 1440) + 1440) % 1440 < 360 ? day - 1 : day;
+/** The Riverside's painters (district-art.ts), in the registry's order. */
+const PAINTERS: readonly DistrictPainter[] = Object.values(DISTRICT_PAINTERS);
+/**
+ * The tree the edge tile (x, y) grows, if it grows one: the west and north edges, the two front
+ * rows and the far bank below the river's head, two tiles in three by hash. Its foot in world px,
+ * swayed up to 7 px either way, its depth, its size and its look (drawTownTree's variant). Never
+ * where a Treeline spur crosses the edge (TUBE_TREE_GAPS), nor in front of a bank pier or the
+ * Boat Landing's stage (RIVERSIDE_TREE_GAPS).
+ */
+export function edgeTree(x: number, y: number) {
+  const seed = hash(`tree${x},${y}`);
+  if (
+    !(x === 0 || y === 0 || y >= WORLD_HEIGHT - 2 || (x === WORLD_WIDTH - 1 && y >= 9)) ||
+    seed % 3 === 0 ||
+    isTubeTreeGap(x, y) ||
+    isRiversideTreeGap(x, y)
+  )
+    return undefined;
+  const point = project(x + 0.5, y + 0.5);
+  return {
+    point: { x: point.x + (seed % 15) - 7, y: point.y },
+    depth: x + y,
+    scale: 1 + (seed % 5) * 0.12,
+    seed,
+  };
+}
+/** Where the edge tile (x, y) grows its tree, in world px, if it grows one (edgeTree). */
+export const edgeTreeAt = (x: number, y: number): Point | undefined => edgeTree(x, y)?.point;
 const trees = terrain.flatMap(({ x, y, point }) => {
   const seed = hash(`tree${x},${y}`);
   const result: { point: Point; depth: number; scale: number; seed: number }[] = [];
-  if (
-    (x === 0 || y === 0 || y >= WORLD_HEIGHT - 2 || (x === WORLD_WIDTH - 1 && y >= 9)) &&
-    seed % 3 !== 0
-  )
-    result.push({
-      point: { x: point.x + (seed % 15) - 7, y: point.y },
-      depth: x + y,
-      scale: 1 + (seed % 5) * 0.12,
-      seed,
-    });
+  const edge = edgeTree(x, y);
+  if (edge) result.push(edge);
   if (
     x < ROAD_MAX_X &&
     y < ROAD_MAX_Y &&
@@ -277,7 +306,7 @@ const trees = terrain.flatMap(({ x, y, point }) => {
     !insideZoo({ x, y }) &&
     !insideFarm({ x, y }) &&
     !insideMillpond({ x, y }) &&
-    !venuePlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
+    !reservedPlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
     x % BLOCK_SIZE === 0 &&
     y % BLOCK_SIZE === 2 &&
     seed % 2
@@ -404,6 +433,8 @@ export function renderCity({
 }: RenderOptions) {
   ctx.clearRect(0, 0, width, height);
   drawSky(ctx, width, height, day, minutes);
+  // The Riverside's sky extras (the summer meteors), in screen space over the sky.
+  for (const painter of PAINTERS) painter.sky?.(ctx, { day, minutes, night, width, height });
   const p = night ? NIGHT : DAY;
   // The turning year: one snapshot per frame, from the same day and minute as the sky.
   const season = townSeasonAt(day, minutes);
@@ -441,8 +472,8 @@ export function renderCity({
     season.groundDay,
   ].join(':');
   // The hover and selection marks stay out of the key: moving the pointer to another plot
-  // repaints just the plots it leaves and reaches. A station lights the whole Treeline, so it
-  // repaints the layer; the venues with their own art mark themselves outside it.
+  // repaints just the plots it leaves and reaches. A Treeline halt marks itself in its own
+  // tubeMarkArea; the venues with their own art mark themselves outside it.
   const mark = (id: string | null) => {
     const plot = getPlot(id ?? '');
     if (
@@ -451,29 +482,32 @@ export function renderCity({
       isCinemaPlot(plot.id) ||
       isZooPlot(plot.id) ||
       isFarmPlot(plot.id) ||
-      isMillpondPlot(plot.id)
+      isMillpondPlot(plot.id) ||
+      isDistrictPlot(plot.id)
     )
       return '';
-    return isTubePlot(plot.id) ? 'tube' : plot.id;
+    return isTubePlot(plot.id) ? `tube:${plot.id}` : plot.id;
   };
   const marks = {
     key: `${mark(selectedPlot)} ${mark(hoveredPlot)}`,
-    areas: (key: string) => {
-      const ids = key.split(' ').filter(Boolean);
-      if (ids.includes('tube')) return null;
-      return ids.map((id) => {
-        const pt = plotCenter(getPlot(id)!);
-        return { left: pt.x - 112, right: pt.x + 112, top: pt.y - 58, bottom: pt.y + 58 };
-      });
-    },
+    areas: (key: string) =>
+      key
+        .split(' ')
+        .filter(Boolean)
+        .map((id) => {
+          if (id.startsWith('tube:')) return tubeMarkArea(id.slice('tube:'.length));
+          const pt = plotCenter(getPlot(id)!);
+          return { left: pt.x - 112, right: pt.x + 112, top: pt.y - 58, bottom: pt.y + 58 };
+        }),
   };
-  // The Treeline: both station plots light up together, and its parcels are read at most once a
-  // frame, only if some of the line is in view.
-  const emphasis = isTubePlot(selectedPlot ?? '')
-    ? 'selected'
+  // The Treeline: a hover or a selection marks one halt, the selected one before the hovered one,
+  // and its parcels are read at most once a frame, only if some of the line is in view.
+  const station = isTubePlot(selectedPlot ?? '')
+    ? selectedPlot
     : isTubePlot(hoveredPlot ?? '')
-      ? 'hover'
-      : 'none';
+      ? hoveredPlot
+      : null;
+  const emphasis = !station ? 'none' : station === selectedPlot ? 'selected' : 'hover';
   let parcels: TubeParcelState[] | undefined;
   const tube = {
     minutes,
@@ -482,11 +516,28 @@ export function renderCity({
     season,
     zoom: camera.zoom,
     emphasis,
+    station,
     visible,
     residents,
     followed,
     parcels: () => (parcels ??= tubeParcelsAt(places, minutes, day)),
   } as const;
+  // What the Riverside's painters see: the moment, the view, the marks and, read only when one
+  // asks, the plan day's trips (before 06:00 the night belongs to yesterday, as in the town).
+  let plan: ReadonlyMap<string, readonly ResidentTrip[]> | undefined;
+  const district: DistrictScene = {
+    day,
+    minutes,
+    night,
+    season,
+    zoom: camera.zoom,
+    visible,
+    selected: selectedPlot,
+    hovered: hoveredPlot,
+    places,
+    residents,
+    plan: () => (plan ??= residentTrips(places, planDayAt(minutes, day))),
+  };
   const paintGround = (ctx: Ctx, area?: GroundArea) => {
     // A partial repaint culls tiles and plots to its own area; the canvas clips the rest.
     const near = area ? within(area) : visible;
@@ -556,16 +607,18 @@ export function renderCity({
         isCinemaPlot(plot.id) ||
         isZooPlot(plot.id) ||
         isFarmPlot(plot.id) ||
-        isMillpondPlot(plot.id)
+        isMillpondPlot(plot.id) ||
+        isDistrictPlot(plot.id)
       )
         continue;
       const pt = plotCenter(plot);
       if (!near(pt, 110, 60, 60)) continue;
       const occupied = byPlot.has(plot.id) || !!venueAt(plot.id);
-      // A tube station keeps its meadow and loses only the stake, label and outline.
+      // A tube station keeps its meadow and loses only the stake, label and outline; a hover or a
+      // selection lights that halt's plot alone.
       const tubePlot = isTubePlot(plot.id);
-      const active = tubePlot ? isTubePlot(selectedPlot ?? '') : selectedPlot === plot.id;
-      const hover = tubePlot ? isTubePlot(hoveredPlot ?? '') : hoveredPlot === plot.id;
+      const active = selectedPlot === plot.id;
+      const hover = hoveredPlot === plot.id;
       if (occupied) {
         diamond(ctx, pt.x, pt.y, 105, 52.5, night ? '#577468' : '#BFD5A4');
         if (plot.id === FORK_PLOT) drawForkPlaza(ctx, pt.x, pt.y, night);
@@ -618,18 +671,24 @@ export function renderCity({
       if (!occupied && !tubePlot) drawSproutStake(ctx, pt.x, pt.y, night, hash(`stake:${plot.id}`));
     }
     drawFarmGround(ctx, night, season);
+    // The Riverside's ground art (the harvest's stubble patch first): cached, so by the day only.
+    for (const painter of PAINTERS)
+      painter.ground?.(ctx, { night, season, groundDay: season.groundDay, visible: near });
     drawMillpondGround(ctx, night, season, p.water, p.waterLight);
     drawTubeGround(ctx, tube);
   };
   paintGroundLayer(ctx, groundKey, paintGround, marks);
   // Riders in the glass behind the tree line: every edge tree stands in front of them.
   drawTubeTraffic(ctx, tube);
+  // The Riverside's floor paint (rugs, wakes, the stubble shadow): under everything sorted.
+  for (const painter of PAINTERS) painter.floor?.(ctx, district);
   const objects = drawFootball(
     ctx,
     football,
     night,
     isFootballPlot(selectedPlot ?? '') || isFootballPlot(hoveredPlot ?? ''),
     minutes,
+    visible,
   );
   objects.push(...drawFarm(ctx, minutes, day, night));
   objects.push(
@@ -651,6 +710,7 @@ export function renderCity({
       night,
       isCinemaPlot(selectedPlot ?? '') || isCinemaPlot(hoveredPlot ?? ''),
       season,
+      visible,
     ),
   );
   // The Millpond: flat water art now, under everyone on its banks; its uprights join the sort.
@@ -666,8 +726,11 @@ export function renderCity({
   };
   drawMillpondSurface(ctx, pond);
   objects.push(...drawMillpond(ctx, pond));
+  // The Riverside's stalls, stand, boats, tables and props join the sort before the residents.
+  for (const painter of PAINTERS) objects.push(...painter.objects(ctx, district));
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
+    // Only the green and the stage are drawn here; every other venue has its own painter.
+    if (venue.kind !== 'green' && venue.kind !== 'stage') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const point = plotCenter(plot);
     drawVenue(
@@ -689,7 +752,8 @@ export function renderCity({
     });
   }
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo' || venue.kind === 'fork') continue;
+    // Only the green and the stage are drawn here; every other venue has its own painter.
+    if (venue.kind !== 'green' && venue.kind !== 'stage') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const pt = plotCenter(plot);
     objects.push({
@@ -856,12 +920,20 @@ export function renderCity({
   drawSeasonLight(ctx, width, height, season, night);
 }
 
+/** Each roster's houses, frontmost first (worked out once per list, not on every pointer move). */
+const frontToBack = new WeakMap<Place[], { place: Place; plot: Plot }[]>();
 export function buildingHit(point: Point, places: Place[]): string | undefined {
   // Frontmost buildings win when their silhouettes overlap.
-  const ordered = places
-    .map((place) => ({ place, plot: PLOTS.find((p) => p.id === place.plot)! }))
-    .filter((v) => v.plot)
-    .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
+  let ordered = frontToBack.get(places);
+  if (!ordered) {
+    ordered = places
+      .flatMap((place) => {
+        const plot = getPlot(place.plot);
+        return plot ? [{ place, plot }] : [];
+      })
+      .sort((a, b) => b.plot.x + b.plot.y - (a.plot.x + a.plot.y));
+    frontToBack.set(places, ordered);
+  }
   for (const { place, plot } of ordered) {
     const p = plotCenter(plot);
     // Only the painted house counts: a walker seen beside its walls or roof stays clickable.
@@ -871,15 +943,28 @@ export function buildingHit(point: Point, places: Place[]): string | undefined {
 }
 
 type CityHit = { kind: 'place' | 'resident'; id: string };
+/** The moment and the marks a click is judged at, for the Riverside's painters' hit tests. */
+export type HitMoment = Pick<
+  DistrictScene,
+  'day' | 'minutes' | 'night' | 'zoom' | 'selected' | 'hovered'
+>;
 
 export function cityHit(
   point: Point,
   places: Place[],
   residents: ResidentState[],
   cinemaScreenReveal = 1,
+  moment: HitMoment = {
+    day: 0,
+    minutes: 720,
+    night: false,
+    zoom: 1,
+    selected: null,
+    hovered: null,
+  },
 ): CityHit | undefined {
   const plotId = buildingHit(point, places);
-  const plot = PLOTS.find((plot) => plot.id === plotId);
+  const plot = plotId ? getPlot(plotId) : undefined;
   let depth = plot ? houseDepth(plot) : -Infinity;
   let target: CityHit | undefined = plot ? { kind: 'place', id: plot.id } : undefined;
   if (insideFarm(unproject(point.x, point.y)) && depth < 0) {
@@ -916,7 +1001,9 @@ export function cityHit(
     }
   }
   for (const venue of VENUES) {
-    if (venue.kind === 'cinema' || venue.kind === 'zoo') continue;
+    // Only the green, the stage and the Fork's crown are hit here; the cinema and the zoo have
+    // their own shapes above, and the Riverside's venues their painters' hit tests below.
+    if (venue.kind !== 'green' && venue.kind !== 'stage' && venue.kind !== 'fork') continue;
     const plot = PLOTS.find((plot) => plot.id === venue.plot)!;
     const p = plotCenter(plot),
       bounds = venueBounds(venue);
@@ -929,6 +1016,23 @@ export function cityHit(
     ) {
       depth = venueDepth(plot);
       target = { kind: 'place', id: plot.id };
+    }
+  }
+  // The Riverside's stalls, stand and props, each by its painter's own shape and depth.
+  let plan: ReadonlyMap<string, readonly ResidentTrip[]> | undefined;
+  const scene: DistrictScene = {
+    ...moment,
+    season: townSeasonAt(moment.day, moment.minutes),
+    visible: () => true,
+    places,
+    residents,
+    plan: () => (plan ??= residentTrips(places, planDayAt(moment.minutes, moment.day))),
+  };
+  for (const painter of PAINTERS) {
+    const hit = painter.hit?.(point, scene);
+    if (hit && hit.depth >= depth) {
+      depth = hit.depth;
+      target = { kind: 'place', id: hit.plot };
     }
   }
   // Match the painter's order: residents follow houses at equal depth, and

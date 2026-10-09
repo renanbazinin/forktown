@@ -1,4 +1,4 @@
-import { FOUNDER_SLOTS, type LanternRegister } from '../lib/lanterns';
+import type { LanternRegister } from '../lib/lanterns';
 import { hash } from '../lib/world';
 import { drawGlow, LIGHT } from './glow';
 import { tint } from './houses';
@@ -12,14 +12,17 @@ type Box = { x: number; y: number; w: number; h: number };
 export type ForkSlot = { x: number; y: number; size: 'large' | 'small' };
 
 // All Fork art is in world px around the D3 plot centre, with negative y up. It stays inside
-// FORK_BOUNDS (x -80..86, y -131..44), so C2, C3 and D2 keep their own hit areas.
+// FORK_BOUNDS (x -80..90, y -140..44), so C2, C3 and D2 keep their own hit areas.
 
 /** The founders' lobe on the left; the crown and east lobes hold the neighbours. The V
- * between them is the fork itself, and it keeps C2's door visible behind the tree. */
+ * between them is the fork itself, and it keeps C2's door visible behind the tree. Two boughs
+ * off the crown, north and north-east, hold the lanterns of a town grown to 20 × 15. */
 export const FORK_LOBES = {
   left: { cx: -44, cy: -92, rx: 32, ry: 22 },
   crown: { cx: 28, cy: -104, rx: 30, ry: 24 },
   east: { cx: 58, cy: -86, rx: 26, ry: 20 },
+  north: { cx: -4, cy: -122, rx: 30, ry: 16 },
+  northeast: { cx: 64, cy: -116, rx: 26, ry: 20 },
 } satisfies Record<string, Lobe>;
 
 // A few fixed leaf clumps per lobe break up the flat fill, like the town trees' stepped tufts.
@@ -71,7 +74,6 @@ const PLACED: [number, number][] = [
   [27, -100],
   [40, -100],
 ];
-const SLOT_TARGET = FOUNDER_SLOTS + 160;
 
 const insideLobe = (lobe: Lobe, box: Box, inset: number) =>
   [
@@ -89,7 +91,12 @@ const apart = (a: Box, b: Box) =>
 /**
  * Every slot a lantern can ever hang in; a slot never moves once a town grows past it.
  * After the placed arcs, large lanterns fill the crown, the east lobe and the upper half of
- * the founders' lobe row by row from the bottom; small ones then pack the gaps tightly.
+ * the founders' lobe row by row from the bottom; small ones then pack the gaps tightly. The two
+ * newer boughs come after, each packed the same way on its own (they never touch), then taken
+ * turn about, north, north-east, north, ..., so a town grown past the crown lights both boughs
+ * evenly rather than one full and one dark. The first 182 slots keep their places and order:
+ * 266 in all, for the 8 founders and 258 house plots. A town whose founders still live in it
+ * fills 8 fewer, since a founder on a house plot holds a founder's slot.
  */
 export const FORK_SLOTS: readonly ForkSlot[] = (() => {
   const slots: ForkSlot[] = PLACED.map(([x, y]) => ({ x, y, size: 'large' }));
@@ -105,7 +112,6 @@ export const FORK_SLOTS: readonly ForkSlot[] = (() => {
       for (let row = 0, y = lobe.cy + lobe.ry - 7 + pass.offset[1]; y >= lobe.cy - lobe.ry; row++) {
         const first = lobe.cx - lobe.rx + pass.offset[0] + (row % 2 ? pass.stagger : 0);
         for (let x = first; x + w <= lobe.cx + lobe.rx; x += pass.step[0]) {
-          if (slots.length >= SLOT_TARGET) return slots;
           const box = { x, y, w, h };
           if (upperOnly && y + h > lobe.cy) continue;
           if (!insideLobe(lobe, box, pass.inset) || !boxes.every((other) => apart(other, box)))
@@ -117,6 +123,27 @@ export const FORK_SLOTS: readonly ForkSlot[] = (() => {
       }
     }
   }
+  const boughs = [FORK_LOBES.north, FORK_LOBES.northeast].map((lobe) => {
+    const own: ForkSlot[] = [];
+    const taken = [...boxes];
+    for (const pass of passes) {
+      const { w, h } = LANTERN_SIZE[pass.size];
+      for (let row = 0, y = lobe.cy + lobe.ry - 7 + pass.offset[1]; y >= lobe.cy - lobe.ry; row++) {
+        const first = lobe.cx - lobe.rx + pass.offset[0] + (row % 2 ? pass.stagger : 0);
+        for (let x = first; x + w <= lobe.cx + lobe.rx; x += pass.step[0]) {
+          const box = { x, y, w, h };
+          if (!insideLobe(lobe, box, pass.inset) || !taken.every((other) => apart(other, box)))
+            continue;
+          own.push({ x, y, size: pass.size });
+          taken.push(box);
+        }
+        y -= pass.step[1];
+      }
+    }
+    return own;
+  });
+  for (let k = 0; k < Math.max(...boughs.map((own) => own.length)); k++)
+    for (const own of boughs) if (k < own.length) slots.push(own[k]);
   return slots;
 })();
 
@@ -252,6 +279,15 @@ function drawTree(ctx: Ctx, o: ForkOptions) {
     [33, -74, 7],
     [40, -74, 7],
     [47, -75, 7],
+    // The two newer boughs leave the crown for the north and north-east lobes.
+    [20, -92, 7],
+    [14, -100, 7],
+    [8, -108, 7],
+    [2, -115, 7],
+    [36, -94, 7],
+    [44, -100, 7],
+    [52, -106, 7],
+    [60, -112, 7],
   ];
   for (const [cx, cy, w] of boughs) {
     const left = cx - Math.floor(w / 2),
@@ -259,7 +295,13 @@ function drawTree(ctx: Ctx, o: ForkOptions) {
     rect(ctx, left, top, w, w, bark);
     rect(ctx, left, top, w, 2, barkLight);
   }
-  for (const lobe of [FORK_LOBES.left, FORK_LOBES.east, FORK_LOBES.crown]) {
+  for (const lobe of [
+    FORK_LOBES.north,
+    FORK_LOBES.northeast,
+    FORK_LOBES.left,
+    FORK_LOBES.east,
+    FORK_LOBES.crown,
+  ]) {
     steppedLobe(ctx, lobe, o.leaf);
     steppedLobe(ctx, lobe, tint(o.leaf, -12), (dy) => dy > 0.45 * lobe.ry);
     for (const dapple of DAPPLES)

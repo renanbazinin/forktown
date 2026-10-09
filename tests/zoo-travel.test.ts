@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { placeSchema, type Place } from '../src/lib/schema';
 import { HOUSE_PLOTS, eventsForDay, insideVenue, venueAt } from '../src/lib/events';
 import { getPlot, isRoad, plotEntrance, project, STREETLIGHTS } from '../src/lib/world';
@@ -28,8 +27,9 @@ import { CHAIN_TURN_TILES, residentTrips } from '../src/lib/resident-trips';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { walkingPace } from '../src/lib/tube-journeys';
 import { onRoadOrTube, stepBound } from './tube-riders';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const homes: Place[] = HOUSE_PLOTS.slice(0, 36).map((plot, index) => ({
   ...sample,
   id: `zoo-neighbor-${index}`,

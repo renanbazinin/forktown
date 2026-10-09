@@ -36,7 +36,7 @@ When one of these becomes an issue, it's labeled [good first issue](https://gith
 
 ## When the first neighborhood fills up
 
-Increase the row and column counts in `src/lib/town-config.ts`; see [Expanding the town](EXPANDING_THE_TOWN.md). The town currently supports 200 plots while preserving the previous 100 addresses and coordinates. Separate districts remain a future design choice for much larger towns.
+Increase the row and column counts in `src/lib/town-config.ts`; see [Expanding the town](EXPANDING_THE_TOWN.md). The town currently supports 300 plots, 230 of them for houses, while preserving the previous 200 addresses and coordinates. Separate districts remain a future design choice for much larger towns.
 
 ## Later experiments
 

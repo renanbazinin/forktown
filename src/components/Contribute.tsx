@@ -24,7 +24,8 @@ import { repositoryUrl } from '../lib/places';
 import { localSaveAvailable, saveToProject } from '../lib/local-save';
 import { blankHouseFileUrl, houseFileLink, readUsername } from '../lib/github-new-file';
 import { availableId, pickDraftNames } from '../lib/draft-names';
-import { restoreDraftDesign, restoreDraftPlot, storyPrompt } from '../lib/builder-nudges';
+import { storyPrompt } from '../lib/builder-nudges';
+import { restoreSavedDraft } from '../lib/saved-draft';
 import { BUILDER_DEFAULT_STORY } from '../lib/lanterns';
 import BuildingPreview from './BuildingPreview';
 import Modal from './Modal';
@@ -66,26 +67,12 @@ function savedDraft(
   available: readonly { id: string }[],
 ): Place | null {
   try {
-    const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
-    const result = draftSchema.safeParse(saved);
-    if (result.success) {
-      const restored = result.data;
-      if (restored.name === 'My Little Place' || restored.resident.name === 'New neighbor') {
-        const { placeName, residentName } = pickDraftNames(places);
-        if (restored.name === 'My Little Place') {
-          if (/^my-little-place(?:-\d+)?$/.test(restored.id))
-            restored.id = availableId(placeName, places);
-          restored.name = placeName;
-        }
-        if (restored.resident.name === 'New neighbor')
-          restored.resident = { ...restored.resident, name: residentName };
-      }
-      return {
-        ...restored,
-        design: restoreDraftDesign(restored.design),
-        plot: restoreDraftPlot(plot ?? restored.plot, available),
-      };
-    }
+    return restoreSavedDraft(
+      JSON.parse(localStorage.getItem(storageKey) ?? 'null'),
+      plot,
+      places,
+      available,
+    );
   } catch {
     /* A stale draft should never prevent a new contribution. */
   }

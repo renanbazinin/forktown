@@ -4,11 +4,15 @@
 // so growth can never turn `npm run check` red for the next neighbor who moves in. It copies the
 // repository's files (tracked, plus new files Git does not ignore) into a temporary folder, links
 // node_modules there (a junction on Windows, a symlink elsewhere), and adds a made-up house from
-// tests/full-town.ts on every free plot. Tests read the town through readPlaces(), which hands
-// out the made-up houses first, so one that takes "the first house in places/" as its fixture
-// will most likely fail here rather than in a newcomer's pull request. places/ in the repository
-// is never touched. It prints a summary naming every failing test, and exits non-zero if the
-// validator or any test failed.
+// tests/full-town.ts on every free plot. A few of them are written the way contributors write
+// houses (scripts/newcomer-houses.ts): the builder's defaults, or every name, story and sign as
+// long as the schema allows. Tests read the town through readPlaces(), which hands out the
+// made-up houses first, so one that takes "the first house in places/" as its fixture will most
+// likely fail here rather than in a newcomer's pull request. The copy gets a Git history of its
+// own, as a pull request's checkout has: the real houses moved in a month ago, the made-up ones
+// yesterday, and one builder-default house is the newest arrival, today. places/ in the
+// repository is never touched. It prints a summary naming every failing test, and exits non-zero
+// if the validator or any test failed.
 // Written to run on Windows, macOS and Linux: checked on Windows, and the Full town workflow runs
 // it on Linux. The whole suite takes a minute or two.
 //
@@ -30,6 +34,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fullTownNewcomers, readPlaces } from '../tests/full-town.ts';
+import { contributorLike } from './newcomer-houses.ts';
 
 type VitestReport = {
   numTotalTests?: number;
@@ -69,6 +74,39 @@ function npm(args: string[]) {
   return result.status === 0;
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+/** Commits everything in the copy as one arrival, dated `daysAgo` before now, as CI's clock. */
+function commit(message: string, daysAgo: number) {
+  const date = new Date(Date.now() - daysAgo * DAY).toISOString();
+  for (const args of [
+    ['add', '-A'],
+    ['commit', '-q', '--no-verify', '-m', message],
+  ]) {
+    const result = spawnSync(
+      'git',
+      [
+        '-c',
+        'user.name=Full town',
+        '-c',
+        'user.email=full-town@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'core.autocrlf=false',
+        '-c',
+        'gc.auto=0',
+        ...args,
+      ],
+      {
+        cwd: town,
+        encoding: 'utf8',
+        env: { ...options.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date },
+      },
+    );
+    if (result.status !== 0) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
+  }
+}
+
 function readReport(): VitestReport {
   try {
     return JSON.parse(readFileSync(report, 'utf8'));
@@ -90,15 +128,28 @@ try {
     mkdirSync(dirname(join(town, file)), { recursive: true });
     copyFileSync(join(root, file), join(town, file));
   }
-  symlinkSync(join(root, 'node_modules'), modules, 'junction');
-
   const real = readPlaces(join(town, 'places'));
-  const newcomers = fullTownNewcomers(real);
-  for (const place of newcomers)
+  const newcomers = contributorLike(fullTownNewcomers(real));
+  const write = (place: (typeof newcomers)[number]) =>
     writeFileSync(join(town, 'places', `${place.id}.json`), `${JSON.stringify(place, null, 2)}\n`);
+  // The history a pull request's checkout has, so the town knows who arrived when: the real
+  // houses first, then the made-up ones, then the newest arrival, which keeps the builder's
+  // defaults like many a first house does.
+  const newest = [...newcomers].reverse().find((place) => place.name === 'My Little Place');
+  const spawned = spawnSync('git', ['init', '-q'], { ...options, stdio: 'pipe' });
+  if (spawned.status !== 0) throw new Error(`git init failed: ${spawned.stderr}`);
+  commit('The town as it is', 30);
+  for (const place of newcomers) if (place !== newest) write(place);
+  commit('Made-up neighbors on the free plots', 1);
+  if (newest) {
+    write(newest);
+    commit(`Add ${newest.id}`, 0);
+  }
+  // Linked only now, so Git never meets it.
+  symlinkSync(join(root, 'node_modules'), modules, 'junction');
   console.log(
     `\nA full town: ${real.length + newcomers.length} houses, ${real.length} real and ` +
-      `${newcomers.length} made up on the free plots, in ${town}\n`,
+      `${newcomers.length} made up on the free plots, the newest ${newest?.id ?? 'none'}, in ${town}\n`,
   );
 
   const valid = npm(['run', 'validate']);

@@ -7,6 +7,8 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { fullTown, fullTownHouse, readPlaces } from './full-town';
 import { recordingContext } from './recording-context';
 import { openingViewBudget } from './render-budget';
+import { houseReach } from '../src/city/houses';
+import { getPlot, plotCenter } from '../src/lib/world';
 
 const places = readPlaces();
 
@@ -31,6 +33,24 @@ function openingView(town: Place[], minutes: number, day = 3, residents: Residen
     }),
   ).not.toThrow();
   return calls.length;
+}
+
+/** How many of a town's houses the opening view can show: render.ts culls the rest by the same
+ *  box (houseReach at the map's house scale), so they cost nothing. */
+function housesInView(town: Place[]) {
+  const scale = 1.12,
+    zoom = 0.7;
+  const view = { left: -720 / zoom, right: 720 / zoom, top: -88 / zoom, bottom: 812 / zoom };
+  return town.filter((place) => {
+    const pt = plotCenter(getPlot(place.plot)!);
+    const reach = houseReach(place);
+    return (
+      pt.x + reach.right * scale >= view.left &&
+      pt.x - reach.right * scale <= view.right &&
+      pt.y + reach.bottom * scale >= view.top &&
+      pt.y - reach.top * scale <= view.bottom
+    );
+  }).length;
 }
 
 // A node frame of the opening view at noon, golden hour, mid Lantern hour and deep night.
@@ -108,14 +128,18 @@ describe('Rendering a full town in node', () => {
   }, 30_000);
 
   it('fails a frame that doubled its calls, even with most houses out of view', () => {
-    // The plots run north to south, so the reversed town fills the far side first.
+    // The plots run north to south, so the reversed town fills the far side first. The budget
+    // counts the houses the view can show, not the roster: in a town this wide the reversed
+    // first 90 are all out of view.
     for (const order of [town, [...town].reverse()])
-      for (const size of [0, 18, 60, 90, town.length])
+      for (const size of [0, 18, 60, 90, town.length]) {
+        const shown = housesInView(order.slice(0, size));
         for (const minutes of MOMENTS)
           expect(
             2 * openingView(order.slice(0, size), minutes),
-            `${size} ${minutes}`,
-          ).toBeGreaterThan(openingViewBudget(size));
+            `${size} (${shown} in view) ${minutes}`,
+          ).toBeGreaterThan(openingViewBudget(shown));
+      }
   }, 30_000);
 });
 

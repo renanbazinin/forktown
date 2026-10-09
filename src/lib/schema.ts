@@ -2,10 +2,10 @@ import { z } from 'zod';
 import { compileSign } from './sign.ts';
 import { getPlot, PLOTS, type Plot } from './world.ts';
 import { venueAt } from './events.ts';
-import { isFootballPlot } from './football.ts';
-import { isFarmPlot } from './farm.ts';
-import { isMillpondPlot } from './millpond.ts';
-import { isTubePlot } from './tubes.ts';
+import { FOOTBALL_VENUE, isFootballPlot } from './football.ts';
+import { FARM, isFarmPlot } from './farm.ts';
+import { isMillpondPlot, MILLPOND_VENUE } from './millpond.ts';
+import { isTubePlot, TUBE_LINE_NAME, tubeStation } from './tubes.ts';
 import { OPEN_PLOTS_COPY } from './open-plots.ts';
 
 const color = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a six-digit hex color.');
@@ -225,18 +225,72 @@ export function openPlotsNear(plot: string, taken: ReadonlySet<string>, count = 
 const orList = (items: string[]) =>
   items.length > 1 ? `${items.slice(0, -1).join(', ')} or ${items.at(-1)}` : items[0];
 
+/** "The Millpond" reads "the Millpond" inside a sentence. */
+const midSentence = (name: string) => name.replace(/^The /, 'the ');
+
+/** The public place that stands on a plot no house may take, by name; undefined for any other. */
+export function publicPlaceAt(plot: string): string | undefined {
+  const venue = venueAt(plot);
+  if (venue) return midSentence(venue.name);
+  if (isTubePlot(plot)) return `${tubeStation(plot).name} on ${midSentence(TUBE_LINE_NAME)}`;
+  if (isFootballPlot(plot)) return midSentence(FOOTBALL_VENUE.name);
+  if (isFarmPlot(plot)) return midSentence(FARM.name);
+  if (isMillpondPlot(plot)) return midSentence(MILLPOND_VENUE.name);
+  return undefined;
+}
+
+// The map's first and last row letters and its column count, for a plot that isn't on it.
+const rowLabel = (plot: Plot) => plot.id.slice(0, -String(plot.col + 1).length);
+const FIRST_ROW = rowLabel(PLOTS[0]);
+const LAST_ROW = rowLabel(PLOTS.reduce((last, plot) => (plot.row > last.row ? plot : last)));
+const COLUMNS = Math.max(...PLOTS.map((plot) => plot.col)) + 1;
+
+/**
+ * What a house file hears when its plot is no house plot: which public place stands there and the
+ * open plots nearest to it, or how plots are named when the plot is not on the map at all.
+ * Undefined for a house plot.
+ */
+export function plotProblem(plot: string, taken: ReadonlySet<string>): string | undefined {
+  if (!getPlot(plot)) {
+    const upper = plot.trim().toUpperCase();
+    const hint = upper !== plot && getPlot(upper) ? ` Did you mean ${upper}?` : '';
+    return `Plot "${plot}" is not on the town map. Plots are a row letter from ${FIRST_ROW} to ${LAST_ROW} and a column number from 1 to ${COLUMNS}, like ${FIRST_ROW}1 or ${LAST_ROW}${COLUMNS}.${hint}`;
+  }
+  const place = publicPlaceAt(plot);
+  if (!place) return undefined;
+  const open = openPlotsNear(plot, taken);
+  return `Plot ${plot} is reserved for ${place}, a public place. ${open.length ? `Pick an open plot such as ${orList(open)}.` : OPEN_PLOTS_COPY.full}`;
+}
+
 export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
   const errors: string[] = [];
   const places: Place[] = [];
   const ids = new Set<string>();
-  // Which file claimed each plot, and every plot any file asks for, even one that isn't valid yet.
+  // Which file claimed each plot.
   const plots = new Map<string, string>();
   let taken: Set<string> | undefined;
+  // Every plot any file asks for, even one that isn't valid yet: none of them is open.
+  const claimed = () =>
+    (taken ??= new Set(
+      entries.flatMap(({ data }) => {
+        const plot = (data as { plot?: unknown } | null)?.plot;
+        return typeof plot === 'string' ? [plot] : [];
+      }),
+    ));
   for (const { file, data } of entries) {
     const result = placeSchema.safeParse(data);
     if (!result.success) {
-      for (const issue of result.error.issues)
-        errors.push(`${file} → ${issue.path.join('.') || 'file'}: ${issue.message}`);
+      const plot = (data as { plot?: unknown } | null)?.plot;
+      // A plot the map has no house on gets one clear sentence instead of the schema's.
+      const plotMessage = typeof plot === 'string' ? plotProblem(plot, claimed()) : undefined;
+      let plotTold = false;
+      for (const issue of result.error.issues) {
+        const path = issue.path.join('.') || 'file';
+        if (path === 'plot' && plotMessage) {
+          if (!plotTold) errors.push(`${file} → plot: ${plotMessage}`);
+          plotTold = true;
+        } else errors.push(`${file} → ${path}: ${issue.message}`);
+      }
       continue;
     }
     const place = result.data;
@@ -259,13 +313,7 @@ export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
       errors.push(`${file}: The id "${place.id}" is already used. Choose another id.`);
     // Either file may be the newcomer, so name both.
     if (plots.has(place.plot)) {
-      taken ??= new Set(
-        entries.flatMap(({ data }) => {
-          const plot = (data as { plot?: unknown } | null)?.plot;
-          return typeof plot === 'string' ? [plot] : [];
-        }),
-      );
-      const open = openPlotsNear(place.plot, taken);
+      const open = openPlotsNear(place.plot, claimed());
       errors.push(
         `Plot ${place.plot} is claimed by both "${plots.get(place.plot)}" and "${file}". ${open.length ? `If yours is the new one, pick an open plot such as ${orList(open)}.` : OPEN_PLOTS_COPY.full}`,
       );

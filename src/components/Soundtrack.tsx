@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Volume2, VolumeX, X } from 'lucide-react';
-import { TRACKS, type TrackId } from '../music/score';
+import { isBandTrack, TRACKS, type TrackId } from '../music/score';
 import { TownPlayer } from '../music/player';
 import { footballSoundsBetween } from '../music/football-sound';
 import type { FootballState } from '../lib/football';
@@ -9,22 +9,28 @@ import type { Playable } from '../lib/break-cards';
 
 export default function Soundtrack({
   track,
+  bed,
   playing,
   football,
   listening,
   cinema,
   cinemaListening,
+  bandstand = { gain: 0, pan: 0 },
   breakSound = null,
   prepare = null,
   autoStart = false,
   hideControls = false,
 }: {
   track: TrackId;
+  /** The town's own tune (trackForTown without the band): a band's set plays over it. */
+  bed?: TrackId;
   playing: boolean;
   football: FootballState;
   listening: { gain: number; pan: number };
   cinema: ReturnType<typeof cinemaAt>;
   cinemaListening: { gain: number; pan: number };
+  /** What the camera hears of the Bandstand: a band's set plays at this gain (bandstandListening). */
+  bandstand?: { gain: number; pan: number };
   /** A live-stream break on air: its jingle plays full and centred, over the town's music. */
   breakSound?: { film: Playable; elapsed: number; key: string } | null;
   /** The next break's ad or card, rendered ahead so its sound starts on time. */
@@ -65,6 +71,12 @@ export default function Soundtrack({
   useEffect(() => {
     if (enabled && prepare) player.current?.cinemaPrepare(prepare);
   }, [enabled, prepare]);
+  // A band at the Bandstand is heard only near it: its tune is scaled by the camera's gain and
+  // panned toward the stand, over the town's own tune.
+  const { gain: bandGain, pan: bandPan } = bandstand;
+  useEffect(() => {
+    if (enabled && isBandTrack(track)) player.current?.level(track, bandGain, bandPan);
+  }, [enabled, track, bandGain, bandPan]);
   useEffect(() => {
     if (
       !enabled ||
@@ -132,7 +144,7 @@ export default function Soundtrack({
     void player.current
       .resume()
       .then(() => {
-        if (!cancelled) return player.current?.play(track);
+        if (!cancelled) return player.current?.play(track, bed);
       })
       .then(() => {
         if (!cancelled) setLoading(false);
@@ -147,7 +159,7 @@ export default function Soundtrack({
     return () => {
       cancelled = true;
     };
-  }, [track, enabled, playing, hidden]);
+  }, [track, bed, enabled, playing, hidden]);
   const toggle = async () => {
     if (enabled) {
       ++request.current;
@@ -204,8 +216,9 @@ export default function Soundtrack({
               : TRACKS[track].subtitle}
           </p>
           <p className="sound-field-note">
-            Zoom into the cinema for movie music and sound effects, or the football for kicks,
-            whistles, and cheers.
+            Zoom into the cinema for movie music and sound effects, the football for kicks,
+            whistles, and cheers, or the Bandstand for its band at the teatime and sundown sets
+            (16:00 and 18:15).
           </p>
           <button className="sound-toggle" onClick={() => void toggle()} aria-pressed={enabled}>
             {enabled ? <Volume2 size={16} /> : <VolumeX size={16} />}

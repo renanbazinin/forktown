@@ -26,6 +26,17 @@ Keep the 64-beat form, leave space in the melody, and test the loop and mix leve
 Do not add someone else's songs or recordings without an appropriate license.
 An automated note validation test lives in `tests/music.test.ts`.
 
+# The Bandstand
+
+The Bandstand's three bands each play an arrangement of their own, in
+`src/music/bandstand-tracks.ts`: the brass "Oom-pah on the Lawn", the folk "The Riverbank Reel"
+and the strings "Deckchairs at Dusk". See [The Bandstand](BANDSTAND.md).
+The music is local, like the cinema's: a live set plays only while the camera is near
+the Bandstand, louder as it zooms in and panned by where the stand sits on screen.
+It plays over the town's own tune, which eases down as the band comes up (the cinema's
+curve) and comes back up, never restarted, when the set ends or the camera leaves: a band
+heard faintly from afar never leaves the town near silent. A live stage show plays first. See [Town events](TOWN_EVENTS.md#bandstand-evenings).
+
 # Football sounds
 
 The Meadow Ground adds original synthesized kick, whistle, and crowd effects to the same opt-in Town sound control. Effects follow the match's actual pass, shot, and goal moments; they fade with zoom and camera distance and pan toward the ground. Pausing, muting, hiding the tab, or moving away stops them. Resuming skips missed cues. See [Football at the Meadow Ground](FOOTBALL.md) for the sound and match preview.

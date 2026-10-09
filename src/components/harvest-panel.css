@@ -1,0 +1,6 @@
+/* The farm panel's Harvest Fair section (FarmInfo.tsx): each outing's times and status on a line
+   of their own. Who is there is the district panels' shared row list (district/NeighborList.tsx). */
+.harvest-outing strong {
+  display: block;
+  font-size: 13px;
+}

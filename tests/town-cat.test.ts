@@ -1,11 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { placeSchema } from '../src/lib/schema';
 import { townCatAt } from '../src/lib/town-cat';
 import { getPlot, isRoad, plotEntrance } from '../src/lib/world';
 import { fullTown, readPlaces } from './full-town';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const homes = ['A1', 'A2', 'B1', 'B2', 'D4'].map((plot) => ({
   ...sample,
   id: `cat-${plot}`,

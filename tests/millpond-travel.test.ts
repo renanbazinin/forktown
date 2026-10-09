@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { placeSchema, type Place } from '../src/lib/schema';
+import { type Place } from '../src/lib/schema';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { getPlot, isRoad, plotEntrance, type Point } from '../src/lib/world';
 import { roadPath } from '../src/lib/walking';
@@ -20,11 +19,15 @@ import {
   loopForSeat,
   millpondRoute,
   millpondSkatingDay,
+  MILLPOND_VENUE,
   skateGlide,
 } from '../src/lib/millpond';
+import { onRoadOrTube } from './tube-riders';
+import { insideEventGround } from './event-ground';
+import { MY_LITTLE_PLACE } from './fixtures';
 
 // A roster-proof crowd: 36 synthetic homes on rows A–E who stroll all day.
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 const homes: Place[] = HOUSE_PLOTS.slice(0, 36).map((plot, index) => ({
   ...sample,
   id: `skater-${index}`,
@@ -229,7 +232,10 @@ describe('Skating on the Millpond', () => {
           const state = at(t);
           const p = state.position!;
           const phase = state.event!.phase;
-          expect(onRoad(p) || insideMillpond(p)).toBe(true);
+          expect(
+            onRoadOrTube({ position: p, transit: state.transit }) ||
+              insideEventGround(trip.event.venue, p),
+          ).toBe(true);
           if (insideWater(p)) expect(onTheirIce(p, trip.seat, phase)).toBe(true);
           // Skating from the moment they reach the loop until they step off it: no standing about.
           const attending = phase === 'attending';
@@ -285,8 +291,13 @@ describe('Skating on the Millpond', () => {
             expect(state.moving).toBe(false);
           }
           if (state.event?.id === 'millpond') {
-            expect(residentActivityLabel(state)).toContain('Millpond');
-            expect(onRoad(state.position) || insideMillpond(state.position)).toBe(true);
+            // Stepping off the tube names the halt; every other moment names the Millpond.
+            if (state.transit?.stage === 'alighting')
+              expect(residentActivityLabel(state)).toMatch(/^Stepping off the tube at .+ Halt$/);
+            else expect(residentActivityLabel(state)).toContain('Millpond');
+            expect(onRoadOrTube(state) || insideEventGround(MILLPOND_VENUE, state.position)).toBe(
+              true,
+            );
           }
         }
       }

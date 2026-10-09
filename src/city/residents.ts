@@ -1,13 +1,27 @@
+import { SNOWMEN_LUNCH } from '../lib/district-copy';
+import type { OutingId } from '../lib/district-calendar';
 import type { Resident } from '../lib/schema';
 import type { ResidentState } from '../lib/simulation';
 import { tint } from './houses';
 import { drawErrandItem, errandItemPose } from './errand-items';
+import { CARRY_SPRITES } from './carry-items';
+import { pick, SNOW, type Pair } from './season-palette';
 
 const GREETING_FONT = '10px "Space Mono", monospace';
 /** How much lower, in a figure's own px, a neighbour perches on the porch chair than the bench. */
 const PORCH_SINK = 2;
 /** How much a figure's colours darken at night: as much as the roofs of the houses around it. */
 export const NIGHT_DIM = -35;
+/**
+ * The outings whose guests chat on their feet: the market's browsers, at the counter. Everyone
+ * else sits down to chat (a blanket, a cinema seat, a deckchair, the fair's straw seat, a rug, or
+ * the bench at home), with the chat's bubble drawn for a seated head.
+ */
+const STANDING_CHAT: ReadonlySet<string> = new Set<OutingId>(['market']);
+/** How much higher a standing chatter's bubble sits than a seated one's, over a head 5 px higher. */
+const STANDING_CHAT_LIFT = 5;
+/** The Bandstand's music notes, its players' and its applause's alike: olive by day, pale at night. */
+export const BANDSTAND_NOTE: Pair = ['#5F7155', '#C9D2C2'];
 
 /**
  * How far a figure, its props and its speech reach from its feet, in its own px before scaling,
@@ -18,9 +32,11 @@ export const NIGHT_DIM = -35;
 export function residentReach(
   ctx: CanvasRenderingContext2D,
   resident: Resident,
-  state?: Pick<ResidentState, 'greeting' | 'duckLove'>,
+  state?: Pick<ResidentState, 'greeting' | 'duckLove'> & Partial<Pick<ResidentState, 'carry'>>,
 ) {
-  const figure = { x: 18, above: 48, below: 5 };
+  // Something carried home from an outing can rise above the hand (carry-items.ts).
+  const lift = state?.carry ? CARRY_SPRITES[state.carry.kind].height : 0;
+  const figure = { x: 18, above: 48 + lift, below: 5 };
   if (!state?.greeting || state.duckLove) return figure;
   ctx.save();
   ctx.font = GREETING_FONT;
@@ -50,7 +66,7 @@ export function drawResident(
     ResidentState,
     'moving' | 'facing' | 'walkPhase' | 'greeting' | 'pose' | 'duckLove' | 'event'
   > &
-    Partial<Pick<ResidentState, 'lot' | 'errand'>>,
+    Partial<Pick<ResidentState, 'lot' | 'errand' | 'carry'>>,
   /**
    * `shadow: false` leaves out the ground shadow, for a figure lifted off the ground.
    * `speech: false` leaves out the greeting or heart, for drawResidentSpeech to add on top.
@@ -64,8 +80,16 @@ export function drawResident(
   const left = facing === 'sw' || facing === 'nw';
   const errand = errandItemPose(state?.errand, facing, state?.walkPhase, state?.moving);
   const errandBehind = back || !!errand?.grounded;
+  // What a Riverside guest carries on one leg of their outing, held in the near hand: the bag
+  // home from the market, a paper boat to the regatta, a dish to the Long Table. A seasonal
+  // round's object, when there is one, takes the hands instead.
+  const carry = !errand && state?.carry ? state.carry : undefined;
+  const carrySprite = carry ? CARRY_SPRITES[carry.kind] : undefined;
+  const carried = carrySprite?.grip(facing, state?.walkPhase ?? 0);
   const female = resident.figure === 'female';
-  const seated = !!state?.pose && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
+  const standingChat = state?.pose === 'chat' && STANDING_CHAT.has(state.event?.id ?? '');
+  const seated =
+    !!state?.pose && !standingChat && ['sit', 'read', 'sip', 'chat'].includes(state.pose);
   // Skating on the Millpond: a forward lean, arms out for balance, one foot pushing back on a blade.
   const skating = state?.pose === 'skate';
   const cheering = state?.pose === 'cheer';
@@ -119,8 +143,7 @@ export function drawResident(
       y: Math.round(rest.y + (at.y - rest.y) * errand!.armReach),
     };
   };
-  const carryingArm = (near: boolean) => {
-    const hand = grip(near);
+  const carryingArm = (near: boolean, hand = grip(near)) => {
     const shoulder = { x: near ? 3 : -4, y: -11 + bob };
     const elbow = { x: Math.round((shoulder.x + hand.x) / 2), y: -8 + bob };
     ctx.fillStyle = near ? outfit : outfitShadow;
@@ -138,10 +161,22 @@ export function drawResident(
         );
     }
   };
-  const carryingHand = (near: boolean) => {
-    const hand = grip(near);
+  const carryingHand = (near: boolean, hand = grip(near)) => {
     ctx.fillStyle = skin;
     ctx.fillRect(hand.x - 1, hand.y - 1, 2, 2);
+  };
+  const carriedItem = () => {
+    if (!carry || !carrySprite || !carried) return;
+    ctx.save();
+    carrySprite.draw(
+      ctx,
+      carried.anchor.x,
+      carried.anchor.y,
+      carry.variant,
+      resident,
+      !!options.night,
+    );
+    ctx.restore();
   };
   const errandItem = () => {
     if (!errand || !state?.errand) return;
@@ -168,6 +203,7 @@ export function drawResident(
   // A sitter's body sits back over the seat, behind the feet at the anchor.
   if (perched) ctx.translate(-3, 0);
   if (errandBehind) errandItem();
+  if (carried?.behind) carriedItem();
   // The far arm and foot sit behind the body; feet lift rather than stretch.
   ctx.fillStyle = outfitShadow;
   if (errand && errand.armReach > 0) {
@@ -269,6 +305,8 @@ export function drawResident(
   ctx.fillStyle = outfit;
   if (errand && errand.armReach > 0) {
     carryingArm(true);
+  } else if (carried) {
+    carryingArm(true, carried.anchor);
   } else if (cheering || (disco && stride <= 0)) {
     ctx.fillRect(3, -15 + bob, 4, 4);
     ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);
@@ -352,6 +390,8 @@ export function drawResident(
     if (!back) carryingHand(false);
     carryingHand(true);
   }
+  if (carried && !carried.behind) carriedItem();
+  if (carried) carryingHand(true, carried.anchor);
   if (state?.pose === 'read') {
     ctx.fillStyle = ink('#567F79');
     ctx.fillRect(-5, -9 + bob, 11, 7);
@@ -427,24 +467,46 @@ export function drawResident(
   ctx.restore();
   if (state?.pose === 'play') {
     const bounce = Math.abs(Math.sin((state.walkPhase ?? 0) * Math.PI * 2));
-    ctx.fillStyle = ink('#D7AA63');
-    ctx.fillRect(7, -3 - Math.round(bounce * 10), 4, 4);
-    ctx.fillStyle = ink('#F5DFA4');
-    ctx.fillRect(7, -3 - Math.round(bounce * 10), 2, 1);
+    const top = -3 - Math.round(bounce * 10);
+    if (state.event?.name === SNOWMEN_LUNCH.name) {
+      // At the snowmen lunch it is a snowball being packed: the snow of the roofs and the
+      // snowmen, its lower edge in the snow's shade.
+      ctx.fillStyle = pick(SNOW.top, !!options.night);
+      ctx.fillRect(7, top, 4, 4);
+      ctx.fillStyle = pick(SNOW.shade, !!options.night);
+      ctx.fillRect(9, top + 3, 2, 1);
+    } else {
+      ctx.fillStyle = ink('#D7AA63');
+      ctx.fillRect(7, top, 4, 4);
+      ctx.fillStyle = ink('#F5DFA4');
+      ctx.fillRect(7, top, 2, 1);
+    }
   }
-  if (state?.pose === 'chat' && (state.walkPhase ?? 0) < 0.4) {
+  // A seated chat's bubble comes and goes over its long beat. A chat on their feet at the market
+  // is short: its bubble stays up throughout, over the standing head, and gives way to a greeting
+  // or a heart.
+  if (
+    state?.pose === 'chat' &&
+    (standingChat ? !state.greeting && !state.duckLove : (state.walkPhase ?? 0) < 0.4)
+  ) {
+    const lift = standingChat ? STANDING_CHAT_LIFT : 0;
     ctx.fillStyle = '#FCFAEF';
-    ctx.fillRect(-7, -31, 15, 9);
-    ctx.fillRect(0, -22, 2, 3);
+    ctx.fillRect(-7, -31 - lift, 15, 9);
+    // The tail ends on a hat's crown over a standing head, and on the hair of a seated one.
+    ctx.fillRect(0, -22 - lift, 2, standingChat ? 2 : 3);
     ctx.fillStyle = '#7B8A69';
-    for (const x of [-4, 0, 4]) ctx.fillRect(x, -27, 2, 2);
+    for (const x of [-4, 0, 4]) ctx.fillRect(x, -27 - lift, 2, 2);
   }
-  // Music notes belong to the stage and the disco; football fans and zoo visitors cheer without.
-  const quiet = state?.event?.id === 'football' || state?.event?.id === 'zoo';
+  // Music notes belong to the stage, the disco and the Bandstand; football fans, zoo visitors and
+  // the regatta's guests cheer without (no music plays at the Landing).
+  const quiet =
+    state?.event?.id === 'football' || state?.event?.id === 'zoo' || state?.event?.id === 'regatta';
+  const bandstand =
+    state?.event?.id === 'bandstand-tea' || state?.event?.id === 'bandstand-sundown';
   if (dancing && !quiet && (state?.walkPhase ?? 0) < 0.3) {
     // A small pixel music note, only occasionally, so a full crowd stays readable.
     const rise = Math.round((state?.walkPhase ?? 0) * 12);
-    ctx.fillStyle = '#E0B768';
+    ctx.fillStyle = bandstand ? pick(BANDSTAND_NOTE, !!options.night) : '#E0B768';
     ctx.fillRect(10, -34 - rise, 2, 9);
     ctx.fillRect(7, -27 - rise, 4, 3);
     ctx.fillRect(12, -34 - rise, 4, 2);

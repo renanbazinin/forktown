@@ -21,6 +21,7 @@ import { useTownDayPrefetch, whenIdle } from '../lib/idle-prefetch';
 import { useTownClock } from '../lib/use-town-clock';
 import { trackForTown } from '../music/score';
 import { cinemaAt, cinemaListening } from '../lib/cinema';
+import { bandstandListening } from '../lib/district-places';
 import { townArrivalDates, townArrivals } from '../lib/arrivals';
 import { TOWN_DAY_MS } from '../lib/town-time';
 import { readLiveParams } from '../lib/live-params';
@@ -79,6 +80,7 @@ export default function LiveStream() {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const [cinemaField, setCinemaField] = useState({ gain: 0, pan: 0 });
+  const [bandstandField, setBandstandField] = useState({ gain: 0, pan: 0 });
   const cinema = useMemo(() => cinemaAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const program = useMemo(() => liveProgram(places, clock.day), [clock.day]);
   // Tomorrow's program while idle in the last town hour (its plan first), so midnight never waits.
@@ -294,8 +296,12 @@ export default function LiveStream() {
     }
     const field = footballListening(camera.current, size.width, size.height);
     const screen = cinemaListening(camera.current, size.width, size.height);
+    // The Bandstand's frame is a shot of its own (live-director's district frames); its band is
+    // heard like the cinema, by how close and central the camera holds it.
+    const band = bandstandListening(camera.current, size.width, size.height);
     // The same steps the town's own view hears in, so both sound alike.
     setCinemaField((old) => steadyListening(old, screen));
+    setBandstandField((old) => steadyListening(old, band));
     setListening((old) => steadyListening(old, field));
   }, [
     size,
@@ -366,12 +372,14 @@ export default function LiveStream() {
       )}
       <BreakOverlay active={shown} ms={ms} />
       <Soundtrack
-        track={trackForTown(clock.minutes, events)}
+        track={trackForTown(clock.minutes, events, bandstandField)}
+        bed={trackForTown(clock.minutes, events)}
         playing={clock.playing}
         football={football}
         listening={listening}
         cinema={cinema}
         cinemaListening={cinemaField}
+        bandstand={bandstandField}
         breakSound={breakSound}
         prepare={prepare}
         autoStart

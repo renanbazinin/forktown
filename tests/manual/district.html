@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Forktown · The Riverside</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        background: #eaf0df;
+        color: #304d40;
+        font: 15px system-ui;
+      }
+      h1 {
+        font: 32px Georgia;
+        margin: 0 0 8px;
+      }
+      h2 {
+        font:
+          13px 'Space Mono',
+          monospace;
+        letter-spacing: 0.06em;
+        margin: 14px 0 4px;
+      }
+      nav {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      button,
+      select {
+        padding: 8px 14px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+        cursor: pointer;
+        font: inherit;
+      }
+      button[aria-pressed='true'] {
+        background: #d9e6c8;
+      }
+      label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      input[type='number'] {
+        width: 7em;
+        padding: 6px;
+        border: 1px solid #8caa91;
+        border-radius: 6px;
+        background: #fffbed;
+        color: #304d40;
+      }
+      input[type='range'] {
+        width: 100%;
+        max-width: 1280px;
+      }
+      canvas {
+        display: block;
+        max-width: 100%;
+        height: auto;
+        border-radius: 12px;
+        background: #dae4cd;
+      }
+      code {
+        font-family: 'Space Mono', monospace;
+        font-size: 13px;
+      }
+      .muted {
+        color: #5d7566;
+      }
+      #names {
+        max-width: 1280px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="muted">FORKTOWN · THE RIVERSIDE</span>
+      <h1>The Riverside, one frame at a time.</h1>
+      <p class="muted">
+        Each venue at its own frame, on any town day and minute, with the published town or a full
+        one out and about. Every feature adds its own moments to its row
+        (<code>tests/manual/district-*.ts</code>). Open a moment straight from the address:
+        <code>?venue=landing&amp;day=1242997&amp;time=915&amp;town=full&amp;frame=live</code>
+        (Summer 10 of Year 1 at 15:15: day is the absolute town day, time the town minute). Pausing
+        writes the moment into the address. The page never changes the live clock or saves houses.
+      </p>
+      <h2>VENUE</h2>
+      <nav id="venues"></nav>
+      <h2>MOMENTS</h2>
+      <nav id="moments"></nav>
+      <h2>JUMP</h2>
+      <nav id="jumps"></nav>
+      <nav id="seasons"></nav>
+      <nav id="minutes"></nav>
+      <nav>
+        <label>Town day <input id="day" type="number" step="1" /></label>
+        <span id="date" class="muted"></span>
+        <button id="play">Play</button>
+      </nav>
+      <nav>
+        <label
+          >Town
+          <select id="town">
+            <option value="published">Published</option>
+            <option value="full">Full: a made-up neighbor on every free plot</option>
+          </select>
+        </label>
+        <label
+          >Frame
+          <select id="frame">
+            <option value="live">Live, 1280 × 720</option>
+            <option value="map">Map, 1120 × 640 (panel on the right)</option>
+            <option value="phone">Phone, 390 × 440 (panel below)</option>
+          </select>
+        </label>
+        <label
+          >Mark
+          <select id="mark">
+            <option value="none">None</option>
+            <option value="hover">Hovered</option>
+            <option value="selected">Selected</option>
+          </select>
+        </label>
+      </nav>
+      <input id="time" type="range" min="0" max="1439.9" step="0.1" aria-label="Town minute" />
+      <p id="status" role="status"></p>
+      <canvas width="1280" height="720" aria-label="The chosen venue at its frame"></canvas>
+      <p id="names" class="muted"></p>
+      <script type="module">
+        import { renderCity } from '/src/city/render.ts';
+        import { eventsForDay, eventMinutes, HOUSE_PLOTS, VENUES } from '/src/lib/events.ts';
+        import { DISTRICT_FRAMES } from '/src/lib/district-places.ts';
+        import { nextOutingDay, SNOWMAN_DAYS } from '/src/lib/district-calendar.ts';
+        import { DISTRICT_SHOTS } from '/src/lib/live-director.ts';
+        import { places } from '/src/lib/places.ts';
+        import { yearDayAt } from '/src/lib/seasons.ts';
+        import { getPlot, plotCenter } from '/src/lib/world.ts';
+        import { simulateResidents, timeLabel } from '/src/lib/simulation.ts';
+        import {
+          CALENDAR_EPOCH_DAY,
+          DAYS_PER_SEASON,
+          DAYS_PER_YEAR,
+          SEASONS,
+          townCalendarAt,
+        } from '/src/lib/town-calendar.ts';
+        import { DISTRICT_BUTTONS } from '/tests/manual/district.ts';
+
+        const green = plotCenter(getPlot(VENUES.find((venue) => venue.id === 'green').plot));
+        const outings =
+          (...ids) =>
+          (event) =>
+            ids.includes(event.outing);
+        // Where each feature is framed (its district frame, or the Lunch Green for the snowmen),
+        // which of the day's events are its own, and the outing whose next day "Next" jumps to.
+        const VIEWS = {
+          market: {
+            label: 'Market Square',
+            frame: DISTRICT_FRAMES.market,
+            plot: 'D14',
+            mine: outings('market'),
+            shots: ['market'],
+          },
+          bandstand: {
+            label: 'The Bandstand',
+            frame: DISTRICT_FRAMES.bandstand,
+            plot: 'K15',
+            mine: outings('bandstand-tea', 'bandstand-sundown'),
+            shots: ['bandstand-tea'],
+          },
+          landing: {
+            label: 'The Boat Landing',
+            frame: DISTRICT_FRAMES.regatta,
+            plot: 'J15',
+            mine: outings('regatta'),
+            shots: ['regatta'],
+            next: { label: 'Next regatta day', outing: 'regatta' },
+          },
+          harvest: {
+            label: 'Moon Harvest Farm',
+            frame: DISTRICT_FRAMES.harvest,
+            plot: 'S9',
+            mine: outings('harvest-fair', 'long-table'),
+            shots: ['harvest-fair', 'long-table'],
+            next: { label: 'Next harvest day', outing: 'harvest-fair' },
+          },
+          stars: {
+            label: 'Stargazing',
+            frame: DISTRICT_FRAMES.bandstand,
+            plot: 'K15',
+            mine: outings('stargazing'),
+            shots: ['stargazing'],
+            next: { label: 'Next star night', outing: 'stargazing' },
+          },
+          snowmen: {
+            label: 'Snowmen on the green',
+            frame: { center: { x: green.x, y: green.y - 35 }, width: 520, height: 370 },
+            plot: 'C5',
+            mine: (event) => event.venue.id === 'green',
+            shots: [],
+            next: { label: 'Next build day', snowmen: true },
+          },
+        };
+        // The minutes worth a look at every venue, from dawn to the stars.
+        const PASS = [375, 510, 590, 920, 980, 1110, 1230, 1360];
+        const FRAMES = {
+          live: { width: 1280, height: 720 },
+          map: { width: 1120, height: 640 },
+          phone: { width: 390, height: 440 },
+        };
+
+        // The full town: every house plot the published town leaves free gets a made-up neighbor,
+        // dressed like a published one and given one of the 54 routines in turn, so every outing
+        // has takers (a browser-side cousin of tests/full-town.ts, which needs node).
+        const ACTIVITIES = ['stroll', 'work', 'home'];
+        const routine = (k) => ({
+          morning: ACTIVITIES[k % 3],
+          afternoon: ACTIVITIES[Math.floor(k / 3) % 3],
+          evening: ACTIVITIES[Math.floor(k / 9) % 3],
+          night: k % 54 < 27 ? 'stroll' : 'sleep',
+        });
+        const taken = new Set(places.map((place) => place.plot));
+        const full = [
+          ...places,
+          ...HOUSE_PLOTS.filter((plot) => !taken.has(plot.id)).map((plot, index) => {
+            const look = places[index % places.length];
+            return {
+              ...look,
+              id: `full-town-${plot.id.toLowerCase()}`,
+              name: `Full Town ${plot.id}`,
+              plot: plot.id,
+              resident: {
+                ...look.resident,
+                name: `Neighbor ${plot.id}`,
+                routine: routine((index * 7) % 54),
+              },
+            };
+          }),
+        ];
+
+        const canvas = document.querySelector('canvas'),
+          ctx = canvas.getContext('2d'),
+          slider = document.querySelector('#time'),
+          dayInput = document.querySelector('#day'),
+          townInput = document.querySelector('#town'),
+          frameInput = document.querySelector('#frame'),
+          markInput = document.querySelector('#mark');
+        const query = new URLSearchParams(location.search);
+        const number = (key, fallback) =>
+          Number.isFinite(Number(query.get(key))) && query.get(key) !== null
+            ? Number(query.get(key))
+            : fallback;
+        const state = {
+          view: VIEWS[query.get('venue')] ? query.get('venue') : 'market',
+          day: Math.floor(number('day', CALENDAR_EPOCH_DAY)),
+          minutes: Math.min(1439.9, Math.max(0, number('time', 600))),
+          playing: false,
+        };
+        for (const [input, key] of [
+          [townInput, 'town'],
+          [frameInput, 'frame'],
+          [markInput, 'mark'],
+        ])
+          if ([...input.options].some((option) => option.value === query.get(key)))
+            input.value = query.get(key);
+        let last = 0;
+
+        /** The camera of a /live district shot, or of the app's own district framing. */
+        function cameraFor(frame, width, height, mode) {
+          if (mode === 'live') {
+            const zoom = Math.max(
+              0.01,
+              Math.min(2.4, (width * 0.9) / frame.width, (height * 0.86) / frame.height),
+            );
+            return {
+              x: width / 2 - frame.center.x * zoom,
+              y: height / 2 - frame.center.y * zoom,
+              zoom,
+            };
+          }
+          const mobile = width < 600;
+          const zoom = Math.max(
+            0.05,
+            Math.min(
+              1.4,
+              (width - (mobile ? 24 : 400)) / frame.width,
+              (mobile ? height * 0.43 : height - 150) / frame.height,
+            ),
+          );
+          return {
+            x: (mobile ? width / 2 : (width - 370) / 2) - frame.center.x * zoom,
+            y: (mobile ? height * 0.29 : height * 0.5) - frame.center.y * zoom,
+            zoom,
+          };
+        }
+
+        function paint() {
+          const view = VIEWS[state.view];
+          const { width, height } = FRAMES[frameInput.value];
+          if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+          }
+          const homes = townInput.value === 'full' ? full : places;
+          const { day, minutes } = state;
+          // eventsForDay already lists the Riverside's outings after today's five.
+          const events = eventsForDay(day, minutes);
+          const residents = simulateResidents(homes, minutes, day);
+          const mark = markInput.value;
+          renderCity({
+            ctx,
+            width,
+            height,
+            camera: cameraFor(view.frame, width, height, frameInput.value),
+            places: homes,
+            ufoPlaces: places,
+            residents,
+            events,
+            minutes,
+            day,
+            night: minutes < 360 || minutes >= 1200,
+            selectedPlot: mark === 'selected' ? view.plot : null,
+            hoveredPlot: mark === 'hover' ? view.plot : null,
+            showPlots: false,
+          });
+          const mine = events.filter(view.mine);
+          const there = residents.filter((resident) =>
+            mine.some(
+              (event) => resident.event?.id === event.id && resident.event.phase === 'attending',
+            ),
+          );
+          const times = (event) =>
+            `${timeLabel(event.start % 1440)}–${timeLabel(event.end % 1440)}`;
+          const live = (event) => {
+            const time = eventMinutes(event, minutes);
+            return time >= event.start && time < event.end;
+          };
+          const calendar = townCalendarAt(minutes < 360 ? day - 1 : day, 1320);
+          document.querySelector('#date').textContent =
+            `${townCalendarAt(day, minutes).label} · year day ${yearDayAt(day)} · ` +
+            (calendar.moonName === 'New moon' ? 'a new-moon night' : calendar.moonName);
+          document.querySelector('#status').textContent =
+            `${timeLabel(minutes)} · ${view.label} · ` +
+            (mine.length
+              ? mine
+                  .map((event) => `${event.name} ${times(event)}${live(event) ? ' (on)' : ''}`)
+                  .join(' · ')
+              : 'nothing on today') +
+            ` · ${there.length} there`;
+          document.querySelector('#names').textContent = there.length
+            ? `There now: ${there.map((resident) => resident.resident.name).join(', ')}.`
+            : '';
+          slider.value = String(minutes);
+          dayInput.value = String(day);
+        }
+        function writeAddress() {
+          const params = new URLSearchParams({
+            venue: state.view,
+            day: String(state.day),
+            time: String(Math.round(state.minutes * 10) / 10),
+            town: townInput.value,
+            frame: frameInput.value,
+            mark: markInput.value,
+          });
+          history.replaceState(null, '', `?${params}`);
+        }
+        function go(day, minutes, view = state.view) {
+          state.view = view;
+          state.day = Math.floor(day);
+          state.minutes = ((minutes % 1440) + 1440) % 1440;
+          rows();
+          paint();
+          writeAddress();
+        }
+        function nav(id, items, pressed, choose) {
+          document.querySelector(id).replaceChildren(
+            ...items.map(([key, label]) => {
+              const button = document.createElement('button');
+              button.textContent = label;
+              button.setAttribute('aria-pressed', String(key === pressed));
+              button.onclick = () => choose(key);
+              return button;
+            }),
+          );
+        }
+        function nextDay() {
+          const { next } = VIEWS[state.view];
+          if (!next) return undefined;
+          if (next.outing) return nextOutingDay(next.outing, state.day + 1);
+          for (let day = state.day + 1; day <= state.day + DAYS_PER_YEAR; day++)
+            if (SNOWMAN_DAYS.includes(yearDayAt(day))) return day;
+          return undefined;
+        }
+        function rows() {
+          nav(
+            '#venues',
+            Object.entries(VIEWS).map(([key, { label }]) => [key, label]),
+            state.view,
+            (key) => go(state.day, state.minutes, key),
+          );
+          const buttons = DISTRICT_BUTTONS[state.view];
+          nav(
+            '#moments',
+            buttons.map((button, index) => [index, button.label]),
+            -1,
+            (index) => go(buttons[index].day, buttons[index].minutes),
+          );
+          if (!buttons.length) {
+            const none = document.createElement('span');
+            none.className = 'muted';
+            none.textContent = 'No moments yet.';
+            document.querySelector('#moments').replaceChildren(none);
+          }
+          const view = VIEWS[state.view];
+          const jumps = view.shots.map((id) => {
+            const shot = DISTRICT_SHOTS[id];
+            return [
+              `shot:${id}`,
+              `Live shot ${timeLabel(shot.from)}–${timeLabel(shot.to)}`,
+              () => go(state.day, shot.from + 5),
+            ];
+          });
+          const next = nextDay();
+          if (view.next && next !== undefined)
+            jumps.unshift(['next', view.next.label, () => go(next, state.minutes)]);
+          nav(
+            '#jumps',
+            jumps.map(([key, label]) => [key, label]),
+            null,
+            (key) => jumps.find(([candidate]) => candidate === key)[2](),
+          );
+          const d = state.day - CALENDAR_EPOCH_DAY,
+            year = Math.floor(d / DAYS_PER_YEAR),
+            date = (d - year * DAYS_PER_YEAR) % DAYS_PER_SEASON;
+          const season = Math.floor((d - year * DAYS_PER_YEAR) / DAYS_PER_SEASON);
+          nav(
+            '#seasons',
+            SEASONS.map((name, index) => [index, `${name} ${date + 1}`]),
+            season,
+            (index) =>
+              go(
+                CALENDAR_EPOCH_DAY + year * DAYS_PER_YEAR + index * DAYS_PER_SEASON + date,
+                state.minutes,
+              ),
+          );
+          nav(
+            '#minutes',
+            PASS.map((minutes) => [minutes, timeLabel(minutes)]),
+            state.minutes,
+            (minutes) => go(state.day, minutes),
+          );
+        }
+        slider.oninput = () => {
+          state.minutes = Number(slider.value);
+          paint();
+        };
+        slider.onchange = writeAddress;
+        dayInput.onchange = () =>
+          go(Math.floor(Number(dayInput.value)) || state.day, state.minutes);
+        for (const input of [townInput, frameInput, markInput])
+          input.onchange = () => {
+            paint();
+            writeAddress();
+          };
+        document.querySelector('#play').onclick = (event) => {
+          state.playing = !state.playing;
+          event.target.textContent = state.playing ? 'Pause' : 'Play';
+          if (!state.playing) writeAddress();
+        };
+        // One town minute a real second, like the town.
+        function tick(now) {
+          if (state.playing && last) {
+            state.minutes += (now - last) / 1000;
+            if (state.minutes >= 1440) {
+              state.minutes -= 1440;
+              state.day++;
+              rows();
+            }
+            paint();
+          }
+          last = now;
+          requestAnimationFrame(tick);
+        }
+        // Scripted access for screenshots: districtPreview.go(day, minutes, 'landing').
+        window.districtPreview = Object.assign(state, { go, views: Object.keys(VIEWS) });
+        rows();
+        paint();
+        requestAnimationFrame(tick);
+      </script>
+    </main>
+  </body>
+</html>

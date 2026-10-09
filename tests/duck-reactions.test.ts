@@ -3,9 +3,42 @@ import { duckAwareWalk, DUCK_LOVE_SECONDS, DUCK_NOTICE_RADIUS } from '../src/lib
 import { ducksAt, DUCK_STREET_Y, DUCK_WALK_START, DUCK_WALK_END } from '../src/lib/ducks';
 import { residentActivityLabel, simulateResidents } from '../src/lib/simulation';
 import { isRoad } from '../src/lib/world';
-import { readPlaces } from './full-town';
+import type { Place } from '../src/lib/schema';
+import { FROZEN_TOWN } from './district';
+import { fullTownHouse, readPlaces } from './full-town';
 
-const places = readPlaces();
+const real = readPlaces();
+/** The duck street's own plots, whose doors open onto it. */
+const STREET = ['C7', 'C8', 'C9', 'C10', 'C11', 'C12', 'C13', 'C14'];
+/** A morning stroller on a street plot. */
+const stroller = (plot: string): Place => {
+  const house = fullTownHouse(plot);
+  return {
+    ...house,
+    resident: {
+      ...house.resident,
+      routine: { morning: 'stroll', afternoon: 'home', evening: 'home', night: 'sleep' },
+    },
+  };
+};
+/**
+ * The family walks the duck street from the river to x ≈ 21.6 and back, east of where today's
+ * homes stand. So the real town is joined by morning strollers on the street plots it leaves free
+ * (the full town fills them): whoever lives there, nobody spins round or is held mid-step.
+ */
+const places = [
+  ...real,
+  ...STREET.filter((plot) => !real.some((place) => place.plot === plot)).map(stroller),
+];
+/**
+ * The frozen town (tests/district.ts) with every street plot a morning stroller's: the walkers
+ * the ducks are counted on, so a contributor who moves onto the street and works mornings never
+ * leaves the family unadmired.
+ */
+const duckTown = [
+  ...FROZEN_TOWN.filter((place) => !STREET.includes(place.plot)),
+  ...STREET.map(stroller),
+];
 // A walker crosses the real family's route head-on at 09:00.
 const crossingX = ducksAt(540)[0].position.x;
 const walk = (time: number) => ({
@@ -64,24 +97,25 @@ describe('Residents admiring the duck family', () => {
 
   it('turns to ducklings ahead or beside, never spinning round in a frame, and not mid-step off a path', () => {
     const opposite = { se: 'nw', nw: 'se', sw: 'ne', ne: 'sw' } as const;
-    let stops = 0;
-    for (const day of [0, 42]) {
-      let before = simulateResidents(places, DUCK_WALK_START, day);
-      for (let time = DUCK_WALK_START + 0.1; time < DUCK_WALK_END + 12; time += 0.1) {
-        const now = simulateResidents(places, time, day);
-        now.forEach((state, i) => {
-          const was = before[i];
-          if (state.duckLove === was.duckLove) return;
-          if (state.duckLove) stops++;
-          // Into the stop and out of it again: a quarter turn at most.
-          expect(state.facing, `${state.id} on day ${day} at ${time}`).not.toBe(
-            opposite[was.facing],
-          );
-        });
-        before = now;
+    const stops = new Map<Place[], number>();
+    for (const homes of [places, duckTown])
+      for (const day of [0, 42]) {
+        let before = simulateResidents(homes, DUCK_WALK_START, day);
+        for (let time = DUCK_WALK_START + 0.1; time < DUCK_WALK_END + 12; time += 0.1) {
+          const now = simulateResidents(homes, time, day);
+          now.forEach((state, i) => {
+            const was = before[i];
+            if (state.duckLove === was.duckLove) return;
+            if (state.duckLove) stops.set(homes, (stops.get(homes) ?? 0) + 1);
+            // Into the stop and out of it again: a quarter turn at most.
+            expect(state.facing, `${state.id} on day ${day} at ${time}`).not.toBe(
+              opposite[was.facing],
+            );
+          });
+          before = now;
+        }
       }
-    }
-    expect(stops).toBeGreaterThan(0);
+    expect(stops.get(duckTown)).toBeGreaterThan(0);
     // Right beside the family the moment a walk begins: they set off first, and look after.
     const start = DUCK_WALK_START + 60;
     const beside = () => ({
@@ -92,7 +126,7 @@ describe('Residents admiring the duck family', () => {
     });
     for (let t = start; t < start + 0.5; t += 0.05)
       expect(duckAwareWalk('test:setting-off', t, start, start + 60, beside).duckLove).toBeFalsy();
-  });
+  }, 90_000);
 
   it('remembers every route’s encounters however many neighbors stroll at once', () => {
     let samples = 0;
@@ -107,26 +141,28 @@ describe('Residents admiring the duck family', () => {
   });
 
   it('integrates with real residents, labels the reaction, and leaves event guests and indoor routines alone', () => {
-    let seen = 0;
-    // One reversed roster, so its day plan is made once rather than for every reaction.
-    const reversed = [...places].reverse();
-    for (let time = DUCK_WALK_START; time < DUCK_WALK_END; time += 0.5) {
-      const states = simulateResidents(places, time, 0);
-      for (const state of states) {
-        if (state.event || state.activity !== 'stroll') expect(state.duckLove).toBeUndefined();
-        if (!state.duckLove) continue;
-        seen++;
-        expect(state.moving).toBe(false);
-        expect(state.greeting).toBe(false);
-        expect(residentActivityLabel(state)).toBe('Stopped to admire the ducklings');
-        const replay = simulateResidents(reversed, time, 0).find((r) => r.id === state.id);
-        expect(replay).toEqual(state);
-        expect(simulateResidents(places, time + 1440, 0).find((r) => r.id === state.id)).toEqual(
-          state,
-        );
+    const seen = new Map<Place[], number>();
+    for (const homes of [places, duckTown]) {
+      // One reversed roster, so its day plan is made once rather than for every reaction.
+      const reversed = [...homes].reverse();
+      for (let time = DUCK_WALK_START; time < DUCK_WALK_END; time += 0.5) {
+        const states = simulateResidents(homes, time, 0);
+        for (const state of states) {
+          if (state.event || state.activity !== 'stroll') expect(state.duckLove).toBeUndefined();
+          if (!state.duckLove) continue;
+          seen.set(homes, (seen.get(homes) ?? 0) + 1);
+          expect(state.moving).toBe(false);
+          expect(state.greeting).toBe(false);
+          expect(residentActivityLabel(state)).toBe('Stopped to admire the ducklings');
+          const replay = simulateResidents(reversed, time, 0).find((r) => r.id === state.id);
+          expect(replay).toEqual(state);
+          expect(simulateResidents(homes, time + 1440, 0).find((r) => r.id === state.id)).toEqual(
+            state,
+          );
+        }
       }
     }
-    expect(seen).toBeGreaterThan(0);
+    expect(seen.get(duckTown)).toBeGreaterThan(0);
     const indoors = places.map((place) => ({
       ...place,
       resident: {

@@ -257,11 +257,13 @@ export function drawVenue(
     rect(40, -29, 7, 10, '#D8C678');
     rect(42, -31, 3, 3, '#E8DCB8');
     rect(51, -24, 5, 6, '#E9DFBC');
-    if (live && event?.id === 'books') {
+    // On a snowman build day the green builds snowmen instead: no books, no lawn games.
+    const props = live && event?.variant !== 'snowmen';
+    if (props && event?.id === 'books') {
       rect(23, -20, 13, 4, '#799C96');
       rect(24, -24, 11, 4, '#BE9776');
     }
-    if (live && event?.id === 'games') {
+    if (props && event?.id === 'games') {
       for (let i = 0; i < 5; i++)
         rect(-18 + i * 7, 8 + (i % 2) * 5, 4, 4, i % 2 ? '#F1DE9F' : '#527866');
     }

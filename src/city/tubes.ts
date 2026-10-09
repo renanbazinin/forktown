@@ -1,25 +1,38 @@
+import { KINGFISHER_PIER } from '../lib/district-calendar';
 import { FORK_PLOT } from '../lib/lanterns';
 import { seedFraction, snowAt, type TownSeason } from '../lib/seasons';
 import type { ResidentState } from '../lib/simulation';
 import type { TubeParcelState } from '../lib/tube-traffic';
 import {
+  TRUNK_ARCS,
   TUBE_ALIGHT_STEPS,
   TUBE_ALTITUDE,
+  TUBE_BANK_X,
   TUBE_BOARD,
   TUBE_BOARD_STEPS,
+  TUBE_CORNER,
   TUBE_PARCELS,
   TUBE_SIGN_LINES,
+  TUBE_SIGN_STATION,
   TUBE_STATIONS,
   TUBE_TRUNK_X,
+  TUBE_TRUNK_Y,
+  loopSpur,
+  stationTap,
+  trunkPoint,
+  trunkS,
   tubeAt,
   tubeInStack,
   tubeRoute,
   tubeStageTime,
+  tubeStation,
+  tubeTrunkBetween,
   type ResidentTransit,
   type TubePoint,
   type TubeStation,
 } from '../lib/tubes';
-import { PLOTS, getPlot, project, type Point } from '../lib/world';
+import { PLOTS, TILE_H, WORLD_WIDTH, getPlot, plotCenter, project, type Point } from '../lib/world';
+import type { GroundArea } from './ground-cache';
 import { drawGlow } from './glow';
 import { tint } from './houses';
 import { lampOn, MAX_LAMP_DISTANCE, MIN_LAMP_DISTANCE } from './lamplight';
@@ -27,18 +40,24 @@ import { drawResident } from './residents';
 import { SNOW, pick, type Pair } from './season-palette';
 
 // The Treeline in three layers, like the Millpond:
-//  1. drawTubeGround: the stations' stone pads, the trunk's posts and the glass behind the tree
-//     line (both elbows and the trunk). It is painted into the cached ground layer, so it reads
-//     only `night`, the zoom, the emphasis and the view.
+//  1. drawTubeGround: the stations' stone pads, the trunk's posts, pilings and the glass behind
+//     the tree lines and on the far bank (every elbow, both corners and the three runs), and
+//     close up the still water under it (reflections, rings) and its shade on the far bank. It
+//     is painted into the cached ground layer, so it reads only `night`, the zoom, the view and
+//     the halt marked, whose own elbows and T light inside its tubeMarkArea.
 //  2. drawTubeTraffic: per frame, straight after the ground: riders and parcels in that glass, so
-//     every edge tree stands in front of them.
+//     every edge tree and far-bank willow stands in front of them.
 //  3. drawTubes: depth objects: the spur pieces with whoever rides in them, the corner bubbles,
-//     the spur posts, the stacks (with anyone boarding or stepping off inside), the first
-//     station's sign and umbrella stand, and the puffs of air.
+//     the spur posts and river piers, the stacks (with anyone boarding or stepping off inside),
+//     the sign station's sign and umbrella stand, and the puffs of air.
 // Model and art read the same routes (src/lib/tubes.ts), and a rider's straight sprite is cut
 // where its glass turns, so a rider is always inside the glass.
-// The line is quiet on purpose: 5-px glass that fades as the map zooms out, stations lower than a
-// cottage, no snow on the glass, and amber only in a lit lamp.
+// The line is quiet on purpose: 5-px glass (4 px down the far bank) that fades as the map zooms
+// out, stations lower than a cottage, no snow on the glass, and amber only in a lit lamp. A hover
+// or a selection marks one halt: its own spur, bubbles, post or pier and stack, and in the
+// ground its elbows, its T and its plot. From zoom 1 (DETAIL) the bends keep their width, a fold
+// or a halt's T never crosses or doubles its glass, the piers stand on stone feet and the water
+// carries reflections; below it the art stays plain.
 
 type Ctx = CanvasRenderingContext2D;
 type Visible = (point: Point, rx: number, above: number, below: number) => boolean;
@@ -54,6 +73,9 @@ export type TubeScene = {
   zoom: number;
   /** Selected if a station plot is selected, else hover if one is hovered. */
   emphasis: TubeEmphasis;
+  /** The halt the emphasis is on: the selected halt, else the hovered one. Only its own pieces
+   *  light; the cached ground stays as it is outside tubeMarkArea(station). */
+  station: string | null;
   /** render.ts's own culling. */
   visible: Visible;
   residents: readonly ResidentState[];
@@ -72,15 +94,18 @@ export type TubeObject = {
   ground: Point;
   slope: number;
 };
-/** A run of glass: part of one station's spur, or a run of trunk. Pieces behind the tree line
- * are painted before the sort; the rest are sorted. */
+/** A run of glass: part of one station's spur, or a run of trunk. Pieces behind the tree lines
+ * and on the far bank are painted before the sort; the rest are sorted. */
 export type TubePiece = {
-  /** Its glass centreline, in the order a ride from the line's north end meets it. */
+  /** Its glass centreline: along the line for a run of trunk, along its own spur for the rest. */
   points: readonly TubePoint[];
   layer: 'ground' | 'spur';
   /** Mean x + y of the piece's points − 0.25 for a spur piece; −1 for the ground layer. */
   depth: number;
   station: string;
+  /** A run of trunk from one tap to the next (owned by the halt it leaves); the rest belongs to
+   *  its station's own spur, elbows included, and lights with it. */
+  trunk?: true;
 };
 export type TubePainter =
   { kind: 'traffic' } | { kind: 'spur'; piece: number } | { kind: 'stack'; station: string };
@@ -141,10 +166,11 @@ const METAL = {
   post: ['#8E9A88', '#46605A'],
   side: ['#6F7C6B', '#34494A'],
 } as const satisfies Record<string, Pair>;
-/** The streetlamp's hood. */
+/** The streetlamp's hood: its face, its top, and the shade under its lip that frames the lamp. */
 const HOOD = {
   face: ['#748269', '#4F6358'],
   top: ['#8B9A7F', '#5E7266'],
+  lip: ['#5C6A55', '#3C4E47'],
 } as const satisfies Record<string, Pair>;
 const PAD = {
   stone: ['#DDD3B3', '#7F8A79'],
@@ -160,6 +186,21 @@ const PLATE = {
 const LAMP = {
   face: ['#EDE5C1', '#7C8272'],
   lit: ['#F4D79A', '#F4D79A'],
+  /** The hot middle of a lit lamp. */
+  core: ['#FFF1C9', '#FFF1C9'],
+} as const satisfies Record<string, Pair>;
+/** A bank bridge's pier: a slim column on a stone foot, its dry top pale, its lit and shaded faces
+ *  darker where the river wets them. */
+const PIER = {
+  top: ['#B4BDA9', '#62776F'],
+  lit: ['#83917F', '#435853'],
+  wet: ['#66766A', '#33474A'],
+} as const satisfies Record<string, Pair>;
+/** On open water: the glass's pale reflection, and the darker one under a pier or a piling. Only
+ *  the head pool and the river under the bridges ever show them. */
+const REFLECTION = {
+  glass: ['#E9F5F17A', '#8BAEB266'],
+  post: ['#5F726A4D', '#1E33375C'],
 } as const satisfies Record<string, Pair>;
 const KRAFT = {
   box: ['#C4A57A', '#6E6250'],
@@ -173,8 +214,12 @@ const UMBRELLA = {
   rim: ['#D8C288', '#9A8E6A'],
 } as const satisfies Record<string, Pair>;
 const PUFF: Pair = ['#F1F5EAB0', '#9DB0AA90'];
+/** A pale ring where a pier or piling stands in the river, instead of a shadow. */
+const RIPPLE: Pair = ['#D4E8E1', '#6F8D8D'];
 const PUFF_GRASS: Pair = ['#7E9C60', '#6B8B73'];
 const SHADOW: Pair = ['#23341B30', '#0B171540'];
+/** The bank glass's own faint shade on the far bank's grass. */
+const GLASS_SHADE: Pair = ['#23341B1A', '#0B171526'];
 /** The follow diamond under a followed neighbor's feet, as in the resident loop. */
 const FOLLOW: Pair = ['#FFF7D5', '#F0DBA575'];
 /** drawResident's leg colour, for the riders' trousers. */
@@ -185,13 +230,26 @@ const NIGHT_DIM = -40;
 /** Every colour the Treeline paints, by name, for the tests. */
 export const TUBE_PALETTE: Record<string, readonly [day: string, night: string]> = {
   ...Object.fromEntries(
-    Object.entries({ GLASS, METAL, HOOD, PAD, PLATE, LAMP, KRAFT, UMBRELLA }).flatMap(
-      ([group, pairs]) => Object.entries(pairs).map(([name, pair]) => [`${group}.${name}`, pair]),
+    Object.entries({
+      GLASS,
+      METAL,
+      HOOD,
+      PAD,
+      PLATE,
+      LAMP,
+      PIER,
+      REFLECTION,
+      KRAFT,
+      UMBRELLA,
+    }).flatMap(([group, pairs]) =>
+      Object.entries(pairs).map(([name, pair]) => [`${group}.${name}`, pair]),
     ),
   ),
   PUFF,
   PUFF_GRASS,
+  RIPPLE,
   SHADOW,
+  GLASS_SHADE,
   FOLLOW,
   TROUSERS: [TROUSERS, tint(TROUSERS, NIGHT_DIM)],
 };
@@ -199,65 +257,93 @@ export const TUBE_PALETTE: Record<string, readonly [day: string, night: string]>
 // ---------------------------------------------------------------------------------------------
 // Geometry: each station's spur and the trunk between them, cut into pieces
 //
-// TUBE_STATIONS runs north to south, so a station's spur toward the station after it heads
-// south (+1) and toward the one before it north (−1); tubeRoute picks the same way from the
-// docks. The first and last stations have one spur each. A station between two others has both,
-// and they share everything but the elbow. Every ride is its boarding station's spur, one run of
-// trunk and its alighting station's spur backwards, so any ride between any two stations maps
-// onto these pieces. See docs/TUBES.md, "Growing the line".
+// TUBE_STATIONS runs in line order round the loop (west run north, north run east, bank run
+// south), so a station's spur toward the station after it heads to larger arc length (+1) and
+// toward the one before it to smaller (−1); tubeRoute picks the same way from the taps. The first
+// and last stations have one spur each. A station between two others has both, and they share
+// everything but the elbow. Every ride is its boarding station's spur, one run of trunk (round
+// any corner between) and its alighting station's spur backwards, so any ride between any two
+// stations maps onto these pieces. See docs/TUBES.md, "Growing the line".
 
 type Heading = 1 | -1;
-const FIRST = TUBE_STATIONS[0];
-TUBE_STATIONS.forEach((station, i) => {
-  if (i > 0 && !(station.dock.y > TUBE_STATIONS[i - 1].dock.y))
-    throw new Error(`The Treeline runs north to south, but ${station.id} is out of order.`);
-});
-const behind = (p: TubePoint) => p.x <= 0.001;
-const onTrunk = (a: TubePoint, b: TubePoint) => a.x === TUBE_TRUNK_X && b.x === TUBE_TRUNK_X;
+/** The halt with the sign and the umbrella stand. */
+const SIGN_STATION = tubeStation(TUBE_SIGN_STATION);
+/** Behind the west or north tree line, or on the far bank: painted in the ground layer. */
+const behind = (p: Point) => p.x <= 0.001 || p.y <= 0.001 || p.x >= WORLD_WIDTH - 1.001;
 const groundStep = (a: TubePoint, b: TubePoint) => Math.hypot(b.x - a.x, b.y - a.y);
 const samePoint = (a: TubePoint, b: TubePoint) => a.x === b.x && a.y === b.y && a.h === b.h;
+/** Where a west or bank spur's leg turns along its row (a north spur runs straight on). */
 const isCorner = (p: TubePoint) =>
-  TUBE_STATIONS.some((s) => Math.abs(s.dock.x - p.x) < 1e-9 && Math.abs(s.dock.y - p.y) < 1e-9);
-const nearestStation = (y: number) =>
-  TUBE_STATIONS.reduce((best, s) =>
-    Math.abs(s.dock.y - y) < Math.abs(best.dock.y - y) ? s : best,
+  TUBE_STATIONS.some(
+    (s) => s.edge !== 'north' && Math.abs(s.dock.x - p.x) < 1e-9 && Math.abs(s.dock.y - p.y) < 1e-9,
   );
-const headingOf = (from: string, to: string): Heading =>
-  TUBE_STATIONS.findIndex((s) => s.id === to) > TUBE_STATIONS.findIndex((s) => s.id === from)
-    ? 1
-    : -1;
-
-/** The one segment of a route that runs along the trunk. Memoised by route. */
-const TRUNK_SEGMENT = new WeakMap<readonly TubePoint[], number>();
-function trunkSegment(route: readonly TubePoint[]) {
-  let k = TRUNK_SEGMENT.get(route);
-  if (k === undefined) {
-    k = route.findIndex((p, i) => i + 1 < route.length && onTrunk(p, route[i + 1]));
-    if (k < 0) throw new Error('A Treeline route that never reaches the trunk.');
-    TRUNK_SEGMENT.set(route, k);
+const indexOf = (id: string) => TUBE_STATIONS.findIndex((s) => s.id === id);
+const headingOf = (from: string, to: string): Heading => (indexOf(to) > indexOf(from) ? 1 : -1);
+/** The station whose tap is nearest arc length s. */
+const nearestTap = (s: number) =>
+  TUBE_STATIONS.reduce((best, station) =>
+    Math.abs(stationTap(station.id) - s) < Math.abs(stationTap(best.id) - s) ? station : best,
+  );
+/** Arc length of the trunk point nearest a ground point near the trunk (for picking). */
+function nearestTrunkS(p: Point) {
+  const { S_N0, S_N1, S_E0 } = TRUNK_ARCS;
+  const R = TUBE_CORNER;
+  const top = TUBE_TRUNK_Y + R,
+    west = TUBE_TRUNK_X + R,
+    east = TUBE_BANK_X - R;
+  const options: { s: number; d: number }[] = [];
+  if (p.y >= top) options.push({ s: top - p.y, d: Math.abs(p.x - TUBE_TRUNK_X) });
+  if (p.x >= west && p.x <= east)
+    options.push({ s: S_N0 + p.x - west, d: Math.abs(p.y - TUBE_TRUNK_Y) });
+  if (p.y >= top) options.push({ s: S_E0 + p.y - top, d: Math.abs(p.x - TUBE_BANK_X) });
+  if (p.x <= west && p.y <= top) {
+    const a = Math.atan2(p.y - top, p.x - west);
+    options.push({ s: (a + Math.PI) * R, d: Math.abs(Math.hypot(p.x - west, p.y - top) - R) });
   }
-  return k;
+  if (p.x >= east && p.y <= top) {
+    const a = Math.atan2(p.y - top, p.x - east);
+    options.push({
+      s: S_N1 + (a + Math.PI / 2) * R,
+      d: Math.abs(Math.hypot(p.x - east, p.y - top) - R),
+    });
+  }
+  return options.reduce((best, option) => (option.d < best.d ? option : best)).s;
+}
+
+/** Where the trunk part of a ride starts and ends: route segments first..last run along it. */
+const SPANS = new Map<string, { first: number; last: number }>();
+function trunkSpan(from: string, to: string) {
+  const key = `${from}>${to}`;
+  let span = SPANS.get(key);
+  if (!span) {
+    const heading = headingOf(from, to);
+    const there = loopSpur(tubeStation(from), heading).length,
+      back = loopSpur(tubeStation(to), -heading as Heading).length;
+    span = { first: there - 1, last: tubeRoute(from, to).length - back - 1 };
+    SPANS.set(key, span);
+  }
+  return span;
 }
 /** A station's spur toward its neighbour that way: stack top first, ending on the trunk. */
 function spurOf(station: TubeStation, heading: Heading): readonly TubePoint[] {
-  const next = TUBE_STATIONS[TUBE_STATIONS.indexOf(station) + heading];
-  if (!next)
+  if (!TUBE_STATIONS[TUBE_STATIONS.indexOf(station) + heading])
     throw new Error(
-      `The Treeline has no station ${heading > 0 ? 'south' : 'north'} of ${station.id}.`,
+      `The Treeline has no station ${heading > 0 ? 'after' : 'before'} ${station.id}.`,
     );
-  const route = tubeRoute(station.id, next.id);
-  return route.slice(0, trunkSegment(route) + 1);
+  return loopSpur(station, heading);
 }
 const slotOf = (station: string, heading: Heading) => `${station}:${heading}`;
 
 /**
- * Along the line from its north end: the first station's spur, then for each next station the
- * trunk down to it, its spur (a middle station: its north elbow, the trunk between its two
- * elbows, where its T will stand, then its spur south). Segment 0 of a spur is inside its stack's
- * top. Segments with both ends at x ≤ 0 are behind the tree line: one ground piece per elbow and
- * one per run of trunk. The rest are spur pieces of at most half a tile, never across a corner,
- * each sorted at its mean x + y − 0.25, so the column-0 pieces go behind the edge tree in front
- * of them. `owners` says which piece draws each segment of each station's spur either way.
+ * Along the line from its first station: the first station's spur, then for each next station the
+ * trunk round to it (to its tap, where a middle station's T stands, or to the last station's
+ * elbow), and its spur (a middle station: its back elbow, then its spur onward). So the trunk is
+ * one run between consecutive taps, corners included, from the first station's elbow to the
+ * last's. Segment 0 of a spur is inside its stack's top. Segments with both ends behind the tree
+ * lines or on the far bank are in the ground layer: one ground piece per elbow and one per run of
+ * trunk. The rest are spur pieces of at most half a tile, never across a corner, each sorted at
+ * its mean x + y − 0.25, so the edge pieces go behind the edge tree in front of them. `owners`
+ * says which piece draws each segment of each station's spur either way.
  */
 const PLAN = (() => {
   const pieces: TubePiece[] = [];
@@ -268,12 +354,13 @@ const PLAN = (() => {
     list[segment] = piece;
     owners.set(slot, list);
   };
-  const trunk = (a: TubePoint, b: TubePoint) =>
+  const trunk = (a: TubePoint, b: TubePoint, station: string) =>
     pieces.push({
-      points: [a, b],
+      points: tubeTrunkBetween(a, b),
       layer: 'ground',
       depth: -1,
-      station: nearestStation((a.y + b.y) / 2).id,
+      station,
+      trunk: true,
     });
   /** Cuts segments first..last of a polyline into pieces, telling `serve` who owns each. */
   const cut = (
@@ -321,32 +408,30 @@ const PLAN = (() => {
   let trunkFrom: TubePoint | undefined;
   TUBE_STATIONS.forEach((station, i) => {
     const id = station.id;
-    const north = i > 0 ? spurOf(station, -1) : undefined;
-    const south = i + 1 < TUBE_STATIONS.length ? spurOf(station, 1) : undefined;
+    const back = i > 0 ? spurOf(station, -1) : undefined;
+    const on = i + 1 < TUBE_STATIONS.length ? spurOf(station, 1) : undefined;
     let shared = 0;
-    const common = north && south ? Math.min(north.length, south.length) : 0;
-    while (shared < common && samePoint(north![shared], south![shared])) shared++;
-    if (north && south && shared < 2)
+    const common = back && on ? Math.min(back.length, on.length) : 0;
+    while (shared < common && samePoint(back![shared], on![shared])) shared++;
+    if (back && on && shared < 2)
       throw new Error(`The Treeline's two spurs at ${id} should share all but the elbow.`);
-    if (north) {
+    if (back) {
       own(id, -1, 0, -1);
-      trunk(trunkFrom!, north.at(-1)!);
+      const end = on ? trunkPoint(stationTap(id)) : back.at(-1)!;
+      trunk(trunkFrom!, end, TUBE_STATIONS[i - 1].id);
+      trunkFrom = end;
       // Trunk first: the elbow alone at a middle station, the whole spur at the last.
-      const track = north.slice(south ? shared - 1 : 0).reverse();
-      const n = north.length - 1;
-      cut(track, 0, track.length - (south ? 2 : 3), id, (t, piece) =>
-        own(id, -1, n - 1 - t, piece),
-      );
-      trunkFrom = north.at(-1);
+      const track = back.slice(on ? shared - 1 : 0).reverse();
+      const n = back.length - 1;
+      cut(track, 0, track.length - (on ? 2 : 3), id, (t, piece) => own(id, -1, n - 1 - t, piece));
     }
-    if (south) {
+    if (on) {
       own(id, 1, 0, -1);
-      if (north) trunk(trunkFrom!, south.at(-1)!);
-      cut(south, 1, south.length - 2, id, (k, piece) => {
+      cut(on, 1, on.length - 2, id, (k, piece) => {
         own(id, 1, k, piece);
-        if (north && k < shared - 1) own(id, -1, k, piece);
+        if (back && k < shared - 1) own(id, -1, k, piece);
       });
-      trunkFrom = south.at(-1);
+      if (!back) trunkFrom = on.at(-1);
     }
   });
   return { pieces, owners };
@@ -367,11 +452,11 @@ function painterOf(from: string, to: string, index: number): TubePainter {
   const last = route.length - 2;
   if (index <= 0) return { kind: 'stack', station: from };
   if (index >= last) return { kind: 'stack', station: to };
-  const trunk = trunkSegment(route);
-  if (index === trunk) return { kind: 'traffic' };
+  const trunk = trunkSpan(from, to);
+  if (index >= trunk.first && index <= trunk.last) return { kind: 'traffic' };
   const heading = headingOf(from, to);
   const piece =
-    index < trunk
+    index < trunk.first
       ? PLAN.owners.get(slotOf(from, heading))?.[index]
       : PLAN.owners.get(slotOf(to, -heading as Heading))?.[last - index];
   if (piece === undefined || piece < 0)
@@ -384,44 +469,93 @@ export function tubePainterFor(from: string, to: string, distance: number): Tube
   return painterOf(from, to, tubeAt(from, to, distance).index);
 }
 
-/** Trunk posts on the middle row of every block the trunk passes (15.5, 19.5, …): 4 tiles apart,
- * mid-block and never beside a road end. None on a station's own row, where a station between
- * two others has its T. */
-export const TUBE_TRUNK_POSTS: readonly Point[] = (() => {
-  const trunk = TUBE_PIECES.filter((piece) => piece.points.every((p) => p.x === TUBE_TRUNK_X));
-  const top = Math.min(...trunk.map((piece) => piece.points[0].y)),
-    bottom = Math.max(...trunk.map((piece) => piece.points.at(-1)!.y));
+/** A post under the trunk: its ground point, its height to the glass's underside, which run it
+ *  holds, and whether it stands in the river's head pool (a piling). */
+export type TubePost = Point & { run: 'west' | 'north' | 'bank'; height: number; water: boolean };
+/** The river as render.ts paints it: the column before the far bank, and the far bank's head. */
+function isRiver(x: number, y: number) {
+  const tx = Math.floor(x),
+    ty = Math.floor(y);
+  return tx === WORLD_WIDTH - 2 || (tx === WORLD_WIDTH - 1 && ty < 8);
+}
+/** The trunk the line actually uses: from the first station's elbow round to the last's. */
+const TRUNK_ENDS = {
+  from: trunkS(loopSpur(TUBE_STATIONS[0], 1).at(-1)!),
+  to: trunkS(loopSpur(TUBE_STATIONS.at(-1)!, -1).at(-1)!),
+};
+const onLine = (s: number) => s > TRUNK_ENDS.from && s < TRUNK_ENDS.to;
+const postHeight = (h: number, radius: number) => Math.round(h - radius);
+/**
+ * Posts under the trunk, in line order. The west run: the middle row of every block it passes
+ * (3.5, 7.5, 15.5, …), 4 tiles apart. The north run: every second plot column (7.5, 15.5, …). The
+ * bank run: every plot row, the first two as pilings in the river's head pool. Never on a
+ * station's own row or column, where a station between two others has its T.
+ */
+export const TUBE_TRUNK_POSTS: readonly TubePost[] = (() => {
   const rows = [...new Set(PLOTS.map((plot) => plot.y + 0.5))].sort((a, b) => a - b);
-  return rows
-    .filter((y) => y > top && y < bottom && !TUBE_STATIONS.some((s) => s.dock.y === y))
-    .map((y) => ({ x: TUBE_TRUNK_X, y }));
+  const halts = (edge: TubeStation['edge']) => TUBE_STATIONS.filter((s) => s.edge === edge);
+  const { S_N0, S_E0 } = TRUNK_ARCS;
+  const top = TUBE_TRUNK_Y + TUBE_CORNER,
+    west = TUBE_TRUNK_X + TUBE_CORNER;
+  const trunkPost = postHeight(TUBE_ALTITUDE.trunk, TUBE_ALTITUDE.radius),
+    bankPost = postHeight(TUBE_ALTITUDE.bank, TUBE_ALTITUDE.bankRadius);
+  const westPosts = rows
+    .filter((y) => y > top && onLine(top - y) && !halts('west').some((s) => s.dock.y === y))
+    .reverse()
+    .map((y) => ({ x: TUBE_TRUNK_X, y, run: 'west' as const, height: trunkPost, water: false }));
+  const northPosts: TubePost[] = [];
+  for (let x = 7.5; x < TUBE_BANK_X - TUBE_CORNER; x += 8)
+    if (onLine(S_N0 + x - west) && !halts('north').some((s) => s.dock.x === x))
+      northPosts.push({ x, y: TUBE_TRUNK_Y, run: 'north', height: trunkPost, water: false });
+  const bankPosts = rows
+    .filter((y) => y > top && onLine(S_E0 + y - top) && !halts('bank').some((s) => s.dock.y === y))
+    .map((y) => ({
+      x: TUBE_BANK_X,
+      y,
+      run: 'bank' as const,
+      height: bankPost,
+      water: isRiver(TUBE_BANK_X, y),
+    }));
+  return [...westPosts, ...northPosts, ...bankPosts];
 })();
-const TRUNK_POST_HEIGHT = Math.round(TUBE_ALTITUDE.trunk - TUBE_ALTITUDE.radius);
-/** Where each spur's one post stands: in the tree-free column-0 tile of its row. */
-const SPUR_POST_X = 0.62;
-/** The glass centreline's lift over ground x along a station's own spur row. */
-function spurLift(station: TubeStation, x: number) {
-  const spur = spurOf(station, station === FIRST ? 1 : -1);
+/** Where each west spur's one post stands: in the tree-free column-0 tile of its row (a north
+ *  spur's in the tree-free row-0 tile of its column). A bank bridge's one pier stands mid-river,
+ *  mirroring it, at KINGFISHER_PIER.x. */
+const SPUR_POST_AT = 0.62;
+/** The glass centreline's lift over a station's own spur, `along` its crossing axis (x along a
+ *  west or bank halt's row, y along a north halt's column). */
+function spurLift(station: TubeStation, along: number) {
+  const spur = loopSpur(station, 1);
+  const north = station.edge === 'north';
+  const axis = (p: Point) => (north ? p.y : p.x),
+    fixed = (p: Point) => (north ? p.x : p.y);
+  const at = fixed(station.dock);
   for (let i = 1; i < spur.length; i++) {
     const a = spur[i - 1],
       b = spur[i];
-    if (a.y !== station.dock.y || b.y !== station.dock.y) continue;
-    if (x <= Math.max(a.x, b.x) && x >= Math.min(a.x, b.x))
-      return a.h + ((b.h - a.h) * (x - a.x)) / (b.x - a.x || 1);
+    if (fixed(a) !== at || fixed(b) !== at) continue;
+    if (along <= Math.max(axis(a), axis(b)) && along >= Math.min(axis(a), axis(b)))
+      return a.h + ((b.h - a.h) * (along - axis(a))) / (axis(b) - axis(a) || 1);
   }
-  throw new Error(`${station.id}'s spur never passes x = ${x} on its own row.`);
+  throw new Error(`${station.id}'s spur never passes ${along} on its own row or column.`);
 }
 const SPUR_POSTS = lazy(() =>
-  TUBE_STATIONS.map((station) => ({
-    station,
-    ground: { x: SPUR_POST_X, y: station.dock.y },
-    height: Math.round(spurLift(station, SPUR_POST_X) - TUBE_ALTITUDE.radius),
-  })),
+  TUBE_STATIONS.map((station) => {
+    const along = station.edge === 'bank' ? KINGFISHER_PIER.x : SPUR_POST_AT;
+    const ground =
+      station.edge === 'north' ? { x: station.dock.x, y: along } : { x: along, y: station.dock.y };
+    return {
+      station,
+      ground,
+      height: postHeight(spurLift(station, along), TUBE_ALTITUDE.radius),
+      water: station.edge === 'bank',
+    };
+  }),
 );
-/** The first station's sign and umbrella stand, placed from its stack's foot: the sign east of
+/** The sign station's sign and umbrella stand, placed from its stack's foot: the sign east of
  * it, where walkers from the Fork pass it first, and the stand west of the walk in. */
-const SIGN_FOOT = { x: FIRST.stack.x + 0.9, y: FIRST.stack.y + 0.15 };
-const STAND_FOOT = { x: FIRST.stack.x - 0.3, y: FIRST.stack.y + 0.1 };
+const SIGN_FOOT = { x: SIGN_STATION.stack.x + 0.9, y: SIGN_STATION.stack.y + 0.15 };
+const STAND_FOOT = { x: SIGN_STATION.stack.x - 0.3, y: SIGN_STATION.stack.y + 0.1 };
 const SIGN_DEPTH = SIGN_FOOT.x + SIGN_FOOT.y;
 const STAND_DEPTH = STAND_FOOT.x + STAND_FOOT.y;
 const stackDepth = (station: TubeStation) => station.stack.x + station.stack.y;
@@ -461,21 +595,90 @@ function pieceVisible(piece: TubePiece, visible: Visible) {
 // ---------------------------------------------------------------------------------------------
 // Glass
 
-/** Glass as vertical-slice parallelograms: consecutive runs share their end edges exactly, so
- * the translucent glass never doubles up. Keep one canvas save for the whole piece, moving
- * between each run's origin and slope with relative transforms. */
+/** On the bank run: the far-bank glass is a 4-px hairline. */
+const onBank = (p: TubePoint) => p.x >= TUBE_BANK_X - 1e-9;
+/** Strictly inside one of the loop's two corners. */
+const inCorner = (p: TubePoint) =>
+  p.y < TUBE_TRUNK_Y + TUBE_CORNER - 1e-9 &&
+  (p.x < TUBE_TRUNK_X + TUBE_CORNER - 1e-9 || p.x > TUBE_BANK_X - TUBE_CORNER + 1e-9);
+/** On one of the trunk's three straight runs. */
+const onRun = (p: TubePoint) => p.x === TUBE_TRUNK_X || p.y === TUBE_TRUNK_Y || p.x === TUBE_BANK_X;
+/** Below this zoom the line is a few pixels across: fewer slices, no 1-px rows, plain posts. */
+const FAR = 0.5;
+/** From this zoom every pixel shows: the curves keep their width, the hood frames its lamp, the
+ *  piers stand on their feet and the still water carries reflections. Below it the line keeps the
+ *  plain art, so the opening view and the whole town cost what they did. */
+const DETAIL = 1;
+/** Below this the phone's opening view holds the whole loop, about 0.15: each halt's run of spur
+ *  glass is one stroke and a dock bubble one square. The whole town at fit (0.245) stays above. */
+const WHOLE = 0.2;
+/**
+ * A piece's points for painting at a zoom. A spur piece below FAR is its chord: at most half a
+ * tile, a few pixels on screen. A ground piece below zoom 1 loses every other corner sample, so a
+ * corner is four slices, not eight (its centreline moves under half a pixel); below FAR every
+ * other elbow sample goes too (under a pixel). The ends and the straight runs always stay.
+ */
+const COARSE = new Map<string, WeakMap<TubePiece, readonly TubePoint[]>>();
+function coarse(piece: TubePiece, zoom: number): readonly TubePoint[] {
+  if (zoom < FAR && piece.layer === 'spur') return [piece.points[0], piece.points.at(-1)!];
+  if (zoom >= 1 || piece.layer !== 'ground') return piece.points;
+  const level = zoom < FAR ? 'far' : 'near';
+  let cache = COARSE.get(level);
+  if (!cache) COARSE.set(level, (cache = new WeakMap()));
+  let points = cache.get(piece);
+  if (!points) {
+    const last = piece.points.length - 1;
+    let k = 0;
+    points = piece.points.filter((p, i) => {
+      if (i === 0 || i === last || onRun(p)) return true;
+      if (level === 'near' && !inCorner(p)) return true;
+      return ++k % 2 === 0;
+    });
+    cache.set(piece, points);
+  }
+  return points;
+}
+/** A piece's glass: in vertical slices, or close up as the runs it is painted in (runsOf). */
 function paintGlass(
   ctx: Ctx,
+  base: DOMMatrix,
   piece: TubePiece,
   emphasis: TubeEmphasis,
   night: boolean,
   lod: number,
+  zoom: number,
 ) {
-  const points = screenOf(piece.points);
-  ctx.save();
-  ctx.globalAlpha *= lod;
+  if (zoom >= DETAIL) return paintRuns(ctx, base, runsOf(piece), emphasis, night, lod);
+  paintSlices(ctx, base, coarse(piece, zoom), emphasis, night, lod, zoom);
+}
+/** Which of a run's layers to paint: its halo (when selected), its glass and lines, or both. */
+type Parts = 'all' | 'halo' | 'glass';
+/** The glass's half-width over one segment: 2.5 px, 2 down the far bank. */
+const halfOf = (a: TubePoint, b: TubePoint) =>
+  onBank(a) && onBank(b) ? TUBE_ALTITUDE.bankRadius : TUBE_ALTITUDE.radius;
+/** Glass as vertical-slice parallelograms: consecutive runs share their end edges exactly, so
+ * the translucent glass never doubles up. One canvas state for the whole run, moving between
+ * each slice's origin and slope with relative transforms, then back to `base`, the layer's own
+ * matrix, exactly: an arithmetic inverse leaves the browser's float32 matrix a hair off, and
+ * every house sprite and football cache painted after the glass would then draw directly. 5 px,
+ * 4 px down the bank run. Zoomed out, the 1-px rows go first: the rim below zoom 1, the
+ * highlight below FAR, where they are a fraction of a pixel. */
+function paintSlices(
+  ctx: Ctx,
+  base: DOMMatrix,
+  ground: readonly TubePoint[],
+  emphasis: TubeEmphasis,
+  night: boolean,
+  lod: number,
+  zoom: number,
+  parts: Parts = 'all',
+) {
+  const points = screenOf(ground);
+  const alpha = ctx.globalAlpha;
+  ctx.globalAlpha = alpha * lod;
   let origin = { x: 0, y: 0 },
-    slope = 0;
+    slope = 0,
+    moved = false;
   for (let k = 1; k < points.length; k++) {
     const a = points[k - 1],
       b = points[k];
@@ -484,18 +687,355 @@ function paintGlass(
     const nextSlope = (b.y - a.y) / dx,
       shiftX = a.x - origin.x;
     ctx.transform(1, nextSlope - slope, 0, 1, shiftX, a.y - origin.y - slope * shiftX);
+    moved = true;
     origin = a;
     slope = nextSlope;
-    if (emphasis === 'selected') box(ctx, 0, -4, dx, 8, pick(GLASS.halo, night));
-    box(ctx, 0, -2.5, dx, 5, pick(GLASS.body, night));
-    box(ctx, 0, -2.5, dx, 1, highlight(emphasis, night));
-    box(ctx, 0, 1.5, dx, 1, pick(GLASS.rim, night));
+    const half = halfOf(ground[k - 1], ground[k]);
+    if (emphasis === 'selected' && parts !== 'glass')
+      box(ctx, 0, -4, dx, 8, pick(GLASS.halo, night));
+    if (parts === 'halo') continue;
+    box(ctx, 0, -half, dx, 2 * half, pick(GLASS.body, night));
+    if (zoom >= FAR) box(ctx, 0, -half, dx, 1, highlight(emphasis, night));
+    if (zoom >= 1) box(ctx, 0, half - 1, dx, 1, pick(GLASS.rim, night));
   }
+  // Back to the caller's transform, bit for bit.
+  if (moved) ctx.setTransform(base);
+  ctx.globalAlpha = alpha;
+}
+
+/** Whether some of a piece's glass runs at least twice as far down the screen as across it: round
+ *  the river's head, and through the bank elbows that turn toward the viewer. Vertical slices
+ *  would pinch the glass there to a wire, so close up such a piece is drawn as one outline
+ *  (paintBentGlass). The steepest dip over the river is about 1:1, and stays in slices. */
+const STEEP = new WeakMap<TubePiece, boolean>();
+function steep(piece: TubePiece) {
+  let value = STEEP.get(piece);
+  if (value === undefined) {
+    const points = screenOf(piece.points);
+    value = points.some(
+      (b, k) => k > 0 && Math.abs(b.y - points[k - 1].y) > 2 * Math.abs(b.x - points[k - 1].x),
+    );
+    STEEP.set(piece, value);
+  }
+  return value;
+}
+/** Below this a segment runs straight down the screen, and its way across does not count. */
+const FOLD_DX = 0.05;
+/**
+ * Where a piece's glass turns back across the screen, or −1: the index of its point furthest
+ * across. The west halts' north elbows and Hawthorn's west one fold back on themselves, their two
+ * legs a few pixels apart, so slices of the one would overlap the other.
+ */
+function foldAt(points: readonly Point[]) {
+  const ways = points
+    .slice(1)
+    .map((b, k) => b.x - points[k].x)
+    .filter((dx) => Math.abs(dx) >= FOLD_DX)
+    .map(Math.sign);
+  if (!ways.some((way, k) => k > 0 && way !== ways[k - 1])) return -1;
+  return points.reduce((tip, p, k) => (ways[0] * (p.x - points[tip].x) > 0 ? k : tip), 0);
+}
+/** A segment's shift to its left edge, `h` px off the centreline: straight up or down where the
+ *  glass runs more across the screen than down it, sideways where it runs more down. Either way
+ *  the glass keeps its full 2h px, as a vertical slice does on the straight. */
+function edgeShift(a: Point, b: Point, h: number): Point {
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
+  return Math.abs(dy) > Math.abs(dx)
+    ? { x: h * Math.sign(dy), y: 0 }
+    : { x: 0, y: -h * Math.sign(dx) };
+}
+/** A segment's shift toward the light, `h` px: the glass's upper edge, sliding in to the middle
+ *  as the glass turns to run straight down the screen, where its top faces the viewer. */
+function lightShift(a: Point, b: Point, h: number): Point {
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
+  return Math.abs(dy) > Math.abs(dx) ? { x: (h * dx) / dy, y: 0 } : { x: 0, y: -h };
+}
+/** A screen polyline moved off itself by each segment's own shift. Where two shifts differ the
+ *  moved segments meet at their miter, or step across where the glass runs straight on. Its two
+ *  ends move by `ends` instead: straight up or down, so they meet the vertical slice that ends
+ *  the next piece along. */
+function offsetLine(
+  points: readonly Point[],
+  shifts: readonly Point[],
+  ends: readonly [Point, Point],
+): Point[] {
+  const out: Point[] = [];
+  points.forEach((p, i) => {
+    const before = i === points.length - 1 ? ends[1] : shifts[i - 1],
+      after = i === 0 ? ends[0] : shifts[i];
+    if (!before || !after || (before.x === after.x && before.y === after.y)) {
+      const s = before ?? after;
+      out.push({ x: p.x + s.x, y: p.y + s.y });
+      return;
+    }
+    const a = { x: p.x - points[i - 1].x, y: p.y - points[i - 1].y },
+      b = { x: points[i + 1].x - p.x, y: points[i + 1].y - p.y };
+    const cross = a.x * b.y - a.y * b.x;
+    const t = ((after.x - before.x) * b.y - (after.y - before.y) * b.x) / cross;
+    if (Number.isFinite(t) && Math.abs(t) * Math.hypot(a.x, a.y) <= 4)
+      out.push({ x: p.x + before.x + t * a.x, y: p.y + before.y + t * a.y });
+    else out.push({ x: p.x + before.x, y: p.y + before.y }, { x: p.x + after.x, y: p.y + after.y });
+  });
+  return out;
+}
+type Bent = {
+  body: Point[];
+  halo: Point[];
+  light: Point[];
+  rim: Point[];
+  /** The glass's two edges, each along the line, for the tests. */
+  edges: readonly [Point[], Point[]];
+};
+/** A bent run's outlines on screen: its glass, its halo, and its highlight and rim lines. */
+const BENT = new WeakMap<readonly TubePoint[], Bent>();
+function bentOf(points: readonly TubePoint[]): Bent {
+  let bent = BENT.get(points);
+  if (bent) return bent;
+  // Repeated points (an elbow meeting its run) have no direction of their own.
+  const keep = screenOf(points).flatMap((p, i, all) =>
+    i > 0 && Math.hypot(p.x - all[i - 1].x, p.y - all[i - 1].y) < 0.01 ? [] : [i],
+  );
+  const screen = keep.map((i) => screenOf(points)[i]),
+    ground = keep.map((i) => points[i]);
+  const segments = screen.slice(1).map((b, k) => ({
+    a: screen[k],
+    b,
+    half: halfOf(ground[k], ground[k + 1]),
+  }));
+  type Segment = (typeof segments)[number];
+  const first = segments[0],
+    last = segments.at(-1)!;
+  /** A vertical cut through an end: up on the left edge, or down where the glass runs leftward. */
+  const cut = (s: Segment, h: number): Point => ({ x: 0, y: -h * (Math.sign(s.b.x - s.a.x) || 1) });
+  const edge = (half: (s: Segment) => number, side: 1 | -1) =>
+    offsetLine(
+      screen,
+      segments.map((s) => edgeShift(s.a, s.b, side * half(s))),
+      [cut(first, side * half(first)), cut(last, side * half(last))],
+    );
+  const band = (half: (s: Segment) => number) => [...edge(half, 1), ...edge(half, -1).reverse()];
+  const line = (side: 1 | -1) =>
+    offsetLine(
+      screen,
+      segments.map((s) => lightShift(s.a, s.b, side * (s.half - 0.5))),
+      [
+        { x: 0, y: -side * (first.half - 0.5) },
+        { x: 0, y: -side * (last.half - 0.5) },
+      ],
+    );
+  const left = edge((s) => s.half, 1),
+    right = edge((s) => s.half, -1);
+  bent = {
+    body: [...left, ...[...right].reverse()],
+    halo: band(() => 4),
+    light: line(1),
+    rim: line(-1),
+    edges: [left, right],
+  };
+  BENT.set(points, bent);
+  return bent;
+}
+function trace(ctx: Ctx, points: readonly Point[]) {
+  ctx.beginPath();
+  points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+}
+/** Close up, a piece that bends toward the viewer: its glass filled as one outline, so it keeps
+ *  its width all the way round and the translucent glass never doubles up, then its highlight
+ *  and rim as 1-px lines along it. */
+function paintBentGlass(
+  ctx: Ctx,
+  points: readonly TubePoint[],
+  emphasis: TubeEmphasis,
+  night: boolean,
+  lod: number,
+  parts: Parts = 'all',
+) {
+  const bent = bentOf(points);
+  const alpha = ctx.globalAlpha,
+    join = ctx.lineJoin;
+  ctx.globalAlpha = alpha * lod;
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 1;
+  const fill = (points: readonly Point[], colour: string) => {
+    ctx.fillStyle = colour;
+    trace(ctx, points);
+    ctx.fill();
+  };
+  const stroke = (points: readonly Point[], colour: string) => {
+    ctx.strokeStyle = colour;
+    trace(ctx, points);
+    ctx.stroke();
+  };
+  if (emphasis === 'selected' && parts !== 'glass') fill(bent.halo, pick(GLASS.halo, night));
+  if (parts !== 'halo') {
+    fill(bent.body, pick(GLASS.body, night));
+    stroke(bent.rim, pick(GLASS.rim, night));
+    stroke(bent.light, highlight(emphasis, night));
+  }
+  ctx.lineJoin = join;
+  ctx.globalAlpha = alpha;
+}
+/** Close up (zoom ≥ DETAIL), the two edges of a piece's glass on screen where it is drawn as one
+ *  outline, or undefined where it is drawn in vertical slices. For the tests. */
+export const tubeGlassEdges = (piece: TubePiece, zoom: number) =>
+  zoom >= DETAIL && steep(piece) ? bentOf(piece.points).edges : undefined;
+
+/** A stretch of glass painted at once: in vertical slices, or as one outline. Depth is its mean
+ *  x + y, so the nearer of two runs that cross on screen is painted first. */
+type GlassRun = { points: readonly TubePoint[]; outline: boolean; depth: number };
+const runOf = (points: readonly TubePoint[], outline: boolean): GlassRun => ({
+  points,
+  outline,
+  depth: points.reduce((sum, p) => sum + p.x + p.y, 0) / points.length,
+});
+/**
+ * Close up, a piece's glass as the runs it is painted in, the nearest first: one outline where it
+ * runs steeper than 2:1; where it folds back on screen, its two legs, each in slices and split at
+ * the fold, so the nearer leg hides the farther one's rim instead of crossing it; else its slices.
+ */
+const RUNS = new WeakMap<TubePiece, readonly GlassRun[]>();
+function runsOf(piece: TubePiece): readonly GlassRun[] {
+  let runs = RUNS.get(piece);
+  if (runs) return runs;
+  const tip = steep(piece) ? -1 : foldAt(screenOf(piece.points));
+  runs =
+    tip < 0
+      ? [runOf(piece.points, steep(piece))]
+      : [runOf(piece.points.slice(0, tip + 1), false), runOf(piece.points.slice(tip), false)].sort(
+          (a, b) => b.depth - a.depth,
+        );
+  RUNS.set(piece, runs);
+  return runs;
+}
+/** A run's glass on screen as one closed outline: its two edges, or its slices' top and bottom
+ *  (`wide` px off its centreline instead, for a halo). */
+const BANDS = new WeakMap<GlassRun, readonly Point[]>();
+function bandOf(run: GlassRun, wide?: number): readonly Point[] {
+  let band = wide ? undefined : BANDS.get(run);
+  if (band) return band;
+  if (run.outline) band = wide ? bentOf(run.points).halo : bentOf(run.points).body;
+  else {
+    const { points } = run;
+    const screen = screenOf(points);
+    const top: Point[] = [],
+      bottom: Point[] = [];
+    screen.forEach((p, k) => {
+      // Each corner once, or twice where the glass narrows onto the far bank.
+      const before = k > 0 ? (wide ?? halfOf(points[k - 1], points[k])) : undefined,
+        after = k < screen.length - 1 ? (wide ?? halfOf(points[k], points[k + 1])) : undefined;
+      for (const half of new Set([before ?? after!, after ?? before!])) {
+        top.push({ x: p.x, y: p.y - half });
+        bottom.push({ x: p.x, y: p.y + half });
+      }
+    });
+    band = [...top, ...bottom.reverse()];
+  }
+  if (!wide) BANDS.set(run, band);
+  return band;
+}
+/** The rectangle round some points, `margin` px wider on every side. */
+function boundsOf(points: readonly Point[], margin: number): GroundArea {
+  const xs = points.map((p) => p.x),
+    ys = points.map((p) => p.y);
+  return {
+    left: Math.min(...xs) - margin,
+    right: Math.max(...xs) + margin,
+    top: Math.min(...ys) - margin,
+    bottom: Math.max(...ys) + margin,
+  };
+}
+/** Keeps whatever is painted next inside `area` and out of a band of glass already there. */
+function clipOut(ctx: Ctx, area: GroundArea, band: readonly Point[]) {
+  ctx.beginPath();
+  ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+  band.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+  ctx.closePath();
+  ctx.clip('evenodd');
+}
+/**
+ * Close up, runs of glass that cross on screen, the nearest first, each kept out of the glass
+ * already painted and out of `under` (the run of trunk a halt's elbows join), so the translucent
+ * glass never doubles up and a nearer run's highlight is never crossed by a farther one's rim.
+ * Selected, their halo goes first, all of it clear of the trunk's own halo width, since the trunk
+ * never lights. One run alone is painted as it is.
+ */
+function paintRuns(
+  ctx: Ctx,
+  base: DOMMatrix,
+  runs: readonly GlassRun[],
+  emphasis: TubeEmphasis,
+  night: boolean,
+  lod: number,
+  under?: GlassRun,
+) {
+  const paintRun = (run: GlassRun, parts: Parts) =>
+    run.outline
+      ? paintBentGlass(ctx, run.points, emphasis, night, lod, parts)
+      : paintSlices(ctx, base, run.points, emphasis, night, lod, DETAIL, parts);
+  if (runs.length === 1 && !under) return paintRun(runs[0], 'all');
+  // Round all of them and their halo, 4 px off the centreline.
+  const area = boundsOf(
+    runs.flatMap((run) => screenOf(run.points)),
+    TUBE_ALTITUDE.radius + 3,
+  );
+  const haloFirst = !!under && emphasis === 'selected';
+  if (haloFirst) {
+    ctx.save();
+    clipOut(ctx, area, bandOf(under, 4));
+    for (const run of runs) paintRun(run, 'halo');
+    ctx.restore();
+  }
+  ctx.save();
+  if (under) clipOut(ctx, area, bandOf(under));
+  runs.forEach((run, i) => {
+    paintRun(run, haloFirst ? 'glass' : 'all');
+    if (i < runs.length - 1) clipOut(ctx, area, bandOf(run));
+  });
   ctx.restore();
 }
-/** The glass ball where a spur's leg turns west, or where a middle station's elbows meet the
- * trunk. It hides the joint of the runs. */
-function paintBubble(ctx: Ctx, at: Point, emphasis: TubeEmphasis, night: boolean, lod: number) {
+/** Close up (zoom ≥ DETAIL), how a piece's glass is painted: its runs on screen, the nearest
+ *  first, each in slices or (with its two edges) as one outline. For the tests. */
+export const tubeGlassRuns = (piece: TubePiece) =>
+  runsOf(piece).map((run) => ({
+    points: screenOf(run.points),
+    edges: run.outline ? bentOf(run.points).edges : undefined,
+  }));
+/** A box between two screen points along their line, from v0 to v1 px below it, then back to
+ *  `base` exactly (paintSlices). */
+function slab(
+  ctx: Ctx,
+  base: DOMMatrix,
+  a: Point,
+  b: Point,
+  v0: number,
+  v1: number,
+  colour: string,
+) {
+  const slope = (b.y - a.y) / (b.x - a.x);
+  ctx.transform(1, slope, 0, 1, a.x, a.y);
+  box(ctx, 0, v0, b.x - a.x, v1 - v0, colour);
+  ctx.setTransform(base);
+}
+/** A flat ring on the water round something standing in it. */
+function ring(ctx: Ctx, x: number, y: number, rx: number, night: boolean) {
+  ctx.strokeStyle = pick(RIPPLE, night);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.ellipse(x + 0.5, y + 0.5, rx, rx / 2.5, 0, 0, Math.PI * 2);
+  ctx.stroke();
+}
+/** The glass ball where a spur's leg turns along its row, or where a middle station's elbows meet
+ * the trunk (its tap). It hides the joint of the runs. */
+function paintBubble(
+  ctx: Ctx,
+  at: Point,
+  emphasis: TubeEmphasis,
+  night: boolean,
+  lod: number,
+  zoom: number,
+) {
   const alpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha * lod;
   if (emphasis === 'selected') {
@@ -504,22 +1044,66 @@ function paintBubble(ctx: Ctx, at: Point, emphasis: TubeEmphasis, night: boolean
     ctx.arc(at.x, at.y, 5.5, 0, Math.PI * 2);
     ctx.fill();
   }
+  // With the whole loop in view the 8-px ball is a square.
+  if (zoom < WHOLE) {
+    box(ctx, at.x - 3, at.y - 3, 6, 6, pick(GLASS.bubble, night));
+    ctx.globalAlpha = alpha;
+    return;
+  }
   ctx.fillStyle = pick(GLASS.bubble, night);
   ctx.beginPath();
   ctx.arc(at.x, at.y, 4, 0, Math.PI * 2);
   ctx.fill();
   const x = Math.round(at.x),
     y = Math.round(at.y);
-  box(ctx, x - 2, y - 3, 2, 1, highlight(emphasis, night));
-  box(ctx, x - 2, y + 3, 4, 1, pick(GLASS.rim, night));
+  if (zoom >= FAR) {
+    box(ctx, x - 2, y - 3, 2, 1, highlight(emphasis, night));
+    box(ctx, x - 2, y + 3, 4, 1, pick(GLASS.rim, night));
+  }
   ctx.globalAlpha = alpha;
 }
-/** A slim post up to the glass's underside: a lit side, a shade side and a shadow. */
-function paintPost(ctx: Ctx, ground: Point, height: number, night: boolean) {
+/** A slim post up to the glass's underside: a lit side, a shade side and a shadow; zoomed out, one
+ * plain stroke. A piling in the river's head pool stands in a pale ripple instead, and close up
+ * in a ring, a pile's foot below the waterline and its dark reflection. */
+function paintPost(
+  ctx: Ctx,
+  ground: Point,
+  height: number,
+  night: boolean,
+  water: boolean,
+  zoom: number,
+) {
   const { x, y } = rounded(ground);
-  box(ctx, x - 2, y, 5, 1, pick(SHADOW, night));
+  if (zoom < FAR) return box(ctx, x - 1, y - height, 2, height, pick(METAL.post, night));
+  if (water && zoom >= DETAIL) {
+    box(ctx, x - 1, y + 2, 2, 3, pick(REFLECTION.post, night));
+    ring(ctx, x, y, 4, night);
+    box(ctx, x - 1, y - height, 1, height + 1, pick(METAL.post, night));
+    box(ctx, x, y - height, 1, height + 1, pick(METAL.side, night));
+    return box(ctx, x - 1, y, 2, 1, pick(PIER.wet, night));
+  }
+  if (water) box(ctx, x - 3, y, 7, 1, pick(RIPPLE, night));
+  else box(ctx, x - 2, y, 5, 1, pick(SHADOW, night));
   box(ctx, x - 1, y - height, 1, height, pick(METAL.post, night));
   box(ctx, x, y - height, 1, height, pick(METAL.side, night));
+}
+/** Where a pier's foot meets the river, close up: the foot's stone top this far up, px. */
+const PIER_FOOT = 4;
+/** A bank bridge's pier mid-river: one slim column on a stone foot, wet below its dry top, under
+ *  the glass's underside. Its ring and reflection lie on the water in the ground layer; zoomed
+ *  out, the column alone. */
+function paintPier(ctx: Ctx, ground: Point, height: number, night: boolean, zoom: number) {
+  const { x, y } = rounded(ground);
+  if (zoom < FAR) return box(ctx, x - 1, y - height, 2, height, pick(METAL.post, night));
+  if (zoom < DETAIL) {
+    box(ctx, x - 1, y - height, 1, height, pick(METAL.post, night));
+    return box(ctx, x, y - height, 1, height, pick(METAL.side, night));
+  }
+  box(ctx, x - 1, y - height, 1, height - PIER_FOOT, pick(METAL.post, night));
+  box(ctx, x, y - height, 1, height - PIER_FOOT, pick(METAL.side, night));
+  box(ctx, x - 2, y - PIER_FOOT, 2, PIER_FOOT + 1, pick(PIER.lit, night));
+  box(ctx, x, y - PIER_FOOT, 2, PIER_FOOT + 1, pick(PIER.wet, night));
+  box(ctx, x - 2, y - PIER_FOOT, 4, 1, pick(PIER.top, night));
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -634,8 +1218,16 @@ function reach(capsule: Capsule, way: 1 | -1, cap: number) {
 /** A capsule lying along its glass segment, head first, in local u (forward) and v (down); then
  * a pane of glass and the highlight row over it at the glass's own strength, so it reads as
  * inside. Every box is cut where the glass turns away (`reach`), so nothing pokes out at a
- * corner, a bend or a stack's top. A rider is at most 11 calls, a parcel 9. */
-function paintCapsule(ctx: Ctx, capsule: Capsule, scene: TubeScene, lod: number) {
+ * corner, a bend or a stack's top. A rider is at most 11 calls, a parcel 9. Below DETAIL a
+ * rider's faint trail goes (a pixel or two); below FAR, where a rider is a few pixels long, the
+ * capsule is its body in the wash. */
+function paintCapsule(
+  ctx: Ctx,
+  capsule: Capsule,
+  scene: TubeScene,
+  lod: number,
+  emphasis: TubeEmphasis,
+) {
   const { night } = scene;
   const look = capsule.look;
   const [tail, head] = look ? [-13, 4] : [-9, 3];
@@ -652,10 +1244,15 @@ function paintCapsule(ctx: Ctx, capsule: Capsule, scene: TubeScene, lod: number)
       b = Math.min(u1 + shift, high);
     if (b > a) box(ctx, f > 0 ? a : -b, v0, b - a, v1 - v0, color);
   };
-  if (look) {
+  if (scene.zoom < FAR) {
+    const body = look?.outfit;
+    part(-6, 4, -1, 1.5, body ? (night ? tint(body, NIGHT_DIM) : body) : pick(KRAFT.box, night));
+  } else if (look) {
     const dim = (color: string) => (night ? tint(color, NIGHT_DIM) : color);
-    part(-13, -6, 0, 1, dim(look.outfit) + '40');
-    part(-6, -3, -0.5, 1.5, dim(look.outfit) + '80');
+    if (scene.zoom >= DETAIL) {
+      part(-13, -6, 0, 1, dim(look.outfit) + '40');
+      part(-6, -3, -0.5, 1.5, dim(look.outfit) + '80');
+    }
     part(-3, -1, 0, 1.5, dim(TROUSERS));
     part(-1, 2, -1, 1.5, dim(look.outfit));
     part(2, 4, -1, 1, dim(look.skin));
@@ -675,7 +1272,7 @@ function paintCapsule(ctx: Ctx, capsule: Capsule, scene: TubeScene, lod: number)
     2.5,
     pick(scene.followed === capsule.id ? GLASS.followWash : GLASS.wash, night),
   );
-  part(tail, head, -2.5, -1.5, highlight(scene.emphasis, night));
+  if (scene.zoom >= FAR) part(tail, head, -2.5, -1.5, highlight(emphasis, night));
   ctx.restore();
 }
 
@@ -725,16 +1322,20 @@ type Inside = {
   parcels: TubeParcelState[];
   capsules: Capsule[];
 };
-/** The glass stack: collar, glass, anyone and anything inside, hood with the lamp. 10 calls
- * empty. */
+/** The glass stack: collar, glass, anyone and anything inside, and the hood with its lamp, which
+ * hangs under the hood's lip like a streetlamp's head and lights in the streetlamps' wave. 12
+ * calls empty; selected, a pale gold glow stands behind the glass. */
 function paintStack(ctx: Ctx, station: TubeStation, scene: TubeScene, inside: Inside) {
   const { night } = scene;
   const { x, y } = rounded(station.stack);
   const { figures, parcels } = inside;
+  const far = scene.zoom < FAR;
+  const emphasis = emphasisOf(scene, station.id);
   if (scene.followed && figures.some((figure) => figure.id === scene.followed))
     diamond(ctx, x, y + 2, 10, 5, pick(FOLLOW, night));
   box(ctx, x - 7, y - 3, 14, 3, pick(METAL.post, night));
-  box(ctx, x + 2, y - 3, 5, 3, pick(METAL.side, night));
+  if (!far) box(ctx, x + 2, y - 3, 5, 3, pick(METAL.side, night));
+  if (emphasis === 'selected') box(ctx, x - 7, y - 42, 14, 40, pick(GLASS.halo, night));
   box(ctx, x - 6, y - 41, 12, 38, pick(GLASS.body, night));
   if (figures.length || parcels.length) {
     ctx.save();
@@ -756,8 +1357,17 @@ function paintStack(ctx: Ctx, station: TubeStation, scene: TubeScene, inside: In
       if (!last) ctx.save();
       const offset = (i - (figures.length - 1) / 2) * 3;
       ctx.transform(pose.sx, 0, 0, pose.sy, x + offset, y - 2 - pose.lift);
-      // Dimmed at night like the walker who stepped in.
-      drawResident(ctx, figure.resident, 0, 0, 1.25, STANDING, { shadow: false, night });
+      // Dimmed at night like the walker who stepped in. Below DETAIL, behind the glass for the
+      // quarter of a second it is in the stack: hair, face, outfit and trousers in four boxes
+      // instead of the whole drawResident, so two of the heaviest figures stepping in together
+      // keep the opening view within its budget.
+      if (scene.zoom < DETAIL) {
+        const dim = (color: string) => (night ? tint(color, NIGHT_DIM) : color);
+        box(ctx, -4, -30, 8, 3, dim(figure.resident.hair));
+        box(ctx, -4, -27, 8, 6, dim(figure.resident.skin));
+        box(ctx, -5, -21, 10, 12, dim(figure.resident.outfit));
+        box(ctx, -4, -9, 8, 9, dim(TROUSERS));
+      } else drawResident(ctx, figure.resident, 0, 0, 1.25, STANDING, { shadow: false, night });
       if (!last) ctx.restore();
     });
     ctx.restore();
@@ -765,17 +1375,30 @@ function paintStack(ctx: Ctx, station: TubeStation, scene: TubeScene, inside: In
   }
   // Anyone just leaving or reaching the stack's top (the first and last 0.15 tiles of a ride),
   // cut at the middle of the top and behind the front of the glass, the collar and the hood.
-  const lod = glassLod(scene.zoom, scene.emphasis);
-  for (const capsule of inside.capsules) paintCapsule(ctx, capsule, scene, lod);
-  // The front of the glass: one bright edge, one glint and the rim.
-  box(ctx, x - 5, y - 40, 1, 36, pick(GLASS.hi, night));
-  ctx.fillRect(x - 3, y - 35, 1, 5);
-  box(ctx, x + 5, y - 41, 1, 38, pick(GLASS.rim, night));
-  box(ctx, x - 7, y - 44, 14, 3, pick(METAL.post, night));
+  const lod = glassLod(scene.zoom, emphasis);
+  for (const capsule of inside.capsules) paintCapsule(ctx, capsule, scene, lod, emphasis);
+  // The front of the glass: one bright edge (pale gold while hovered, like the glass), one glint
+  // and the rim (zoomed out, a fraction of a pixel each, so the stack is its collar, glass, hood
+  // and lamp).
+  if (!far) {
+    box(ctx, x - 5, y - 40, 1, 36, highlight(emphasis, night));
+    box(ctx, x - 3, y - 35, 1, 5, pick(GLASS.hi, night));
+    box(ctx, x + 5, y - 41, 1, 38, pick(GLASS.rim, night));
+    box(ctx, x - 7, y - 44, 14, 3, pick(METAL.post, night));
+  }
+  // The hood: its face, its top, and the shade under its lip, where the lamp hangs in a dark
+  // frame, pale by day, grey at night until the wave reaches it, then amber with a hot middle.
   box(ctx, x - 8, y - 47, 16, 3, pick(HOOD.face, night));
-  box(ctx, x - 7, y - 48, 14, 1, pick(HOOD.top, night));
   const lit = night && lampOn(lampDistance(station), scene.minutes);
-  box(ctx, x - 2, y - 43, 4, 1, pick(lit ? LAMP.lit : LAMP.face, night));
+  const lamp = pick(lit ? LAMP.lit : LAMP.face, night);
+  if (far) box(ctx, x - 2, y - 43, 4, 1, lamp);
+  else {
+    box(ctx, x - 7, y - 48, 14, 1, pick(HOOD.top, night));
+    box(ctx, x - 8, y - 45, 16, 1, pick(HOOD.lip, night));
+    box(ctx, x - 3, y - 45, 6, 4, pick(HOOD.lip, night));
+    box(ctx, x - 2, y - 44, 4, 2, lamp);
+    if (lit) box(ctx, x - 1, y - 44, 2, 1, pick(LAMP.core, night));
+  }
   const snow = snowAt(scene.season.yearDay, seedFraction(`tube:${station.id}`));
   if (snow > 0) {
     const alpha = ctx.globalAlpha;
@@ -788,43 +1411,50 @@ function paintStack(ctx: Ctx, station: TubeStation, scene: TubeScene, inside: In
     drawGlow(ctx, x, y - 2, 12, 0.1);
   }
 }
-/** The first station's sign: a small enamel plate on one post, turned to face the road. */
+/** The sign station's sign: a small enamel plate on one post, turned to face the road. */
 function paintSign(ctx: Ctx, scene: TubeScene) {
   const { night } = scene;
   const { x, y } = rounded(SIGN_FOOT);
-  box(ctx, x - 2, y, 5, 1, pick(SHADOW, night));
+  if (scene.zoom >= FAR) box(ctx, x - 2, y, 5, 1, pick(SHADOW, night));
   box(ctx, x - 1, y - 9, 2, 9, pick(METAL.side, night));
   ctx.save();
   ctx.transform(1, 0.5, 0, 1, x, y);
   box(ctx, -22, -24, 44, 15, pick(PLATE.border, night));
   box(ctx, -21, -23, 42, 13, pick(PLATE.face, night));
-  const snow = snowAt(scene.season.yearDay, seedFraction(`tube:${FIRST.id}`));
+  const snow = snowAt(scene.season.yearDay, seedFraction(`tube:${SIGN_STATION.id}`));
   if (snow > 0) {
     const alpha = ctx.globalAlpha;
     ctx.globalAlpha = alpha * snow;
     box(ctx, -22, -25, 44, 1, pick(SNOW.top, night));
     ctx.globalAlpha = alpha;
   }
-  ctx.fillStyle = pick(PLATE.ink, night);
-  ctx.font = 'bold 4px "Space Mono", monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(TUBE_SIGN_LINES[0], 0, -19.1, 41);
-  ctx.fillText(TUBE_SIGN_LINES[1], 0, -14.8, 41);
-  ctx.fillText(TUBE_SIGN_LINES[2], 0, -10.5, 41);
+  // Zoomed out the 4-px words are under two pixels high: the plate alone.
+  if (scene.zoom >= FAR) {
+    ctx.fillStyle = pick(PLATE.ink, night);
+    ctx.font = 'bold 4px "Space Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(TUBE_SIGN_LINES[0], 0, -19.1, 41);
+    ctx.fillText(TUBE_SIGN_LINES[1], 0, -14.8, 41);
+    ctx.fillText(TUBE_SIGN_LINES[2], 0, -10.5, 41);
+  }
   ctx.restore();
 }
 /** A brass bucket by the walk in, with one furled plum umbrella that somebody did remove. */
 function paintStand(ctx: Ctx, scene: TubeScene) {
   const { night } = scene;
   const { x, y } = rounded(STAND_FOOT);
-  box(ctx, x - 3, y, 7, 1, pick(SHADOW, night));
+  // Below DETAIL, the bucket and the furled umbrella alone.
+  const far = scene.zoom < DETAIL;
+  if (!far) box(ctx, x - 3, y, 7, 1, pick(SHADOW, night));
   box(ctx, x - 1, y - 15, 2, 10, pick(UMBRELLA.cloth, night));
-  box(ctx, x - 1, y - 17, 3, 1, pick(UMBRELLA.handle, night));
-  ctx.fillRect(x + 1, y - 16, 1, 1);
+  if (!far) {
+    box(ctx, x - 1, y - 17, 3, 1, pick(UMBRELLA.handle, night));
+    ctx.fillRect(x + 1, y - 16, 1, 1);
+  }
   box(ctx, x - 3, y - 6, 6, 6, pick(UMBRELLA.bucket, night));
-  box(ctx, x - 3, y - 6, 6, 1, pick(UMBRELLA.rim, night));
-  const snow = snowAt(scene.season.yearDay, seedFraction(`tube:${FIRST.id}`));
+  if (!far) box(ctx, x - 3, y - 6, 6, 1, pick(UMBRELLA.rim, night));
+  const snow = snowAt(scene.season.yearDay, seedFraction(`tube:${SIGN_STATION.id}`));
   if (snow > 0) {
     const alpha = ctx.globalAlpha;
     ctx.globalAlpha = alpha * snow;
@@ -834,32 +1464,35 @@ function paintStand(ctx: Ctx, scene: TubeScene) {
 }
 /** A puff lasts half a minute; the one at the drop starts 0.08 min into stepping off. */
 const PUFF_TIMES = { minutes: 0.5, drop: 0.08 } as const;
-/** A soft puff of air at the stack's foot, `age` minutes old: two rings and four grass bits. */
-function paintPuff(ctx: Ctx, station: TubeStation, age: number, night: boolean) {
+/** A soft puff of air at the stack's foot, `age` minutes old: two rings and four grass bits; below
+ *  DETAIL one ring between the two, and no grass. */
+function paintPuff(ctx: Ctx, station: TubeStation, age: number, night: boolean, zoom: number) {
   const c = project(station.stack.x, station.stack.y);
   const k = clamp01(age / PUFF_TIMES.minutes);
   const alpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha * (1 - k);
   ctx.strokeStyle = pick(PUFF, night);
   ctx.lineWidth = 1;
-  for (const r of [9 + 12 * k, 5 + 16 * k]) {
+  for (const r of zoom < DETAIL ? [7 + 14 * k] : [9 + 12 * k, 5 + 16 * k]) {
     ctx.beginPath();
     ctx.ellipse(c.x, c.y - 1, r, r / 2, 0, 0, Math.PI * 2);
     ctx.stroke();
   }
   ctx.fillStyle = pick(PUFF_GRASS, night);
-  for (const [dx, lift] of [
-    [-1, 1],
-    [1, 1.3],
-    [-0.6, 1.6],
-    [0.7, 0.8],
-  ])
-    ctx.fillRect(
-      Math.round(c.x + dx * 16 * k),
-      Math.round(c.y - 3 - lift * 22 * k * (1 - k)),
-      1,
-      1,
-    );
+  // Below DETAIL, the ring alone: the grass bits are under a pixel.
+  if (zoom >= DETAIL)
+    for (const [dx, lift] of [
+      [-1, 1],
+      [1, 1.3],
+      [-0.6, 1.6],
+      [0.7, 0.8],
+    ])
+      ctx.fillRect(
+        Math.round(c.x + dx * 16 * k),
+        Math.round(c.y - 3 - lift * 22 * k * (1 - k)),
+        1,
+        1,
+      );
   ctx.globalAlpha = alpha;
 }
 /** The puffs at each station: at the fwoomp (boarding 1.88 on into the ride) and at the drop
@@ -887,57 +1520,320 @@ function puffsAt(residents: readonly ResidentState[]) {
 // ---------------------------------------------------------------------------------------------
 // The three layers
 
-/** The Treeline's share of the cached ground layer: pads, trunk posts and the glass behind the
- * tree line. Its type admits only what the cache key covers (night, selection, transform). */
+/** The emphasis on one halt's own art: the scene's, if it is the halt hovered or selected. */
+const emphasisOf = (scene: Pick<TubeScene, 'emphasis' | 'station'>, station: string) =>
+  scene.station === station ? scene.emphasis : 'none';
+/** A halt's own glass in the cached ground: its elbows onto the trunk, never a run of trunk. */
+const ownGround = (piece: TubePiece, station: string | null | undefined) =>
+  piece.layer === 'ground' && !piece.trunk && piece.station === station;
+/** The T bubble where a station between two others meets the trunk, on screen. */
+const tapBubble = (station: TubeStation) =>
+  station === TUBE_STATIONS[0] || station === TUBE_STATIONS.at(-1)
+    ? undefined
+    : lifted(trunkPoint(stationTap(station.id)));
+/**
+ * Close up, a halt's own glass in the ground, painted together: its elbows onto the trunk and, at
+ * a halt between two others whose elbows open round its T bubble on screen (the bank halts'), a
+ * short stem straight on from where its dip splits to the bubble, so the dip runs into the T and
+ * the elbows read as its fillets. At the west and north halts the elbow toward the viewer already
+ * carries the dip past the bubble, and a stem would hide inside it. The nearest run goes first and
+ * every run stays off the trunk between the elbows (paintRuns), so no glass doubles up and no rim
+ * crosses a highlight. `around` bounds it all, with its halo.
+ */
+type Junction = {
+  runs: readonly GlassRun[];
+  under?: GlassRun;
+  stem?: readonly TubePoint[];
+  around: GroundArea;
+};
+const JUNCTIONS = lazy(
+  () => new Map(TUBE_STATIONS.map((station) => [station.id, junctionOf(station)])),
+);
+function junctionOf(station: TubeStation): Junction {
+  const runs = TUBE_PIECES.filter((piece) => ownGround(piece, station.id)).flatMap(runsOf);
+  let under: GlassRun | undefined, stem: TubePoint[] | undefined;
+  if (tapBubble(station)) {
+    const on = loopSpur(station, 1),
+      back = loopSpur(station, -1);
+    let shared = 0;
+    while (samePoint(on[shared], back[shared])) shared++;
+    const tap = trunkPoint(stationTap(station.id));
+    const [a, b] = [on[shared - 1], tap].map(lifted);
+    const middle = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const carried = runs.some((run) =>
+      screenOf(run.points).some(
+        (p, k, all) => k > 0 && toSegment(middle, all[k - 1], p).distance <= TUBE_ALTITUDE.radius,
+      ),
+    );
+    if (!carried) {
+      stem = [on[shared - 1], tap];
+      runs.push(runOf(stem, false));
+    }
+    const ends = [trunkS(on.at(-1)!), trunkS(back.at(-1)!)].sort((a, b) => a - b);
+    under = runOf([trunkPoint(ends[0]), tap, trunkPoint(ends[1])], false);
+  }
+  runs.sort((a, b) => b.depth - a.depth);
+  return {
+    runs,
+    under,
+    stem,
+    around: boundsOf(
+      runs.flatMap((run) => screenOf(run.points)),
+      TUBE_ALTITUDE.radius + 4,
+    ),
+  };
+}
+/** Close up, the glass a bank halt between two others adds from its dip's split to its T, as
+ *  ground points. For the tests. */
+export const tubeStem = (id: string) => JUNCTIONS().get(id)?.stem;
+/** Px round anything that lights in the ground: the 8-px halo is 4 px off the centreline, a
+ *  bubble's 5.5. */
+const MARK_MARGIN = 8;
+const MARK_AREAS = new Map<string, GroundArea>();
+/**
+ * The ground layer a hover or a selection of one halt may repaint: its own plot (the rectangle
+ * render.ts repaints for any plot), widened over the halt's own glass in the ground, its elbows
+ * onto the trunk and its T bubble, which light with it. Nothing else of the line lights in the
+ * cached ground, so moving the pointer repaints only the halts it leaves and reaches.
+ */
+export function tubeMarkArea(id: string): GroundArea {
+  let area = MARK_AREAS.get(id);
+  if (area) return area;
+  const station = tubeStation(id);
+  const c = plotCenter(getPlot(station.plot)!);
+  const points = [
+    ...TUBE_PIECES.filter((piece) => ownGround(piece, id)).flatMap((piece) =>
+      screenOf(piece.points),
+    ),
+    ...[tapBubble(station)].filter((p): p is Point => !!p),
+  ];
+  area = {
+    left: Math.min(c.x - 112, ...points.map((p) => p.x - MARK_MARGIN)),
+    right: Math.max(c.x + 112, ...points.map((p) => p.x + MARK_MARGIN)),
+    top: Math.min(c.y - 58, ...points.map((p) => p.y - MARK_MARGIN)),
+    bottom: Math.max(c.y + 58, ...points.map((p) => p.y + MARK_MARGIN)),
+  };
+  MARK_AREAS.set(id, area);
+  return area;
+}
+
+/** Where the river's head pool ends down the far bank: the bank glass runs over open water above
+ *  it, and on the far bank's grass below. */
+const POOL_END = (() => {
+  let y = 0;
+  while (isRiver(TUBE_BANK_X, y)) y++;
+  return y;
+})();
+/**
+ * The bank glass's reflection down the head pool, in the river's own hand: short flat 1-px ticks
+ * like its glints, 3–9 px long and 7–12 px apart, broken at each piling, the same every day. The
+ * glass is TUBE_ALTITUDE.bank px over the water, so its reflection lies as far below: twice that
+ * under its centreline, and only where it still lands in the pool.
+ */
+const REFLECTION_TICKS = lazy(() => {
+  const h = TUBE_ALTITUDE.bank;
+  const a = project(TUBE_BANK_X, TUBE_TRUNK_Y + TUBE_CORNER),
+    b = project(TUBE_BANK_X, POOL_END - h / TILE_H - 0.05);
+  const length = Math.hypot(b.x - a.x, b.y - a.y);
+  const pilings = TUBE_TRUNK_POSTS.filter((post) => post.water).map((post) =>
+    project(post.x, post.y),
+  );
+  const ticks: { x: number; y: number; w: number }[] = [];
+  for (let t = 4, k = 0; t <= length - 4; k++) {
+    const w = 3 + Math.floor(seedFraction(`tube:reflection:${k}`) * 7);
+    const x = a.x + ((b.x - a.x) * t) / length,
+      y = a.y + ((b.y - a.y) * t) / length + h;
+    // A piling breaks it: its own ring and dark reflection stand there instead.
+    if (!pilings.some((p) => Math.abs(p.x - x) < 8 + w && Math.abs(p.y - y) < 10))
+      ticks.push({ x: Math.round(x - w / 2), y: Math.round(y), w });
+    t += 7 + Math.floor(seedFraction(`tube:reflection:gap:${k}`) * 6);
+  }
+  return ticks;
+});
+/**
+ * Close up, still water under the line, in the ground layer: the bank glass's pale reflection
+ * down the head pool, and each bank pier's dark reflection and the ring round its foot (a plain
+ * ripple from FAR). The pilings carry their own (paintPost).
+ */
+function paintStillWater(
+  ctx: Ctx,
+  base: DOMMatrix,
+  night: boolean,
+  zoom: number,
+  visible: Visible,
+) {
+  if (zoom < FAR) return;
+  if (zoom >= DETAIL) {
+    const ticks = REFLECTION_TICKS();
+    const glint = pick(REFLECTION.glass, night);
+    for (const { x, y, w } of ticks)
+      if (visible({ x: x + w / 2, y }, w / 2, 1, 1)) box(ctx, x, y, w, 1, glint);
+  }
+  if (zoom >= DETAIL) {
+    // Down the far bank's grass the glass's own faint shade lies under it.
+    const a = project(TUBE_BANK_X, POOL_END),
+      b = project(TUBE_BANK_X, trunkPoint(TRUNK_ENDS.to).y);
+    if (visible({ x: (a.x + b.x) / 2, y: b.y }, Math.abs(b.x - a.x) / 2 + 2, b.y - a.y + 2, 2))
+      slab(ctx, base, a, b, 0, 1, pick(GLASS_SHADE, night));
+  }
+  for (const pier of SPUR_POSTS()) {
+    if (!pier.water) continue;
+    const { x, y } = rounded(pier.ground);
+    if (!visible({ x, y }, 8, 4, 12)) continue;
+    if (zoom < DETAIL) {
+      box(ctx, x - 3, y, 7, 1, pick(RIPPLE, night));
+      continue;
+    }
+    box(ctx, x - 2, y + 2, 4, 2, pick(REFLECTION.post, night));
+    box(ctx, x - 1, y + 5, 2, 4, pick(REFLECTION.post, night));
+    ring(ctx, x - 0.5, y, 6, night);
+  }
+}
+
+/** The Treeline's share of the cached ground layer: pads, trunk posts and pilings, the still water
+ * under the bank glass and the piers, the glass behind the tree lines and on the far bank, and the
+ * T bubbles. Its type admits only what the cache key and the marks cover (night, the transform,
+ * and the halt hovered or selected, which repaints only its own tubeMarkArea): of the ground,
+ * only a marked halt's elbows and T light, never a run of trunk. */
 export function drawTubeGround(
   ctx: Ctx,
-  scene: Pick<TubeScene, 'night' | 'zoom' | 'emphasis' | 'visible'>,
+  scene: Pick<TubeScene, 'night' | 'zoom' | 'visible'> &
+    Partial<Pick<TubeScene, 'emphasis' | 'station'>>,
 ) {
-  const { night, emphasis, visible } = scene;
+  const { night, visible } = scene;
+  // The layer's own matrix, which the glass's slices return to exactly.
+  const base = ctx.getTransform();
+  const marked = (id: string) => (scene.station === id ? (scene.emphasis ?? 'none') : 'none');
   for (const station of TUBE_STATIONS) {
     const { x, y } = rounded(station.stack);
     if (!visible({ x, y }, 16, 8, 8)) continue;
-    ctx.fillStyle = pick(PAD.edge, night);
-    ctx.beginPath();
-    ctx.ellipse(x, y + 0.5, 12, 6, 0, 0, Math.PI * 2);
-    ctx.fill();
+    // Zoomed out, the stone alone: its edge is half a pixel.
+    if (scene.zoom >= FAR) {
+      ctx.fillStyle = pick(PAD.edge, night);
+      ctx.beginPath();
+      ctx.ellipse(x, y + 0.5, 12, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.fillStyle = pick(PAD.stone, night);
     ctx.beginPath();
     ctx.ellipse(x, y, 11, 5.5, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+  paintStillWater(ctx, base, night, scene.zoom, visible);
   for (const post of TUBE_TRUNK_POSTS)
-    if (visible(project(post.x, post.y), 3, TRUNK_POST_HEIGHT + 1, 2))
-      paintPost(ctx, post, TRUNK_POST_HEIGHT, night);
-  const lod = glassLod(scene.zoom, emphasis);
+    if (visible(project(post.x, post.y), 6, post.height + 1, 6))
+      paintPost(ctx, post, post.height, night, post.water, scene.zoom);
+  const close = scene.zoom >= DETAIL;
   for (const piece of TUBE_PIECES)
-    if (piece.layer === 'ground' && pieceVisible(piece, visible))
-      paintGlass(ctx, piece, emphasis, night, lod);
-  // A station between two others joins the trunk with both elbows; a bubble on its row hides the
+    if (piece.layer === 'ground' && pieceVisible(piece, visible)) {
+      // Close up a halt's own glass is painted with the rest of its junction, below.
+      if (close && !piece.trunk) continue;
+      const emphasis = piece.trunk ? 'none' : marked(piece.station);
+      paintGlass(ctx, base, piece, emphasis, night, glassLod(scene.zoom, emphasis), scene.zoom);
+    }
+  if (close)
+    for (const station of TUBE_STATIONS) {
+      const { runs, under, around } = JUNCTIONS().get(station.id)!;
+      const { left, right, top, bottom } = around;
+      if (!visible({ x: (left + right) / 2, y: bottom }, (right - left) / 2, bottom - top, 0))
+        continue;
+      const emphasis = marked(station.id);
+      paintRuns(ctx, base, runs, emphasis, night, glassLod(scene.zoom, emphasis), under);
+    }
+  // A station between two others joins the trunk with both elbows; a bubble at its tap hides the
   // T, where a trunk post would otherwise stand.
-  for (const station of TUBE_STATIONS.slice(1, -1)) {
-    const at = lifted({ x: TUBE_TRUNK_X, y: station.dock.y, h: TUBE_ALTITUDE.trunk });
-    if (visible(at, 6, 6, 6)) paintBubble(ctx, at, emphasis, night, lod);
+  for (const station of TUBE_STATIONS) {
+    const at = tapBubble(station);
+    const emphasis = marked(station.id);
+    if (at && visible(at, 6, 6, 6))
+      paintBubble(ctx, at, emphasis, night, glassLod(scene.zoom, emphasis), scene.zoom);
   }
 }
 
-/** Riders and parcels in the glass behind the tree line, per frame, before the depth sort. */
+/**
+ * Below WHOLE, the spur glass in view as runs: each run is consecutive pieces of one halt's spur
+ * that meet end to end, keyed by its first piece's index. That piece paints the run as one stroke
+ * (paintSpurRun); the others paint only their riders.
+ */
+function spurRuns(visible: Visible) {
+  const runs = new Map<number, TubePiece[]>();
+  let run: number[] = [];
+  const flush = () => {
+    if (run.length)
+      runs.set(
+        run[0],
+        run.map((i) => TUBE_PIECES[i]),
+      );
+    run = [];
+  };
+  TUBE_PIECES.forEach((piece, index) => {
+    if (piece.layer !== 'spur' || !pieceVisible(piece, visible)) return flush();
+    const last = run.at(-1);
+    if (last !== undefined) {
+      const end = TUBE_PIECES[last].points.at(-1)!,
+        start = piece.points[0];
+      const joined =
+        last === index - 1 &&
+        TUBE_PIECES[last].station === piece.station &&
+        Math.hypot(end.x - start.x, end.y - start.y) <= 1e-6;
+      if (!joined) flush();
+    }
+    run.push(index);
+  });
+  flush();
+  return runs;
+}
+/** A run of spur glass zoomed right out: one stroke through its pieces' ends, the glass's width,
+ *  over its halo when selected. */
+function paintSpurRun(
+  ctx: Ctx,
+  run: readonly TubePiece[],
+  emphasis: TubeEmphasis,
+  night: boolean,
+  lod: number,
+) {
+  const alpha = ctx.globalAlpha,
+    width = ctx.lineWidth;
+  ctx.globalAlpha = alpha * lod;
+  ctx.beginPath();
+  const first = lifted(run[0].points[0]);
+  ctx.moveTo(first.x, first.y);
+  for (const piece of run) {
+    const end = lifted(piece.points.at(-1)!);
+    ctx.lineTo(end.x, end.y);
+  }
+  if (emphasis === 'selected') {
+    ctx.strokeStyle = pick(GLASS.halo, night);
+    ctx.lineWidth = 8;
+    ctx.stroke();
+  }
+  ctx.strokeStyle = pick(GLASS.body, night);
+  ctx.lineWidth = 2 * TUBE_ALTITUDE.radius;
+  ctx.stroke();
+  ctx.lineWidth = width;
+  ctx.globalAlpha = alpha;
+}
+
+/** Riders and parcels in the glass behind the tree lines and on the far bank, per frame, before
+ * the depth sort. */
 export function drawTubeTraffic(ctx: Ctx, scene: TubeScene) {
   if (!TUBE_PIECES.some((piece) => piece.layer === 'ground' && pieceVisible(piece, scene.visible)))
     return;
-  const lod = glassLod(scene.zoom, scene.emphasis);
+  const lod = glassLod(scene.zoom, 'none');
   for (const capsule of capsulesOf(scene))
     if (capsule.painter.kind === 'traffic' && scene.visible(capsule.at, 20, 6, 6))
-      paintCapsule(ctx, capsule, scene, lod);
+      paintCapsule(ctx, capsule, scene, lod, 'none');
 }
 
 /** The Treeline's depth objects. Push them before the residents, so walkers win ties. */
 export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
-  const { night, visible, emphasis } = scene;
-  const lod = glassLod(scene.zoom, emphasis);
+  const { night, visible } = scene;
   const out: TubeObject[] = [];
+  // The frame's matrix, which every object is painted at and the glass returns to exactly.
+  const base = ctx.getTransform();
   let traffic: Capsule[] | undefined;
   const capsules = () => (traffic ??= capsulesOf(scene));
+  const runs = scene.zoom < WHOLE ? spurRuns(visible) : undefined;
   TUBE_PIECES.forEach((piece, index) => {
     if (piece.layer !== 'spur' || !pieceVisible(piece, visible)) return;
     const riding = capsules().filter(
@@ -950,6 +1846,8 @@ export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
       b = piece.points.at(-1)!;
     const ga = project(a.x, a.y),
       gb = project(b.x, b.y);
+    const emphasis = emphasisOf(scene, piece.station);
+    const lod = glassLod(scene.zoom, emphasis);
     out.push({
       depth: piece.depth,
       part: 'spur',
@@ -957,33 +1855,43 @@ export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
       ground: { x: a.x, y: a.y },
       slope: (gb.y - ga.y) / (gb.x - ga.x),
       paint: () => {
-        paintGlass(ctx, piece, emphasis, night, lod);
-        for (const capsule of riding) paintCapsule(ctx, capsule, scene, lod);
+        if (!runs) paintGlass(ctx, base, piece, emphasis, night, lod, scene.zoom);
+        else {
+          const run = runs.get(index);
+          if (run) paintSpurRun(ctx, run, emphasis, night, lod);
+        }
+        for (const capsule of riding) paintCapsule(ctx, capsule, scene, lod, emphasis);
       },
     });
   });
   const puffs = puffsAt(scene.residents);
   for (const station of TUBE_STATIONS) {
     const id = station.id;
+    const emphasis = emphasisOf(scene, id);
+    const lod = glassLod(scene.zoom, emphasis);
+    // A west or bank spur turns at its dock; a north spur runs straight on, with no bubble.
     const dock = lifted({ ...station.dock, h: TUBE_ALTITUDE.spur });
-    if (visible(dock, 6, 6, 6))
+    if (station.edge !== 'north' && visible(dock, 6, 6, 6))
       out.push({
         depth: station.dock.x + station.dock.y - 0.2,
         part: 'bubble',
         station: id,
         ground: station.dock,
         slope: 0,
-        paint: () => paintBubble(ctx, dock, emphasis, night, lod),
+        paint: () => paintBubble(ctx, dock, emphasis, night, lod, scene.zoom),
       });
     const post = SPUR_POSTS().find((p) => p.station === station)!;
-    if (visible(project(post.ground.x, post.ground.y), 3, post.height + 1, 2))
+    if (visible(project(post.ground.x, post.ground.y), 4, post.height + 1, 2))
       out.push({
         depth: post.ground.x + post.ground.y - 0.25,
         part: 'post',
         station: id,
         ground: post.ground,
         slope: 0,
-        paint: () => paintPost(ctx, post.ground, post.height, night),
+        paint: () =>
+          post.water
+            ? paintPier(ctx, post.ground, post.height, night, scene.zoom)
+            : paintPost(ctx, post.ground, post.height, night, false, scene.zoom),
       });
     const foot = project(station.stack.x, station.stack.y);
     if (visible(foot, 10, 52, 6)) {
@@ -1013,7 +1921,7 @@ export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
         paint: () => paintStack(ctx, station, scene, inside),
       });
     }
-    if (station === FIRST) {
+    if (station === SIGN_STATION) {
       if (visible(project(SIGN_FOOT.x, SIGN_FOOT.y), 24, 38, 14))
         out.push({
           depth: SIGN_DEPTH,
@@ -1041,7 +1949,7 @@ export function drawTubes(ctx: Ctx, scene: TubeScene): TubeObject[] {
           station: id,
           ground: station.stack,
           slope: 0,
-          paint: () => paintPuff(ctx, station, age, night),
+          paint: () => paintPuff(ctx, station, age, night, scene.zoom),
         });
   }
   return out;
@@ -1058,7 +1966,8 @@ function toSegment(p: Point, a: Point, b: Point) {
   return { distance: Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy), t };
 }
 /** The frontmost part of the line under a world point: a stack, the sign, the umbrella stand or
- * a 6-px band around the glass. Glass behind the tree line is at depth −1, under everything. */
+ * a 6-px band around the glass. Glass behind the tree lines and on the far bank is at depth −1,
+ * under everything, and selects the station whose tap is nearest along the loop. */
 export function tubeHit(point: Point): { id: string; depth: number } | undefined {
   let best: { id: string; depth: number } | undefined;
   const offer = (id: string, depth: number) => {
@@ -1072,10 +1981,10 @@ export function tubeHit(point: Point): { id: string; depth: number } | undefined
   const sign = rounded(SIGN_FOOT);
   const u = point.x - sign.x,
     v = point.y - sign.y - 0.5 * u;
-  if (Math.abs(u) <= 22 && v >= -25 && v <= 0) offer(FIRST.id, SIGN_DEPTH);
+  if (Math.abs(u) <= 22 && v >= -25 && v <= 0) offer(SIGN_STATION.id, SIGN_DEPTH);
   const stand = rounded(STAND_FOOT);
   if (Math.abs(point.x - stand.x) <= 4 && point.y >= stand.y - 18 && point.y <= stand.y + 1)
-    offer(FIRST.id, STAND_DEPTH);
+    offer(SIGN_STATION.id, STAND_DEPTH);
   for (const piece of TUBE_PIECES) {
     const screen = screenOf(piece.points);
     for (let k = 1; k < screen.length; k++) {
@@ -1085,7 +1994,8 @@ export function tubeHit(point: Point): { id: string; depth: number } | undefined
       else {
         const a = piece.points[k - 1],
           b = piece.points[k];
-        offer(nearestStation(a.y + (b.y - a.y) * t).id, -1);
+        const ground = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+        offer(nearestTap(nearestTrunkS(ground)).id, -1);
       }
     }
   }

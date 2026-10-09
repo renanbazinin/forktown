@@ -25,6 +25,7 @@ import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { opposite, routeLength, WALK_SPEED } from '../src/lib/walking';
 import { getPlot, isRoad, plotEntrance, type Point } from '../src/lib/world';
 import { fullTown, readPlaces } from './full-town';
+import { rosterTimeout } from './roster-timeout';
 
 const real = readPlaces();
 const full = fullTown(real);
@@ -66,51 +67,55 @@ describe('One small seasonal errand', () => {
     expect(seasonalRitual(SEASON_DAYS[3]).delivery.point.y).toBeGreaterThan(37);
   });
 
-  it('fits the entire round between existing outings and inside a daytime stroll run', () => {
-    for (const homes of [real, full])
-      for (const day of YEAR) {
-        const outings = residentTrips(homes, day);
-        const before = JSON.stringify([...outings]);
-        const list = rounds(homes, day);
-        expect(list.length).toBeLessThanOrEqual(1);
-        for (const trip of list) {
-          const home = homes.find((candidate) => candidate.id === trip.residentId)!;
-          expect(trip.depart).toBeGreaterThanOrEqual(ERRAND_HOURS.from + ERRAND_MARGIN);
-          expect(trip.homeBy - trip.depart).toBeLessThanOrEqual(ERRAND_MAX_MINUTES + 1e-9);
-          expect(trip.homeBy).toBeLessThanOrEqual(ERRAND_HOURS.until - ERRAND_MARGIN + 1e-9);
-          expect(
-            strollRuns(home).some(
-              (run) =>
-                trip.depart >= run.start + ERRAND_MARGIN &&
-                trip.homeBy <= run.end - ERRAND_MARGIN + 1e-9,
-            ),
-          ).toBe(true);
-          for (const event of outings.get(home.id) ?? [])
+  it(
+    'fits the entire round between existing outings and inside a daytime stroll run',
+    () => {
+      for (const homes of [real, full])
+        for (const day of YEAR) {
+          const outings = residentTrips(homes, day);
+          const before = JSON.stringify([...outings]);
+          const list = rounds(homes, day);
+          expect(list.length).toBeLessThanOrEqual(1);
+          for (const trip of list) {
+            const home = homes.find((candidate) => candidate.id === trip.residentId)!;
+            expect(trip.depart).toBeGreaterThanOrEqual(ERRAND_HOURS.from + ERRAND_MARGIN);
+            expect(trip.homeBy - trip.depart).toBeLessThanOrEqual(ERRAND_MAX_MINUTES + 1e-9);
+            expect(trip.homeBy).toBeLessThanOrEqual(ERRAND_HOURS.until - ERRAND_MARGIN + 1e-9);
             expect(
-              trip.homeBy + ERRAND_MARGIN <= event.depart + 1e-9 ||
-                event.homeBy + ERRAND_MARGIN <= trip.depart + 1e-9,
+              strollRuns(home).some(
+                (run) =>
+                  trip.depart >= run.start + ERRAND_MARGIN &&
+                  trip.homeBy <= run.end - ERRAND_MARGIN + 1e-9,
+              ),
             ).toBe(true);
-          expect(trip.segments.map((segment) => segment.phase)).toEqual([
-            'outbound',
-            'pickup',
-            'carrying',
-            'dropoff',
-            'returning',
-          ]);
-          expect(trip.segments[0].start).toBe(trip.depart);
-          expect(trip.segments.at(-1)!.end).toBe(trip.homeBy);
-          for (const [index, segment] of trip.segments.entries()) {
-            if (index) expect(segment.start).toBe(trip.segments[index - 1].end);
-            expect(segment.end - segment.start).toBeCloseTo(
-              'route' in segment ? routeLength(segment.route) / WALK_SPEED : ERRAND_PAUSE,
-              9,
-            );
+            for (const event of outings.get(home.id) ?? [])
+              expect(
+                trip.homeBy + ERRAND_MARGIN <= event.depart + 1e-9 ||
+                  event.homeBy + ERRAND_MARGIN <= trip.depart + 1e-9,
+              ).toBe(true);
+            expect(trip.segments.map((segment) => segment.phase)).toEqual([
+              'outbound',
+              'pickup',
+              'carrying',
+              'dropoff',
+              'returning',
+            ]);
+            expect(trip.segments[0].start).toBe(trip.depart);
+            expect(trip.segments.at(-1)!.end).toBe(trip.homeBy);
+            for (const [index, segment] of trip.segments.entries()) {
+              if (index) expect(segment.start).toBe(trip.segments[index - 1].end);
+              expect(segment.end - segment.start).toBeCloseTo(
+                'route' in segment ? routeLength(segment.route) / WALK_SPEED : ERRAND_PAUSE,
+                9,
+              );
+            }
           }
+          expect(JSON.stringify([...outings])).toBe(before);
+          expect([...residentTrips(homes, day)]).toEqual([...planResidentTrips(homes, day)]);
         }
-        expect(JSON.stringify([...outings])).toBe(before);
-        expect([...residentTrips(homes, day)]).toEqual([...planResidentTrips(homes, day)]);
-      }
-  }, 30_000);
+    },
+    rosterTimeout(250, 60_000),
+  );
 
   it('skips a round when nobody has time, and a private preview never becomes its carrier', () => {
     const working = copy(previewRoster).map((home) => ({

@@ -7,9 +7,9 @@ import { residentTrips } from './resident-trips';
 import { townClock } from './simulation';
 import type { TripLeg } from './tube-journeys';
 import {
+  TUBE_PARCEL_ROUTE,
   TUBE_PARCELS,
   TUBE_SPEED,
-  TUBE_STATIONS,
   tubeAt,
   tubeLength,
   tubeParcelMinutes,
@@ -21,6 +21,10 @@ import {
 export type TubeRide = {
   residentId: string;
   eventId: string;
+  /** The event's start (a guest's own for a personal one, such as the market's hour). With
+   *  `eventId` it names the ride's trip: a neighbor can go to the same event twice in a day, the
+   *  football in the morning and again in the afternoon, walking once and riding once. */
+  eventStart: number;
   direction: 'there' | 'home';
   from: string;
   to: string;
@@ -53,7 +57,7 @@ function rideOf(
   legs: readonly TripLeg[],
   start: number,
   residentId: string,
-  eventId: string,
+  event: { id: string; start: number },
   direction: TubeRide['direction'],
 ): TubeRide | undefined {
   let board = start;
@@ -72,7 +76,8 @@ function rideOf(
       arrive = depart + ride.minutes;
     return {
       residentId,
-      eventId,
+      eventId: event.id,
+      eventStart: event.start,
       direction,
       from: leg.from,
       to: leg.to,
@@ -94,12 +99,12 @@ export function tubeRides(places: Place[], day: number): TubeRide[] {
   for (const [id, trips] of residentTrips(places, day))
     for (const trip of trips) {
       if (trip.legs) {
-        const ride = rideOf(trip.legs, trip.depart, id, trip.event.id, 'there');
+        const ride = rideOf(trip.legs, trip.depart, id, trip.event, 'there');
         if (ride) list.push(ride);
       }
       // A cinema guest who goes on to the party never takes the cinema's way home.
       if (trip.returnLegs && !trip.continuesTo) {
-        const ride = rideOf(trip.returnLegs, trip.leave, id, trip.event.id, 'home');
+        const ride = rideOf(trip.returnLegs, trip.leave, id, trip.event, 'home');
         if (ride) list.push(ride);
       }
     }
@@ -136,11 +141,9 @@ let parcelHours: { from: number; until: number } | undefined;
  *  nothing is planned (at night the town still follows yesterday's plan). */
 function parcelDaylight(time: number) {
   if (!parcelHours) {
-    const longest = Math.max(
-      ...TUBE_STATIONS.flatMap((a) =>
-        TUBE_STATIONS.filter((b) => b !== a).map((b) => tubeParcelMinutes(a.id, b.id)),
-      ),
-    );
+    // Parcels only ever run along their own route, both ways.
+    const [a, b] = TUBE_PARCEL_ROUTE;
+    const longest = Math.max(tubeParcelMinutes(a, b), tubeParcelMinutes(b, a));
     parcelHours = {
       from: TUBE_PARCELS.first - TUBE_PARCELS.wait,
       until: TUBE_PARCELS.last + TUBE_PARCELS.jitter + longest + TUBE_PARCELS.wait,

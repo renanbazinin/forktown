@@ -114,6 +114,11 @@ export function drawChimneySmoke(
   ctx.restore();
 }
 
+/** Minutes a flock takes to cross the town: 50 tiles in 80 minutes, however wide it grows. */
+export const BIRD_CROSSING = (80 * (WORLD_WIDTH + 6)) / 50;
+/** Quiet minutes between one flock's passes. */
+const BIRD_GAP = 40;
+
 export function drawBirds(ctx: Ctx, minutes: number, night: boolean) {
   if (night) return;
   ctx.save();
@@ -121,15 +126,16 @@ export function drawBirds(ctx: Ctx, minutes: number, night: boolean) {
   ctx.lineWidth = 1.5;
   ctx.lineCap = 'round';
   // Two small flocks, with a quiet gap between passes. No independent animation timer.
+  const period = BIRD_CROSSING + BIRD_GAP;
   for (let flock = 0; flock < 2; flock++) {
-    const elapsed = (minutes + flock * 60) % 120;
-    if (elapsed >= 80) continue;
-    const progress = elapsed / 80;
+    const elapsed = (minutes + (flock * period) / 2) % period;
+    if (elapsed >= BIRD_CROSSING) continue;
+    const progress = elapsed / BIRD_CROSSING;
     const center = project(
       -3 + progress * (WORLD_WIDTH + 6),
       WORLD_HEIGHT * (flock ? 0.65 : 0.3) + Math.sin(progress * Math.PI * 2) * 1.5,
     );
-    ctx.globalAlpha = Math.min(1, elapsed / 6, (80 - elapsed) / 6) * 0.7;
+    ctx.globalAlpha = Math.min(1, elapsed / 6, (BIRD_CROSSING - elapsed) / 6) * 0.7;
     for (let bird = 0; bird < 3; bird++) {
       const x = center.x - bird * 14,
         y = center.y - 95 + (bird % 2 ? -9 : 4);

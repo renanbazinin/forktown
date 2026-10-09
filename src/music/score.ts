@@ -1,6 +1,10 @@
 import { isEventLive, type TownEvent } from '../lib/events';
+import { BANDS, type Band } from '../lib/district-calendar';
+import { BAND_COPY } from '../lib/district-copy';
+import { BANDSTAND_TRACKS, composeBandstand } from './bandstand-tracks';
 
-export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party';
+/** The town's own tunes, the stage's shows, and the Bandstand's three bands (bandstand-tracks.ts). */
+export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | Band;
 export type Voice = 'bell' | 'keys' | 'pluck' | 'lead' | 'pad' | 'bass' | 'kick' | 'snare' | 'hat';
 export type Note = {
   beat: number;
@@ -17,13 +21,36 @@ export const TRACKS: Record<TrackId, { title: string; subtitle: string; bpm: num
   acoustic: { title: 'Honey on the Steps', subtitle: 'Sun-warmed strings', bpm: 86 },
   jazz: { title: 'After-hours Lemonade', subtitle: 'A little swing under the stars', bpm: 96 },
   party: { title: 'One More Little Dance', subtitle: 'Midnight at the Little Stage', bpm: 112 },
+  ...BANDSTAND_TRACKS,
 };
 export const BEATS = 64;
 export const durationOf = (track: TrackId) => (BEATS * 60) / TRACKS[track].bpm;
-export function trackForTown(minutes: number, events: TownEvent[]): TrackId {
+/** Whether a track is one of the Bandstand's bands, heard only near it and scaled by its gain. */
+export const isBandTrack = (track: TrackId): track is Band =>
+  (BANDS as readonly string[]).includes(track);
+/**
+ * What the town plays: a live show on the stage first (the concert, the disco); then a live
+ * Bandstand set, only while the Bandstand is heard (`bandstand.gain` ≥ 0.005, local like the
+ * cinema); then the town's day or night tune.
+ */
+export function trackForTown(
+  minutes: number,
+  events: TownEvent[],
+  bandstand: { gain: number } = { gain: 0 },
+): TrackId {
   const show = events.find((event) => event.venue.kind === 'stage' && isEventLive(event, minutes));
   if (show?.id === 'night-party') return 'party';
   if (show && (show.id === 'rock' || show.id === 'acoustic' || show.id === 'jazz')) return show.id;
+  if (bandstand.gain >= 0.005) {
+    const set = events.find(
+      (event) =>
+        (event.outing === 'bandstand-tea' || event.outing === 'bandstand-sundown') &&
+        isEventLive(event, minutes),
+    );
+    // Both sets play the day's band, named in the set's own title.
+    const band = set && BANDS.find((band) => BAND_COPY[band].name === set.name);
+    if (band) return band;
+  }
   return minutes < 360 || minutes >= 1200 ? 'night' : 'town';
 }
 
@@ -317,6 +344,8 @@ const harmony = [
 ];
 
 export function compose(track: TrackId): Note[] {
+  // A band plays its own arrangement; until it has one, today's acoustic notes.
+  if (isBandTrack(track)) return composeBandstand(track) ?? compose('acoustic');
   const notes: Note[] = [];
   const add = (
     beat: number,

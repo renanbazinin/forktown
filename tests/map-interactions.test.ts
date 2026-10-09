@@ -7,7 +7,17 @@ import { plotDoor } from '../src/lib/home-life';
 import { getPlot, plotCenter, project, unproject } from '../src/lib/world';
 import { ZOO_SIGN, ZOO_SIGN_DEPTH } from '../src/city/zoo';
 import { FORK_PLOT } from '../src/lib/lanterns';
-import { tubeAt, tubeLength, tubeRoute, tubeStation, type ResidentTransit } from '../src/lib/tubes';
+import {
+  TRUNK_ARCS,
+  TUBE_STATIONS,
+  stationTap,
+  trunkPoint,
+  tubeAt,
+  tubeLength,
+  tubeRoute,
+  tubeStation,
+  type ResidentTransit,
+} from '../src/lib/tubes';
 import { AFTER_HOURS } from './fixtures';
 import { readPlaces } from './full-town';
 
@@ -298,5 +308,36 @@ describe('Map selection follows visible depth', () => {
     expect(tubeHit(off(5))?.id).toBe('C1');
     expect(tubeHit(off(7))).toBeUndefined();
     expect(tubeHit(off(-7))).toBeUndefined();
+  });
+
+  it('selects the nearer halt along the loop from any of its glass, round both corners', () => {
+    const place = (id: string) => ({ kind: 'place', id });
+    const onTrunk = (s: number) => {
+      const p = trunkPoint(s);
+      return lifted(p.x, p.y, p.h);
+    };
+    // Either side of the midpoint between each two halts' taps, the trunk selects its own side's
+    // halt: up the west run, round the north-west corner, along the north run, round the river's
+    // head and down the far bank.
+    for (let i = 1; i < TUBE_STATIONS.length; i++) {
+      const a = TUBE_STATIONS[i - 1].id,
+        b = TUBE_STATIONS[i].id;
+      const middle = (stationTap(a) + stationTap(b)) / 2;
+      expect(cityHit(onTrunk(middle - 0.5), [], []), `${a}|${b}`).toEqual(place(a));
+      expect(cityHit(onTrunk(middle + 0.5), [], []), `${a}|${b}`).toEqual(place(b));
+    }
+    // The corners themselves belong to the halt nearer along the loop.
+    expect(cityHit(onTrunk(TRUNK_ARCS.S_N0 / 2), [], [])).toEqual(place('C1'));
+    expect(cityHit(onTrunk((TRUNK_ARCS.S_N1 + TRUNK_ARCS.S_E0) / 2), [], [])).toEqual(place('C15'));
+    // Hawthorn, Watercress and Kingfisher: the stack, the glass high over the lane or the
+    // riverside road, and the trunk beside the tap.
+    for (const id of ['A9', 'C15', 'L15']) {
+      const { stack, dock, edge } = tubeStation(id);
+      expect(cityHit(lifted(stack.x, stack.y, 30), [], []), id).toEqual(place(id));
+      const over = edge === 'north' ? lifted(dock.x, 1.5, 39) : lifted(61.5, dock.y, 39);
+      expect(cityHit(over, [], []), id).toEqual(place(id));
+      expect(cityHit(onTrunk(stationTap(id) + 2), [], []), id).toEqual(place(id));
+      expect(cityHit(onTrunk(stationTap(id) - 2), [], []), id).toEqual(place(id));
+    }
   });
 });

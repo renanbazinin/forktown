@@ -44,6 +44,8 @@ import { TUBE_MIN_SAVING } from '../src/lib/tubes';
 import { roadPath, routeLength, MAX_TRAVEL_SPEED_MULTIPLIER, WALK_SPEED } from '../src/lib/walking';
 import { getPlot, plotEntrance, type Point } from '../src/lib/world';
 import { fullTown, fullTownHouse, readPlaces } from './full-town';
+import { rosterTimeout } from './roster-timeout';
+import { outingOf } from '../src/lib/outings';
 
 const real = readPlaces();
 const everyone = fullTown(real);
@@ -99,55 +101,59 @@ function outings(town: Place[], days: number[]) {
     }),
   );
 }
-const SEATED = ['sit', 'read', 'sip', 'chat'];
+const SEATED = ['sit', 'read', 'sip', 'chat', 'perch', 'tea'];
 
 describe('Walking routes to the venues', () => {
-  it('never walks past a gate, a lane or a seat and back, from any doorstep', () => {
-    const venues = [
-      ...VENUES.filter((venue) => venue.kind !== 'fork').flatMap((venue) =>
-        EVENT_SPOTS[venue.kind].map((_, seat) => ({ venue, seat })),
-      ),
-      ...Array.from({ length: 6 }, (_, seat) => [
-        { venue: FOOTBALL_VENUE, seat },
-        { venue: MILLPOND_VENUE, seat },
-      ]).flat(),
-    ];
-    let checked = 0,
-      trimmed = 0,
-      rides = 0;
-    for (const plot of HOUSE_PLOTS) {
-      const home = fullTownHouse(plot.id);
-      const doorstep = plotEntrance(plot);
-      for (const { venue, seat } of venues) {
-        const event = { venue } as Parameters<typeof eventRoute>[1];
-        const approach = eventApproach({ venue }, seat);
-        const route = eventRoute(home, event, seat);
-        // The road then the approach, end to end, as the town walked them before the join.
-        const plain = [...roadPath(doorstep, approach[0]), ...approach.slice(1)];
-        expect(route[0]).toEqual(doorstep);
-        expect(route.at(-1)).toEqual(approach.at(-1));
-        expect(reversals(route)).toEqual([]);
-        expect(routeLength(route)).toBeLessThanOrEqual(routeLength(plain) + 1e-9);
-        // Every stretch runs along a row or a column, like the roads and the approaches.
-        route
-          .slice(1)
-          .forEach((p, i) => expect(p.x === route[i].x || p.y === route[i].y).toBe(true));
-        if (reversals(plain).length) trimmed++;
-        checked++;
-        // A ride still saves its ten unhurried minutes against the shorter walk.
-        const tube = eventTubeJourney(home, event, seat);
-        if (!tube) continue;
-        expect(routeLength(route) / WALK_SPEED - legsMinutes(tube.legs)).toBeGreaterThanOrEqual(
-          TUBE_MIN_SAVING,
-        );
-        rides++;
+  it(
+    'never walks past a gate, a lane or a seat and back, from any doorstep',
+    () => {
+      const venues = [
+        ...VENUES.filter((venue) => venue.kind !== 'fork').flatMap((venue) =>
+          EVENT_SPOTS[venue.kind].map((_, seat) => ({ venue, seat })),
+        ),
+        ...Array.from({ length: 6 }, (_, seat) => [
+          { venue: FOOTBALL_VENUE, seat },
+          { venue: MILLPOND_VENUE, seat },
+        ]).flat(),
+      ];
+      let checked = 0,
+        trimmed = 0,
+        rides = 0;
+      for (const plot of HOUSE_PLOTS) {
+        const home = fullTownHouse(plot.id);
+        const doorstep = plotEntrance(plot);
+        for (const { venue, seat } of venues) {
+          const event = { venue } as Parameters<typeof eventRoute>[1];
+          const approach = eventApproach({ venue }, seat);
+          const route = eventRoute(home, event, seat);
+          // The road then the approach, end to end, as the town walked them before the join.
+          const plain = [...roadPath(doorstep, approach[0]), ...approach.slice(1)];
+          expect(route[0]).toEqual(doorstep);
+          expect(route.at(-1)).toEqual(approach.at(-1));
+          expect(reversals(route)).toEqual([]);
+          expect(routeLength(route)).toBeLessThanOrEqual(routeLength(plain) + 1e-9);
+          // Every stretch runs along a row or a column, like the roads and the approaches.
+          route
+            .slice(1)
+            .forEach((p, i) => expect(p.x === route[i].x || p.y === route[i].y).toBe(true));
+          if (reversals(plain).length) trimmed++;
+          checked++;
+          // A ride still saves its ten unhurried minutes against the shorter walk.
+          const tube = eventTubeJourney(home, event, seat);
+          if (!tube) continue;
+          expect(routeLength(route) / WALK_SPEED - legsMinutes(tube.legs)).toBeGreaterThanOrEqual(
+            TUBE_MIN_SAVING,
+          );
+          rides++;
+        }
       }
-    }
-    expect(checked).toBe(HOUSE_PLOTS.length * venues.length);
-    // Most doorsteps used to overshoot somewhere: the gate lanes all share their entrance's row.
-    expect(trimmed).toBeGreaterThan(1000);
-    expect(rides).toBeGreaterThan(1000);
-  });
+      expect(checked).toBe(HOUSE_PLOTS.length * venues.length);
+      // Most doorsteps used to overshoot somewhere: the gate lanes all share their entrance's row.
+      expect(trimmed).toBeGreaterThan(1000);
+      expect(rides).toBeGreaterThan(1000);
+    },
+    rosterTimeout(190, 45_000),
+  );
 
   it('turns in at the zoo gate even when home is on the zoo road, east of the gate', () => {
     const zoo = VENUES.find((venue) => venue.kind === 'zoo')!;
@@ -360,79 +366,86 @@ describe('Lanes on the road', () => {
     expect(turned).toBeGreaterThan(50);
   }, 60_000);
 
-  it('draws neighbors who walk together side by side, not as one figure', () => {
-    // Pairs of walkers heading the same way, and how long each pair is drawn as one figure at
-    // zoom 1 (figures about 12 px wide and 27 tall): within 6 px across and 12 up or down they
-    // read as one; within 7 across and 22 up or down, one head over the other, as a two-headed
-    // one. The published town for four days (one of them a busy one, with the stage's night owls
-    // out late), and a full town for a day.
-    const STEP = 0.2;
-    let together = 0,
-      close = 0;
-    const longest = { fused: 0, stacked: 0 };
-    const longestAt = { fused: '', stacked: '' };
-    for (const [town, days] of [
-      [real, [...DAYS(3), DAYS(43)[42]]],
-      [everyone, DAYS(1)],
-    ] as const)
-      for (const day of days) {
-        const runs = { fused: new Map<string, number>(), stacked: new Map<string, number>() };
-        for (let minute = 360; minute < 1800; minute += STEP) {
-          const states = simulateResidents(town, minute % 1440, day + Math.floor(minute / 1440));
-          const walkers = states.filter(
-            (state) =>
-              state.activity === 'stroll' &&
-              state.moving &&
-              !state.transit &&
-              state.fade === undefined,
-          );
-          const drawn = walkers.map((state) => {
-            const ground = residentGround(state);
-            return { x: (ground.x - ground.y) * 38, y: (ground.x + ground.y) * 19 };
-          });
-          const now = { fused: new Set<string>(), stacked: new Set<string>() };
-          for (let i = 0; i < walkers.length; i++)
-            for (let j = i + 1; j < walkers.length; j++) {
-              const a = walkers[i],
-                b = walkers[j];
-              if (a.facing !== b.facing) continue;
-              const x = Math.abs(drawn[i].x - drawn[j].x),
-                y = Math.abs(drawn[i].y - drawn[j].y);
-              // Walkers the simulation has on one spot of the road (lockstep), and how many of
-              // those moments lanes still draw on top of each other.
-              if (Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) < 0.2) {
-                together++;
-                if (x < 8 && y < 8) close++;
-              }
-              const key = `${a.id}&${b.id}`;
-              for (const [kind, over] of [
-                ['fused', x < 6 && y < 12],
-                ['stacked', x < 7 && y < 22],
-              ] as const) {
-                if (!over) continue;
-                now[kind].add(key);
-                const run = (runs[kind].get(key) ?? 0) + STEP;
-                runs[kind].set(key, run);
-                if (run > longest[kind]) {
-                  longest[kind] = run;
-                  longestAt[kind] =
-                    `${town === real ? 'published' : 'full'} town: ${key}, day ${day}, ending at ${minute.toFixed(2)}`;
+  it(
+    'draws neighbors who walk together side by side, not as one figure',
+    () => {
+      // Pairs of walkers heading the same way, and how long each pair is drawn as one figure at
+      // zoom 1 (figures about 12 px wide and 27 tall): within 6 px across and 12 up or down they
+      // read as one; within 7 across and 22 up or down, one head over the other, as a two-headed
+      // one. The published town for four days (one of them a busy one, with the stage's night owls
+      // out late), and a full town for a day. Measured with the branch's 30 houses: fused 0.8 and
+      // stacked 1.6 at worst, in either town. A newcomer on K14 once walked one head over a
+      // neighbor for 4 minutes on the way to the zoo, each in the lane worst for the other, until
+      // the planner learned to move both at once.
+      const STEP = 0.2;
+      let together = 0,
+        close = 0;
+      const longest = { fused: 0, stacked: 0 };
+      const longestAt = { fused: '', stacked: '' };
+      for (const [town, days] of [
+        [real, [...DAYS(3), DAYS(43)[42]]],
+        [everyone, DAYS(1)],
+      ] as const)
+        for (const day of days) {
+          const runs = { fused: new Map<string, number>(), stacked: new Map<string, number>() };
+          for (let minute = 360; minute < 1800; minute += STEP) {
+            const states = simulateResidents(town, minute % 1440, day + Math.floor(minute / 1440));
+            const walkers = states.filter(
+              (state) =>
+                state.activity === 'stroll' &&
+                state.moving &&
+                !state.transit &&
+                state.fade === undefined,
+            );
+            const drawn = walkers.map((state) => {
+              const ground = residentGround(state);
+              return { x: (ground.x - ground.y) * 38, y: (ground.x + ground.y) * 19 };
+            });
+            const now = { fused: new Set<string>(), stacked: new Set<string>() };
+            for (let i = 0; i < walkers.length; i++)
+              for (let j = i + 1; j < walkers.length; j++) {
+                const a = walkers[i],
+                  b = walkers[j];
+                if (a.facing !== b.facing) continue;
+                const x = Math.abs(drawn[i].x - drawn[j].x),
+                  y = Math.abs(drawn[i].y - drawn[j].y);
+                // Walkers the simulation has on one spot of the road (lockstep), and how many of
+                // those moments lanes still draw on top of each other.
+                if (Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) < 0.2) {
+                  together++;
+                  if (x < 8 && y < 8) close++;
+                }
+                const key = `${a.id}&${b.id}`;
+                for (const [kind, over] of [
+                  ['fused', x < 6 && y < 12],
+                  ['stacked', x < 7 && y < 22],
+                ] as const) {
+                  if (!over) continue;
+                  now[kind].add(key);
+                  const run = (runs[kind].get(key) ?? 0) + STEP;
+                  runs[kind].set(key, run);
+                  if (run > longest[kind]) {
+                    longest[kind] = run;
+                    longestAt[kind] =
+                      `${town === real ? 'published' : 'full'} town: ${key}, day ${day}, ending at ${minute.toFixed(2)}`;
+                  }
                 }
               }
-            }
-          for (const kind of ['fused', 'stacked'] as const)
-            for (const key of [...runs[kind].keys()])
-              if (!now[kind].has(key)) runs[kind].delete(key);
+            for (const kind of ['fused', 'stacked'] as const)
+              for (const key of [...runs[kind].keys()])
+                if (!now[kind].has(key)) runs[kind].delete(key);
+          }
         }
-      }
-    expect(together).toBeGreaterThan(300);
-    // Lanes keep all but a few moments apart (where two walks both ease in to a doorstep or a
-    // seat, or one walker overtakes another), and never draw two neighbors as one figure for
-    // long: under two minutes as one, under three one head over the other.
-    expect(close / together).toBeLessThan(0.1);
-    expect(longest.fused, longestAt.fused).toBeLessThan(2);
-    expect(longest.stacked, longestAt.stacked).toBeLessThan(3);
-  }, 60_000);
+      expect(together).toBeGreaterThan(300);
+      // Lanes keep all but a few moments apart (where two walks both ease in to a doorstep or a
+      // seat, or one walker overtakes another), and never draw two neighbors as one figure for
+      // long: under two minutes as one, under three one head over the other.
+      expect(close / together).toBeLessThan(0.1);
+      expect(longest.fused, longestAt.fused).toBeLessThan(2);
+      expect(longest.stacked, longestAt.stacked).toBeLessThan(3);
+    },
+    rosterTimeout(390, 90_000),
+  );
 
   it('gives lanes that stay put on a straight and turn smoothly round a corner', () => {
     const route = [
@@ -509,10 +522,14 @@ describe('At the venue', () => {
   it('crouches for a moment sitting down on a blanket or a cinema seat, and getting up', () => {
     let seats = 0,
       players = 0;
-    for (const { home, trip, day } of outings(everyone, DAYS(4))) {
+    // A week of the full town: a morning at the market can make a games player late for the
+    // lunch, so a few days pass with no one waiting on the blanket to play.
+    for (const { home, trip, day } of outings(everyone, DAYS(8))) {
       const kind = trip.event.venue.kind;
       const pose = (t: number) => stateOn(home, trip, t, day).pose;
-      if (kind !== 'green' && kind !== 'cinema') {
+      // The Riverside's seated outings (the Bandstand's deckchairs, the stars' rugs) sit too.
+      const seatedOuting = !!trip.event.outing && outingOf(trip.event.outing)!.seated;
+      if (kind !== 'green' && kind !== 'cinema' && !seatedOuting) {
         for (const t of [trip.arrive + SEAT_SETTLE / 2, trip.leave - SEAT_SETTLE / 2])
           expect(pose(t)).not.toBe('crouch');
         continue;

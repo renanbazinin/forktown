@@ -15,6 +15,7 @@ import { renderCinemaPCM } from '../src/music/cinema-render';
 import { readPlaces } from './full-town';
 import { everyShape } from './house-variety';
 import { recordingContext } from './recording-context';
+import { isSignFont, OFF_VOICE, withoutTheirWords, WORDY_HOUSES } from './their-words';
 
 // "We’ll be right back" (Miso asleep on the test pattern, looping every 12 s) and "A new neighbor
 // just moved in" (the newest house lands on its plot and lights its lantern).
@@ -212,21 +213,14 @@ describe('A new neighbor just moved in', () => {
     now: 0,
     house: spotlight(place, lantern),
   });
-  /** The card’s own words, with the neighbor’s name, greeting and handle taken out. */
+  /**
+   * The card’s own words, with the neighbor’s taken out: their name, greeting and handle, whole
+   * or as the column wraps them, and their house’s sign (tests/their-words.ts).
+   */
   const ours = (written: Written[], place: Place) =>
     written
-      .filter((w) => w.x >= COLUMN.x && !w.shadow)
-      .map((w) =>
-        [
-          place.name.trim(),
-          ...place.name.split(/\s+/),
-          place.resident.greeting.trim(),
-          ...place.resident.greeting.split(/\s+/),
-          place.creator,
-        ]
-          .filter(Boolean)
-          .reduce((text, theirs) => text.split(theirs).join(''), w.text),
-      );
+      .filter((w) => w.x >= COLUMN.x && !w.shadow && !isSignFont(w.font))
+      .map((w) => withoutTheirWords(w.text, place));
 
   it('is the card the registry and the live stream draw', () => {
     expect(CARDS.welcome.draw).toBeTypeOf('function');
@@ -299,11 +293,14 @@ describe('A new neighbor just moved in', () => {
   });
 
   it('speaks in the town’s voice for every house in town, and keeps handles as they are', () => {
-    for (const place of [...readPlaces(), longest]) {
+    for (const place of [...readPlaces(), longest, ...WORDY_HOUSES]) {
       const { written } = draw(welcome, 9.5, data(place));
       const words = ours(written, place);
-      for (const text of words)
-        expect(text, place.id).not.toMatch(/!|'|\b(?:repo|commit|branch|SHA|merged)\b/i);
+      for (const text of words) expect(text, place.id).not.toMatch(OFF_VOICE);
+      // Taking a wordy neighbor's words out still leaves the card's own to check.
+      if (WORDY_HOUSES.includes(place))
+        for (const line of ['A NEW NEIGHBOR', 'BUILT BY', 'LANTERN No. 12 OF 19'])
+          expect(words, place.id).toContain(line);
       for (const eyebrow of ['A NEW NEIGHBOR', 'BUILT BY']) {
         expect(eyebrow).toMatch(EYEBROW);
         expect(written.map((w) => w.text)).toContain(eyebrow);

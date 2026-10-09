@@ -10,7 +10,9 @@ import {
   SISTER_FORKS,
 } from '../src/city/horizon';
 import { drawSky } from '../src/city/sky';
+import { BIRD_CROSSING, drawBirds } from '../src/city/ambience';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
+import { WORLD_WIDTH } from '../src/lib/world';
 
 // Records every method call and style change; gradients answer with inert stops.
 // Path building is logged too, but budgets count only the calls that do the work.
@@ -219,5 +221,26 @@ describe('Far fields and commit stones', () => {
     ]);
     const alpha = evening.log.find((entry) => entry.startsWith('globalAlpha='))!;
     expect(Number(alpha.split('=')[1])).toBeLessThanOrEqual(0.05);
+  });
+});
+
+describe('Birds', () => {
+  it('cross a wider town at the same pace, with the same quiet gap', () => {
+    // 50 tiles in 80 minutes, as over the 20 × 10 town (112 minutes over a 64-tile slab).
+    expect(BIRD_CROSSING).toBeCloseTo((80 * (WORLD_WIDTH + 6)) / 50, 9);
+    const strokes = (minutes: number) => {
+      const { ctx, calls } = recorder();
+      drawBirds(ctx, minutes, false);
+      return calls().filter((call) => call.startsWith('stroke(')).length;
+    };
+    // Three birds a flock. The first flock is still crossing a minute before the end of its
+    // pass and gone a minute after; the second, half a period behind, is on its way.
+    expect(strokes(BIRD_CROSSING - 1)).toBe(6);
+    expect(strokes(BIRD_CROSSING + 1)).toBe(3);
+    expect(strokes(BIRD_CROSSING + 40 - 1)).toBe(3);
+    expect(strokes(BIRD_CROSSING + 40 + 1)).toBe(6);
+    const night = recorder();
+    drawBirds(night.ctx, 300, true);
+    expect(night.calls()).toEqual([]);
   });
 });

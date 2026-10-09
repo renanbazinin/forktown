@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { TownPlayer } from '../src/music/player';
+import { bedLevel, TownPlayer } from '../src/music/player';
 import { renderTrack, renderCinemaTrack } from '../src/music/synth';
 import { CINEMA_FILMS } from '../src/lib/cinema';
 vi.mock('../src/music/synth', () => ({
@@ -18,8 +18,22 @@ const parameter = () => ({
 const sources: {
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
 }[] = [];
+/** The gain node a source plays through (its first connection). */
+const gainOf = (source: (typeof sources)[number]) =>
+  source.connect.mock.calls[0][0] as { gain: ReturnType<typeof parameter> };
+/** The last level a gain was eased or ramped to, whichever came last. */
+const lastTarget = (gain: { gain: ReturnType<typeof parameter> }) => {
+  const last = (mock: ReturnType<typeof vi.fn>) => ({
+    order: mock.mock.invocationCallOrder.at(-1) ?? -1,
+    value: mock.mock.calls.at(-1)?.[0] as number,
+  });
+  const eased = last(gain.gain.setTargetAtTime),
+    ramped = last(gain.gain.linearRampToValueAtTime);
+  return eased.order > ramped.order ? eased.value : ramped.value;
+};
 const close = vi.fn();
 beforeEach(() => {
   sources.length = 0;
@@ -161,5 +175,61 @@ describe('Soundtrack playback lifecycle', () => {
     finish(buffer);
     await pending;
     expect(sources).toHaveLength(0);
+  });
+});
+
+describe('A band at the Bandstand', () => {
+  it('plays over the town’s tune, which a band heard from afar barely touches', async () => {
+    vi.mocked(renderTrack).mockResolvedValue(buffer);
+    const player = new TownPlayer();
+    await player.play('town');
+    const town = sources[0];
+    // The whole town at fit on a big screen hears the band at about 0.04.
+    player.level('folk', 0.04, 0.3);
+    await player.play('folk', 'town');
+    expect(sources).toHaveLength(2);
+    const band = sources[1];
+    expect(lastTarget(gainOf(band))).toBeCloseTo(0.04);
+    expect(lastTarget(gainOf(town))).toBeGreaterThanOrEqual(0.9);
+    expect(lastTarget(gainOf(town))).toBeCloseTo(bedLevel(0.04));
+    expect(town.stop).not.toHaveBeenCalled();
+    // Panned toward the stand (the mock's connect returns the source, so the chain's second link
+    // is the panner).
+    const panner = band.connect.mock.calls[1][0] as { pan: { value: number } };
+    expect(panner.pan.value).toBeCloseTo(0.3);
+    // At the stand the band is almost all there is.
+    player.level('folk', 1, 0);
+    expect(lastTarget(gainOf(band))).toBe(1);
+    expect(lastTarget(gainOf(town))).toBeLessThanOrEqual(0.1);
+    // The set ends: the band fades and the same tune comes back up, never restarted.
+    await player.play('town');
+    expect(sources).toHaveLength(2);
+    expect(band.stop).toHaveBeenCalled();
+    expect(town.stop).not.toHaveBeenCalled();
+    expect(lastTarget(gainOf(town))).toBe(1);
+    player.dispose();
+  });
+
+  it('starts the town’s tune under a band when sound is turned on during a set', async () => {
+    vi.mocked(renderTrack).mockResolvedValue(buffer);
+    const player = new TownPlayer();
+    player.level('brass', 0.05);
+    await player.play('brass', 'night');
+    expect(sources).toHaveLength(2);
+    expect(
+      vi
+        .mocked(renderTrack)
+        .mock.calls.map(([track]) => track)
+        .sort(),
+    ).toEqual(['brass', 'night']);
+    const [night, band] = [sources[0], sources[1]];
+    expect(lastTarget(gainOf(band))).toBeCloseTo(0.05);
+    expect(lastTarget(gainOf(night))).toBeGreaterThanOrEqual(0.88);
+    // A stage show takes over from both.
+    await player.play('party');
+    expect(night.stop).toHaveBeenCalled();
+    expect(band.stop).toHaveBeenCalled();
+    player.stop();
+    player.dispose();
   });
 });

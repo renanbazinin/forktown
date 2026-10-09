@@ -337,7 +337,7 @@ describe('A link preview for every house', () => {
       site,
     );
     expect(quiet).not.toMatch(/http-equiv|Lantern No/i);
-  });
+  }, 60_000);
 
   it('uses the main town’s address when no site address is set', async () => {
     const page = (await build({})).find((page) => page.fileName.startsWith('house/'))!;
@@ -438,9 +438,11 @@ describe('A quiet first install and build', () => {
     expect((plugin.config as () => unknown)()).toEqual({
       build: { chunkSizeWarningLimit: CHUNK_WARNING_KB },
     });
-    // A full town's main chunk measured 1,149–1,204 kB; see scripts/chunk-budget.ts.
-    expect(CHUNK_WARNING_KB).toBeGreaterThanOrEqual(1250);
-    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1300);
+    // A full town's main chunk (all a page loads first) measured 1,590 kB, and 1,685 kB with the
+    // largest house on every free plot; the limit is the first and 8%. See
+    // scripts/chunk-budget.ts.
+    expect(CHUNK_WARNING_KB).toBeGreaterThanOrEqual(1686);
+    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1718);
   });
 });
 

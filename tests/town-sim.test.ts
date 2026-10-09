@@ -11,6 +11,8 @@ import { townCatAt } from '../src/lib/town-cat';
 import { CALENDAR_EPOCH_DAY } from '../src/lib/town-calendar';
 import { tubeRides } from '../src/lib/tube-traffic';
 import { fullTown as variedTown, readPlaces } from './full-town';
+import { bubbleWidth } from './greeting-bubble';
+import { rosterTimeout } from './roster-timeout';
 import { roadNodes, roadPath, WALK_SPEED } from '../src/lib/walking';
 import {
   getPlot,
@@ -156,29 +158,33 @@ describe('The town simulation at any size', () => {
     for (const [from, to] of pairs) expect(roadPath(from, to)).toEqual(referenceRoadPath(from, to));
   }, 20_000);
 
-  it('strolls at walking pace in every free window, however short', () => {
-    for (const homes of [places, fullTown])
-      for (const day of DAYS) {
-        let fastest = 0,
-          fastestWithDucks = 0,
-          walked = 0;
-        for (const { minute, now, next } of daytime(homes, day))
-          now.forEach((state, index) => {
-            const later = next[index];
-            expect(later.id).toBe(state.id);
-            if (!strolling(state) || !strolling(later)) return;
-            const pace = distance(state.position, later.position) / 0.1;
-            if (pace > 0) walked++;
-            // Catching up after stopping for the ducklings is the one brisker walk (4/3 pace).
-            if (minute >= DUCK_WALK_START && minute < DUCK_WALK_END + 16)
-              fastestWithDucks = Math.max(fastestWithDucks, pace);
-            else fastest = Math.max(fastest, pace);
-          });
-        expect(walked).toBeGreaterThan(100);
-        expect(fastest).toBeLessThanOrEqual(WALK_SPEED + 1e-9);
-        expect(fastestWithDucks).toBeLessThanOrEqual((WALK_SPEED * 4) / 3 + 1e-9);
-      }
-  }, 60_000);
+  it(
+    'strolls at walking pace in every free window, however short',
+    () => {
+      for (const homes of [places, fullTown])
+        for (const day of DAYS) {
+          let fastest = 0,
+            fastestWithDucks = 0,
+            walked = 0;
+          for (const { minute, now, next } of daytime(homes, day))
+            now.forEach((state, index) => {
+              const later = next[index];
+              expect(later.id).toBe(state.id);
+              if (!strolling(state) || !strolling(later)) return;
+              const pace = distance(state.position, later.position) / 0.1;
+              if (pace > 0) walked++;
+              // Catching up after stopping for the ducklings is the one brisker walk (4/3 pace).
+              if (minute >= DUCK_WALK_START && minute < DUCK_WALK_END + 16)
+                fastestWithDucks = Math.max(fastestWithDucks, pace);
+              else fastest = Math.max(fastest, pace);
+            });
+          expect(walked).toBeGreaterThan(100);
+          expect(fastest).toBeLessThanOrEqual(WALK_SPEED + 1e-9);
+          expect(fastestWithDucks).toBeLessThanOrEqual((WALK_SPEED * 4) / 3 + 1e-9);
+        }
+    },
+    rosterTimeout(390, 90_000),
+  );
 
   it('spends more free time walking than resting and goes in with the routine', () => {
     const periods = ['morning', 'afternoon', 'evening', 'night'] as const;
@@ -232,7 +238,7 @@ describe('The town simulation at any size', () => {
     // Bubbles as drawResident draws them at scale 1.25: 10px Space Mono, padded, 20 px tall.
     const bubble = (state: ResidentState) => {
       const at = project(state.position.x, state.position.y);
-      const half = ((state.resident.greeting.length * 6.12 + 12) * 1.25) / 2;
+      const half = bubbleWidth(state.resident.greeting) / 2;
       return { left: at.x - half, right: at.x + half, top: at.y - 57.5 };
     };
     let greetings = 0;
@@ -263,33 +269,37 @@ describe('The town simulation at any size', () => {
     expect(greetings).toBeGreaterThan(100);
   }, 20_000);
 
-  it('says a greeting for a moment or not at all, never flashing it up in passing', () => {
-    // Every bubble of an afternoon in the full town, and in a full town of varied homes on a day
-    // whose crowds used to cut bubbles short, at twenty frames a town minute.
-    const STEP = 0.05;
-    const lengths: number[] = [];
-    for (const [homes, day] of [
-      [fullTown, DAYS[0]],
-      [variedTown(readPlaces()), CALENDAR_EPOCH_DAY + 224 + 42],
-    ] as const) {
-      const since = new Map<string, number>();
-      for (let minute = 600; minute < 1080; minute += STEP)
-        for (const state of simulateResidents(homes, minute, day)) {
-          const started = since.get(state.id);
-          if (state.greeting && started === undefined) since.set(state.id, minute);
-          if (!state.greeting && started !== undefined) {
-            lengths.push(minute - started);
-            since.delete(state.id);
+  it(
+    'says a greeting for a moment or not at all, never flashing it up in passing',
+    () => {
+      // Every bubble of an afternoon in the full town, and in a full town of varied homes on a day
+      // whose crowds used to cut bubbles short, at twenty frames a town minute.
+      const STEP = 0.05;
+      const lengths: number[] = [];
+      for (const [homes, day] of [
+        [fullTown, DAYS[0]],
+        [variedTown(readPlaces()), CALENDAR_EPOCH_DAY + 224 + 42],
+      ] as const) {
+        const since = new Map<string, number>();
+        for (let minute = 600; minute < 1080; minute += STEP)
+          for (const state of simulateResidents(homes, minute, day)) {
+            const started = since.get(state.id);
+            if (state.greeting && started === undefined) since.set(state.id, minute);
+            if (!state.greeting && started !== undefined) {
+              lengths.push(minute - started);
+              since.delete(state.id);
+            }
           }
-        }
-    }
-    // Enough to mean something whichever homes are in town: 113 with 19 homes, 98 with 17.
-    expect(lengths.length).toBeGreaterThan(50);
-    // Each is said for its whole spell, which lasts GREETING_MINUTES at least: never cut short
-    // by another bubble drifting close, nor begun late when another conversation ends.
-    expect(GREETING_MINUTES).toBeGreaterThanOrEqual(1);
-    for (const length of lengths) expect(length).toBeGreaterThan(GREETING_MINUTES - STEP - 1e-6);
-  }, 40_000);
+      }
+      // Enough to mean something whichever homes are in town: 113 with 19 homes, 98 with 17.
+      expect(lengths.length).toBeGreaterThan(50);
+      // Each is said for its whole spell, which lasts GREETING_MINUTES at least: never cut short
+      // by another bubble drifting close, nor begun late when another conversation ends.
+      expect(GREETING_MINUTES).toBeGreaterThanOrEqual(1);
+      for (const length of lengths) expect(length).toBeGreaterThan(GREETING_MINUTES - STEP - 1e-6);
+    },
+    rosterTimeout(260, 60_000),
+  );
 
   it('shows every visitor the same cat, broadcast and tube, whatever their language', () => {
     // Fresh rosters each time, so nothing is answered from a cache built in another language.

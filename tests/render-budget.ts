@@ -6,14 +6,17 @@
 // and so is the zoo below it, so only the houses the view can show cost anything:
 // - no houses at all: 25,463–26,756 calls;
 // - today's 18 houses: 28,498–29,738;
-// - all 141 house plots taken (tests/full-town.ts): 36,739–37,799;
+// - all 141 house plots of the 20 × 10 town taken (tests/full-town.ts): 36,739–37,799;
 // - the heaviest house the builder allows (a café with a gable roof, shutters, a balcony, a bench
 //   and a three-run HTML sign) on the first 10, 30, 60, 90 and all 141 plots: 28,970, 35,195,
 //   45,066, 49,167 and 49,665 at most. Each one in view costs about 300 calls, and past about 90
 //   houses every plot the view can show is taken.
+// The 20 × 15 town's new columns lie east of the view (x ≥ 44 needs both y < 17 and y > 17), so
+// its 230 house plots show no more houses here than the 141 did.
 // So the budget covers the empty town with ~8% to spare and a town of the heaviest house at every
-// size, while a frame that doubled its calls fails at every size from 0 to 141 houses, even with
-// most houses out of view. Drawing fewer calls (caching) always stays within it.
+// size, while a frame that doubled its calls fails at every size, counted by the houses in view
+// (render-smoke.test.ts), even with most houses out of view. Drawing fewer calls (caching)
+// always stays within it.
 
 /** The town without a single house: scenery, venues, sky and weather. */
 export const OPENING_VIEW_BASE = 29_000;

@@ -61,9 +61,11 @@ import { HOUSE_PLOTS, venueAt } from '../src/lib/events';
 import { placeSchema } from '../src/lib/schema';
 import { isRoad, project, STREETLIGHTS, type Point } from '../src/lib/world';
 import { riverGlint } from '../src/city/season-ground';
+import { schemaHousePlots } from './house-plots';
 import { readPlaces } from './full-town';
+import { MY_LITTLE_PLACE } from './fixtures';
 
-const sample = placeSchema.parse(JSON.parse(readFileSync('places/my-little-place.json', 'utf8')));
+const sample = MY_LITTLE_PLACE;
 /** The absolute town day of a whole day of the year (0 = Spring 1) in a given year. */
 const dayOf = (groundDay: number, year = 3) => CALENDAR_EPOCH_DAY + (year - 1) * 112 + groundDay;
 const distance = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -133,9 +135,9 @@ const separation = (A: Point[], B: Point[]) => {
 };
 
 describe('The Millpond site', () => {
-  it('reserves exactly H3–I6 and leaves 141 house plots', () => {
+  it('reserves exactly H3–I6 and leaves the rest to the houses', () => {
     expect([...MILLPOND_PLOTS].sort()).toEqual(['H3', 'H4', 'H5', 'H6', 'I3', 'I4', 'I5', 'I6']);
-    expect(HOUSE_PLOTS).toHaveLength(141);
+    expect(HOUSE_PLOTS.map((plot) => plot.id)).toEqual(schemaHousePlots());
     expect(MILLPOND_GROUND).toEqual({ left: 10, right: 25, top: 30, bottom: 37 });
     for (const plot of MILLPOND_PLOTS) {
       expect(isMillpondPlot(plot)).toBe(true);

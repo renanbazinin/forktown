@@ -1,4 +1,5 @@
 import { FARM_GROUND as G, scarecrowAt, ufoAt } from '../lib/farm';
+import { drawScarecrowExtras } from './district/harvest';
 import type { Place } from '../lib/schema';
 import { houseBounds } from './houses';
 import { project, hash, type Point } from '../lib/world';
@@ -285,6 +286,9 @@ export function drawFarm(ctx: Ctx, minutes: number, day: number, night: boolean)
       for (const x of [-21, 18]) box(ctx, x, -29, 4, 2, '#D8BE80');
       box(ctx, -5, -13, 3, 6, '#D8BE80');
       box(ctx, 3, -13, 3, 6, '#D8BE80');
+      // Its festival dress for the Harvest Fair (district/harvest.ts), in its own frame: (0, 0)
+      // is its feet, lifted and tilted with it.
+      drawScarecrowExtras(ctx, 0, 0, day, night);
       ctx.restore();
     },
   });

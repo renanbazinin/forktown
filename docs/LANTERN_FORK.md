@@ -4,7 +4,7 @@ At the heart of Forktown, on plot D3, stands a forked tree with one lantern for 
 
 ## What visitors see
 
-The trunk splits into two limbs. The smaller left lobe holds the eight founding lanterns. The taller right crown fills with the neighbors' lanterns in arrival order. A timber-and-green plaque at the foot reads `forktown.`, the only place the word appears in the world. Select the tree, or open `#venue=fork`, for the full register.
+The trunk splits into two limbs. The smaller left lobe holds the eight founding lanterns. The taller right crown fills with the neighbors' lanterns in arrival order, and two newer boughs off the crown, north and north-east, carry on where it ends, filling turn about so both light evenly. The tree has 266 places: room for the eight founding lanterns and one for every house plot in the 20 × 15 town, with some to spare. A timber-and-green plaque at the foot reads `forktown.`, the only place the word appears in the world. Select the tree, or open `#venue=fork`, for the full register.
 
 By day the lanterns are paper. One house, one neighbor, one lantern: a lantern never means anything else.
 
@@ -37,7 +37,7 @@ Arrival order comes from Git history at build time. A shallow clone or a source 
 
 ## The D3 reservation
 
-The Fork is a public venue like the Little Stage and the Lunch Green. A house file on D3 fails validation with the usual reserved-venue message, and the builder and Explore skip it. The town has 141 house plots.
+The Fork is a public venue like the Little Stage and the Lunch Green. A house file on D3 fails validation with the usual reserved-venue message, and the builder and Explore skip it. The town has 230 house plots, and the tree has a place for a lantern on every one of them.
 
 ## Determinism
 

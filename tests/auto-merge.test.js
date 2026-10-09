@@ -124,6 +124,14 @@ function fakeGitHub({
 }
 
 describe('Auto-merge for a new neighbor', () => {
+  it('reads a house saved as UTF-8 with a byte-order mark, as some Windows editors save it', async () => {
+    const github = fakeGitHub({ house: `\uFEFF${JSON.stringify({ creator: 'Newcomer' })}` });
+    expect(await github.run()).toEqual([
+      { number: 1, state: 'success', description: expect.stringContaining('Merged automatically') },
+    ]);
+    expect(github.merges()).toHaveLength(1);
+  });
+
   it('merges one new house from someone with no house yet, once every check has passed', async () => {
     const github = fakeGitHub();
     expect(await github.run()).toEqual([
@@ -575,7 +583,8 @@ describe('The town it compares against', SUBPROCESS_TEST, () => {
   it('names every creator, ignoring case, with their houses and the commit read', () => {
     const { directory, sha } = checkout({
       'a.json': '{"creator":"Alice"}',
-      'b.json': '{"creator":"alice"}',
+      // Saved as "UTF-8 with BOM", as some Windows editors do: the mark is no reason to stop.
+      'b.json': '\uFEFF{"creator":"alice"}',
       'c.json': '{"creator":"Bob"}',
       'notes.md': 'Not a house',
     });

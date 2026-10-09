@@ -5,6 +5,32 @@ export type View = { x: number; y: number; zoom: number };
 export type Point = { x: number; y: number };
 export type Size = { width: number; height: number };
 
+/**
+ * A venue's panel view of a frame (`{ center, width, height }`, world px): beside the desktop
+ * panel (370 px on the right), or above the phone's sheet (the top 29%), as large as fits up to
+ * zoom 1.4.
+ */
+export function frameView(
+  frame: { center: Point; width: number; height: number },
+  width: number,
+  height: number,
+): View {
+  const mobile = width < 600;
+  const zoom = Math.max(
+    0.05,
+    Math.min(
+      1.4,
+      (width - (mobile ? 24 : 400)) / frame.width,
+      (mobile ? height * 0.43 : height - 150) / frame.height,
+    ),
+  );
+  return {
+    x: (mobile ? width / 2 : (width - 370) / 2) - frame.center.x * zoom,
+    y: (mobile ? height * 0.29 : height * 0.5) - frame.center.y * zoom,
+    zoom,
+  };
+}
+
 /** How far the map zooms at a given whole-town fit: a little past the whole town, up to a sign. */
 export function zoomRange(fit: number) {
   return { min: fit * 0.65, max: Math.max(6, fit * 3.5) };
@@ -35,6 +61,68 @@ export function resizeView(view: View, from: Size, to: Size, fit: number): View 
     y: view.y + (to.height - from.height) / 2,
   };
   return zoomAround(moved, clampZoom(view.zoom, fit), { x: to.width / 2, y: to.height / 2 });
+}
+
+/** The world's extent in world px (WORLD_BOUNDS): its left and right tips and its bottom tip. */
+export type Bounds = { left: number; right: number; bottom: number };
+
+/** The whole town at its fit zoom, centred, with room for the controls. */
+export function fitView(width: number, height: number, bounds: Bounds): View {
+  const zoom = Math.max(
+    0.01,
+    Math.min(
+      (width - 52) / (bounds.right - bounds.left + 36),
+      (height - 85) / (bounds.bottom + 98),
+    ),
+  );
+  return {
+    x: width / 2 - ((bounds.left + bounds.right) / 2) * zoom,
+    y: (height - bounds.bottom * zoom) / 2 + 28,
+    zoom,
+  };
+}
+
+/** Screen px under the top of the map that the header and the clock cover. */
+export const MAP_HEADER = 96;
+
+/**
+ * The map's opening view: where people live, from the centres (world px) of the homes and the
+ * town's green and stage. A lone far-off house does not zoom it back out, and a town with every
+ * plot taken opens no further out than 0.35 (0.15 on a phone) rather than at whole-town fit,
+ * every house tiny; Reset still shows it all. Then the homes no longer fit, and the view moves
+ * down far enough to keep `keep` (the Lantern Fork's crown) below the header. With no points,
+ * the overview.
+ */
+export function neighborhoodView(
+  points: readonly Point[],
+  width: number,
+  height: number,
+  overview: View,
+  keep?: Point,
+): View {
+  if (!points.length) return overview;
+  const median = (values: number[]) => values.sort((a, b) => a - b)[values.length >> 1];
+  const mid = { x: median(points.map((p) => p.x)), y: median(points.map((p) => p.y)) };
+  const distance = (p: Point) => Math.hypot(p.x - mid.x, p.y - mid.y);
+  const typical = median(points.map(distance));
+  const near = points.filter((p) => distance(p) <= Math.max(typical * 2.2, 260));
+  const left = Math.min(...near.map((point) => point.x)) - 110;
+  const right = Math.max(...near.map((point) => point.x)) + 110;
+  const top = Math.min(...near.map((point) => point.y)) - 145;
+  const bottom = Math.max(...near.map((point) => point.y)) + 80;
+  const floor = Math.max(overview.zoom, width < 600 ? 0.15 : 0.35);
+  const fitted = Math.min(
+    0.85,
+    (width < 600 ? width * 1.6 : width - 150) / (right - left),
+    (height - 160) / (bottom - top),
+  );
+  const zoom = Math.max(floor, fitted);
+  const y = height * (width < 600 ? 0.42 : 0.5) - ((top + bottom) / 2) * zoom;
+  return {
+    x: width / 2 - ((left + right) / 2) * zoom,
+    y: keep && floor > fitted ? Math.max(y, MAP_HEADER - keep.y * zoom) : y,
+    zoom,
+  };
 }
 
 const middle = ([a, b]: readonly [Point, Point]) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });

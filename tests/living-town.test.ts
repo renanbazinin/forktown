@@ -4,8 +4,9 @@ import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
 import { periodAt, roadPath, simulateResidents, timeLabel } from '../src/lib/simulation';
 import { findPlotAt, getPlot, project, ROAD_MAX_X, ROAD_MAX_Y } from '../src/lib/world';
 import { plotDoor } from '../src/lib/home-life';
-import { eventsForDay, HOUSE_PLOTS, insideVenue } from '../src/lib/events';
-import { insideFootball } from '../src/lib/football';
+import { eventsForDay, HOUSE_PLOTS } from '../src/lib/events';
+import { FOOTBALL_VENUE } from '../src/lib/football';
+import { insideEventGround } from './event-ground';
 import { TUBE_TRUNK_X } from '../src/lib/tubes';
 import { AFTER_HOURS } from './fixtures';
 import { readPlaces } from './full-town';
@@ -65,7 +66,8 @@ describe('A small predictable daily life', () => {
   // Roster-wide checks gather what they find and assert once: an expect per resident per minute
   // costs more than the simulation itself once every house plot is taken. They still grow
   // with the town, so each gets a roster-wide timeout.
-  // Two simulations of the whole town a sample: about 4 s alone with all 141 plots taken.
+  // Two simulations of the whole town a sample: about 4 s alone with 141 plots taken (20 × 10),
+  // and more with every one of today's 230 house plots taken.
   it('faces in the direction of movement on all four isometric road directions', () => {
     const seen = new Set<string>();
     const wrong: string[] = [];
@@ -94,7 +96,8 @@ describe('A small predictable daily life', () => {
     expect(simulateResidents([...places].reverse(), 810.25).reverse()).toEqual(before);
     expect(simulateResidents(places, 810.25 + 1440)).toEqual(before);
   });
-  // Everyone out walking all day: about 2.5 s alone with all 141 plots taken.
+  // Everyone out walking all day: about 2.5 s alone with 141 plots taken (20 × 10), and more
+  // with every one of today's 230 house plots taken.
   it('keeps residents on roads, their own lot, or their assigned public venue', () => {
     const wanderers = places.map((place) => ({
       ...place,
@@ -123,8 +126,8 @@ describe('A small predictable daily life', () => {
         if (
           !onRoadOrTube(state) &&
           !ownLot &&
-          !(state.event?.id === 'football' && insideFootball(state.position)) &&
-          !(event && insideVenue(event.venue, state.position))
+          !(state.event?.id === 'football' && insideEventGround(FOOTBALL_VENUE, state.position)) &&
+          !(event && insideEventGround(event.venue, state.position))
         )
           stray('off the road at');
         // Only the tube runs west of the lane, behind the trees.
