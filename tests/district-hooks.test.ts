@@ -51,7 +51,7 @@ import {
 } from '../src/lib/simulation';
 import type { ResidentTransit } from '../src/lib/tubes';
 import { linkHash, readDeepLink } from '../src/lib/deep-link';
-import { compose, durationOf, trackForTown, TRACKS } from '../src/music/score';
+import { compose, durationOf, townTuneAt, trackForTown, TRACKS } from '../src/music/score';
 import {
   DISTRICT_SHOTS,
   districtShotAirs,
@@ -306,13 +306,15 @@ describe('The Bandstand’s music', () => {
 
   it('plays the day’s band only near the stand, and never over the stage', () => {
     const concert = events[1];
-    expect(trackForTown(concert.start - 0.01, events)).toBe('town');
-    expect(trackForTown(concert.start - 0.01, events, { gain: 0.004 })).toBe('town');
+    expect(trackForTown(concert.start - 0.01, events)).toBe(townTuneAt(concert.start - 0.01));
+    expect(trackForTown(concert.start - 0.01, events, { gain: 0.004 })).toBe(
+      townTuneAt(concert.start - 0.01),
+    );
     expect(trackForTown(concert.start - 0.01, events, { gain: 1 })).toBe(band);
     expect(trackForTown(1000, events, { gain: 0.5 })).toBe(band);
     expect(trackForTown(concert.start, events, { gain: 1 })).toBe(concert.id);
     // Between the sets the town plays its own tune.
-    expect(trackForTown(1060, events, { gain: 1 })).toBe('town');
+    expect(trackForTown(1060, events, { gain: 1 })).toBe(townTuneAt(1060));
     // Without the Riverside in the list, today's answers.
     expect(
       trackForTown(
@@ -320,7 +322,7 @@ describe('The Bandstand’s music', () => {
         events.filter((event) => !event.outing),
         { gain: 1 },
       ),
-    ).toBe('town');
+    ).toBe(townTuneAt(1000));
   });
 
   it('has a playable track for every band, today’s acoustic notes until its own', () => {

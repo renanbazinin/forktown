@@ -10,6 +10,7 @@ import type { Playable } from '../lib/break-cards';
 export default function Soundtrack({
   track,
   bed,
+  upcoming,
   playing,
   football,
   listening,
@@ -24,6 +25,8 @@ export default function Soundtrack({
   track: TrackId;
   /** The town's own tune (trackForTown without the band): a band's set plays over it. */
   bed?: TrackId;
+  /** The town's tune a little later (townTuneAt), rendered ahead so its turn starts on time. */
+  upcoming?: TrackId;
   playing: boolean;
   football: FootballState;
   listening: { gain: number; pan: number };
@@ -71,6 +74,10 @@ export default function Soundtrack({
   useEffect(() => {
     if (enabled && prepare) player.current?.cinemaPrepare(prepare);
   }, [enabled, prepare]);
+  useEffect(() => {
+    if (enabled && playing && !hidden && upcoming && upcoming !== track && upcoming !== bed)
+      player.current?.prepare(upcoming);
+  }, [enabled, playing, hidden, upcoming, track, bed]);
   // A band at the Bandstand is heard only near it: its tune is scaled by the camera's gain and
   // panned toward the stand, over the town's own tune.
   const { gain: bandGain, pan: bandPan } = bandstand;

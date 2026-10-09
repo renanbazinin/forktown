@@ -9,6 +9,7 @@ import { sharePreview } from './scripts/share-preview.ts';
 import { chunkBudget } from './scripts/chunk-budget.ts';
 import { placeJsonErrors } from './scripts/place-files.ts';
 import { buildManifest, readBuildInfo } from './scripts/build-manifest.ts';
+import { listeningRoom } from './scripts/listening-room.ts';
 
 // This build's identity, computed once: the live page and live/build.json share it.
 const BUILD = readBuildInfo(process.cwd());
@@ -21,6 +22,7 @@ export default defineConfig(({ mode }) => {
       placeJsonErrors(),
       react(),
       localPlacesPlugin(),
+      listeningRoom(),
       thirdPartyLicenses(),
       sharePreview(),
       chunkBudget(),

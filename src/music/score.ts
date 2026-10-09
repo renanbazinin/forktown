@@ -2,36 +2,126 @@ import { isEventLive, type TownEvent } from '../lib/events';
 import { BANDS, type Band } from '../lib/district-calendar';
 import { BAND_COPY } from '../lib/district-copy';
 import { BANDSTAND_TRACKS, composeBandstand } from './bandstand-tracks';
+import type { Instrument } from './instruments';
+import { composeTune, isTune, TOWN_TUNES, type TuneId } from './tunes';
 
-/** The town's own tunes, the stage's shows, and the Bandstand's three bands (bandstand-tracks.ts). */
-export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | Band;
+/**
+ * The town's own tunes (the day and night theme and the tunes of each hour, tunes/), the stage's
+ * shows, and the Bandstand's three bands (bandstand-tracks.ts).
+ */
+export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | Band | TuneId;
 export type Voice = 'bell' | 'keys' | 'pluck' | 'lead' | 'pad' | 'bass' | 'kick' | 'snare' | 'hat';
 export type Note = {
   beat: number;
   length: number;
   pitch: number;
-  voice: Voice;
+  /** One of render.ts's voices, or one of the instruments the newer tunes are written for. */
+  voice: Voice | Instrument;
   gain: number;
   pan: number;
 };
-export const TRACKS: Record<TrackId, { title: string; subtitle: string; bpm: number }> = {
-  town: { title: 'Little Windows, Big Sky', subtitle: 'A pocket-sized daydream', bpm: 92 },
-  night: { title: 'Porch Lights', subtitle: 'The town, tucked in', bpm: 70 },
-  rock: { title: 'One More Block', subtitle: 'Small stage. Big Saturday.', bpm: 116 },
-  acoustic: { title: 'Honey on the Steps', subtitle: 'Sun-warmed strings', bpm: 86 },
-  jazz: { title: 'After-hours Lemonade', subtitle: 'A little swing under the stars', bpm: 96 },
-  party: { title: 'One More Little Dance', subtitle: 'Midnight at the Little Stage', bpm: 112 },
+/** A tune's room: how much reverb (wet), how large (size, 0..1) and how dark (damp, 0..1). */
+export type Hall = { wet: number; size: number; damp: number };
+export type TrackInfo = {
+  title: string;
+  subtitle: string;
+  bpm: number;
+  /** Beats in the loop: BEATS (16 bars of four) unless the tune says otherwise. */
+  beats?: number;
+  /** Beats in a bar, four unless the tune says otherwise; a phrase is four bars. */
+  bar?: number;
+  /** A reverb under the mix; without one, the town's short reflections only. */
+  hall?: Hall;
+  /** The RMS level the render settles the mix at, so the tunes of the day sit at one volume. */
+  loudness?: number;
+  /** What plays it, for the listening room. */
+  instruments?: string;
+};
+export const TRACKS: Record<TrackId, TrackInfo> = {
+  // The day and night themes take turns with the tunes of the hour, so they settle at levels
+  // beside them (tunes/index.ts).
+  town: {
+    title: 'Little Windows, Big Sky',
+    subtitle: 'A pocket-sized daydream',
+    bpm: 92,
+    loudness: 0.052,
+    instruments: 'Pixel bells, soft pad, plucks, bass, light drums',
+  },
+  night: {
+    title: 'Porch Lights',
+    subtitle: 'The town, tucked in',
+    bpm: 70,
+    loudness: 0.035,
+    instruments: 'Pixel bells, soft pad, slow bass',
+  },
+  rock: {
+    title: 'One More Block',
+    subtitle: 'Small stage. Big Saturday.',
+    bpm: 116,
+    instruments: 'Lead synth, power chords, bass, drums',
+  },
+  acoustic: {
+    title: 'Honey on the Steps',
+    subtitle: 'Sun-warmed strings',
+    bpm: 86,
+    instruments: 'Fingerpicked plucks, bass, light drums',
+  },
+  jazz: {
+    title: 'After-hours Lemonade',
+    subtitle: 'A little swing under the stars',
+    bpm: 96,
+    instruments: 'Keys, walking bass, swung drums',
+  },
+  party: {
+    title: 'One More Little Dance',
+    subtitle: 'Midnight at the Little Stage',
+    bpm: 112,
+    instruments: 'Plucked lead, offbeat keys, octave bass, four-on-the-floor kick',
+  },
   ...BANDSTAND_TRACKS,
+  ...TOWN_TUNES,
 };
 export const BEATS = 64;
-export const durationOf = (track: TrackId) => (BEATS * 60) / TRACKS[track].bpm;
+/** Beats in a track's loop. */
+export const beatsOf = (track: TrackId) => TRACKS[track].beats ?? BEATS;
+export const durationOf = (track: TrackId) => (beatsOf(track) * 60) / TRACKS[track].bpm;
+/** Seconds in a phrase of four bars: where one of the town's tunes hands over to the next. */
+export const phraseOf = (track: TrackId) => (4 * (TRACKS[track].bar ?? 4) * 60) / TRACKS[track].bpm;
 /** Whether a track is one of the Bandstand's bands, heard only near it and scaled by its gain. */
 export const isBandTrack = (track: TrackId): track is Band =>
   (BANDS as readonly string[]).includes(track);
 /**
+ * The town's own tunes through the day, in town minutes (one is a real second): each plays from
+ * its `from` until the next one's. The midnight party (23:30–02:30) and the evening concert
+ * (19:00–21:00) play over them, and a Bandstand set near the stand; see trackForTown.
+ */
+export const TOWN_ROTATION: readonly { from: number; track: TrackId }[] = [
+  { from: 0, track: 'night' },
+  { from: 150, track: 'smallhours' },
+  { from: 255, track: 'beforedawn' },
+  { from: 360, track: 'sunrise' },
+  { from: 465, track: 'morning' },
+  { from: 585, track: 'town' },
+  { from: 670, track: 'midday' },
+  { from: 795, track: 'afternoon' },
+  { from: 900, track: 'teatime' },
+  { from: 1020, track: 'goldenhour' },
+  { from: 1260, track: 'lamplight' },
+  { from: 1335, track: 'night' },
+];
+/** Whether a track is one of the town's own tunes, which take turns through the day. */
+export const isTownTune = (track: TrackId) => TOWN_ROTATION.some((slot) => slot.track === track);
+/** The town's own tune at a town minute (any day: wrapped to 0..1440). */
+export function townTuneAt(minutes: number): TrackId {
+  const minute = ((minutes % 1440) + 1440) % 1440;
+  let track = TOWN_ROTATION[0].track;
+  for (const slot of TOWN_ROTATION) if (minute >= slot.from) track = slot.track;
+  return track;
+}
+/**
  * What the town plays: a live show on the stage first (the concert, the disco); then a live
  * Bandstand set, only while the Bandstand is heard (`bandstand.gain` ≥ 0.005, local like the
- * cinema); then the town's day or night tune.
+ * cinema); then the town's own tune for the hour (townTuneAt).
  */
 export function trackForTown(
   minutes: number,
@@ -51,7 +141,7 @@ export function trackForTown(
     const band = set && BANDS.find((band) => BAND_COPY[band].name === set.name);
     if (band) return band;
   }
-  return minutes < 360 || minutes >= 1200 ? 'night' : 'town';
+  return townTuneAt(minutes);
 }
 
 // Original 16-bar arrangements, in MIDI pitches. Each phrase has a question,
@@ -323,7 +413,7 @@ const jazzMelody: Phrase[] = [
     [3.66, 74, 0.25],
   ],
 ];
-// Root and close upper voicings: Cmaj9, G6, Am9, Fmaj9, Dm9, G13.
+// Root and close upper voicings: Cmaj9, G6, Am9, Fmaj9, Dm9, G9.
 const harmony = [
   [36, 60, 64, 67, 71],
   [43, 59, 62, 67, 69],
@@ -332,11 +422,11 @@ const harmony = [
   [36, 60, 64, 67, 71],
   [40, 59, 62, 64, 67],
   [38, 60, 65, 69, 72],
-  [43, 59, 64, 65, 69],
+  [43, 59, 62, 65, 69],
   [41, 60, 64, 67, 69],
   [33, 60, 64, 67, 71],
   [38, 60, 65, 69, 72],
-  [43, 59, 64, 65, 69],
+  [43, 59, 62, 65, 69],
   [36, 60, 64, 67, 71],
   [33, 60, 64, 67, 71],
   [43, 59, 62, 65, 69],
@@ -346,6 +436,7 @@ const harmony = [
 export function compose(track: TrackId): Note[] {
   // A band plays its own arrangement; until it has one, today's acoustic notes.
   if (isBandTrack(track)) return composeBandstand(track) ?? compose('acoustic');
+  if (isTune(track)) return composeTune(track);
   const notes: Note[] = [];
   const add = (
     beat: number,
