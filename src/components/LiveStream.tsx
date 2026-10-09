@@ -19,7 +19,7 @@ import { simulateResidents } from '../lib/simulation';
 import { residentTrips } from '../lib/resident-trips';
 import { useTownDayPrefetch, whenIdle } from '../lib/idle-prefetch';
 import { useTownClock } from '../lib/use-town-clock';
-import { trackForTown } from '../music/score';
+import { townTuneAt, trackForTown } from '../music/score';
 import { cinemaAt, cinemaListening } from '../lib/cinema';
 import { townArrivalDates, townArrivals } from '../lib/arrivals';
 import { TOWN_DAY_MS } from '../lib/town-time';
@@ -367,6 +367,7 @@ export default function LiveStream() {
       <BreakOverlay active={shown} ms={ms} />
       <Soundtrack
         track={trackForTown(clock.minutes, events)}
+        upcoming={townTuneAt(clock.minutes + 30)}
         playing={clock.playing}
         football={football}
         listening={listening}
