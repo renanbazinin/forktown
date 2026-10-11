@@ -1,0 +1,41 @@
+{
+  "id": "willow-cottage",
+  "name": "Willow Cottage",
+  "creator": "r0533154639-arch",
+  "plot": "Q10",
+  "building": "cottage",
+  "color": "#C97878",
+  "decoration": "flowers",
+  "story": "Hi!!!!!!!!",
+  "design": {
+    "wall": "#48938e",
+    "trim": "#846C56",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Elio",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

@@ -399,6 +399,33 @@ describe('The Treeline in the opening view', () => {
       expect(most).toBeGreaterThan(0);
     },
   );
+
+  it('keeps simultaneous boarding and alighting within the whole-town budget', () => {
+    // A busy frame independent of the roster: one neighbor boards while two step off together.
+    // Saving canvas state for every glass segment made this ordinary frame cost 429 calls.
+    const painted = paint(
+      sceneOf({
+        zoom: WHOLE.zoom,
+        visible: visibleFor(WHOLE),
+        residents: [
+          person('boarding', '#789B76', boarding(C1.id, N1.id, 0.89), {
+            figure: 'male',
+            accessory: 'none',
+          }),
+          person('first-off', '#789B76', alighting(C1.id, N1.id, 0.05), {
+            figure: 'male',
+            accessory: 'glasses',
+          }),
+          person('second-off', '#789B76', alighting(C1.id, N1.id, 0.05), {
+            figure: 'male',
+            accessory: 'none',
+          }),
+        ],
+      }),
+    );
+    expect(painted.total).toBeLessThanOrEqual(420);
+    expect(painted.alpha).toBe(1);
+  });
 });
 
 describe('The Treeline’s parts', () => {

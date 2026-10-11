@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TownPlayer } from '../src/music/player';
+import { durationOf, phraseOf } from '../src/music/score';
 import { renderTrack, renderCinemaTrack } from '../src/music/synth';
 import { CINEMA_FILMS } from '../src/lib/cinema';
 vi.mock('../src/music/synth', () => ({
@@ -18,15 +19,25 @@ const parameter = () => ({
 const sources: {
   start: ReturnType<typeof vi.fn>;
   stop: ReturnType<typeof vi.fn>;
+  connect: ReturnType<typeof vi.fn>;
   disconnect: ReturnType<typeof vi.fn>;
 }[] = [];
+/** The gain node a source plays through (its first connection). */
+const gainOf = (source: (typeof sources)[number]) =>
+  source.connect.mock.calls[0][0] as { gain: ReturnType<typeof parameter> };
 const close = vi.fn();
+/** Every mocked AudioContext, so a test can move its clock. */
+const contexts: { currentTime: number }[] = [];
 beforeEach(() => {
   sources.length = 0;
+  contexts.length = 0;
   vi.clearAllMocks();
   vi.stubGlobal(
     'AudioContext',
     class {
+      constructor() {
+        contexts.push(this);
+      }
       currentTime = 10;
       state = 'running';
       sampleRate = 12000;
@@ -161,5 +172,58 @@ describe('Soundtrack playback lifecycle', () => {
     finish(buffer);
     await pending;
     expect(sources).toHaveLength(0);
+  });
+});
+
+describe('The town’s tunes through the day', () => {
+  it('hands one tune to the next at the end of a phrase, never mid-line', async () => {
+    vi.mocked(renderTrack).mockResolvedValue(buffer);
+    const player = new TownPlayer();
+    await player.play('sunrise');
+    const sunrise = sources[0];
+    expect(sunrise.start).toHaveBeenCalledWith(10);
+    // Three seconds in, the clock reaches the next tune's hour.
+    contexts[0].currentTime = 13;
+    await player.play('morning');
+    const morning = sources[1];
+    const end = 10 + phraseOf('sunrise');
+    expect(morning.start.mock.calls[0][0]).toBeCloseTo(end);
+    expect(player.handoff).toBeCloseTo(end - 13);
+    expect(player.position?.track).toBe('morning');
+    // The outgoing tune fades over the phrase's last moments; the next comes in as it ends.
+    const [target, from] = gainOf(sunrise).gain.setTargetAtTime.mock.calls.at(-1)!;
+    expect(target).toBe(0);
+    expect(from).toBeCloseTo(end - 0.9);
+    expect(sunrise.stop.mock.calls.at(-1)![0]).toBeCloseTo(end + 1.5);
+    expect(gainOf(morning).gain.linearRampToValueAtTime.mock.calls.at(-1)![1]).toBeCloseTo(
+      end + 0.25,
+    );
+    // Another change before then replaces the waiting tune, which never starts, at the same end.
+    await player.play('town');
+    expect(morning.stop).toHaveBeenCalledWith(13);
+    expect(sources[2].start.mock.calls[0][0]).toBeCloseTo(end);
+    // The listening room's picks switch at once.
+    await player.play('midday', 'now');
+    expect(sources[3].start).toHaveBeenCalledWith(13);
+    expect(player.handoff).toBe(0);
+    player.dispose();
+  });
+  it('switches at once for a stage show, and knows where in its loop a tune is', async () => {
+    vi.mocked(renderTrack).mockResolvedValue(buffer);
+    const player = new TownPlayer();
+    await player.play('goldenhour');
+    contexts[0].currentTime = 10 + durationOf('goldenhour') + 2;
+    expect(player.position?.seconds).toBeCloseTo(2);
+    await player.play('jazz');
+    expect(sources[1].start).toHaveBeenCalledWith(contexts[0].currentTime);
+    expect(player.handoff).toBe(0);
+    player.dispose();
+  });
+  it('renders the next tune ahead of its turn', () => {
+    vi.mocked(renderTrack).mockResolvedValue(buffer);
+    const player = new TownPlayer();
+    player.prepare('teatime');
+    expect(renderTrack).toHaveBeenCalledWith('teatime');
+    player.dispose();
   });
 });

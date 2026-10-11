@@ -29,9 +29,9 @@ export function duckAwareWalk(
   time: number,
   start: number,
   end: number,
-  sample: (time: number) => WalkMotion,
+  sample: (routeTime: number, laneTime: number) => WalkMotion,
 ): WalkMotion {
-  if (time < DUCK_WALK_START || time >= DUCK_WALK_END + RECOVERY_SECONDS) return sample(time);
+  if (time < DUCK_WALK_START || time >= DUCK_WALK_END + RECOVERY_SECONDS) return sample(time, time);
   let pauses = encounters.get(routeKey);
   if (pauses) {
     encounters.delete(routeKey);
@@ -47,7 +47,7 @@ export function duckAwareWalk(
     for (let at = Math.max(start, DUCK_WALK_START); at < lastStart; at += 0.5) {
       // Just setting off (off a garden path onto the road), a walker looks where they are going.
       if (at < start + 0.5) continue;
-      const motion = sample(at);
+      const motion = sample(at, at);
       if (!motion.moving || Math.abs(motion.position.y - DUCK_STREET_Y) > DUCK_NOTICE_RADIUS)
         continue;
       const duck = nearestDuck(motion.position, at);
@@ -67,10 +67,10 @@ export function duckAwareWalk(
     encounters.set(routeKey, pauses);
   }
   const pause = pauses.find((at) => time >= at && time < at + DUCK_LOVE_SECONDS + RECOVERY_SECONDS);
-  if (pause === undefined) return sample(time);
+  if (pause === undefined) return sample(time, time);
   const elapsed = time - pause;
   if (elapsed < DUCK_LOVE_SECONDS) {
-    const motion = sample(pause);
+    const motion = sample(pause, pause);
     // Turn to the duckling that caught their eye and keep looking that way for the whole stop,
     // rather than snapping round after whichever duck is nearest from frame to frame.
     const duck = nearestDuck(motion.position, pause);
@@ -82,5 +82,6 @@ export function duckAwareWalk(
     };
   }
   const delay = DUCK_LOVE_SECONDS * (1 - (elapsed - DUCK_LOVE_SECONDS) / RECOVERY_SECONDS);
-  return sample(time - delay);
+  // Catch up along the route while keeping the lane planned for the current town minute.
+  return sample(time - delay, time);
 }

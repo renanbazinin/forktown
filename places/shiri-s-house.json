@@ -1,0 +1,41 @@
+{
+  "id": "shiri-s-house",
+  "name": "shiri's house",
+  "creator": "shir-exe",
+  "plot": "J10",
+  "building": "cottage",
+  "color": "#759BAF",
+  "decoration": "mailbox",
+  "story": "cozy winter house",
+  "design": {
+    "wall": "#d7b4e4",
+    "trim": "#4a8765",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Avery",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

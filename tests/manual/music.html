@@ -5,221 +5,2198 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Forktown FM — listening room</title>
     <style>
+      :root {
+        color-scheme: light;
+        --paper: #f4f1e7;
+        --card: #fffcf4;
+        --line: #dedfd2;
+        --wash: #ebede0;
+        --ink: #314a3e;
+        --green: #486344;
+        --green-dark: #3a5237;
+        --muted: #5f6e57;
+        --soft: #6c7c66;
+        --gold: #b49151;
+        --focus: #8a6a2f;
+        --cream: #fdfcf4;
+        --deck: #2f4639;
+        --deck-text: #dfe5d6;
+        --deck-accent: #e3c27a;
+        --mono: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+        --serif: Georgia, 'Times New Roman', serif;
+        /* A record's colour; each card, segment and panel sets its own. */
+        --cover: #8f9a86;
+      }
       * {
         box-sizing: border-box;
       }
+      [hidden] {
+        display: none !important;
+      }
       body {
         margin: 0;
-        background: #f4f1e7;
-        color: #314a3e;
+        overflow-x: clip;
+        background: var(--paper);
+        color: var(--ink);
         font:
-          15px system-ui,
+          15px/1.55 system-ui,
           sans-serif;
+        overflow-wrap: break-word;
       }
       main {
-        max-width: 900px;
-        margin: auto;
-        padding: 60px 24px;
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 56px 24px 24px;
       }
-      .eyebrow {
-        font: 11px monospace;
-        letter-spacing: 3px;
-        color: #77866e;
+      p {
+        margin: 0;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        margin: 0;
+        font-family: var(--serif);
+        font-weight: normal;
       }
       h1 {
-        font:
-          56px Georgia,
-          serif;
-        letter-spacing: -2px;
         margin: 18px 0;
-      }
-      .intro {
-        max-width: 550px;
-        line-height: 1.8;
-        color: #71816b;
-      }
-      #tracks {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-        gap: 16px;
-        margin: 36px 0;
-      }
-      article {
-        border: 1px solid #dedfd2;
-        background: #fffcf4;
-        padding: 24px;
-        border-radius: 18px;
-      }
-      .art {
-        height: 105px;
-        border-radius: 10px;
-        margin-bottom: 22px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 45px;
-        background: var(--cover);
-        color: #fffdf3;
+        font-size: 56px;
+        line-height: 1.04;
+        letter-spacing: -2px;
       }
       h2 {
-        font:
-          25px Georgia,
-          serif;
-        margin: 10px 0;
+        margin: 6px 0 8px;
+        font-size: 32px;
+        line-height: 1.1;
+        letter-spacing: -0.5px;
       }
-      article p {
-        min-height: 36px;
-        font-size: 12px;
-        color: #7e856f;
+      h3 {
+        font-size: 25px;
+        line-height: 1.15;
       }
-      button {
-        border: 0;
-        border-radius: 24px;
-        padding: 12px 20px;
-        color: #fdfcf4;
-        background: #486344;
-        cursor: pointer;
-        font: inherit;
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: wait;
-      }
-      button:focus-visible,
-      a:focus-visible {
-        outline: 3px solid #b49151;
-        outline-offset: 3px;
-      }
-      .controls {
-        display: flex;
-        gap: 16px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-      input {
-        accent-color: #486344;
-        max-width: 140px;
-      }
-      #status {
-        min-height: 25px;
-        margin: 20px 0;
-      }
-      #checks {
-        white-space: pre-wrap;
-        font: 12px/1.8 monospace;
+      h4 {
+        font-size: 22px;
+        line-height: 1.15;
       }
       a {
-        color: #486344;
+        color: var(--green);
       }
-      .note {
+      .eyebrow {
+        font: 11px/1.5 var(--mono);
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .intro,
+      .lede {
+        max-width: 620px;
+        color: var(--soft);
+        line-height: 1.75;
+      }
+      .intro {
+        font-size: 16px;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+      }
+      .panel {
+        margin: 28px 0;
+        padding: 28px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+      }
+
+      /* ---- Buttons and inputs ---- */
+      button {
+        min-height: 42px;
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 999px;
+        color: var(--cream);
+        background: var(--green);
+        font: inherit;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--green-dark);
+      }
+      button:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
+      button.ghost {
+        color: var(--green);
+        background: transparent;
+        box-shadow: inset 0 0 0 1.5px currentColor;
+      }
+      button.ghost:hover {
+        background: var(--wash);
+      }
+      button.small {
+        min-height: 34px;
+        padding: 6px 14px;
+        font-size: 13px;
+      }
+      button[aria-pressed='true'] {
+        background: var(--ink);
+      }
+      button[aria-pressed='true']::before {
+        content: '';
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 9px;
+        vertical-align: 1px;
+        border-radius: 50%;
+        background: var(--deck-accent);
+        box-shadow: 0 0 0 3px rgb(227 194 122 / 0.3);
+      }
+      :focus-visible {
+        outline: 3px solid var(--focus);
+        outline-offset: 3px;
+      }
+      input[type='range'] {
+        accent-color: var(--green);
+      }
+
+      /* ---- Record covers: a colour, a glyph, and the record peeking out of its sleeve ---- */
+      .cover {
+        position: relative;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 12px;
+        color: #fffdf3;
+        background:
+          radial-gradient(circle at 82% 16%, rgb(255 255 255 / 0.28), transparent 45%),
+          linear-gradient(160deg, var(--cover), color-mix(in srgb, var(--cover) 70%, #1e2b24));
+      }
+      .cover .glyph {
+        position: relative;
+        z-index: 1;
+        font-size: 46px;
+        line-height: 1;
+        text-shadow: 0 2px 0 rgb(0 0 0 / 0.12);
+      }
+      .cover::after {
+        content: '';
+        position: absolute;
+        right: -60px;
+        bottom: -60px;
+        width: 120px;
+        aspect-ratio: 1;
+        border-radius: 50%;
+        background:
+          radial-gradient(circle, var(--cover) 0 13px, #1f241f 14px 16px, transparent 17px),
+          conic-gradient(
+            rgb(255 255 255 / 0.14),
+            transparent 20%,
+            rgb(255 255 255 / 0.14) 50%,
+            transparent 70%
+          ),
+          repeating-radial-gradient(circle, #262a25 0 2px, #31352f 2px 4px);
+        transition: translate 0.6s ease;
+      }
+      .card.playing .cover::after {
+        translate: -16px -16px;
+        animation: spin 3.2s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          rotate: 1turn;
+        }
+      }
+      .badge {
+        padding: 5px 8px;
+        border-radius: 999px;
+        color: var(--ink);
+        background: var(--card);
+        font: 10px/1 var(--mono);
+        letter-spacing: 2px;
+        text-transform: uppercase;
+      }
+      .badge.today {
+        color: #5b4416;
+        background: #f3e2b5;
+      }
+      .badge.live {
+        margin-left: auto;
+        color: var(--cream);
+        background: var(--ink);
+      }
+
+      /* ---- On air in town now ---- */
+      .onair {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+        gap: 32px;
+        background: linear-gradient(
+          135deg,
+          color-mix(in srgb, var(--cover) 18%, var(--card)),
+          var(--card) 65%
+        );
+      }
+      .clock {
+        margin: 12px 0 4px;
+        font: 76px/1 var(--serif);
+        letter-spacing: -3px;
+        font-variant-numeric: tabular-nums;
+      }
+      .now-card {
+        display: grid;
+        grid-template-columns: 120px minmax(0, 1fr);
+        gap: 18px;
+        align-items: center;
+      }
+      .now-card .cover {
+        aspect-ratio: 1;
+      }
+      .now-card h3 {
+        margin: 4px 0;
+        font-size: 28px;
+      }
+      .now-card .subtitle {
+        color: var(--soft);
+      }
+      .onair .next {
+        margin: 18px 0 14px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+      }
+      .onair .next strong {
+        font-weight: 600;
+      }
+      .countdown {
+        font: 13px var(--mono);
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+      .handoff {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--green);
+        font-size: 13px;
+      }
+      .handoff::before {
+        content: '';
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold);
+        animation: pulse 0.9s ease-in-out infinite alternate;
+      }
+      @keyframes pulse {
+        to {
+          opacity: 0.25;
+        }
+      }
+
+      /* ---- A day of Forktown FM ---- */
+      .timeline {
+        position: relative;
+        margin: 22px 0 4px;
+        padding-top: 28px;
+      }
+      .lanes {
+        display: grid;
+        gap: 5px;
+      }
+      .lane {
+        position: relative;
+        height: 22px;
+      }
+      .lane.tunes {
+        height: 56px;
+      }
+      .lane button {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        display: grid;
+        place-items: center;
+        min-height: 0;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 6px;
+        color: #fffdf3;
+        background: var(--cover);
+        font-size: 15px;
+        line-height: 1;
+      }
+      .lane button:hover {
+        background: var(--cover);
+        filter: brightness(1.1);
+      }
+      .lane button:focus-visible {
+        z-index: 4;
+        outline-offset: 2px;
+      }
+      .segment {
+        box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.4);
+      }
+      .segment[aria-current='true'] {
+        box-shadow:
+          inset 0 0 0 2px var(--ink),
+          inset 0 0 0 4px rgb(255 255 255 / 0.5);
+      }
+      .segment.heard span {
+        animation: bob 1.2s ease-in-out infinite alternate;
+      }
+      @keyframes bob {
+        to {
+          translate: 0 -3px;
+        }
+      }
+      .lane.stage .mark {
         font-size: 12px;
-        color: #7e856f;
+      }
+      .playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        z-index: 3;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--ink);
+        pointer-events: none;
+      }
+      .playhead span {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        translate: -50%;
+        padding: 3px 7px;
+        border-radius: 999px;
+        color: var(--cream);
+        background: var(--ink);
+        font: 11px/1 var(--mono);
+        white-space: nowrap;
+      }
+      .now-mark {
+        position: absolute;
+        top: 24px;
+        bottom: 0;
+        z-index: 2;
+        margin-left: -1px;
+        border-left: 2px dotted var(--gold);
+        pointer-events: none;
+      }
+      .ticks {
+        position: relative;
+        height: 16px;
+        margin-top: 6px;
+        color: var(--muted);
+        font: 10.5px/16px var(--mono);
+      }
+      .ticks span {
+        position: absolute;
+        translate: -50%;
+      }
+      .ticks span:first-child {
+        translate: 0;
+      }
+      .ticks span:last-child {
+        translate: -100%;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        margin: 14px 0 0;
+        padding: 0;
+        list-style: none;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .legend li {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+      }
+      .swatch {
+        flex: none;
+        width: 18px;
+        height: 10px;
+        border-radius: 3px;
+        background: #6f8a6a;
+      }
+      .swatch.stage {
+        background: #9b7ca8;
+      }
+      .swatch.now {
+        width: 0;
+        border-left: 2px dotted var(--gold);
+        border-radius: 0;
+        background: none;
+      }
+      .caption {
+        min-height: 3.2em;
+        margin-top: 14px;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: var(--wash);
+        font-size: 14px;
+      }
+      .scrub {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 16px;
+        align-items: center;
+        margin-top: 22px;
+      }
+      .scrub label {
+        font: 21px var(--serif);
+        white-space: nowrap;
+      }
+      .scrub output {
+        font-variant-numeric: tabular-nums;
+      }
+      .scrub input {
+        width: 100%;
+        margin: 0;
+      }
+      .speeds {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        margin: 18px 0 0;
+        padding: 0;
+        border: 0;
+      }
+      .speeds legend {
+        float: left;
+        margin-right: 4px;
+        padding: 0;
+      }
+      .segmented {
+        display: inline-flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 999px;
+        box-shadow: inset 0 0 0 1.5px var(--green);
+      }
+      .segmented label {
+        position: relative;
+      }
+      .segmented input {
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        opacity: 0;
+        cursor: pointer;
+      }
+      .segmented span {
+        display: block;
+        padding: 6px 15px;
+        border-radius: 999px;
+        color: var(--green);
+        font-size: 14px;
+      }
+      .segmented input:checked + span {
+        color: var(--cream);
+        background: var(--green);
+      }
+      .segmented input:focus-visible + span {
+        outline: 3px solid var(--focus);
+        outline-offset: 2px;
+      }
+
+      /* ---- Play the day in order ---- */
+      .count {
+        color: var(--muted);
+        font: 13px var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+      .sleeve {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+        gap: 2px 24px;
+        margin: 20px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .sleeve button {
+        display: grid;
+        grid-template-columns: auto auto minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        width: 100%;
+        min-height: 0;
+        padding: 8px 10px;
+        border-radius: 10px;
+        color: var(--ink);
+        background: transparent;
+        text-align: left;
+      }
+      .sleeve button:hover {
+        background: var(--wash);
+      }
+      .sleeve button[aria-current='true'] {
+        background: var(--wash);
+        box-shadow: inset 3px 0 0 var(--green);
+      }
+      .sleeve .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--cover);
+      }
+      .sleeve .at,
+      .sleeve .len {
+        color: var(--muted);
+        font: 12px var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* ---- The library ---- */
+      .library-group {
+        margin: 34px 0;
+      }
+      .library-group > header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        align-items: baseline;
+        margin-bottom: 16px;
+      }
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(100%, 228px), 1fr));
+        gap: 16px;
+      }
+      .card {
+        display: flex;
+        flex-direction: column;
+        gap: 9px;
+        padding: 16px;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+      }
+      .card.playing {
+        border-color: var(--green);
+        box-shadow:
+          0 0 0 1px var(--green),
+          0 12px 26px rgb(49 74 62 / 0.12);
+      }
+      .card.next {
+        border-style: dashed;
+        border-color: var(--green);
+      }
+      .card.spotlight {
+        box-shadow: 0 0 0 3px var(--gold);
+      }
+      .sleeve-art {
+        position: relative;
+        margin-bottom: 6px;
+      }
+      .sleeve-art .cover {
+        height: 112px;
+      }
+      .badges {
+        position: absolute;
+        inset: 8px 8px auto;
+        z-index: 2;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        pointer-events: none;
+      }
+      .card-when {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        min-height: 16px;
+        letter-spacing: 2px;
+      }
+      .card .subtitle {
+        color: var(--soft);
+        font-size: 13.5px;
+      }
+      .card .instruments {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px 16px;
+        margin: 0;
+        font-size: 12.5px;
+      }
+      .facts div {
+        display: flex;
+        gap: 5px;
+      }
+      .facts dt {
+        color: var(--muted);
+      }
+      .facts dd {
+        margin: 0;
+        font-variant-numeric: tabular-nums;
+      }
+      .foot {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 12px;
+        align-items: center;
+        margin-top: auto;
+        padding-top: 6px;
+      }
+      .play {
+        display: inline-flex;
+        gap: 9px;
+        align-items: center;
+      }
+      .play .icon {
+        width: 10px;
+        height: 11px;
+        background: currentColor;
+        clip-path: polygon(0 0, 100% 50%, 0 100%);
+      }
+      .play[data-on] .icon {
+        height: 10px;
+        clip-path: none;
+        border-radius: 1px;
+      }
+      .meter {
+        display: flex;
+        flex: 1 1 110px;
+        gap: 10px;
+        align-items: center;
+        min-width: 0;
+      }
+      .bar {
+        flex: 1;
+        height: 4px;
+        overflow: hidden;
+        border-radius: 2px;
+        background: var(--wash);
+      }
+      .bar span {
+        display: block;
+        width: 0;
+        height: 100%;
+        background: var(--green);
+      }
+      .time {
+        color: var(--muted);
+        font: 12px var(--mono);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      .eq {
+        display: none;
+        gap: 2px;
+        align-items: flex-end;
+        height: 11px;
+      }
+      .card.playing .eq {
+        display: inline-flex;
+      }
+      .eq i {
+        width: 3px;
+        height: 100%;
+        background: var(--green);
+        transform-origin: bottom;
+        animation: eq 0.8s ease-in-out infinite alternate;
+      }
+      .eq i:nth-child(2) {
+        animation-delay: -0.3s;
+      }
+      .eq i:nth-child(3) {
+        animation-delay: -0.55s;
+      }
+      @keyframes eq {
+        from {
+          transform: scaleY(0.25);
+        }
+      }
+
+      /* ---- Check all mixes ---- */
+      .table-wrap {
+        margin-top: 18px;
+        overflow-x: auto;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      th,
+      td {
+        padding: 9px 12px;
+        border-bottom: 1px solid var(--line);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
+      tbody tr:last-child > * {
+        border-bottom: 0;
+      }
+      thead th {
+        color: var(--muted);
+        background: #f8f5ea;
+        font: 10.5px var(--mono);
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+      }
+      th:first-child,
+      td:last-child {
+        text-align: left;
+      }
+      tbody th {
+        min-width: 170px;
+        font-weight: normal;
+        white-space: normal;
+      }
+      tbody th .badge {
+        margin-left: 8px;
+        background: var(--wash);
+      }
+      tbody th .id {
+        display: block;
+        color: var(--muted);
+        font: 11px var(--mono);
+      }
+      td small {
+        display: block;
+        color: var(--muted);
+        font-size: 11px;
+      }
+      td.flag {
+        color: #8c3b22;
+        font-weight: 600;
+      }
+      td.ok {
+        color: var(--green);
+      }
+
+      footer.note {
+        margin: 36px 0 12px;
+        color: var(--muted);
+        font-size: 13px;
         line-height: 1.8;
       }
-      @media (max-width: 500px) {
+      footer.note p + p {
+        margin-top: 10px;
+      }
+
+      /* ---- The deck: what plays, volume and stop, always at hand ---- */
+      .deck {
+        position: sticky;
+        bottom: 0;
+        z-index: 20;
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 0 24px 14px;
+      }
+      .deck-inner {
+        display: grid;
+        grid-template-columns: 52px minmax(0, 1fr) auto auto;
+        grid-template-areas:
+          'cover main volume stop'
+          'status status status status';
+        gap: 6px 18px;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: 20px;
+        color: var(--cream);
+        background: var(--deck);
+        box-shadow: 0 12px 32px rgb(35 52 44 / 0.28);
+      }
+      .deck .cover {
+        grid-area: cover;
+        width: 52px;
+        height: 52px;
+        border-radius: 10px;
+      }
+      .deck .cover .glyph {
+        font-size: 24px;
+      }
+      .deck .cover::after {
+        display: none;
+      }
+      .deck-main {
+        grid-area: main;
+        min-width: 0;
+      }
+      .deck .eyebrow {
+        overflow: hidden;
+        color: #c8d2bd;
+        letter-spacing: 2px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .deck-title {
+        overflow: hidden;
+        font: 19px/1.3 var(--serif);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .deck .bar {
+        background: rgb(255 255 255 / 0.18);
+      }
+      .deck .bar span {
+        background: var(--deck-accent);
+      }
+      .deck .time {
+        color: #c8d2bd;
+      }
+      .deck .volume {
+        display: flex;
+        grid-area: volume;
+        gap: 8px;
+        align-items: center;
+        color: var(--deck-text);
+        font-size: 13px;
+      }
+      .deck .volume input {
+        width: 110px;
+        accent-color: var(--deck-accent);
+      }
+      .deck #stop-all {
+        grid-area: stop;
+        color: var(--ink);
+        background: var(--cream);
+      }
+      .deck #stop-all:hover {
+        background: #ebe5d0;
+      }
+      .deck-status {
+        grid-area: status;
+        min-height: 1.3em;
+        color: var(--deck-text);
+        font-size: 12.5px;
+      }
+      .deck :focus-visible {
+        outline-color: var(--deck-accent);
+      }
+
+      @media (max-width: 720px) {
+        .onair {
+          grid-template-columns: 1fr;
+          gap: 18px;
+        }
+        .clock {
+          font-size: 60px;
+        }
+        .now-card {
+          grid-template-columns: 88px minmax(0, 1fr);
+        }
+      }
+      @media (max-width: 600px) {
         main {
-          padding-top: 32px;
+          padding: 32px 16px 16px;
         }
         h1 {
           font-size: 42px;
+        }
+        h2 {
+          font-size: 27px;
+        }
+        .panel {
+          padding: 20px 16px;
+          border-radius: 18px;
+        }
+        .ticks .minor {
+          display: none;
+        }
+        .scrub {
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+        .scrub input {
+          grid-row: 2;
+          grid-column: 1 / -1;
+        }
+        .deck {
+          padding: 0 8px 8px;
+        }
+        .deck-inner {
+          grid-template-columns: 40px minmax(0, 1fr) auto;
+          grid-template-areas:
+            'cover main stop'
+            'volume volume volume'
+            'status status status';
+          gap: 6px 12px;
+          padding: 10px 12px;
+        }
+        .deck .cover {
+          width: 40px;
+          height: 40px;
+        }
+        .deck-title {
+          font-size: 17px;
+        }
+        .deck .volume input {
+          flex: 1;
+          width: auto;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation: none !important;
+          transition: none !important;
         }
       }
     </style>
   </head>
   <body>
     <main>
-      <div class="eyebrow">FORKTOWN FM / VOL. 01</div>
-      <h1>A soundtrack for<br />a little place.</h1>
-      <p class="intro">
-        Six original miniatures. Warm keys, wooden plucks, soft pixel bells, and a tiny band with
-        somewhere to be. Pick a record. Stay a while.
-      </p>
-      <div id="tracks"></div>
-      <div class="controls">
-        <button id="stop">Stop music</button
-        ><label>Volume <input id="volume" type="range" min="0" max="100" value="55" /></label
-        ><button id="check">Check all mixes</button>
-      </div>
-      <p id="status" role="status">Choose a tune to listen.</p>
-      <pre id="checks"></pre>
-      <p class="note">
-        Each tune has a 16-bar arrangement and loops seamlessly. This listening room is only in the
-        local development build. In town, music follows the day, the evening concert, and the
-        midnight party.
-      </p>
-      <a href="/">Back to the town →</a>
+      <header>
+        <p class="eyebrow">Forktown FM / Vol. 02 · The listening room</p>
+        <h1>A soundtrack for<br />a little place.</h1>
+        <p class="intro">
+          <span id="count-tunes">11</span> tunes for the hours of the day (<span id="count-new"
+            >9</span
+          >
+          of them new) and the stage's <span id="count-shows">4</span> shows. Every note is written
+          in code and played by a little synthesizer in your browser. Pick a record, tune in to the
+          town, or let the whole day play.
+        </p>
+      </header>
+
+      <section class="panel onair" id="on-air" aria-labelledby="on-air-title">
+        <div>
+          <p class="eyebrow">01 · Live</p>
+          <h2 id="on-air-title">On air in town now</h2>
+          <p class="clock">
+            <span class="visually-hidden">Town time </span><span id="clock">--:--</span>
+          </p>
+          <p class="muted">Town time: a town minute is one real second.</p>
+        </div>
+        <div>
+          <div class="now-card">
+            <div class="cover" aria-hidden="true">
+              <span class="glyph" id="on-air-glyph">♪</span>
+            </div>
+            <div>
+              <p class="eyebrow">Playing in town</p>
+              <h3 id="on-air-track">…</h3>
+              <p class="subtitle" id="on-air-subtitle"></p>
+              <p class="muted" id="on-air-why"></p>
+            </div>
+          </div>
+          <p class="next">
+            <span id="on-air-next"></span> <span class="countdown" id="on-air-countdown"></span>
+          </p>
+          <div class="row" style="margin-top: 14px">
+            <button type="button" id="tune-in" aria-pressed="false">Tune in</button>
+            <span class="handoff" id="on-air-handoff" hidden
+              >Switching at the end of the phrase…</span
+            >
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="day" aria-labelledby="day-title">
+        <p class="eyebrow">02 · The rota</p>
+        <h2 id="day-title">A day of Forktown FM</h2>
+        <p class="lede">
+          Each stretch of the day has a tune of its own, and each tune hands over to the next at the
+          end of a four-bar phrase. The stage's shows play over them. Click any part of the day to
+          hear it.
+        </p>
+        <div class="timeline">
+          <div class="lanes">
+            <div
+              class="lane stage"
+              id="lane-stage"
+              role="group"
+              aria-label="The Little Stage"
+            ></div>
+            <div
+              class="lane tunes"
+              id="lane-tunes"
+              role="toolbar"
+              aria-label="The town's tunes through the day"
+            ></div>
+          </div>
+          <div class="playhead" id="playhead" aria-hidden="true">
+            <span id="playhead-time">00:00</span>
+          </div>
+          <div class="now-mark" id="now-mark" aria-hidden="true"></div>
+          <div class="ticks" id="ticks" aria-hidden="true"></div>
+        </div>
+        <ul class="legend">
+          <li>
+            <span class="swatch stage"></span>The Little Stage: the concert and the midnight party
+          </li>
+          <li><span class="swatch"></span>The town's tune for each stretch of the day</li>
+          <li><span class="swatch now"></span>The town's real time</li>
+        </ul>
+        <p class="caption" id="caption"></p>
+        <div class="scrub">
+          <label for="pretend"
+            >Pretend it's <output id="pretend-time" for="pretend">00:00</output></label
+          >
+          <input id="pretend" type="range" min="0" max="1439" step="1" value="0" />
+          <button type="button" class="ghost small" id="back-to-now">Back to now</button>
+        </div>
+        <fieldset class="speeds" aria-describedby="speed-note">
+          <legend class="eyebrow">Fast-forward</legend>
+          <div class="segmented">
+            <label><input type="radio" name="speed" value="0" checked /><span>Off</span></label>
+            <label><input type="radio" name="speed" value="1" /><span>1×</span></label>
+            <label><input type="radio" name="speed" value="5" /><span>5×</span></label>
+            <label><input type="radio" name="speed" value="20" /><span>20×</span></label>
+          </div>
+          <p class="muted" id="speed-note">
+            1× is the town's own pace: a town minute every second.
+          </p>
+        </fieldset>
+      </section>
+
+      <section class="panel" id="album" aria-labelledby="album-title">
+        <p class="eyebrow">03 · The album</p>
+        <h2 id="album-title">Play the day in order</h2>
+        <p class="lede">
+          From the first kettle at 06:00 round to 05:59: each tune for one whole loop, then on to
+          the next at the end of its phrase, the way the town hands over.
+        </p>
+        <div class="row" style="margin-top: 18px">
+          <button type="button" class="ghost" id="album-previous">Previous</button>
+          <button type="button" id="album-play" aria-pressed="false">Play the day in order</button>
+          <button type="button" class="ghost" id="album-next">Next</button>
+          <span class="count" id="album-count"></span>
+        </div>
+        <ol class="sleeve" id="album-list" aria-label="The day's tunes, in order"></ol>
+      </section>
+
+      <section id="library" aria-labelledby="library-title">
+        <p class="eyebrow">04 · The shelves</p>
+        <h2 id="library-title">The library</h2>
+        <p class="lede">Every record the town can play. The new tunes of the hour are marked.</p>
+        <div id="groups"></div>
+      </section>
+
+      <section class="panel" id="mixes" aria-labelledby="mixes-title">
+        <p class="eyebrow">05 · The engineer's corner</p>
+        <h2 id="mixes-title">Check all mixes</h2>
+        <p class="lede">
+          Renders every record the way the town does and measures it. Flags a peak at or above −1
+          dBFS, an RMS level below −40 dB and a loop seam of 0.03 or more. Numbers catch clipping
+          and silence; only listening catches the rest.
+        </p>
+        <div class="row" style="margin-top: 18px">
+          <button type="button" id="check">Check all mixes</button>
+          <span class="muted" id="check-note" role="status"></span>
+        </div>
+        <div
+          class="table-wrap"
+          id="checks-wrap"
+          role="region"
+          aria-labelledby="mixes-title"
+          tabindex="0"
+          hidden
+        >
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Record</th>
+                <th scope="col">Peak dBFS</th>
+                <th scope="col">RMS dB</th>
+                <th scope="col">Loop seam</th>
+                <th scope="col">Render ms</th>
+                <th scope="col">Verdict</th>
+              </tr>
+            </thead>
+            <tbody id="checks"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="note">
+        <p>
+          Every loop is synthesized here, in your browser, from the notes in src/music: no
+          recordings, no samples, nothing downloaded. In town the music follows the clock, the
+          evening concert and the midnight party play over the tune of the hour. This room is in the
+          development build only and never changes the town's clock.
+        </p>
+        <p><a href="/">Back to the town →</a></p>
+      </footer>
     </main>
+
+    <section class="deck" aria-label="Player">
+      <div class="deck-inner">
+        <div class="cover" id="deck-cover" aria-hidden="true"><span class="glyph">♪</span></div>
+        <div class="deck-main">
+          <p class="eyebrow" id="deck-mode">Nothing playing</p>
+          <p class="deck-title" id="deck-title">Pick a record, tune in, or play the day</p>
+          <div class="meter" id="deck-meter" hidden>
+            <div class="bar" aria-hidden="true"><span id="deck-fill"></span></div>
+            <span class="time" id="deck-time"></span>
+          </div>
+        </div>
+        <label class="volume"
+          >Volume <input id="volume" type="range" min="0" max="100" value="55"
+        /></label>
+        <button type="button" id="stop-all">Stop all</button>
+        <p class="deck-status" id="status" role="status">Choose a record to listen.</p>
+      </div>
+    </section>
+
     <script type="module">
-      import { TRACKS, durationOf } from '/src/music/score.ts';
+      import {
+        TOWN_ROTATION,
+        TRACKS,
+        durationOf,
+        isTownTune,
+        townTuneAt,
+        trackForTown,
+      } from '/src/music/score.ts';
+      import { TOWN_TUNES } from '/src/music/tunes/index.ts';
       import { TownPlayer } from '/src/music/player.ts';
       import { renderTrack } from '/src/music/synth.ts';
-      const colors = ['#93ae7e', '#566b80', '#ba8064', '#c2a56f', '#798784', '#9b7ca8'];
-      const glyphs = ['♫', '☾', 'ϟ', '♬', '♪', '✦'];
-      const list = document.querySelector('#tracks');
-      const status = document.querySelector('#status');
-      let player,
-        revision = 0;
-      Object.entries(TRACKS).forEach(([id, track], index) => {
-        const article = document.createElement('article');
-        article.innerHTML = `<div class="art" style="--cover:${colors[index]}">${glyphs[index]}</div><span class="eyebrow">0${index + 1} / ${id}</span><h2>${track.title}</h2><p>${track.subtitle} · ${Math.round(durationOf(id))} seconds</p><button>Play ${track.title}</button>`;
-        article.querySelector('button').addEventListener('click', async () => {
-          const current = ++revision;
-          try {
-            player ??= new TownPlayer();
-            await player.resume();
-            player.volume(Number(document.querySelector('#volume').value) / 100);
-            status.textContent = `Warming up ${track.title}…`;
-            await player.play(id);
-            if (current === revision) status.textContent = `Now playing: ${track.title}`;
-          } catch (error) {
-            status.textContent = `Could not play: ${error.message}`;
-          }
-        });
-        list.append(article);
-      });
-      document.querySelector('#stop').onclick = () => {
-        ++revision;
-        player?.stop();
-        status.textContent = 'Music stopped.';
+      import { townDayAt, townMinutesAt } from '/src/lib/town-time.ts';
+      import { eventsForDay, isEventLive } from '/src/lib/events.ts';
+
+      // ---------- The records ----------
+
+      /** Each record's cover: a colour and a glyph. A record without one gets a plain cover. */
+      const COVERS = {
+        town: ['#93ae7e', '♫'],
+        night: ['#566b80', '☾'],
+        rock: ['#ba8064', 'ϟ'],
+        acoustic: ['#c2a56f', '♬'],
+        jazz: ['#798784', '♪'],
+        party: ['#9b7ca8', '✦'],
+        smallhours: ['#4f5a78', '✧'],
+        beforedawn: ['#5f7e9c', '◓'],
+        sunrise: ['#cf9468', '☼'],
+        morning: ['#86a865', '✿'],
+        midday: ['#c9a443', '✺'],
+        afternoon: ['#6c968f', '⊞'],
+        teatime: ['#bf8489', '❦'],
+        goldenhour: ['#c4843f', '❂'],
+        lamplight: ['#87694d', '✶'],
       };
-      document.querySelector('#volume').oninput = (event) =>
-        player?.volume(Number(event.target.value) / 100);
+      const STAGE_SHOWS = ['rock', 'acoustic', 'jazz', 'party'];
+      const DAY = 1440;
+      /** 06:00: the album starts here, and so does the day's half of the library. */
+      const DAWN = 360;
+      /** 21:00: where the night's half of the library starts. */
+      const DUSK = 1260;
+      /** A pending phrase handoff shorter than this is treated as done. */
+      const SETTLED = 0.05;
+
+      const titleOf = (track) => TRACKS[track]?.title ?? track;
+      const coverOf = (track) => COVERS[track] ?? ['#8f9a86', '♪'];
+      const isNew = (track) => Object.hasOwn(TOWN_TUNES, track);
+
+      // ---------- Small helpers ----------
+
+      const $ = (selector) => document.querySelector(selector);
+      const pad = (value) => String(value).padStart(2, '0');
+      const wrap = (minutes) => ((minutes % DAY) + DAY) % DAY;
+      function hhmm(minutes) {
+        const minute = Math.floor(wrap(minutes));
+        return `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
+      }
+      /** A stretch of the day, "07:45–09:45"; one that runs to midnight ends at 24:00. */
+      const span = ({ from, to }) => `${hhmm(from)}–${to === DAY ? '24:00' : hhmm(to)}`;
+      const eventSpan = (event) => span({ from: event.start, to: event.end });
+      function mss(seconds) {
+        const whole = Math.max(0, Math.floor(seconds));
+        return `${Math.floor(whole / 60)}:${pad(whole % 60)}`;
+      }
+      const percent = (minutes) => `${(minutes / DAY) * 100}%`;
+      const decibels = (value) =>
+        value > 0 ? (20 * Math.log10(value)).toFixed(1).replace('-', '−') : '−∞';
+      const capitalised = (text) => text.charAt(0).toUpperCase() + text.slice(1);
+
+      /** Builds an element: attributes (on* adds a listener; false or undefined skips) and children. */
+      function el(tag, attributes = {}, ...children) {
+        const node = document.createElement(tag);
+        for (const [name, value] of Object.entries(attributes)) {
+          if (value === undefined || value === null || value === false) continue;
+          if (name.startsWith('on')) node.addEventListener(name.slice(2), value);
+          else if (name === 'class') node.className = value;
+          else node.setAttribute(name, value === true ? '' : String(value));
+        }
+        node.append(...children.flat().filter((child) => child || child === 0));
+        return node;
+      }
+      /** Writes text only when it changed, so a tick never disturbs the page needlessly. */
+      function setText(node, text) {
+        if (node.textContent !== text) node.textContent = text;
+      }
+      function setCover(node, track) {
+        const [color, glyph] = coverOf(track);
+        node.style.setProperty('--cover', color);
+        setText(node.querySelector('.glyph') ?? node, glyph);
+      }
+
+      // ---------- The day's rota ----------
+
+      /** The rotation's stretches: each tune of the hour from its `from` to the next one's. */
+      const SLOTS = TOWN_ROTATION.map((slot, index) => ({
+        ...slot,
+        to: TOWN_ROTATION[index + 1]?.from ?? DAY,
+      }));
+      const slotAt = (minutes) => SLOTS.findLast((slot) => slot.from <= wrap(minutes)) ?? SLOTS[0];
+      /** When a tune of the hour plays: its stretches, one running over midnight joined up. */
+      function stretchesOf(track) {
+        const stretches = SLOTS.filter((slot) => slot.track === track).map(({ from, to }) => ({
+          from,
+          to,
+        }));
+        const first = stretches[0];
+        const last = stretches.at(-1);
+        if (stretches.length > 1 && first.from === 0 && last.to === DAY) {
+          last.to = DAY + first.to;
+          stretches.shift();
+        }
+        return stretches;
+      }
+      const sinceDawn = (minutes) => wrap(minutes - DAWN);
+      /** The day in order: each tune of the hour once, from 06:00 round to 05:59. */
+      const ALBUM = [];
+      for (const slot of [
+        { from: DAWN, track: townTuneAt(DAWN) },
+        ...[...SLOTS].sort((a, b) => sinceDawn(a.from) - sinceDawn(b.from)),
+      ])
+        if (!ALBUM.some((entry) => entry.track === slot.track))
+          ALBUM.push({ track: slot.track, from: slot.from });
+      const ALBUM_LENGTH = ALBUM.reduce((total, entry) => total + durationOf(entry.track), 0);
+
+      const GROUPS = [
+        {
+          title: 'Through the day',
+          blurb: '06:00 to 21:00, from the first kettle to the long shadows.',
+          tracks: ALBUM.filter((entry) => sinceDawn(entry.from) < DUSK - DAWN).map((e) => e.track),
+        },
+        {
+          title: 'Through the night',
+          blurb: '21:00 to 06:00: the lamps, the porch lights and the small hours.',
+          tracks: ALBUM.filter((entry) => sinceDawn(entry.from) >= DUSK - DAWN).map((e) => e.track),
+        },
+        {
+          title: 'Stage shows',
+          blurb: 'The Little Stage: one evening concert a night, then the midnight party.',
+          tracks: STAGE_SHOWS.filter((track) => track in TRACKS),
+        },
+      ];
+      const shelved = new Set(GROUPS.flatMap((group) => group.tracks));
+      const unshelved = Object.keys(TRACKS).filter((track) => !shelved.has(track));
+      if (unshelved.length)
+        GROUPS.push({ title: 'More records', blurb: 'Not on the rota yet.', tracks: unshelved });
+      const LIBRARY = GROUPS.flatMap((group) => group.tracks);
+
+      // ---------- What the town plays ----------
+
+      const eventCache = new Map();
+      /** The town's events on `day` as seen at `minutes` (before 06:00 the night is yesterday's). */
+      function eventsAt(day, minutes) {
+        const key = `${day}:${wrap(minutes) < DAWN}`;
+        let events = eventCache.get(key);
+        if (!events) {
+          if (eventCache.size > 8) eventCache.clear();
+          events = eventsForDay(day, wrap(minutes));
+          eventCache.set(key, events);
+        }
+        return events;
+      }
+      /** What the town plays at a minute of a day. */
+      const townTrack = (day, minutes) => trackForTown(wrap(minutes), eventsAt(day, minutes));
+      const isStage = (event) => event.venue.kind === 'stage';
+      /**
+       * The next time the music changes after `minutes`, minute by minute for up to a day.
+       * `rollsOver` moves to the next day at midnight (the real clock); a pretend day stays put.
+       */
+      function nextChange(day, minutes, rollsOver) {
+        const playing = townTrack(day, minutes);
+        for (let step = 1; step <= DAY; step++) {
+          const at = Math.floor(minutes) + step;
+          const track = townTrack(rollsOver ? day + Math.floor(at / DAY) : day, at);
+          if (track !== playing) return { track, at: wrap(at), in: at - minutes };
+        }
+        return undefined;
+      }
+      /** Why the town plays `track` then: a live show, or the stretch of the day it belongs to. */
+      function reasonAt(day, minutes, track) {
+        const show = eventsAt(day, minutes).find(
+          (event) => isStage(event) && isEventLive(event, wrap(minutes)),
+        );
+        if (show) return `${show.name}, ${eventSpan(show)}`;
+        return isTownTune(track) ? `the tune for ${span(slotAt(minutes))}` : '';
+      }
+      /** The stage shows of a day, as pieces of the 24-hour bar. */
+      function marksOf(events) {
+        const marks = [];
+        for (const event of events) {
+          if (!isStage(event)) continue;
+          const lane = 'stage';
+          const track = trackForTown(event.start, events);
+          // The midnight party runs past 24:00: its last part is drawn from 00:00.
+          const pieces =
+            event.end > DAY
+              ? [
+                  [event.start, DAY],
+                  [0, event.end - DAY],
+                ]
+              : [[event.start, event.end]];
+          pieces.forEach(([from, to], index) =>
+            marks.push({ lane, event, track, from, to, continued: index > 0 }),
+          );
+        }
+        return marks;
+      }
+      /** A record's place in the day for its card, and a badge when it is on today. */
+      function whenOf(track, events) {
+        if (isTownTune(track)) return { text: stretchesOf(track).map(span).join(' · ') };
+        const shows = events.filter(isStage);
+        const tonight = shows.find((show) => trackForTown(show.start, events) === track);
+        const concert = shows.find((show) => show.period === 'evening');
+        if (tonight?.period === 'night') return { text: `Midnight party · ${eventSpan(tonight)}` };
+        if (tonight) return { text: `Concert · ${eventSpan(tonight)}`, badge: 'Tonight' };
+        if (STAGE_SHOWS.includes(track) && concert)
+          return { text: `Concert · ${eventSpan(concert)}` };
+        return { text: 'In the library' };
+      }
+
+      // ---------- The player ----------
+
+      const ui = {
+        status: $('#status'),
+        clock: $('#clock'),
+        onAir: $('#on-air'),
+        onAirGlyph: $('#on-air-glyph'),
+        onAirTrack: $('#on-air-track'),
+        onAirSubtitle: $('#on-air-subtitle'),
+        onAirWhy: $('#on-air-why'),
+        onAirNext: $('#on-air-next'),
+        onAirCountdown: $('#on-air-countdown'),
+        onAirHandoff: $('#on-air-handoff'),
+        tuneIn: $('#tune-in'),
+        laneStage: $('#lane-stage'),
+        laneTunes: $('#lane-tunes'),
+        playhead: $('#playhead'),
+        playheadTime: $('#playhead-time'),
+        nowMark: $('#now-mark'),
+        ticks: $('#ticks'),
+        caption: $('#caption'),
+        pretend: $('#pretend'),
+        pretendTime: $('#pretend-time'),
+        backToNow: $('#back-to-now'),
+        speeds: [...document.querySelectorAll('input[name="speed"]')],
+        speedNote: $('#speed-note'),
+        albumPrevious: $('#album-previous'),
+        albumPlay: $('#album-play'),
+        albumNext: $('#album-next'),
+        albumCount: $('#album-count'),
+        albumList: $('#album-list'),
+        groups: $('#groups'),
+        check: $('#check'),
+        checkNote: $('#check-note'),
+        checksWrap: $('#checks-wrap'),
+        checks: $('#checks'),
+        deckCover: $('#deck-cover'),
+        deckMode: $('#deck-mode'),
+        deckTitle: $('#deck-title'),
+        deckMeter: $('#deck-meter'),
+        deckFill: $('#deck-fill'),
+        deckTime: $('#deck-time'),
+        volume: $('#volume'),
+        stopAll: $('#stop-all'),
+      };
+
+      /** Made on the first click: browsers start sound only from a gesture. */
+      let player;
+      /** Each listen() takes a ticket; a newer one makes an older one's result stale. */
+      let request = 0;
+      const state = {
+        /** 'idle', 'library', 'radio' (the real clock), 'day' (a pretend time), 'fast' or 'album'. */
+        mode: 'idle',
+        /** The record asked for last: it may still be warming up or waiting for a phrase end. */
+        track: undefined,
+        /** The record you hear now. */
+        heard: undefined,
+        heardSince: 0,
+        loading: false,
+        /** Waiting for the playing tune's phrase to end before the next comes in. */
+        waiting: false,
+        /** The timeline's playhead, in town minutes; it follows the real clock until moved. */
+        playhead: townMinutesAt(Date.now()),
+        follow: true,
+        /** Fast-forward: town minutes per real second, 0 when off. */
+        speed: 0,
+      };
+      const album = { index: 0 };
+      let today = -1;
+
+      const announce = (text) => setText(ui.status, text);
+      const volumeLevel = () => Number(ui.volume.value) / 100;
+      const handoffLeft = () => player?.handoff ?? 0;
+      const realTown = () => {
+        const now = Date.now();
+        return { day: townDayAt(now), minutes: townMinutesAt(now) };
+      };
+
+      /** Plays a record: at once ('now'), or at the end of the playing tune's phrase ('phrase'). */
+      async function listen(track, mode, handoff = 'now') {
+        const ticket = ++request;
+        Object.assign(state, { mode, track, loading: true, waiting: false });
+        player ??= new TownPlayer();
+        player.volume(volumeLevel());
+        announce(
+          state.heard && handoff === 'phrase'
+            ? `${titleOf(track)} is next.`
+            : `Warming up ${titleOf(track)}…`,
+        );
+        paint();
+        try {
+          if (!document.hidden) await player.resume();
+          await player.play(track, handoff);
+        } catch (error) {
+          if (ticket === request)
+            stopAll(`Could not play ${titleOf(track)}: ${error?.message ?? error}`);
+          return;
+        }
+        if (ticket !== request) return;
+        state.loading = false;
+        if (handoffLeft() > SETTLED) {
+          state.waiting = true;
+          announce(`${titleOf(track)} comes in at the end of the phrase.`);
+        } else arrive();
+        paint();
+      }
+      /** The asked-for record is now the one you hear. */
+      function arrive() {
+        state.waiting = false;
+        if (state.heard !== state.track) {
+          state.heard = state.track;
+          state.heardSince = performance.now();
+        }
+        announce(`Now playing ${titleOf(state.track)}.`);
+      }
+      /** Plays `track` in `mode`, unless it is already playing or on its way. */
+      function tuneTo(track, mode, handoff = 'now') {
+        if (track === state.track && (state.heard === track || state.loading || state.waiting)) {
+          if (state.mode !== mode) {
+            state.mode = mode;
+            paint();
+          }
+          return;
+        }
+        void listen(track, mode, handoff);
+      }
+      function stopAll(message = 'Music stopped.') {
+        ++request;
+        player?.stop();
+        Object.assign(state, {
+          mode: 'idle',
+          track: undefined,
+          heard: undefined,
+          loading: false,
+          waiting: false,
+        });
+        setSpeed(0);
+        announce(message);
+        paint();
+      }
+      let prepared;
+      /** Renders the next record ahead, once, so its turn starts on time. */
+      function prepare(track) {
+        if (track === prepared || track === state.track) return;
+        prepared = track;
+        player?.prepare?.(track);
+      }
+
+      const seen = { track: undefined, seconds: 0, at: 0 };
+      /** Where in its loop a record is: the player's position, or the wall clock without one. */
+      function whereIs(track) {
+        const now = performance.now();
+        const duration = durationOf(track);
+        // While a tune waits for its turn, the player reports it; the one heard is estimated.
+        const position = state.waiting ? undefined : player?.position;
+        if (position?.track === track) {
+          Object.assign(seen, { track, seconds: position.seconds, at: now });
+          return { seconds: position.seconds, duration: position.duration || duration };
+        }
+        const since =
+          seen.track === track ? seen.seconds * 1000 + now - seen.at : now - state.heardSince;
+        return { seconds: (since / 1000) % duration, duration };
+      }
+      /** Seconds of the heard record listened to so far, for the album; a hidden tab pauses it. */
+      const listened = { track: undefined, seconds: 0, last: 0, duration: 1 };
+      function countListening() {
+        const track = state.heard;
+        if (!track) {
+          listened.track = undefined;
+          return;
+        }
+        const { seconds, duration } = whereIs(track);
+        if (listened.track !== track) {
+          Object.assign(listened, { track, seconds: 0, last: seconds, duration });
+          return;
+        }
+        const step = (seconds - listened.last + duration) % duration;
+        // A longer step is a jump (a suspended tab, a restart), not listening.
+        if (step < 5) listened.seconds += step;
+        Object.assign(listened, { last: seconds, duration });
+      }
+
+      // ---------- Modes ----------
+
+      function toggleRecord(track) {
+        if (state.track === track || state.heard === track) return stopAll();
+        document.querySelector('.spotlight')?.classList.remove('spotlight');
+        setSpeed(0);
+        tuneTo(track, 'library');
+        try {
+          history.replaceState(null, '', `?track=${encodeURIComponent(track)}`);
+        } catch {
+          // A sandboxed page may refuse; the link is only a convenience.
+        }
+      }
+      function toggleRadio() {
+        if (state.mode === 'radio') return stopAll('Tuned out.');
+        setSpeed(0);
+        const real = realTown();
+        state.follow = true;
+        state.playhead = real.minutes;
+        tuneTo(townTrack(real.day, real.minutes), 'radio');
+      }
+      /** Plays a part of the day from the timeline, and moves the playhead there. */
+      function playAt(minutes, track) {
+        state.follow = false;
+        state.playhead = minutes;
+        tuneTo(track, state.speed ? 'fast' : 'day');
+      }
+      function setSpeed(speed) {
+        state.speed = speed;
+        for (const input of ui.speeds) input.checked = Number(input.value) === speed;
+        if (!speed && state.mode === 'fast') state.mode = 'day';
+      }
+      function chooseSpeed(speed) {
+        setSpeed(speed);
+        if (speed) {
+          state.follow = false;
+          tuneTo(townTrack(today, state.playhead), 'fast');
+        }
+        paint();
+      }
+      function playAlbum(index, handoff = 'now') {
+        album.index = (index + ALBUM.length) % ALBUM.length;
+        const entry = ALBUM[album.index];
+        // A tune already playing starts its album loop now.
+        listened.track = undefined;
+        setSpeed(0);
+        state.follow = false;
+        state.playhead = entry.from;
+        tuneTo(entry.track, 'album', handoff);
+      }
+
+      /** Each tick: radio follows the clock, fast-forward the playhead, the album its loops. */
+      function steer(real) {
+        if (state.mode === 'radio') {
+          tuneTo(townTrack(real.day, real.minutes), 'radio', 'phrase');
+          const next = nextOnAir(real);
+          if (next && next.in < 25) prepare(next.track);
+        } else if (state.mode === 'fast') {
+          tuneTo(townTrack(today, state.playhead), 'fast', 'phrase');
+          const next = nextChange(today, state.playhead, false);
+          if (next && next.in / state.speed < 25) prepare(next.track);
+        } else if (
+          state.mode === 'album' &&
+          !state.loading &&
+          !state.waiting &&
+          state.heard === ALBUM[album.index].track
+        ) {
+          // Ask for the next tune just before the loop ends: its last phrase end is the handoff.
+          const left = listened.duration - listened.seconds;
+          if (left < 30) prepare(ALBUM[(album.index + 1) % ALBUM.length].track);
+          if (left < 2.5) playAlbum(album.index + 1, 'phrase');
+        }
+      }
+
+      let onAirMemo = { key: '', next: undefined, due: 0 };
+      /** The real clock's next change, worked out once a town minute. */
+      function nextOnAir(real) {
+        const key = `${real.day}:${Math.floor(real.minutes)}`;
+        const now = real.day * DAY + real.minutes;
+        if (onAirMemo.key !== key) {
+          const next = nextChange(real.day, real.minutes, true);
+          onAirMemo = { key, next, due: next ? now + next.in : 0 };
+        }
+        return onAirMemo.next && { ...onAirMemo.next, in: onAirMemo.due - now };
+      }
+
+      // ---------- Building the page ----------
+
+      setText($('#count-tunes'), String(ALBUM.length));
+      setText($('#count-new'), String(Object.keys(TOWN_TUNES).length));
+      setText($('#count-shows'), String(GROUPS[2].tracks.length));
+
+      let hinting = false;
+      /** Describes what a hovered or focused part of the day is; with no text, the playhead. */
+      function hint(text) {
+        hinting = Boolean(text);
+        if (text) setText(ui.caption, text);
+        else paintCaption();
+      }
+      const hints = (text) => ({
+        onmouseenter: () => hint(text),
+        onfocus: () => hint(text),
+        onmouseleave: () => hint(),
+        onblur: () => hint(),
+      });
+
+      ui.laneTunes.append(
+        ...SLOTS.map((slot, index) =>
+          el(
+            'button',
+            {
+              type: 'button',
+              class: 'segment',
+              'data-slot': index,
+              tabindex: index === 0 ? '0' : '-1',
+              style: `left: ${percent(slot.from)}; width: calc(${percent(slot.to - slot.from)} - 2px); --cover: ${coverOf(slot.track)[0]}`,
+              'aria-label': `${span(slot)}: ${titleOf(slot.track)}`,
+              onclick: () => playAt(slot.from, slot.track),
+              ...hints(
+                `${span(slot)} · ${titleOf(slot.track)}: ${TRACKS[slot.track].subtitle}. Click to play it.`,
+              ),
+            },
+            el('span', { 'aria-hidden': 'true' }, coverOf(slot.track)[1]),
+          ),
+        ),
+      );
+      const segments = [...ui.laneTunes.children];
+      // The tunes lane is one stop in the tab order: the arrow keys move along the day.
+      ui.laneTunes.addEventListener('keydown', (event) => {
+        const index = segments.indexOf(document.activeElement);
+        const to = {
+          ArrowRight: index + 1,
+          ArrowLeft: index - 1,
+          Home: 0,
+          End: segments.length - 1,
+        }[event.key];
+        if (index < 0 || to === undefined) return;
+        event.preventDefault();
+        const target = segments[(to + segments.length) % segments.length];
+        for (const segment of segments) segment.tabIndex = segment === target ? 0 : -1;
+        target.focus();
+      });
+      ui.ticks.append(
+        ...[0, 3, 6, 9, 12, 15, 18, 21, 24].map((hour) =>
+          el(
+            'span',
+            { class: hour % 6 ? 'minor' : undefined, style: `left: ${percent(hour * 60)}` },
+            pad(hour),
+          ),
+        ),
+      );
+
+      /** The stage's lane, and the cards' "today" lines: once a town day. */
+      function paintDay(day) {
+        const events = eventsAt(day, 720);
+        const marks = marksOf(events);
+        for (const [lane, node] of [['stage', ui.laneStage]])
+          node.replaceChildren(
+            ...marks
+              .filter((mark) => mark.lane === lane)
+              .map((mark) =>
+                el(
+                  'button',
+                  {
+                    type: 'button',
+                    class: 'mark',
+                    style: `left: ${percent(mark.from)}; width: ${percent(mark.to - mark.from)}; --cover: ${coverOf(mark.track)[0]}`,
+                    'aria-label': `${mark.event.name}, ${eventSpan(mark.event)}: ${titleOf(mark.track)}`,
+                    // The party's part after midnight repeats the one before it for the mouse only.
+                    'aria-hidden': mark.continued && 'true',
+                    tabindex: mark.continued && '-1',
+                    onclick: () => playAt(mark.from, mark.track),
+                    ...hints(
+                      `${mark.event.name}, ${eventSpan(mark.event)} · ${titleOf(mark.track)}. Click to play it.`,
+                    ),
+                  },
+                  el('span', { 'aria-hidden': 'true' }, coverOf(mark.track)[1]),
+                ),
+              ),
+          );
+        for (const [track, card] of cards) {
+          const when = whenOf(track, events);
+          setText(card.when, when.text);
+          card.badge.hidden = !when.badge;
+          setText(card.badge, when.badge || '');
+        }
+      }
+
+      ui.albumList.append(
+        ...ALBUM.map((entry, index) =>
+          el(
+            'li',
+            {},
+            el(
+              'button',
+              {
+                type: 'button',
+                style: `--cover: ${coverOf(entry.track)[0]}`,
+                'aria-label': `${index + 1}. ${hhmm(entry.from)}, ${titleOf(entry.track)}, ${mss(durationOf(entry.track))}`,
+                onclick: () => playAlbum(index),
+              },
+              el('span', { class: 'dot', 'aria-hidden': 'true' }),
+              el('span', { class: 'at' }, hhmm(entry.from)),
+              el('span', {}, titleOf(entry.track)),
+              el('span', { class: 'len' }, mss(durationOf(entry.track))),
+            ),
+          ),
+        ),
+      );
+      const albumButtons = [...ui.albumList.querySelectorAll('button')];
+
+      const cards = new Map();
+      const fact = (term, value) => el('div', {}, el('dt', {}, term), el('dd', {}, value));
+      function makeCard(track) {
+        const info = TRACKS[track];
+        const instruments = info.instruments;
+        const card = {
+          when: el('span'),
+          badge: el('span', { class: 'badge today', hidden: true }),
+          onAir: el('span', { class: 'badge live', hidden: true }, 'On air'),
+          label: el('span', {}, 'Play'),
+          fill: el('span'),
+          time: el('span', { class: 'time' }),
+        };
+        card.button = el(
+          'button',
+          { type: 'button', class: 'play', onclick: () => toggleRecord(track) },
+          el('span', { class: 'icon', 'aria-hidden': 'true' }),
+          card.label,
+          el('span', { class: 'visually-hidden' }, ` ${info.title}`),
+        );
+        card.meter = el(
+          'div',
+          { class: 'meter', hidden: true },
+          el('div', { class: 'bar', 'aria-hidden': 'true' }, card.fill),
+          card.time,
+        );
+        card.article = el(
+          'article',
+          {
+            class: 'card',
+            id: `record-${track}`,
+            style: `--cover: ${coverOf(track)[0]}`,
+            'aria-labelledby': `title-${track}`,
+          },
+          el(
+            'div',
+            { class: 'sleeve-art' },
+            el(
+              'div',
+              { class: 'cover', 'aria-hidden': 'true' },
+              el('span', { class: 'glyph' }, coverOf(track)[1]),
+            ),
+            el(
+              'div',
+              { class: 'badges' },
+              isNew(track) && el('span', { class: 'badge' }, 'New'),
+              card.badge,
+              card.onAir,
+            ),
+          ),
+          el(
+            'p',
+            { class: 'eyebrow card-when' },
+            el('span', { class: 'eq', 'aria-hidden': 'true' }, el('i'), el('i'), el('i')),
+            card.when,
+          ),
+          el('h4', { id: `title-${track}` }, info.title),
+          el('p', { class: 'subtitle' }, info.subtitle),
+          instruments &&
+            el(
+              'p',
+              { class: 'instruments' },
+              el('span', { class: 'visually-hidden' }, 'Played on: '),
+              instruments,
+            ),
+          el(
+            'dl',
+            { class: 'facts' },
+            fact('Tempo', `${info.bpm} bpm`),
+            fact('Meter', `${info.bar ?? 4}/4`),
+            fact('Length', mss(durationOf(track))),
+          ),
+          el('div', { class: 'foot' }, card.button, card.meter),
+        );
+        cards.set(track, card);
+        return card.article;
+      }
+      ui.groups.append(
+        ...GROUPS.map((group, index) =>
+          el(
+            'section',
+            { class: 'library-group', 'aria-labelledby': `group-${index}` },
+            el(
+              'header',
+              {},
+              el('h3', { id: `group-${index}` }, group.title),
+              el('p', { class: 'muted' }, group.blurb),
+            ),
+            el('div', { class: 'cards' }, group.tracks.map(makeCard)),
+          ),
+        ),
+      );
+
+      // ---------- Painting ----------
+
+      function modeLabel() {
+        switch (state.mode) {
+          case 'radio':
+            return 'Tuned in · following the town clock';
+          case 'day':
+            return `Pretending it's ${hhmm(state.playhead)}`;
+          case 'fast':
+            return `Fast-forward ${state.speed}× · ${hhmm(state.playhead)}`;
+          case 'album':
+            return `The day in order · ${album.index + 1} of ${ALBUM.length}`;
+          case 'library':
+            return 'From the library';
+          default:
+            return 'Nothing playing';
+        }
+      }
+      function paintCaption() {
+        if (hinting) return;
+        const track = townTrack(today, state.playhead);
+        const why = reasonAt(today, state.playhead, track);
+        setText(
+          ui.caption,
+          `At ${hhmm(state.playhead)} the town plays ${titleOf(track)}${why ? `: ${why}` : ''}.`,
+        );
+      }
+      function paintOnAir(real) {
+        const track = townTrack(real.day, real.minutes);
+        setText(ui.clock, hhmm(real.minutes));
+        ui.onAir.style.setProperty('--cover', coverOf(track)[0]);
+        setText(ui.onAirGlyph, coverOf(track)[1]);
+        setText(ui.onAirTrack, titleOf(track));
+        setText(ui.onAirSubtitle, TRACKS[track]?.subtitle ?? '');
+        setText(ui.onAirWhy, capitalised(reasonAt(real.day, real.minutes, track)));
+        const next = nextOnAir(real);
+        setText(ui.onAirNext, next ? `Next at ${hhmm(next.at)}: ${titleOf(next.track)}` : '');
+        setText(ui.onAirCountdown, next ? `in ${mss(next.in)}` : '');
+        ui.tuneIn.setAttribute('aria-pressed', String(state.mode === 'radio'));
+        ui.onAirHandoff.hidden = !(state.mode === 'radio' && state.waiting);
+        for (const [id, card] of cards) card.onAir.hidden = id !== track;
+      }
+      function paintTimeline(real) {
+        const at = state.playhead;
+        ui.playhead.style.left = percent(at);
+        setText(ui.playheadTime, hhmm(at));
+        // Keep the time label inside the bar at either end of the day.
+        ui.playheadTime.style.translate = at < 50 ? '-4px' : at > DAY - 50 ? '-100%' : '-50%';
+        ui.nowMark.style.left = percent(real.minutes);
+        ui.nowMark.hidden = Math.abs(real.minutes - at) < 6;
+        const slot = slotAt(at);
+        for (const segment of segments) {
+          const own = SLOTS[Number(segment.dataset.slot)];
+          if (own === slot) segment.setAttribute('aria-current', 'true');
+          else segment.removeAttribute('aria-current');
+          segment.classList.toggle('heard', own.track === state.heard);
+        }
+        const minute = Math.floor(at);
+        if (Number(ui.pretend.value) !== minute) ui.pretend.value = String(minute);
+        setText(ui.pretendTime, hhmm(at));
+        const valueText = `${hhmm(at)}, ${titleOf(townTrack(today, at))}`;
+        if (ui.pretend.getAttribute('aria-valuetext') !== valueText)
+          ui.pretend.setAttribute('aria-valuetext', valueText);
+        setText(
+          ui.speedNote,
+          state.mode === 'fast' && state.waiting
+            ? `Switching to ${titleOf(state.track)} at the end of the phrase…`
+            : state.mode === 'fast'
+              ? `Playing what the town plays at ${hhmm(at)}.`
+              : "1× is the town's own pace: a town minute every second.",
+        );
+        paintCaption();
+      }
+      function paintCards() {
+        const left = Math.ceil(handoffLeft());
+        for (const [track, card] of cards) {
+          const heard = state.heard === track;
+          const next = !heard && state.track === track;
+          card.article.classList.toggle('playing', heard);
+          card.article.classList.toggle('next', next);
+          card.button.toggleAttribute('data-on', heard || next);
+          setText(card.label, heard || next ? 'Stop' : 'Play');
+          card.meter.hidden = !(heard || next);
+          if (heard) {
+            const { seconds, duration } = whereIs(track);
+            card.fill.style.width = `${(seconds / duration) * 100}%`;
+            setText(card.time, `${mss(seconds)} / ${mss(duration)}`);
+          } else if (next) {
+            card.fill.style.width = '0%';
+            setText(
+              card.time,
+              state.loading ? 'warming up…' : `comes in at the phrase end · ${left} s`,
+            );
+          }
+        }
+      }
+      function paintAlbum() {
+        const playing = state.mode === 'album';
+        ui.albumPlay.setAttribute('aria-pressed', String(playing));
+        setText(
+          ui.albumCount,
+          playing
+            ? `${album.index + 1} of ${ALBUM.length} · ${titleOf(ALBUM[album.index].track)}`
+            : `${ALBUM.length} tunes · ${mss(ALBUM_LENGTH)}`,
+        );
+        albumButtons.forEach((button, index) => {
+          if (playing && index === album.index) button.setAttribute('aria-current', 'true');
+          else button.removeAttribute('aria-current');
+        });
+      }
+      function paintDeck() {
+        const shown = state.heard ?? state.track;
+        setCover(ui.deckCover, shown);
+        setText(
+          ui.deckTitle,
+          !shown
+            ? 'Pick a record, tune in, or play the day'
+            : state.heard && state.track && state.track !== state.heard
+              ? `${titleOf(state.heard)} → ${titleOf(state.track)}`
+              : state.loading
+                ? `Warming up ${titleOf(shown)}…`
+                : titleOf(shown),
+        );
+        setText(
+          ui.deckMode,
+          state.waiting ? `${modeLabel()} · switching at the end of the phrase…` : modeLabel(),
+        );
+        ui.deckMeter.hidden = !state.heard;
+        if (state.heard) {
+          const { seconds, duration } = whereIs(state.heard);
+          ui.deckFill.style.width = `${(seconds / duration) * 100}%`;
+          setText(ui.deckTime, `${mss(seconds)} / ${mss(duration)}`);
+        }
+      }
+      function paint(real = realTown()) {
+        paintOnAir(real);
+        paintTimeline(real);
+        paintCards();
+        paintAlbum();
+        paintDeck();
+      }
+
+      let lastTick = performance.now();
+      function tick() {
+        const now = performance.now();
+        const seconds = Math.min(1, (now - lastTick) / 1000);
+        lastTick = now;
+        const real = realTown();
+        if (real.day !== today) {
+          today = real.day;
+          paintDay(today);
+        }
+        if (state.mode === 'fast') {
+          if (!document.hidden) state.playhead = wrap(state.playhead + seconds * state.speed);
+        } else if (state.follow) state.playhead = real.minutes;
+        if (state.waiting && handoffLeft() <= SETTLED) arrive();
+        countListening();
+        steer(real);
+        paint(real);
+      }
+
+      // ---------- Controls ----------
+
+      ui.tuneIn.addEventListener('click', toggleRadio);
+      let scrubbing;
+      ui.pretend.addEventListener('input', () => {
+        state.follow = false;
+        state.playhead = Number(ui.pretend.value);
+        if (state.mode === 'radio') state.mode = 'day';
+        paint();
+        // Fast-forward simply carries on from here; otherwise play this minute once it settles.
+        if (state.mode === 'fast') return;
+        clearTimeout(scrubbing);
+        scrubbing = setTimeout(() => tuneTo(townTrack(today, state.playhead), 'day'), 250);
+      });
+      ui.backToNow.addEventListener('click', () => {
+        const real = realTown();
+        state.follow = state.mode !== 'fast';
+        state.playhead = real.minutes;
+        if (state.mode === 'day') tuneTo(townTrack(real.day, real.minutes), 'day');
+        paint(real);
+      });
+      for (const input of ui.speeds)
+        input.addEventListener('change', () => chooseSpeed(Number(input.value)));
+      ui.albumPlay.addEventListener('click', () =>
+        state.mode === 'album' ? stopAll('The album stopped.') : playAlbum(0),
+      );
+      ui.albumPrevious.addEventListener('click', () => playAlbum(album.index - 1));
+      ui.albumNext.addEventListener('click', () => playAlbum(album.index + 1));
+      ui.stopAll.addEventListener('click', () => stopAll());
+
+      const VOLUME_KEY = 'forktown-listening-room-volume';
+      try {
+        const saved = localStorage.getItem(VOLUME_KEY);
+        if (saved !== null) ui.volume.value = saved;
+      } catch {
+        // Storage can be blocked; the default volume is fine.
+      }
+      ui.volume.setAttribute('aria-valuetext', `${ui.volume.value}%`);
+      ui.volume.addEventListener('input', () => {
+        player?.volume(volumeLevel());
+        ui.volume.setAttribute('aria-valuetext', `${ui.volume.value}%`);
+        try {
+          localStorage.setItem(VOLUME_KEY, ui.volume.value);
+        } catch {
+          // Not remembered this time.
+        }
+      });
+
+      // Silent while the tab is hidden; gone with the page.
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) void player?.suspend();
-        else void player?.resume();
+        else if (state.heard || state.loading) void player?.resume();
       });
       window.addEventListener('pagehide', () => {
-        ++revision;
+        ++request;
         player?.dispose();
+        player = undefined;
+        Object.assign(state, {
+          mode: 'idle',
+          track: undefined,
+          heard: undefined,
+          loading: false,
+          waiting: false,
+        });
+        setSpeed(0);
       });
-      document.querySelector('#check').onclick = async (event) => {
-        event.target.disabled = true;
-        const report = document.querySelector('#checks');
-        report.textContent = 'Rendering and measuring all six mixes…\n';
-        try {
-          for (const id of Object.keys(TRACKS)) {
-            const buffer = await renderTrack(id);
-            let peak = 0,
-              sum = 0,
-              seam = 0;
-            for (let c = 0; c < 2; c++) {
-              const data = buffer.getChannelData(c);
-              seam = Math.max(seam, Math.abs(data[0] - data[data.length - 1]));
-              for (const value of data) {
-                peak = Math.max(peak, Math.abs(value));
-                sum += value * value;
-              }
-            }
-            const rms = Math.sqrt(sum / (buffer.length * 2));
-            const ok =
-              Number.isFinite(peak + rms + seam) && peak < 0.98 && rms > 0.005 && seam < 0.08;
-            report.textContent += `${ok ? 'PASS' : 'CHECK'} ${id}: peak ${peak.toFixed(3)}, RMS ${rms.toFixed(3)}, loop seam ${seam.toFixed(4)}\n`;
-          }
-        } catch (error) {
-          report.textContent += `ERROR: ${error.message}`;
+      window.addEventListener('pageshow', (event) => {
+        if (event.persisted) {
+          announce('Choose a record to listen.');
+          paint();
         }
-        event.target.disabled = false;
-      };
+      });
+
+      // ---------- Check all mixes ----------
+
+      function measure(buffer) {
+        let peak = 0;
+        let sum = 0;
+        let seam = 0;
+        for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
+          const data = buffer.getChannelData(channel);
+          seam = Math.max(seam, Math.abs(data[0] - data[data.length - 1]));
+          for (let index = 0; index < data.length; index++) {
+            const value = data[index];
+            peak = Math.max(peak, Math.abs(value));
+            sum += value * value;
+          }
+        }
+        return { peak, rms: Math.sqrt(sum / (buffer.length * buffer.numberOfChannels)), seam };
+      }
+      async function checkMixes() {
+        ui.check.disabled = true;
+        ui.checksWrap.hidden = false;
+        const rows = LIBRARY.map((track) => {
+          const cells = Array.from({ length: 5 }, () => el('td', {}, '·'));
+          const row = el(
+            'tr',
+            {},
+            el(
+              'th',
+              { scope: 'row' },
+              titleOf(track),
+              isNew(track) && el('span', { class: 'badge' }, 'New'),
+              el('span', { class: 'id' }, track),
+            ),
+            cells,
+          );
+          return { track, row, cells };
+        });
+        ui.checks.replaceChildren(...rows.map(({ row }) => row));
+        let flagged = 0;
+        for (const [index, { track, cells }] of rows.entries()) {
+          setText(ui.checkNote, `Rendering ${index + 1} of ${rows.length}: ${titleOf(track)}…`);
+          const [peakCell, rmsCell, seamCell, msCell, verdictCell] = cells;
+          const started = performance.now();
+          try {
+            const buffer = await renderTrack(track);
+            const ms = performance.now() - started;
+            const { peak, rms, seam } = measure(buffer);
+            const problems = [];
+            if (!Number.isFinite(peak + rms + seam)) problems.push('not finite');
+            const hot = peak >= 10 ** (-1 / 20);
+            const quiet = rms < 10 ** (-40 / 20);
+            const seamy = seam >= 0.03;
+            if (hot) problems.push('peak');
+            if (quiet) problems.push('too quiet');
+            if (seamy) problems.push('loop seam');
+            setText(peakCell, decibels(peak));
+            peakCell.classList.toggle('flag', hot);
+            // A tune with a target level shows it under the measured one.
+            const aim = TRACKS[track].loudness;
+            rmsCell.replaceChildren(decibels(rms));
+            if (aim) rmsCell.append(el('small', {}, `aim ${decibels(aim)}`));
+            rmsCell.classList.toggle('flag', quiet);
+            setText(seamCell, seam.toFixed(4));
+            seamCell.classList.toggle('flag', seamy);
+            setText(msCell, Math.round(ms).toLocaleString('en'));
+            setText(verdictCell, problems.length ? `Check: ${problems.join(', ')}` : 'OK');
+            verdictCell.className = problems.length ? 'flag' : 'ok';
+            if (problems.length) flagged++;
+          } catch (error) {
+            setText(verdictCell, `Error: ${error?.message ?? error}`);
+            verdictCell.className = 'flag';
+            flagged++;
+          }
+        }
+        setText(
+          ui.checkNote,
+          flagged
+            ? `Done: ${flagged} of ${rows.length} mixes to look at.`
+            : `Done: all ${rows.length} mixes pass.`,
+        );
+        ui.check.disabled = false;
+      }
+      ui.check.addEventListener('click', () => void checkMixes());
+
+      // ---------- Start ----------
+
+      tick();
+      setInterval(tick, 200);
+      // /music?track=sunrise points at one record: show it, ready to play.
+      const wanted = new URLSearchParams(location.search).get('track');
+      if (wanted && cards.has(wanted)) {
+        const card = cards.get(wanted);
+        card.article.classList.add('spotlight');
+        card.article.scrollIntoView({ block: 'center' });
+        card.button.focus({ preventScroll: true });
+        announce(`Press Play to hear ${titleOf(wanted)}.`);
+      }
     </script>
   </body>
 </html>

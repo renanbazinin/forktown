@@ -1,0 +1,41 @@
+{
+  "id": "michals-place",
+  "name": "michals place",
+  "creator": "michalKenig",
+  "plot": "A8",
+  "building": "cottage",
+  "color": "#AD88AE",
+  "decoration": "mailbox",
+  "story": "Don't come without permission.",
+  "design": {
+    "wall": "#26dfa7",
+    "trim": "#f27907",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "round",
+    "garden": "vegetables",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Hershy",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#f2f8f2",
+    "accessory": "none",
+    "greeting": "Hello, what's up?",
+    "routine": {
+      "morning": "work",
+      "afternoon": "work",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "MICHAL'S PLACE",
+    "color": "#FFF4D4",
+    "background": "#489387",
+    "html": ""
+  }
+}

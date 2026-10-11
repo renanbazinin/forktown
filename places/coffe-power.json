@@ -1,0 +1,41 @@
+{
+  "id": "coffe-power",
+  "name": "coffe power",
+  "creator": "odelia50872",
+  "plot": "G7",
+  "building": "cafe",
+  "color": "#C97878",
+  "decoration": "flowers",
+  "story": "Bon a petit!!",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Odelia",
+    "figure": "female",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hi!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HI",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

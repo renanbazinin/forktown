@@ -139,8 +139,14 @@ export function residentGround(resident: Pick<ResidentState, 'position' | 'laneO
 
 // ---- Planning lanes for walkers who walk together ----------------------------------------
 
-/** A stretch of walking at a steady pace: along `route` from minute `start`, for `minutes`. */
-export type LanePiece = { route: readonly Point[]; start: number; minutes: number };
+/** A stretch of walking, with an optional actual motion sample for pauses and changes of pace. */
+export type LanePiece = {
+  route: readonly Point[];
+  start: number;
+  minutes: number;
+  /** Motion in lane 1 at this town minute, including any easing, turns and duck stops. */
+  sample?: (minute: number) => Pick<ResidentState, 'position' | 'moving' | 'facing' | 'laneOffset'>;
+};
 /** Minutes between the samples that find who walks with whom, and between a planned lane's steps. */
 export const LANE_SAMPLE = 0.25;
 /**
@@ -215,6 +221,10 @@ export type LaneWalk = {
   faces: Int8Array;
   piece: Int16Array;
   walked: Float64Array;
+  /** Unit-lane offsets for pieces with a custom motion clock. */
+  offsets?: Float64Array;
+  /** Visible pauses in sampled motion keep their lane until walking resumes. */
+  paused?: Uint8Array;
   box: { left: number; right: number; top: number; bottom: number };
   near: Near[];
   path?: LanePath;
@@ -247,11 +257,14 @@ export function laneWalk(
     faces: new Int8Array(n).fill(-1),
     piece: new Int16Array(n).fill(-1),
     walked: new Float64Array(n),
+    ...(pieces.some((piece) => piece.sample)
+      ? { offsets: new Float64Array(2 * n), paused: new Uint8Array(n) }
+      : {}),
     box: { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity },
     near: [],
     ...(path === undefined ? {} : { path }),
   };
-  pieces.forEach(({ route, start, minutes }, p) => {
+  pieces.forEach(({ route, start, minutes, sample }, p) => {
     const { ends, dirs, starts } = stretches(route);
     const length = ends[ends.length - 1];
     if (!(minutes > 0) || !length) return;
@@ -263,13 +276,27 @@ export function laneWalk(
       if (progress < 0 || progress >= 1) continue;
       const walked = progress * length;
       while (s < dirs.length - 1 && walked >= ends[s + 1]) s++;
-      const x = starts[s].x + dirs[s].x * (walked - ends[s]),
-        y = starts[s].y + dirs[s].y * (walked - ends[s]);
+      const motion = sample?.((k0 + i) * LANE_SAMPLE);
+      if (motion && !motion.moving) {
+        walk.paused![i] = 1;
+        continue;
+      }
+      const x = motion?.position.x ?? starts[s].x + dirs[s].x * (walked - ends[s]),
+        y = motion?.position.y ?? starts[s].y + dirs[s].y * (walked - ends[s]);
       walk.xs[i] = x;
       walk.ys[i] = y;
-      walk.faces[i] = facingIndex(dirs[s].x, dirs[s].y);
+      walk.faces[i] = motion
+        ? { se: 0, sw: 1, ne: 2, nw: 3 }[motion.facing]
+        : facingIndex(dirs[s].x, dirs[s].y);
       walk.piece[i] = p;
       walk.walked[i] = walked;
+      if (walk.offsets) {
+        const offset = motion
+          ? motion.laneOffset
+          : laneOffset(route, walked, routeLane(route, walked, 1));
+        walk.offsets[2 * i] = offset?.x ?? 0;
+        walk.offsets[2 * i + 1] = offset?.y ?? 0;
+      }
       walk.box.left = Math.min(walk.box.left, x);
       walk.box.right = Math.max(walk.box.right, x);
       walk.box.top = Math.min(walk.box.top, y);
@@ -281,6 +308,7 @@ export function laneWalk(
 
 /** A whole lane's offset for `walk` at sample `i`. */
 function unitOffset(walk: LaneWalk, i: number): Point {
+  if (walk.offsets) return { x: walk.offsets[2 * i], y: walk.offsets[2 * i + 1] };
   const { route } = walk.pieces[walk.piece[i]];
   const walked = walk.walked[i];
   return laneOffset(route, walked, routeLane(route, walked, 1)) ?? { x: 0, y: 0 };
@@ -316,7 +344,8 @@ function overlapWeight(x: number, y: number) {
     down = Math.abs((x + y) * 19);
   if (down >= 22 || across >= 10) return 0;
   if (across < 6 && down < 12) return across < 3 && down < 6 ? 16 : 8;
-  return across < 7 ? 3 : 0.5;
+  // Within a stacked pair, prefer making room over lingering directly below the other head.
+  return across < 7 ? 3 + (3 * (7 - across)) / 7 : 0.5;
 }
 
 /**
@@ -350,14 +379,15 @@ function choosePath(walk: LaneWalk, { cost, from }: Tables): LanePath {
   let before = cost.slice(0, STATES),
     now = new Float64Array(STATES);
   for (let i = 1; i < n; i++) {
+    const canDrift = !walk.paused?.[i - 1] && !walk.paused?.[i];
     for (let s = 0; s < STATES; s++) {
       let best = before[s],
         came = s;
-      if (s > 0 && before[s - 1] + DRIFT_COST < best) {
+      if (canDrift && s > 0 && before[s - 1] + DRIFT_COST < best) {
         best = before[s - 1] + DRIFT_COST;
         came = s - 1;
       }
-      if (s < STATES - 1 && before[s + 1] + DRIFT_COST < best) {
+      if (canDrift && s < STATES - 1 && before[s + 1] + DRIFT_COST < best) {
         best = before[s + 1] + DRIFT_COST;
         came = s + 1;
       }
