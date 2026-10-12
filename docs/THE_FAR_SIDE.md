@@ -48,7 +48,6 @@ Everything here is a pure function of the town day and minute, the viewport size
 - `src/city/horizon.ts`: `goldenHour`, the ridges and their winter snow, the sister forks, `drawHorizon`, `drawFarFields` with the far trees' seasons, `drawCommitStone` and `drawGoldenHour`.
 - `src/city/sky.ts`: the warmer gradient and sun, and the horizon painted after the sun and moon with the town's snow cover.
 - `src/city/render.ts`: draws the far fields first in the ground cache, a commit stone on each road crossing, and the golden wash after the finished frame.
-- `tests/far-side.test.ts`: golden-hour timing and continuity, ridge bands and determinism, sister-fork placement and lighting, call budgets, stone colours and the wash.
 - `/tests/manual/sky.html` on the development server: buttons for 12:00, 19:25 golden hour, 20:01 nightfall and 06:15 dawn, a **Whole town** toggle, and a 1440 × 900 / 390 × 844 size switch. `?time=1165&size=390x844&view=whole` opens a scene directly.
 
 Run `npm run check` and `npm run format:check`.

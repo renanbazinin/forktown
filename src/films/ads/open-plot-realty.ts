@@ -69,7 +69,7 @@ const upstairs = (ctx: Ctx, top: number, floors: number, lit: number, left = -10
 
 /**
  * One painter for each building style a neighbor can choose. Keyed by the town's own style list,
- * so a new style will not type-check until it has a painter here (and the tests compare labels).
+ * so a new style will not type-check until it has a painter here.
  */
 export const STYLES: Record<BuildingType, { label: string; paint: Paint }> = {
   cottage: {
@@ -188,7 +188,7 @@ export const STYLES: Record<BuildingType, { label: string; paint: Paint }> = {
 };
 /**
  * The catalogue's order, as a plain list so the jingle's beats (STYLE_AT) never pull the painters
- * into the audio worker. The test checks it against STYLES and the schema's BUILDING_TYPES.
+ * into the audio worker. Keep it in step with STYLES and the schema's BUILDING_TYPES.
  */
 export const ORDER: readonly BuildingType[] = [
   'cottage',
@@ -200,7 +200,7 @@ export const ORDER: readonly BuildingType[] = [
 ];
 const COUNT_WORDS = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine'];
 
-/** The copy, shared with the tests. The tagline lives only on the sponsor slate. */
+/** The ad's copy. The tagline lives only on the sponsor slate. */
 export const COPY = {
   plots: `${PLOT_COUNT} plots.`,
   styles: `${COUNT_WORDS[ORDER.length] ?? ORDER.length} styles.`,

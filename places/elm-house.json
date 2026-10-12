@@ -1,0 +1,41 @@
+{
+  "id": "elm-house",
+  "name": "Elm House",
+  "creator": "NoaGaler",
+  "plot": "A5",
+  "building": "cafe",
+  "color": "#C97878",
+  "decoration": "flowers",
+  "story": "we love everyone!\ncome get a coffee, and be happy!",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#be8855",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "shutters",
+    "garden": "paving",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Calla",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

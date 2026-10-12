@@ -1,6 +1,6 @@
-// The map's opening view of a town, as City.tsx opens it, for the app, the tests and the manual
-// harnesses alike: the homes, the green and the stage framed by map-view's neighborhoodView, with
-// the Lantern Fork's crown kept below the header when a full town opens at the zoom floor.
+// The map's opening view of a town, as City.tsx opens it, for the app and the manual harnesses
+// alike: the homes, the green and the stage framed by map-view's neighborhoodView, with the
+// Lantern Fork's crown kept below the header when a full town opens at the zoom floor.
 import { VENUES } from './events';
 import { FORK_BOUNDS, FORK_PLOT } from './lanterns';
 import { fitView, neighborhoodView, type View } from './map-view';

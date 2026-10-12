@@ -187,8 +187,6 @@ const SCOPE = {
     { x: 1, y: -2 },
   ],
 } as const;
-/** The telescope's tallest point above its foot, world px: 24 at most. */
-export const TELESCOPE_HEIGHT = 24;
 const BRASS = {
   tube: ['#A08C5C', '#8E8059'] as Pair,
   light: ['#C9B47E', '#B5A67B'] as Pair,

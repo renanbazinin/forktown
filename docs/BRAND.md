@@ -6,7 +6,7 @@ One house. One neighbor. One lantern. The lantern is the town's unit of belongin
 
 ## The mark
 
-The mark is drawn on a 32 x 32 pixel grid from a single list, `MARK_PIXELS` in `src/lib/brand.ts`. The header (`BrandMark`), the favicon, the home-screen icon, and the `/live` watermark all read that list. `tests/brand.test.ts` pins `public/favicon.svg` to `markSvg({ tile: true })` byte for byte, and `public/apple-touch-icon.png` to `scripts/touch-icon.ts` pixel for pixel: the mark at 5x on a square day tile, 180 x 180, since iOS rounds the corners itself.
+The mark is drawn on a 32 x 32 pixel grid from a single list, `MARK_PIXELS` in `src/lib/brand.ts`. The header (`BrandMark`), the favicon, the home-screen icon, and the `/live` watermark all read that list. `public/favicon.svg` is `markSvg({ tile: true })` byte for byte, and `public/apple-touch-icon.png` is what `scripts/touch-icon.ts` writes, pixel for pixel: the mark at 5x on a square day tile, 180 x 180, since iOS rounds the corners itself. When the mark changes, update both.
 
 | Part                   | Rects `[x, y, w, h]`                                                                | Day       | Night     |
 | ---------------------- | ----------------------------------------------------------------------------------- | --------- | --------- |
@@ -35,11 +35,11 @@ Lowercase **forktown** in Fraunces 500 at 27px (23px below 600px), tracked -1px,
 
 The word appears in the world exactly once, on the timber-and-green plaque at the foot of the Lantern Fork.
 
-One tagline, everywhere: **A little town, built one pull request at a time.** The page title is `Forktown — a little town, built one pull request at a time`. Both live in `src/lib/brand.ts` as `TAGLINE` and `TITLE`, and the test checks `index.html`, `live/index.html`, and the README against them.
+One tagline, everywhere: **A little town, built one pull request at a time.** The page title is `Forktown — a little town, built one pull request at a time`. Both live in `src/lib/brand.ts` as `TAGLINE` and `TITLE`; keep `index.html`, `live/index.html`, and the README in step with them.
 
 ## Tokens
 
-The tokens live in `src/styles.css` under `@layer base :root`. `BRAND` in `src/lib/brand.ts` mirrors them, and the test fails if the two drift apart or if any stylesheet uses a `var(--x)` that is not declared.
+The tokens live in `src/styles.css` under `@layer base :root`. `BRAND` in `src/lib/brand.ts` mirrors them, so change the two together, and declare every `var(--x)` a stylesheet uses.
 
 | Token            | Value     | Role                                                   |
 | ---------------- | --------- | ------------------------------------------------------ |
@@ -63,7 +63,7 @@ The existing tokens (`--paper`, `--surface`, `--ink`, `--muted`, `--line`, `--gr
 
 ### Contrast
 
-WCAG ratios, computed from `BRAND` by `contrast()` and asserted in `tests/brand.test.ts`. `/tests/manual/brand.html` renders the same table live.
+WCAG ratios, computed from `BRAND` by `contrast()`. `/tests/manual/brand.html` renders the same table live.
 
 | Text on background                  | Ratio | Use                                                         |
 | ----------------------------------- | ----- | ----------------------------------------------------------- |

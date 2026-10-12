@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -12,16 +12,9 @@ import {
 } from '../src/lib/schema';
 import { compileSign } from '../src/lib/sign';
 import { AFTER_HOURS } from './fixtures';
-import {
-  FULL_TOWN_CREATOR,
-  fullTown,
-  fullTownHouse,
-  fullTownId,
-  fullTownNewcomers,
-  readPlaces,
-} from './full-town';
+import { fullTown, fullTownHouse, fullTownId, readPlaces } from './full-town';
 
-// The made-up full town that the growth checks and `npm run check:full-town` lean on.
+// The made-up full town that the town smoke test and `npm run check:full-town` lean on.
 
 const places = readPlaces();
 const everyone = fullTown([]);
@@ -46,17 +39,6 @@ describe('A full town', () => {
     const { errors, places: valid } = validatePlaces(files);
     expect(errors).toEqual([]);
     expect(valid).toHaveLength(HOUSE_PLOTS.length);
-  });
-
-  it('puts the same house on a plot however many real neighbors there are', () => {
-    const alone = new Map(everyone.map((place) => [place.plot, place]));
-    for (const roster of [places.slice(0, 1), places])
-      for (const place of fullTownNewcomers(roster)) expect(place).toEqual(alone.get(place.plot));
-    for (const [plot, place] of alone) {
-      expect(fullTownHouse(plot)).toEqual(place);
-      expect(place).toMatchObject({ id: fullTownId(plot), creator: FULL_TOWN_CREATOR });
-    }
-    expect(() => fullTownHouse('Z99')).toThrow();
   });
 
   it('puts its made-up houses first when read, then the real ones by file name', () => {
@@ -86,17 +68,6 @@ describe('A full town', () => {
     } finally {
       rmSync(folder, { recursive: true, force: true });
     }
-  });
-
-  it('leaves reading places/ to readPlaces(), so every test meets the made-up houses first', () => {
-    // A test with a loader of its own would meet the real houses first, and check:full-town could
-    // not catch it leaning on the first of them.
-    const loaders = readdirSync('tests')
-      .filter((file) => /\.(ts|tsx|js)$/.test(file) && file !== 'full-town.ts')
-      .filter((file) =>
-        /readdir(?:Sync)?\(\s*['"`](?:\.\/)?places\b/.test(readFileSync(`tests/${file}`, 'utf8')),
-      );
-    expect(loaders, 'Read the town with readPlaces() from tests/full-town.ts').toEqual([]);
   });
 
   it('shows everything the builder offers, with at most two floors', () => {

@@ -119,10 +119,7 @@ export const MARKET_STALL_GEOMETRY: readonly MarketStall[] = [0, 1, 2, 3, 4, 5].
 });
 /** The counters' front line: y 14.9 north, x 54.9 west. */
 export const COUNTER_FRONT = { north: G.top + Q.front, west: G.left + Q.front } as const;
-/**
- * How high each piece stands, px: the stalls' awnings and the pump, at most 28 and 24
- * (tests/district-render-market.test.ts).
- */
+/** How high each piece stands, px: the stalls' awnings and the pump, at most 28 and 24. */
 export const MARKET_HEIGHTS = { stall: H.rail + 1.5, pump: 23 } as const;
 
 /** A point of a row's stall, `h` px up. */

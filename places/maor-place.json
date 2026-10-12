@@ -1,0 +1,41 @@
+{
+  "id": "maor-place",
+  "name": "Juniper Nest",
+  "creator": "maorbs",
+  "plot": "G2",
+  "building": "cottage",
+  "color": "#D0AA65",
+  "decoration": "bench",
+  "story": "my land !!!!",
+  "design": {
+    "wall": "#ddb136",
+    "trim": "#2813c9",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "vegetables",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "Lila",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

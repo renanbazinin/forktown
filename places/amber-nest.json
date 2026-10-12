@@ -1,0 +1,41 @@
+{
+  "id": "amber-nest",
+  "name": "Amber Nest",
+  "creator": "RoniSabas",
+  "plot": "T1",
+  "building": "studio",
+  "color": "#759BAF",
+  "decoration": "flowers",
+  "story": "Windy valley",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "gable",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Olive",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

@@ -1,22 +1,22 @@
 // npm run check:full-town [-- [--keep] [vitest filters]]
 //
 // Runs the place validator and the whole test suite against a town with every house plot taken,
-// so growth can never turn `npm run check` red for the next neighbor who moves in. It copies the
-// repository's files (tracked, plus new files Git does not ignore) into a temporary folder, links
-// node_modules there (a junction on Windows, a symlink elsewhere), and adds a made-up house from
-// tests/full-town.ts on every free plot. A few of them are written the way contributors write
-// houses (scripts/newcomer-houses.ts): the builder's defaults, or every name, story and sign as
-// long as the schema allows. Tests read the town through readPlaces(), which hands out the
-// made-up houses first, so one that takes "the first house in places/" as its fixture will most
-// likely fail here rather than in a newcomer's pull request. The copy gets a Git history of its
-// own, as a pull request's checkout has: the real houses moved in a month ago, the made-up ones
-// yesterday, and one builder-default house is the newest arrival, today. places/ in the
-// repository is never touched. It prints a summary naming every failing test, and exits non-zero
-// if the validator or any test failed.
-// Written to run on Windows, macOS and Linux: checked on Windows, and the Full town workflow runs
-// it on Linux. The whole suite takes a minute or two.
+// so a change can be tried there before growth turns `npm run check` red for a newcomer. It
+// copies the repository's files (tracked, plus new files Git does not ignore) into a temporary
+// folder, links node_modules there (a junction on Windows, a symlink elsewhere), and adds a
+// made-up house from tests/full-town.ts on every free plot. A few of them are written the way
+// contributors write houses (scripts/newcomer-houses.ts): the builder's defaults, or every name,
+// story and sign as long as the schema allows. Tests read the town through readPlaces(), which
+// hands out the made-up houses first, so one that takes "the first house in places/" as its
+// fixture will most likely fail here, when you run it, rather than in a newcomer's pull request.
+// The copy gets a Git history of its own, as a pull request's checkout has: the real houses moved
+// in a month ago, the made-up ones yesterday, and one builder-default house is the newest
+// arrival, today. places/ in the repository is never touched. It prints a summary naming every
+// failing test, and exits non-zero if the validator or any test failed.
+// A local check, not run in CI: use it to try a change against a full town. Written to run on
+// Windows, macOS and Linux, and checked on Windows. It takes well under a minute.
 //
-// Anything after `--` goes to Vitest, e.g. `npm run check:full-town -- tests/render-smoke.test.ts`.
+// Anything after `--` goes to Vitest, e.g. `npm run check:full-town -- tests/town-smoke.test.ts`.
 // `--keep` leaves the temporary town in place and prints its path, for a closer look.
 import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import {

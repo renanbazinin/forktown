@@ -1,7 +1,7 @@
 // The Riverside's outings: one spec for each, the planner's single registry.
 // Every field but the feature functions is frozen data from the district calendar and places;
 // the poses and glances come from src/lib/outings/*.ts, one file per feature. The planner
-// (resident-trips.ts), the labels and the tests read the outings from here and nowhere else.
+// (resident-trips.ts) and the labels read the outings from here and nowhere else.
 // events.ts never imports this file: the events list is built from the frozen data alone.
 import type { Place } from './schema.ts';
 import type { ResidentTrip } from './resident-trips.ts';

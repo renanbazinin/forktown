@@ -53,13 +53,6 @@ export function glanceFacing(id: string, seat: number, k: number): Facing {
   return way > 0 ? 'sw' : 'ne';
 }
 
-/** Minutes from arriving to the start of look k (look 0 starts on arrival). */
-export function marketLookStart(id: string, k: number) {
-  let t = 0;
-  for (let i = 1; i <= k; i++) t += beatLength(id, i);
-  return t;
-}
-
 export type MarketBeat = {
   /** The look this moment belongs to, 0 on arrival. */
   look: number;

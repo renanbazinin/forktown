@@ -84,7 +84,7 @@ The green's panel adds one line while any snowman stands (finished and not yet m
 | Stargazing props (rugs, flasks, telescope, astronomer), at full detail and in view | 300 calls | 204 at most |
 | Four snowmen, with the builders' trail and heaps on a build day                    | 40 calls  | 38 at most  |
 
-- **Cached.** The rugs (once all eight are flat) and the telescope do not change while they are out, so in a browser each is painted once into a sprite at the canvas's own scale, by its look (night, snow, detail), and copied after that. A new zoom is painted into the sprite only once it has held for six frames, so a pinch draws directly. Without a document (the tests) everything is drawn directly, which is what the caps measure.
+- **Cached.** The rugs (once all eight are flat) and the telescope do not change while they are out, so in a browser each is painted once into a sprite at the canvas's own scale, by its look (night, snow, detail), and copied after that. A new zoom is painted into the sprite only once it has held for six frames, so a pinch draws directly. Without a document (in node) everything is drawn directly, which is what the caps measure.
 - **Off-screen**, every part is skipped by `scene.visible`, and both painters return nothing.
 - **No amber**, anywhere: rugs, brass, the astronomer, snow, scarves, the carrot and the meteors.
 - **No flashing.** Meteors, the telescope's fade, the astronomer's fade, the rugs' drifts and the snow trail change alpha by at most 0.08 a frame; the rugs unroll rather than fade.
@@ -98,5 +98,4 @@ The green's panel adds one line while any snowman stands (finished and not yet m
 - `src/city/sky-extras.ts`: the summer meteors (`drawSkyExtras`, the stargazing painter's `sky`).
 - `src/city/district/snowmen.ts`: the snowmen (`snowmanShape`), and on a build day the snow trail (floor) and the builders' heaps (`buildersAt`, `builderSnow`). The snowball in a builder's hands is the figure's own (`src/city/residents.ts`).
 - `src/components/district/StargazingNote.tsx`, `src/components/district/GreenNote.tsx`: the panel lines.
-- `tests/stargazing.test.ts`, `tests/snowmen.test.ts`, `tests/district-render-stars.test.ts`: poses held a minute, the astronomer's walk and fades, the meteors frame by frame on every summer star night, the snowmen's stages, sizes, thaw and scarves, the panel lines, the caps at every moment they are out, heights, depths, colours and the sprites.
 - `tests/manual/district-stars.ts`, `tests/manual/district-snowmen.ts`: the moments to check by eye in `tests/manual/district.html`.

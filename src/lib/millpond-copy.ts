@@ -14,9 +14,8 @@ import { DAYS_PER_YEAR, townCalendarAt } from './town-calendar.ts';
 
 // The Millpond's words. millpond.ts holds the facts; this file holds the voice. Everything reads
 // the same (minutes, day) the pond is drawn from, so the panel never describes a different pond.
-// Brand rules (tests/millpond-ui.test.ts holds them): headings end with a period, eyebrows are
-// uppercase, no exclamation marks, and the copy never promises a crowd or hints at what the
-// winter nights keep to themselves.
+// Brand rules: headings end with a period, eyebrows are uppercase, no exclamation marks, and the
+// copy never promises a crowd or hints at what the winter nights keep to themselves.
 
 export type MillpondCopyBlock = { eyebrow: string; heading: string; body: string; note?: string };
 export type MillpondCopy = { label: string; blocks: MillpondCopyBlock[]; footer: string };
@@ -307,7 +306,7 @@ function lifeBlock(status: MillpondStatus): MillpondCopyBlock | null {
   return { eyebrow: lead.eyebrow, heading: lead.heading, body: lead.body, note: note || undefined };
 }
 
-/** The panel's words for a given pond state (pure: the tests feed it every combination).
+/** The panel's words for a given pond state (pure, so any combination can be tried).
  * `skaters` are the names of the neighbours on the ice right now. */
 export function millpondCopyFor(
   status: MillpondStatus,

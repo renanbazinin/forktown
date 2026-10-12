@@ -443,11 +443,6 @@ function makeRoom(layer: Layer, need: number) {
   }
   return fits();
 }
-/** How many sprites a canvas holds, and the device pixels they take (for the tests). */
-export function harvestSpriteStats(ctx: Ctx) {
-  const layer = layers.get(ctx);
-  return { sprites: layer?.sprites.size ?? 0, pixels: layer?.pixels ?? 0 };
-}
 /**
  * Paints `paint` (drawing round its own origin) at world px (x, y): from the sprite `key` when
  * the layer holds and it fits the budget, else straight onto the canvas.
@@ -572,7 +567,6 @@ export const STUBBLE_FROM = AUTUMN + 21;
 export const isStubbleGroundDay = (groundDay: number) => groundDay >= STUBBLE_FROM;
 /** The fair's three days, Autumn 23–25: the loose straw lies from the first to the autumn's end. */
 const FAIR_DAYS = [AUTUMN + 22, AUTUMN + 23, AUTUMN + 24];
-export const isFairGroundDay = (groundDay: number) => FAIR_DAYS.includes(groundDay);
 const strawLies = (groundDay: number) => groundDay >= FAIR_DAYS[0] && groundDay < WINTER;
 /** The bed's four strips of soil, as the farm lays them (its tops from FARM_GROUND.top). */
 const BED_ROWS = [0.35, 2.1, 3.9, 5.9].map((top) => FARM_GROUND.top + top);
@@ -1374,22 +1368,3 @@ export const drawScarecrowExtras: (
   box(ctx, x - 4, y - 57, 1, 6, pick(P.wheat, night));
   box(ctx, x - 4, y - 59, 2, 2, pick(P.wheat, night));
 };
-
-/** Each prop's own paint round its ground point, for the tests' height checks. */
-export const HARVEST_PIECES: Record<string, (ctx: Ctx, night: boolean) => void> = {
-  bale: (ctx, night) => paintBale(ctx, night, 0),
-  seat: paintSeat,
-  cart: paintCart,
-  press: paintPress,
-  // A lamp where it stands on the table, round the table's middle line.
-  lamp: (ctx, night) => pixels(ctx, LAMP_ROWS, lampColors(night), 0, -(TABLE_TOP.rise + 1)),
-};
-
-/** Every [day, night] pair this file paints with, for the palette tests. */
-export const HARVEST_PAIRS: readonly Pair[] = [
-  ...Object.values(P).flatMap((value) =>
-    typeof value[0] === 'string' ? [value as Pair] : (value as readonly Pair[]),
-  ),
-  PUMPKIN.body,
-  PUMPKIN.stem,
-];

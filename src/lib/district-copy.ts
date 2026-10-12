@@ -1,6 +1,6 @@
 // The Riverside's words: every outing's name, description, labels and panel lines.
 // district-calendar.ts holds the facts; this file holds the voice. Frozen: the events list, the
-// labels, the panels and the tests all read these strings, so they change here or nowhere.
+// labels and the panels all read these strings, so they change here or nowhere.
 // The copy reports and never ranks, and never promises a crowd.
 import { bandOf, marketKind, type Band, type OutingId } from './district-calendar.ts';
 import { townCalendarAt } from './town-calendar.ts';

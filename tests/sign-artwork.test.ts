@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { layoutSign, signArtwork } from '../src/city/signs';
-import { compileSign } from '../src/lib/sign';
-import type { Place } from '../src/lib/schema';
+import { signArtwork } from '../src/city/signs';
+import { compileSign, SIGN_EXAMPLE } from '../src/lib/sign';
+import { placeSchema, type Place } from '../src/lib/schema';
+import { AFTER_HOURS } from './fixtures';
 
 const sign: Place['sign'] = {
   mode: 'text',
@@ -11,35 +12,58 @@ const sign: Place['sign'] = {
   html: '',
 };
 describe('Readable sign artwork', () => {
-  it('balances long labels without squeezing or losing their words', () => {
-    const art = signArtwork(sign)!;
-    expect(art.lines.map((line) => line.text)).toEqual(['MAKE', 'SOMETHING']);
-    expect(signArtwork({ ...sign, text: 'HELLO, WORLD!' })!.lines.map((line) => line.text)).toEqual(
-      ['HELLO,', 'WORLD!'],
-    );
-    expect(signArtwork({ ...sign, text: 'CAFÉ' })!.lines).toHaveLength(1);
-  });
-  it('fits all three maximum-size HTML lines inside the board with padding', () => {
-    const art = compileSign('<div style="font-size:28px"><p>ONE</p><p>TWO</p><p>THREE</p></div>');
-    const lines = layoutSign(art, (line) => line.text.length * line.size * 0.6);
-    expect(lines).toHaveLength(3);
-    expect(lines[0].y - (lines[0].size * lines[0].scale) / 2).toBeGreaterThanOrEqual(9.99);
-    expect(lines[2].y + (lines[2].size * lines[2].scale) / 2).toBeLessThanOrEqual(90.01);
-  });
-  it('fits a long unbroken word proportionally, keeping text style hierarchy', () => {
-    const art = compileSign(
-      '<div><strong style="font-size:28px">ABCDEFGHIJKLMNOPQRSTUVWX</strong><p style="font-size:12px">Small caption</p></div>',
-    );
-    const measure = (line: (typeof art.lines)[number]) => line.text.length * line.size * 0.6;
-    const lines = layoutSign(art, measure);
-    for (const line of lines) expect(measure(line) * line.scale).toBeLessThanOrEqual(220.000001);
-    expect(lines[0].scale).toBe(lines[1].scale);
-    expect(lines[0].size / lines[1].size).toBe(28 / 12);
-  });
   it('keeps disabled signs absent and unsupported HTML inert', () => {
     expect(signArtwork({ ...sign, mode: 'none' })).toBeNull();
     expect(
       signArtwork({ ...sign, mode: 'html', html: '<script>alert(1)</script>' })!.lines[0].text,
     ).toBe('Your sign');
+  });
+});
+
+describe('Exterior artwork is data, not a webpage', () => {
+  it('compiles text, inherited styles and character entities into drawing instructions', () => {
+    const art = compileSign(SIGN_EXAMPLE);
+    expect(art.background).toBe('#35554A');
+    expect(art.lines).toHaveLength(2);
+    expect(art.lines[0]).toMatchObject({
+      text: 'HELLO, NEIGHBOR',
+      size: 24,
+      bold: true,
+      color: '#FFF4D4',
+    });
+    expect(compileSign('<p>Tea &amp; cake</p>').lines[0].text).toBe('Tea & cake');
+  });
+  it.each([
+    '<script>alert(1)</script>',
+    '<img src="https://example.com/pixel">',
+    '<a href="javascript:alert(1)">Hello</a>',
+    '<svg onload="alert(1)"></svg>',
+    '<div onclick="alert(1)">Hi</div>',
+    '<iframe srcdoc="hello"></iframe>',
+    '<div style="background-image: url(https://example.com)">Hi</div>',
+    '<div style="color: var(--secret)">Hi</div>',
+    '<form>Hi</form>',
+    '<style>@import "https://example.com";</style>',
+    '<div style="position:fixed">Hi</div>',
+    '<span style="font-size:999px">Hi</span>',
+    '<div id="town">Hi</div>',
+  ])('rejects executable, external or unbounded markup: %s', (html) => {
+    expect(() => compileSign(html)).toThrow();
+    expect(
+      placeSchema.safeParse({ ...AFTER_HOURS, sign: { ...AFTER_HOURS.sign, mode: 'html', html } })
+        .success,
+    ).toBe(false);
+  });
+  it('bounds source size, nesting, line count and line length', () => {
+    for (const html of [
+      'x'.repeat(2001),
+      '<div>'.repeat(10) + 'Hi' + '</div>'.repeat(10),
+      '<p>Hi</p>'.repeat(4),
+      '<p>' + 'x'.repeat(25) + '</p>',
+    ])
+      expect(() => compileSign(html)).toThrow();
+  });
+  it('preserves escaped markup as harmless text', () => {
+    expect(compileSign('<p>&lt;script&gt;</p>').lines[0].text).toBe('<script>');
   });
 });

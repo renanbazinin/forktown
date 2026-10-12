@@ -84,7 +84,7 @@ export type TubeScene = {
   followed?: string | null;
 };
 export type TubePart = 'spur' | 'bubble' | 'post' | 'stack' | 'sign' | 'stand' | 'puff';
-/** A depth object, tagged for the tests: `ground` is its contact point (tiles) and `slope` the
+/** A depth object, tagged with its part: `ground` is its contact point (tiles) and `slope` the
  * screen slope of its footprint through it (±0.5 along a spur piece, 0.5 for the sign's plate). */
 export type TubeObject = {
   depth: number;
@@ -226,33 +226,6 @@ const FOLLOW: Pair = ['#FFF7D5', '#F0DBA575'];
 const TROUSERS = '#3C4744';
 /** Riders are dimmed by this much at night, like the rest of the town's colours. */
 const NIGHT_DIM = -40;
-
-/** Every colour the Treeline paints, by name, for the tests. */
-export const TUBE_PALETTE: Record<string, readonly [day: string, night: string]> = {
-  ...Object.fromEntries(
-    Object.entries({
-      GLASS,
-      METAL,
-      HOOD,
-      PAD,
-      PLATE,
-      LAMP,
-      PIER,
-      REFLECTION,
-      KRAFT,
-      UMBRELLA,
-    }).flatMap(([group, pairs]) =>
-      Object.entries(pairs).map(([name, pair]) => [`${group}.${name}`, pair]),
-    ),
-  ),
-  PUFF,
-  PUFF_GRASS,
-  RIPPLE,
-  SHADOW,
-  GLASS_SHADE,
-  FOLLOW,
-  TROUSERS: [TROUSERS, tint(TROUSERS, NIGHT_DIM)],
-};
 
 // ---------------------------------------------------------------------------------------------
 // Geometry: each station's spur and the trunk between them, cut into pieces
@@ -785,7 +758,7 @@ type Bent = {
   halo: Point[];
   light: Point[];
   rim: Point[];
-  /** The glass's two edges, each along the line, for the tests. */
+  /** The glass's two edges, each along the line. */
   edges: readonly [Point[], Point[]];
 };
 /** A bent run's outlines on screen: its glass, its halo, and its highlight and rim lines. */
@@ -878,7 +851,7 @@ function paintBentGlass(
   ctx.globalAlpha = alpha;
 }
 /** Close up (zoom ≥ DETAIL), the two edges of a piece's glass on screen where it is drawn as one
- *  outline, or undefined where it is drawn in vertical slices. For the tests. */
+ *  outline, or undefined where it is drawn in vertical slices. */
 export const tubeGlassEdges = (piece: TubePiece, zoom: number) =>
   zoom >= DETAIL && steep(piece) ? bentOf(piece.points).edges : undefined;
 
@@ -996,7 +969,7 @@ function paintRuns(
   ctx.restore();
 }
 /** Close up (zoom ≥ DETAIL), how a piece's glass is painted: its runs on screen, the nearest
- *  first, each in slices or (with its two edges) as one outline. For the tests. */
+ *  first, each in slices or (with its two edges) as one outline. */
 export const tubeGlassRuns = (piece: TubePiece) =>
   runsOf(piece).map((run) => ({
     points: screenOf(run.points),
@@ -1584,7 +1557,7 @@ function junctionOf(station: TubeStation): Junction {
   };
 }
 /** Close up, the glass a bank halt between two others adds from its dip's split to its T, as
- *  ground points. For the tests. */
+ *  ground points. */
 export const tubeStem = (id: string) => JUNCTIONS().get(id)?.stem;
 /** Px round anything that lights in the ground: the 8-px halo is 4 px off the centreline, a
  *  bubble's 5.5. */

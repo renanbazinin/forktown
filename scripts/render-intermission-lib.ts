@@ -1,6 +1,6 @@
 // Pure helpers for scripts/render-intermission.ts: argument parsing, the segment list, the reel
 // manifest, the WAV writer, the FFmpeg command and the list of places Chrome may live. No I/O, so
-// tests/render-intermission.test.ts covers all of it without Chrome or FFmpeg.
+// all of it runs without Chrome or FFmpeg.
 import { posix, win32 } from 'node:path';
 import type { ReelSegment } from '../src/lib/break-cards';
 

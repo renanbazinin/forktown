@@ -47,8 +47,8 @@ export const FALLEN_LEAVES: readonly Pair[] = [
 export const FIREFLY = { core: '#EEF6B2', halo: '#C4DE7C' };
 
 // The Millpond's own colours. None of them is a light and none repeats a signature swatch
-// above, so the season tests can tell the pond's water, ice and reeds apart from snow, blossom,
-// foliage and fallen leaves. The ice is winter's alone and joins the snow signature in the tests.
+// above, so the pond's water, ice and reeds stay distinct from snow, blossom, foliage and fallen
+// leaves. The ice is winter's alone.
 export const POND = {
   /** The middle of the pond; the shallows and open water use the town's own water colours. */
   deep: ['#8FBBBC', '#3E6371'] as Pair,
@@ -105,7 +105,7 @@ export const hexChannels = (hex: string) => {
 // Two-digit hex for every channel value: seasonal colours are mixed on every frame.
 const HEX2 = Array.from({ length: 256 }, (_, i) => i.toString(16).padStart(2, '0').toUpperCase());
 const byte = (value: number) => HEX2[Math.max(0, Math.min(255, Math.round(value)))];
-/** Upper-case hex for an RGB triple; hex fill styles keep the call-log budgets honest. */
+/** Upper-case hex for an RGB triple, so every mixed colour is a plain '#RRGGBB' fill style. */
 export const toHex = ([r, g, b]: readonly number[]) => '#' + byte(r) + byte(g) + byte(b);
 
 /** Mix two hex colours and return hex. */

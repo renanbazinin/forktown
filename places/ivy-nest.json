@@ -1,0 +1,41 @@
+{
+  "id": "ivy-nest",
+  "name": "Ivy Nest",
+  "creator": "TamarMizrachi",
+"plot": "A6",
+  "building": "greenhouse",
+  "color": "#AD88AE",
+  "decoration": "mailbox",
+  "story": "\"Neighbors looking for a quiet moment, a cup of tea, and green plants are always welcome.\"",
+  "design": {
+    "wall": "#d3c59c",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Leo",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

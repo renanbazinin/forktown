@@ -1,0 +1,41 @@
+{
+  "id": "my-home",
+  "name": "My Home",
+  "creator": "rivkakatz200",
+  "plot": "N7",
+  "building": "cottage",
+  "color": "#AD88AE",
+  "decoration": "bench",
+  "story": "It’s just me, and that’s a lot!",
+  "design": {
+    "wall": "#fed462",
+    "trim": "#765785",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Li",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#000000",
+    "outfit": "#78779c",
+    "accessory": "none",
+    "greeting": "Hi",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "WELCOME",
+    "color": "#FFF4D4",
+    "background": "#3d3880",
+    "html": "WELCOME"
+  }
+}

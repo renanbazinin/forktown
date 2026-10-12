@@ -1,6 +1,6 @@
 // Small helpers for isometric props. Each face is painted flat in its own sheared frame (`face`
-// for upright ones, `plane` for level ones), so most details are single fillRects; the budget
-// tests count every canvas call.
+// for upright ones, `plane` for level ones), so most details are single fillRects and the
+// canvas call count stays low.
 import { project, TILE_W, type Point } from '../lib/world';
 
 type Ctx = CanvasRenderingContext2D;
