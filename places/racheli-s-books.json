@@ -1,0 +1,41 @@
+{
+  "id": "racheli-s-books",
+  "name": "Racheli's Books",
+  "creator": "Racheli19",
+  "plot": "A7",
+  "building": "bookshop",
+  "color": "#759BAF",
+  "decoration": "mailbox",
+  "story": "Rachel loved writing stories, so she opened her own bookstore, filled with books, poems, and imagination!",
+  "design": {
+    "wall": "#c7dbf0",
+    "trim": "#576485",
+    "floors": 1,
+    "roof": "gable",
+    "windows": "cross",
+    "garden": "paving",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Rachel Salikov",
+    "figure": "female",
+    "skin": "#f3dbbf",
+    "hair": "#191714",
+    "outfit": "#dca5f3",
+    "accessory": "none",
+    "greeting": "Welcome to my store!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "Racheli's books",
+    "color": "#FFF4D4",
+    "background": "#353755",
+    "html": ""
+  }
+}
