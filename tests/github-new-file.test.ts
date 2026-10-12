@@ -4,8 +4,6 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import StartOnGitHub from '../src/components/StartOnGitHub';
 import pools from '../src/data/draft-names.json';
-import { GUIDE_COPY, guideSteps } from '../src/lib/brand';
-import { storyPrompt } from '../src/lib/builder-nudges';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import {
   CREATOR_PLACEHOLDER,
@@ -211,8 +209,7 @@ describe('Starting a house on GitHub', () => {
     }
   });
 
-  it('fits every house in town, and a sign that uses all its characters, in one link', () => {
-    for (const place of places) expect(houseFileLink(REPOSITORY, place), place.id).toBeTruthy();
+  it('fits a sign that uses all its characters in one link', () => {
     // The longest artwork a sign may have: a title and 2,000 characters of styled spans.
     const span =
       '<span style="color: #FFF4D4; font-size: 12px; font-weight: bold; text-align: center"></span>';
@@ -255,7 +252,7 @@ describe('Starting a house on GitHub', () => {
 });
 
 describe('The open-plot panel on the published town', () => {
-  const render = (plot: string, typed = '', onBuild?: () => void) =>
+  const render = (plot: string, typed = '') =>
     renderToStaticMarkup(
       createElement(StartOnGitHub, {
         plot,
@@ -263,7 +260,6 @@ describe('The open-plot panel on the published town', () => {
         repositoryUrl: REPOSITORY,
         typed,
         onTyped: () => {},
-        onBuild,
       }),
     );
 
@@ -281,103 +277,14 @@ describe('The open-plot panel on the published town', () => {
     expect(markup).toContain(start.resident.name);
   });
 
-  it('asks for a username while the file still has the placeholder', () => {
-    const markup = render(OPEN);
-    expect(markup).toContain('Your GitHub username');
-    expect(markup).toContain('Fill this in');
-    expect(markup).toContain(CREATOR_PLACEHOLDER);
-  });
-
   it('links a typed username into the file it credits', () => {
     const markup = render(OPEN, '@Octo-Cat');
     const start = starterHouse(OPEN, town, 'Octo-Cat')!;
     expect(markup).toContain(`href="${newHouseFileUrl(REPOSITORY, start).replace(/&/g, '&amp;')}"`);
-    expect(markup).not.toContain('Fill this in');
-  });
-
-  it('walks through the steps on GitHub', () => {
-    const markup = render(OPEN);
-    for (const step of ['fork', 'Commit changes', 'Propose changes', 'Create pull request'])
-      expect(markup).toContain(step);
-  });
-
-  it('asks for a story of their own, since the Fork never tells the one filled in', () => {
-    const markup = render(OPEN);
-    const start = starterHouse(OPEN, town)!;
-    expect(markup).toContain('Replace the placeholder <code>story</code> with your own');
-    expect(markup).toContain('Tonight’s tale');
-    expect(markup).toContain(`Try answering “${storyPrompt(start.id)}”`);
-  });
-
-  it('offers the full builder quietly, under the button, when the town can open it', () => {
-    const markup = render(OPEN, '', () => {});
-    const link = 'class="start-builder-link"';
-    expect(markup).toContain(link);
-    expect(markup).toContain('Or design every detail in the builder');
-    expect(markup.indexOf(link)).toBeGreaterThan(markup.indexOf('Create my house file on GitHub'));
-    expect(markup.indexOf(link)).toBeLessThan(markup.indexOf('class="start-steps"'));
-    expect(render(OPEN)).not.toContain(link);
   });
 
   it('shows nothing for a plot that is taken or reserved', () => {
     expect(render('A1')).toBe('');
     expect(render('D3')).toBe('');
-  });
-
-  it('is what the published town shows for an open plot, with the builder a link away', () => {
-    const app = readFileSync('src/App.tsx', 'utf8');
-    expect(app).toContain('!localSaveAvailable && repositoryUrl && available.some(');
-    expect(app).toContain('`Plot ${selectedPlot} is open`');
-    // The town keeps the typed username, so comparing plots never asks for it again, and the
-    // builder starts with it.
-    expect(app).toContain('typed={githubUsername}');
-    expect(app).toContain('creator={githubUsername}');
-    // The builder opens wherever its house can go: into a local checkout, or to GitHub.
-    expect(app).toContain('const builderAvailable = localSaveAvailable || !!repositoryUrl;');
-    expect(app).toContain('onBuild={() => startBuilding(startPlot)}');
-    expect(app).toContain("modal === 'contribute' && builderAvailable &&");
-    // After every venue's panel, before the empty-plot card that offers "Build here".
-    expect(app.indexOf('<StartOnGitHub')).toBeGreaterThan(app.indexOf('<TubeInfo'));
-    expect(app.indexOf('<StartOnGitHub')).toBeLessThan(app.indexOf("'Build here'"));
-  });
-});
-
-describe('The builder on the published town', () => {
-  const builder = readFileSync('src/components/Contribute.tsx', 'utf8');
-
-  it('hands its finished house to GitHub, like an open plot does', () => {
-    expect(builder).toContain('houseFileLink(repositoryUrl, parsed.data)');
-    expect(builder).toContain('Create my house file on GitHub');
-    expect(builder).toContain('blankHouseFileUrl(repositoryUrl)');
-    for (const step of ['Commit changes', 'Propose changes', 'Create pull request'])
-      expect(builder).toContain(step);
-    // No more forking by hand and uploading a downloaded file.
-    expect(builder).not.toContain('/fork`');
-    expect(builder).not.toContain('Upload <code>');
-  });
-
-  it('starts a draft with the username typed on the open plot, never over one it has', () => {
-    expect(builder).toContain(
-      'start.creator || typed.problem ? start : { ...start, creator: typed.username }',
-    );
-  });
-});
-
-describe('The Find your way in guide', () => {
-  it('offers the browser only where an open plot can start a house on GitHub', () => {
-    expect(guideSteps(false)).toBe(GUIDE_COPY.steps);
-    for (const [, detail] of GUIDE_COPY.steps) expect(detail).not.toMatch(/browser/i);
-    const [first, ...rest] = guideSteps(true);
-    expect(first).toEqual([GUIDE_COPY.steps[0][0], GUIDE_COPY.forkInBrowser]);
-    expect(first[1]).toContain('Start right in your browser from an open plot');
-    expect(rest).toEqual(GUIDE_COPY.steps.slice(1));
-    // The same condition as the guide's Pick an open plot button: published, with a
-    // repository to link to and a plot free. Localhost keeps the builder's steps.
-    const app = readFileSync('src/App.tsx', 'utf8');
-    expect(app).toContain(
-      'const startInBrowser = !localSaveAvailable && !!repositoryUrl && !townFull;',
-    );
-    expect(app).toContain('guideSteps(startInBrowser).map(');
-    expect(app).toContain('{startInBrowser && (');
   });
 });

@@ -12,7 +12,7 @@ export const TUBE_LINE_NAME = 'The Treeline';
 
 // In order along the line, north to south by row: a new station goes in at its row, not at the end,
 // so the first and last are always the line's two ends (the parcels, the panel's words and the art
-// rely on it, and a test holds it). Hedgerow Halt carries the sign.
+// rely on it). Hedgerow Halt carries the sign.
 const STATIONS = [
   { plot: 'C1', name: 'Hedgerow Halt' },
   { plot: 'N1', name: 'Willow Halt' },

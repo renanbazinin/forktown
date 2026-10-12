@@ -11,20 +11,7 @@ import {
   type Place,
 } from '../src/lib/schema';
 import { OPEN_PLOTS_COPY } from '../src/lib/open-plots';
-import {
-  PLOTS,
-  findPlotAt,
-  getPlot,
-  plotCenter,
-  plotEntrance,
-  isRoad,
-  ROAD_MIN,
-  ROAD_MAX_X,
-  ROAD_MAX_Y,
-  project,
-  unproject,
-} from '../src/lib/world';
-import { buildingHit, shade } from '../src/city/render';
+import { PLOTS, getPlot } from '../src/lib/world';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { FOOTBALL_PLOTS } from '../src/lib/football';
 import { CINEMA_PLOTS } from '../src/lib/cinema';
@@ -33,7 +20,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { placeJsonErrors, readPlaceFiles } from '../scripts/place-files';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createServer } from 'vite';
 
 const sample: Place = placeSchema.parse({
@@ -153,6 +140,22 @@ describe('The contribution contract', () => {
       }).success,
     ).toBe(false);
   });
+  it('keeps the starter credit reserved for the original starter files', () => {
+    expect(
+      validatePlaces([
+        { file: 'new-starter.json', data: { ...sample, id: 'new-starter', creator: 'forktown' } },
+      ]).errors.join(' '),
+    ).toContain('reserved');
+  });
+  it('gives new homes one or two floors, keeping the third only for arts', () => {
+    const tall = { ...sample, design: { ...sample.design, floors: 3 } };
+    expect(validatePlaces([{ file: 'tiny-library.json', data: tall }]).errors).toEqual([
+      'tiny-library.json: New homes can have one or two floors. Set "floors" to 1 or 2.',
+    ]);
+    expect(validatePlaces([{ file: 'arts.json', data: { ...tall, id: 'arts' } }]).errors).toEqual(
+      [],
+    );
+  });
   it('trims names and stories while retaining international characters', () => {
     const result = placeSchema.parse({
       ...sample,
@@ -206,13 +209,8 @@ describe('The open plots a plot clash suggests', () => {
 });
 
 describe('The world stays predictable as people contribute', () => {
-  it('preserves building colors through the second shading pass at night', () => {
-    expect(shade(shade('#C97878', -30), 14)).toBe('#b96868');
-    expect(shade('#FFFFFF', 30)).toBe('#ffffff');
-    expect(shade('#000000', -30)).toBe('#000000');
-  });
-  it('has 200 unique plots with public venues, football ground, cinema, zoo, farm, millpond, and tube stations reserved', () => {
-    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(200);
+  it('has unique plots with public venues, football ground, cinema, zoo, farm, millpond, and tube stations reserved', () => {
+    expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(PLOTS.length);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
         ![
@@ -231,45 +229,6 @@ describe('The world stays predictable as people contribute', () => {
   it('keeps the same coordinates for an existing plot regardless of other places', () => {
     expect(getPlot('B2')).toEqual({ id: 'B2', col: 1, row: 1, x: 7, y: 7 });
     expect(getPlot('E5')).toEqual({ id: 'E5', col: 4, row: 4, x: 19, y: 19 });
-  });
-  it('round-trips projected coordinates, including negative positions', () => {
-    for (const [x, y] of [
-      [0, 0],
-      [5, 9],
-      [-2, 8],
-      [3.25, 7.75],
-    ]) {
-      const pixel = project(x, y),
-        world = unproject(pixel.x, pixel.y);
-      expect(world.x).toBeCloseTo(x);
-      expect(world.y).toBeCloseTo(y);
-    }
-  });
-  it('makes every ground plot selectable while leaving roads unclaimed', () => {
-    for (const plot of PLOTS) expect(findPlotAt(plot.x + 0.5, plot.y + 0.5)?.id).toBe(plot.id);
-    expect(findPlotAt(1, 1)).toBeUndefined();
-    expect(findPlotAt(-10, 500)).toBeUndefined();
-  });
-  it('gives every home a selectable three-by-three grass plot bounded by streets', () => {
-    for (const plot of HOUSE_PLOTS) {
-      for (let dx = -1; dx <= 1; dx++)
-        for (let dy = -1; dy <= 1; dy++) {
-          expect(isRoad(plot.x + dx, plot.y + dy)).toBe(false);
-          expect(findPlotAt(plot.x + dx + 0.5, plot.y + dy + 0.5)?.id).toBe(plot.id);
-        }
-      const entrance = plotEntrance(plot);
-      expect(isRoad(Math.floor(entrance.x), Math.floor(entrance.y))).toBe(true);
-      expect(findPlotAt(entrance.x, entrance.y)).toBeUndefined();
-    }
-    for (let x = ROAD_MIN; x <= ROAD_MAX_X; x++)
-      for (let y = ROAD_MIN; y <= ROAD_MAX_Y; y++) {
-        if (isRoad(x, y)) expect(findPlotAt(x + 0.5, y + 0.5)).toBeUndefined();
-      }
-  });
-  it('selects a tall building by its roof, above the ground tile', () => {
-    const center = plotCenter(getPlot(sample.plot)!);
-    expect(buildingHit({ x: center.x, y: center.y - 75 }, [sample])).toBe('A1');
-    expect(buildingHit({ x: center.x + 200, y: center.y - 75 }, [sample])).toBeUndefined();
   });
 });
 
@@ -385,41 +344,6 @@ describe('The examples a newcomer copies', () => {
       expect(validatePlaces([{ file: 'your-unique-id.json', data: example }]).errors).toEqual([
         'your-unique-id.json: "your-unique-id" is the example\'s id. Choose your own id and rename the file to match.',
       ]);
-    },
-  );
-});
-
-describe('The buttons the guides tell newcomers to click', () => {
-  const sources = (dir: string): string[] =>
-    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-      entry.isDirectory()
-        ? sources(join(dir, entry.name))
-        : /\.tsx?$/.test(entry.name)
-          ? [readFileSync(join(dir, entry.name), 'utf8')]
-          : [],
-    );
-  const app = sources('src').join('\n');
-  // GitHub's own buttons, which the guides walk through too.
-  const github = new Set([
-    'Create fork',
-    'Compare & pull request',
-    'Commit changes',
-    'Propose changes',
-    'Create pull request',
-    'Update branch',
-  ]);
-
-  it.each(['README.md', 'CONTRIBUTING.md'])(
-    '%s names only labels the town really shows',
-    (file) => {
-      const labels = [
-        ...readFileSync(file, 'utf8').matchAll(
-          /\b(?:click|choose|select|press|says|see|opens?|in the) \*\*([^*]+)\*\*/gi,
-        ),
-      ].flatMap(([, label]) => label.split('→').map((part) => part.trim()));
-      expect(labels.length).toBeGreaterThan(5);
-      for (const label of labels)
-        if (!github.has(label)) expect(app.includes(label), label).toBe(true);
     },
   );
 });

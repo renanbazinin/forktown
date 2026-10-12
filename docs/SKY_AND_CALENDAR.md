@@ -39,10 +39,6 @@ The lights, the town's events and the page's night style keep 20:00 and 06:00: l
 - `src/city/horizon.ts`: golden-hour timing, the screen-space hills and sister forks with their winter snow, and the world-space far fields and commit stones.
 - `src/components/CalendarClock.tsx` and `src/calendar.css`: the clock's date button and native dismissible almanac popover, with its season line.
 - `src/lib/seasons.ts` and `src/lib/season-copy.ts`: what each day of the year does to the scenery, and the almanac's line for it.
-- `tests/town-calendar.test.ts`: timezone agreement, direct access after gaps, season/year boundaries, lunar symmetry, sunrise/sunset, midnight continuity, and a night share that agrees with the lights outside the fades and never steps between two frames.
-- `tests/twilight.test.ts`: one plain paint outside the fades and in their unseen first and last seconds, the right look and plot-mark ink on each canvas through them, the weight each look is laid down at, and only the second canvas handed back once a fade ends. `tests/render-smoke.test.ts` checks that the plot marks take their ink from the lights, not the look.
-- `tests/far-side.test.ts`: golden-hour timing, ridge bands, sister-fork lighting, call budgets for the sky and far fields, and deterministic drawing.
-- `tests/seasons.test.ts` and `tests/season-copy.test.ts`: the seasons' schedules agree with the almanac in every timezone, and the season line never names something the town is not showing.
 - `/tests/manual/sky.html` on the development server: inspect day, night, golden hour, and moon phases using the real town renderer and its dusk and dawn fades, in the opening view or the whole town, at 1440 × 900 or 390 × 844. These controls exist only in the manual fixture and do not change the live clock. `/tests/manual/seasons.html` does the same for the seasons across the whole year, and `/tests/manual/millpond.html` shows the moon in the water at each phase.
 
 Run `npm run check`. The fixed epoch should not be changed in later releases: changing it would shift everyone's calendar and moon phase.

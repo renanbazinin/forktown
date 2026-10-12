@@ -47,7 +47,7 @@ export const insideFootball = (p: Point) =>
 export const spectatorSpot = (seat: number): Point => ({ x: 13.2 + seat * 0.65, y: 28.15 });
 /** The 140-second cycle: two 60-second halves, an 8-second break, and 12 seconds at full-time. */
 export const MATCH = { first: 60, halftime: 8, second: 60, fulltime: 12, length: 140 } as const;
-/** Goal mouth on the tile y axis, shared by the engine, the renderer and the tests. */
+/** Goal mouth on the tile y axis. football-engine.ts keeps the same posts as POST_A and POST_B. */
 export const GOAL_MOUTH = { top: 24.2, bottom: 25.8 } as const;
 /** Crossbar height in screen pixels at zoom 1; a ball above it cannot score. */
 export const CROSSBAR = 22;

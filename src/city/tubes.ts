@@ -62,7 +62,7 @@ export type TubeScene = {
   followed?: string | null;
 };
 export type TubePart = 'spur' | 'bubble' | 'post' | 'stack' | 'sign' | 'stand' | 'puff';
-/** A depth object, tagged for the tests: `ground` is its contact point (tiles) and `slope` the
+/** A depth object, tagged with its part: `ground` is its contact point (tiles) and `slope` the
  * screen slope of its footprint through it (±0.5 along a spur piece, 0.5 for the sign's plate). */
 export type TubeObject = {
   depth: number;
@@ -181,20 +181,6 @@ const FOLLOW: Pair = ['#FFF7D5', '#F0DBA575'];
 const TROUSERS = '#3C4744';
 /** Riders are dimmed by this much at night, like the rest of the town's colours. */
 const NIGHT_DIM = -40;
-
-/** Every colour the Treeline paints, by name, for the tests. */
-export const TUBE_PALETTE: Record<string, readonly [day: string, night: string]> = {
-  ...Object.fromEntries(
-    Object.entries({ GLASS, METAL, HOOD, PAD, PLATE, LAMP, KRAFT, UMBRELLA }).flatMap(
-      ([group, pairs]) => Object.entries(pairs).map(([name, pair]) => [`${group}.${name}`, pair]),
-    ),
-  ),
-  PUFF,
-  PUFF_GRASS,
-  SHADOW,
-  FOLLOW,
-  TROUSERS: [TROUSERS, tint(TROUSERS, NIGHT_DIM)],
-};
 
 // ---------------------------------------------------------------------------------------------
 // Geometry: each station's spur and the trunk between them, cut into pieces

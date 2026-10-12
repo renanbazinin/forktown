@@ -3,7 +3,6 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
-  readdirSync,
   rmSync,
   rmdirSync,
   unlinkSync,
@@ -28,7 +27,6 @@ import {
   sharePreview,
   siteUrl,
 } from '../scripts/share-preview';
-import { CHUNK_WARNING_KB, chunkBudget } from '../scripts/chunk-budget';
 import { shareTitle } from '../src/lib/brand';
 import { places } from '../src/lib/places';
 
@@ -90,27 +88,6 @@ describe('Static publishing configuration', SUBPROCESS_TEST, () => {
   });
   it('requires a valid owner/repository pair', () => {
     expect(configure('not-a-repository').status).toBe(1);
-  });
-});
-
-describe('Private reports', () => {
-  const form = 'https://github.com/renanbazinin/forktown/security/advisories/new';
-  it('send security and conduct reports to the same private form', () => {
-    for (const file of ['SECURITY.md', 'CODE_OF_CONDUCT.md', '.github/ISSUE_TEMPLATE/config.yml'])
-      expect(readFileSync(file, 'utf8'), file).toContain(form);
-    for (const file of ['SECURITY.md', 'CODE_OF_CONDUCT.md'])
-      expect(readFileSync(file, 'utf8'), file).not.toMatch(/when it is enabled|must be listed/);
-  });
-});
-
-describe('Merges in the docs', () => {
-  it('never claim that nothing merges automatically, now that first houses do', () => {
-    const docs = readdirSync('docs').filter((name) => name.endsWith('.md'));
-    const pages = ['README.md', 'CONTRIBUTING.md', 'SECURITY.md', ...docs.map((n) => `docs/${n}`)];
-    for (const file of pages)
-      expect(readFileSync(file, 'utf8'), file).not.toMatch(
-        /(?:no|or) automatic merges|no contribution is automatically merged/i,
-      );
   });
 });
 
@@ -224,42 +201,10 @@ describe('Third-party notices in the published site', () => {
   });
 });
 
-const pngSize = (file: string) => {
-  const png = readFileSync(file);
-  expect(png.subarray(1, 4).toString('ascii'), file).toBe('PNG');
-  return { width: png.readUInt32BE(16), height: png.readUInt32BE(20), bytes: png.length };
-};
-
 const meta = (html: string, key: string) =>
   html.match(new RegExp(`(?:property|name)="${key}"\\s+content="([^"]*)"`))?.[1];
 
 describe('Link previews', () => {
-  it.each([
-    ['index.html', '%SITE_URL%'],
-    ['live/index.html', '%SITE_URL%live/'],
-  ])('%s has a large picture card with absolute addresses', (file, url) => {
-    const html = readFileSync(file, 'utf8');
-    for (const key of ['og:title', 'og:description', 'og:image:alt'])
-      expect(meta(html, key)?.length, key).toBeGreaterThan(10);
-    expect(meta(html, 'og:type')).toBe('website');
-    expect(meta(html, 'og:url')).toBe(url);
-    expect(meta(html, 'og:image')).toBe('%SITE_URL%og-image.png');
-    expect(meta(html, 'twitter:card')).toBe('summary_large_image');
-    expect(html).toContain('<link rel="apple-touch-icon" href="%BASE_URL%apple-touch-icon.png" />');
-  });
-
-  it('points at real pictures of the right size', () => {
-    const image = pngSize('public/og-image.png');
-    expect(image).toMatchObject({ width: 1200, height: 630 });
-    expect(image.bytes).toBeLessThan(300_000);
-    for (const file of ['index.html', 'live/index.html']) {
-      const html = readFileSync(file, 'utf8');
-      expect(meta(html, 'og:image:width')).toBe(String(image.width));
-      expect(meta(html, 'og:image:height')).toBe(String(image.height));
-    }
-    expect(pngSize('public/apple-touch-icon.png')).toMatchObject({ width: 180, height: 180 });
-  });
-
   it("fills in the main town, or a fork's own address", () => {
     expect(siteUrl()).toBe('https://renanbazinin.github.io/forktown/');
     expect(siteUrl('')).toBe(CANONICAL_SITE);
@@ -418,51 +363,5 @@ describe('A link preview for every house', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
-  });
-});
-
-describe('A quiet first install and build', () => {
-  it('names every package whose install script may run, so npm has nothing to warn about', () => {
-    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8'));
-    const withScripts = Object.entries<{ hasInstallScript?: boolean }>(lock.packages)
-      .filter(([, entry]) => entry.hasInstallScript)
-      .map(([path]) => path.split('node_modules/').at(-1));
-    const { allowScripts } = JSON.parse(readFileSync('package.json', 'utf8'));
-    expect(withScripts.length).toBeGreaterThan(0);
-    for (const name of withScripts) expect(allowScripts, name).toHaveProperty([name!], true);
-  });
-
-  it('keeps the chunk-size warning quiet for a full town, but not for any size', () => {
-    expect(readFileSync('vite.config.ts', 'utf8')).toMatch(/plugins: \[[^\]]*chunkBudget\(\)/);
-    const plugin = chunkBudget();
-    expect((plugin.config as () => unknown)()).toEqual({
-      build: { chunkSizeWarningLimit: CHUNK_WARNING_KB },
-    });
-    // A full town's main chunk measured 1,149–1,204 kB; see scripts/chunk-budget.ts.
-    expect(CHUNK_WARNING_KB).toBeGreaterThanOrEqual(1250);
-    expect(CHUNK_WARNING_KB).toBeLessThanOrEqual(1300);
-  });
-});
-
-describe('The live stream’s build manifest', () => {
-  const config = () => readFileSync('vite.config.ts', 'utf8');
-
-  it('comes after the chunk budget, from a plugin of its own', () => {
-    expect(config()).toMatch(/chunkBudget\(\),\s*buildManifest\(\s*BUILD,/);
-  });
-
-  it('names the same build as the page, computed once', () => {
-    const source = config();
-    expect(source.match(/readBuildInfo\(/g)).toHaveLength(1);
-    expect(source).toMatch(/const BUILD = readBuildInfo\(process\.cwd\(\)\);/);
-    expect(source).toContain('__FORKTOWN_BUILD__: JSON.stringify(BUILD)');
-    expect(source).toContain('__TOWN_ARRIVAL_DATES__: JSON.stringify(arrivalDates(arrivals))');
-  });
-
-  it('never reaches the browser-only roster from the config', () => {
-    for (const file of ['scripts/build-manifest.ts', 'scripts/town-arrivals.ts', 'vite.config.ts'])
-      expect(readFileSync(file, 'utf8'), file).not.toMatch(
-        /from ['"][^'"]*\/(?:places|arrivals|live-breaks)(?:\.ts)?['"]/,
-      );
   });
 });

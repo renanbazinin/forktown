@@ -4,9 +4,9 @@ import type { TubeStatus } from './tube-traffic.ts';
 
 // The Treeline's words. tubes.ts holds the facts and tube-traffic.ts the day's rides; this file
 // holds the voice. Everything reads the status the town is drawn from, so the panel never
-// describes a different line. Brand rules (tests/tube-ui.test.ts holds them): headings end with a
-// period, eyebrows are uppercase, no exclamation marks, and the copy never promises a crowd. Only
-// the neighbors on the line right now are ever named; future riders stay private.
+// describes a different line. Brand rules: headings end with a period, eyebrows are uppercase, no
+// exclamation marks, and the copy never promises a crowd. Only the neighbors on the line right now
+// are ever named; future riders stay private.
 
 export const TUBE_LABEL = `PUBLIC SPACE · ${TUBE_PLOTS.join(' / ')}`;
 export const TUBE_SIGN_CAPTION = `STATION SIGN · ${TUBE_STATIONS[0].plot}`;
@@ -106,7 +106,7 @@ function ridesBlock(status: TubeStatus): TubeCopyBlock {
   };
 }
 
-/** The panel's words for a given line status (pure: the tests feed it every combination). */
+/** The panel's words for a given line status (pure, so any combination can be tried). */
 export function tubeCopy(status: TubeStatus): TubeCopy {
   return {
     label: TUBE_LABEL,

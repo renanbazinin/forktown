@@ -21,8 +21,8 @@ import { hash } from '../src/lib/world';
  * Every house file in places/, parsed and sorted by file name, so the order is the same on every
  * OS, with any made-up houses first. Only check:full-town writes those, so there a test that takes
  * "the first house in places/" as its fixture meets a made-up house instead, which will most
- * likely break it before a newcomer's house can. Tests read places/ only through here (a check in
- * full-town.test.ts makes sure), and tests that need a particular home use tests/fixtures.ts.
+ * likely break it before a newcomer's house can. Tests that need a particular home use
+ * tests/fixtures.ts.
  */
 export function readPlaces(directory = 'places'): Place[] {
   const places = readdirSync(directory)

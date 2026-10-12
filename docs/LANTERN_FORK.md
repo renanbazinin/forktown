@@ -50,7 +50,6 @@ Everything is a pure function of the UTC clock, the published houses and the arr
 - `src/lib/live-director.ts`: the /live Lantern hour shot.
 - `src/city/lantern-fork.ts`, `lantern-post.ts`, `glow.ts` and `render.ts`: the tree, the posts, the light and the cascade.
 - `src/components/ForkCard.tsx`: the register card.
-- `tests/lanterns.test.ts` and `tests/lantern-fork.test.ts`.
 - `tests/manual/lantern-fork.html`: scrub the minute and the roster by hand.
 
 ## Extend it

@@ -4,7 +4,7 @@ import { MARK_COLORS, MARK_PIXELS } from '../src/lib/brand';
 
 // The home-screen icon: the mark at 5x on a full day tile, 180 x 180 as iOS asks. iOS
 // rounds the corners itself, so the tile has none. Run `npx tsx scripts/touch-icon.ts`
-// after changing the mark; tests/brand.test.ts checks the icon still matches it.
+// after changing the mark, so public/apple-touch-icon.png still matches it.
 export const TOUCH_ICON_SIZE = 180;
 const SCALE = 5;
 const INSET = (TOUCH_ICON_SIZE - 32 * SCALE) / 2;

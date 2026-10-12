@@ -24,7 +24,7 @@ For example, change this to `{ rows: 20, columns: 14 }` for 280 plots, or `{ row
 
 ## Before publishing an expansion
 
-Run `npm run check` and `npm run format:check`. The tests protect the original 25 plots, later growth along either axis, row labels beyond Z, road connectivity, new edge contributions, and shared schema validation.
+Run `npm run check` and `npm run format:check`. The tests protect the original 25 plots, later growth along either axis, new edge contributions, and shared schema validation.
 
 Inspect the full map and select the furthest new plot on desktop and mobile. Reset fits the whole map; selecting a plot or following a neighbor zooms in so the town remains usable as it grows.
 
@@ -42,4 +42,4 @@ In deep winter the frozen Millpond is one more. On Winter 9–19, half of the af
 
 ### Occasional animal moments
 
-Zoo habitats take turns at their own pace: penguins every 113 real seconds, elephants every 137, zebras every 157, and giraffes every 173. Each turn lasts 30 seconds including approach and return, with the main trick lasting about 6-14 seconds. Animals rotate fairly within each habitat. Elephants drink and spray, penguins dive and swim lying flat, zebras run two laps and skid while the other two watch, and giraffes stretch for a leafy snack. Between turns each animal keeps to its own patch of the habitat: it walks somewhere, then grazes, looks around or just stands, and tails, ears, flippers and blinks never stop. Animals in one habitat always keep a clear gap, even during a trick or asleep; `tests/zoo-motion.test.ts` checks it over two town days. The shared town clock drives all movement and effects, including across midnight, so pausing and reloading cannot start a different performance. Use the four animal buttons in the zoo preview to jump to a close view of each sequence.
+Zoo habitats take turns at their own pace: penguins every 113 real seconds, elephants every 137, zebras every 157, and giraffes every 173. Each turn lasts 30 seconds including approach and return, with the main trick lasting about 6-14 seconds. Animals rotate fairly within each habitat. Elephants drink and spray, penguins dive and swim lying flat, zebras run two laps and skid while the other two watch, and giraffes stretch for a leafy snack. Between turns each animal keeps to its own patch of the habitat: it walks somewhere, then grazes, looks around or just stands, and tails, ears, flippers and blinks never stop. Animals in one habitat always keep a clear gap, even during a trick or asleep. The shared town clock drives all movement and effects, including across midnight, so pausing and reloading cannot start a different performance. Use the four animal buttons in the zoo preview to jump to a close view of each sequence.

@@ -65,7 +65,7 @@ Whatever the films leave, always less than a minute, is filled exactly with **ad
 
 Every ad except the snack bar and "phones off" also plays in the live stream's breaks ([Forktown Live](LIVE.md#breaks)).
 
-Because the screen time is fixed, every bill ends by 23:54 and the screen is stowed before midnight. The Little Stage's night party, resident bedtimes, and the live director's night coverage all rely on that. The tests check every night of a year, and the latest possible bill (three one-minute films, the most cards).
+Because the screen time is fixed, every bill ends by 23:54 and the screen is stowed before midnight. The Little Stage's night party, resident bedtimes, and the live director's night coverage all rely on that.
 
 Half the residents who chose both an evening stroll and a night out can attend, up to twelve. They walk in along the perimeter and side aisle and sit facing the screen. Afterward, selected disco guests can walk straight to the Little Stage if they can still dance for at least fifteen town minutes and get home before their own bedtime. Otherwise they walk home. Free time before bedtime can include moonlit loops round the block and a sit on their own bench, porch or front step. Residents with earlier bedtimes may leave the screening early to allow a full walk home; film playback is unchanged. Sleeping residents are never woken. The show runs even with no audience.
 

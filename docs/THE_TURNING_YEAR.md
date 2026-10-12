@@ -104,7 +104,7 @@ The largest change to one frame, measured with the recording context in the open
 | Falling snow                      | 0      | 0      | 0      | +62    |
 | Far-ridge snow in the sky         | 0      | 0      | 0      | +57    |
 
-The season light is one `fillRect`, drawn only in autumn and winter. Across the year, at several times of day, a whole opening-view frame now stays between about 31,000 and 33,500 calls (31,497–33,461 with the Millpond, the Treeline and today's football), well inside the budget of `tests/render-budget.ts`, 41,400 calls with today's 18 houses. When the turning year arrived, a frame on the same day and minute differed from the town before it by −752 to +214 calls. Spring and winter frames are often lighter than before, because the young farm and the snowy meadows draw less.
+The season light is one `fillRect`, drawn only in autumn and winter. Across the year, at several times of day, a whole opening-view frame now stays between about 31,000 and 33,500 calls (31,497–33,461 with the Millpond, the Treeline and today's football). When the turning year arrived, a frame on the same day and minute differed from the town before it by −752 to +214 calls. Spring and winter frames are often lighter than before, because the young farm and the snowy meadows draw less.
 
 ## Determinism
 
@@ -126,9 +126,6 @@ Flurry days are seeded by the absolute day, so one winter differs from the next,
 - `src/lib/millpond.ts` and `src/city/millpond.ts`: the Millpond's ice, reeds, lilies, petals, leaves and rowboats through the year. See [The Millpond](MILLPOND.md).
 - `src/city/render.ts`: the snapshot, `season.groundDay` in `groundKey`, streetlamp snow, fireflies in the depth sort, and the snowfall and season light over the finished frame.
 - `src/components/CalendarClock.tsx` and `src/calendar.css`: the almanac line.
-- `tests/seasons.test.ts`: agreement with the almanac and across time zones, snow schedules for every possible seed, canopies, pumpkins, fireflies, flurries, continuity across midnights and the new year, and determinism.
-- `tests/season-copy.test.ts`: the town voice, stages that cover the year in order and turn at midnight, and a check every half town hour that the line never names something the town is not showing.
-- `tests/season-render.test.ts`: the opening view at each stage of the year, within budget and identical for identical moments; each season's colours only in its own season; the sky, the sister forks and the far fields; every house design, with seasonal art inside `houseBounds` and previews unchanged; the Fork; the weather; and a ground cache that repaints once a town day.
 - `/tests/manual/seasons.html` on the development server draws Year 3 with the real renderer. **Four seasons** shows Spring 9, Summer 15, Autumn 13 and Winter 12 at dawn, noon, golden hour or night, in the opening view or the whole town. **Through the year** scrubs all 112 days and every minute along a ribbon drawn from the model, with jumps to each stage, **Play the year** and **Run the clock**. **Details** shows ten subjects at eight stages, with a closer look at twice the zoom. **Night and weather** runs fireflies, the first snow, petals and falling leaves at town speed; with reduced motion they start paused. `?day=95&time=1320&view=whole` opens the scrubber on a year day (0–111) and town minute (0–1439), `?closer=0,6` opens a closer look by subject and stage (here the gable roof in deep snow), and `?eager=1` renders all 80 close-ups at once. The page never changes the live clock.
 
 Run `npm run check` and `npm run format:check`.

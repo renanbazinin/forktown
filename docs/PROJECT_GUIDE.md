@@ -78,7 +78,7 @@ src/components/ForkCard.tsx    The Lantern Fork's register card
 src/App.tsx                The town, directory, and onboarding
 scripts/validate-places.ts Command-line contribution checks
 scripts/local-places.ts    Development-only saves to the local places folder
-tests/                    Contribution rules and world behavior
+tests/                    Contribution rules, publishing, and a town smoke check
 docs/                     Architecture and publishing guides
 .github/                  Pull request checks, templates, and deployment
 ```
@@ -89,12 +89,12 @@ docs/                     Architecture and publishing guides
 | ------------------------- | -------------------------------------------------------- |
 | `npm run dev`             | Start the local city                                     |
 | `npm run validate`        | Check every place with beginner-friendly errors          |
-| `npm test`                | Test contribution rules and map behavior                 |
+| `npm test`                | Test contributions, publishing, and a town smoke run     |
 | `npm run typecheck`       | Check the app’s TypeScript                               |
 | `npm run build`           | Validate and build the production site                   |
 | `npm run preview`         | Serve the production build locally                       |
 | `npm run check`           | Run tests, validation, type checks, and production build |
-| `npm run check:full-town` | Validate and test a copy with every house plot taken     |
+| `npm run check:full-town` | Locally, validate and test with every house plot taken   |
 
 ## Put your town online
 

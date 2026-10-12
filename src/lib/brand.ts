@@ -4,7 +4,7 @@
 export const TAGLINE = 'A little town, built one pull request at a time.';
 export const TITLE = 'Forktown — a little town, built one pull request at a time';
 
-// Mirrors the tokens in styles.css; tests/brand.test.ts keeps the two in step.
+// Mirrors the tokens in styles.css; change the two together.
 export const BRAND = {
   paper: '#F8F7F2',
   surface: '#FDFCF8',

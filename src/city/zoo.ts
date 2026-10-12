@@ -38,7 +38,7 @@ import { drawVenueTitle } from './venue-title';
 import { drawZooAnimal } from './zoo-animals';
 
 type Ctx = CanvasRenderingContext2D;
-/** A depth object; `part` tells the animals apart from the grounds for the tests. */
+/** A depth object; `part` tells the animals apart from the grounds. */
 type Object = { depth: number; paint: () => void; part?: 'animal' };
 type Visible = (point: Point, rx: number, above: number, below: number) => boolean;
 type Rect = { left: number; top: number; width: number; height: number };
@@ -104,24 +104,6 @@ export const ZOO_HABITAT_SIGNS = ZOO_HABITATS.map((h, index) => {
   };
 });
 export type ZooSign = (typeof ZOO_HABITAT_SIGNS)[number];
-/** A board's screen rectangle, slope included, for the overlap test. */
-export function zooSignRect(sign: {
-  point: Point;
-  width: number;
-  height: number;
-  rise: number;
-  slant: number;
-}) {
-  const p = project(sign.point.x, sign.point.y);
-  const drop = (sign.width / 2) * sign.slant;
-  return {
-    left: p.x - sign.width / 2,
-    right: p.x + sign.width / 2,
-    top: p.y - sign.rise - drop,
-    bottom: p.y - sign.rise + sign.height + drop,
-  };
-}
-export const ZOO_GATE_RECT = zooSignRect({ ...ZOO_SIGN, slant: 0.5 });
 
 // ---------------------------------------------------------------------------------------------
 // Colours, as [day, night]. Muted, cool at night, and never a light: the only amber in the zoo
