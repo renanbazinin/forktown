@@ -1,10 +1,41 @@
 {
   "id": "yaelis202-netizen-house",
-  "name": "Gryffindor Common Room",
+  "name": "The Lion's Den",
   "creator": "yaelis202-netizen",
   "plot": "M2",
-  "building": "tower",
+  "building": "observatory",
   "color": "#740001",
-  "decoration": "candles",
-  "story": "A cozy place for Gryffindors to study, relax, and maybe plan a little mischief."
+  "decoration": "bench",
+  "story": "A cozy place for Gryffindors to study, relax, and maybe plan a little mischief.",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#D3A625",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "round",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Rowan",
+    "figure": "female",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#740001",
+    "accessory": "glasses",
+    "greeting": "Welcome, brave one!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "LION'S DEN",
+    "color": "#D3A625",
+    "background": "#740001",
+    "html": ""
+  }
 }
