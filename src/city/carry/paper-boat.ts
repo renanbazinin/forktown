@@ -59,7 +59,7 @@ export function paintPaperBoat(
   });
 }
 
-/** A bright warm colour, that the eye would take for lamplight (the render tests' own test). */
+/** A bright warm colour, that the eye would take for lamplight. */
 const warm = (hex: string) => {
   const n = parseInt(hex.slice(1, 7), 16);
   const [r, g, b] = [n >> 16, (n >> 8) & 255, n & 255];

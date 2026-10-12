@@ -28,7 +28,7 @@ The brass band wears navy with peaked caps; the squeezebox player a flat cap. Ev
 
 ## The deckchairs
 
-Eight striped deckchairs, sage, rose and sky with cream, stand on the lawn's eight spots facing the stand. They are out from 15:35 to 20:20 (`BANDSTAND_FURNITURE.chairs`), every day: one at a time from 15:26, each over most of a minute, and gathered in one at a time from 20:20. The rest of the day they lie folded in a stack by the stand's east side. Every listener of the year arrives after 15:35 and has gone by 20:20, so a guest never sits in a chair that is not fully there (tested over the full town's year).
+Eight striped deckchairs, sage, rose and sky with cream, stand on the lawn's eight spots facing the stand. They are out from 15:35 to 20:20 (`BANDSTAND_FURNITURE.chairs`), every day: one at a time from 15:26, each over most of a minute, and gathered in one at a time from 20:20. The rest of the day they lie folded in a stack by the stand's east side. Every listener of the year arrives after 15:35 and has gone by 20:20, so a guest never sits in a chair that is not fully there.
 
 Each chair is drawn in two parts: its seat, front legs and shadow just under its guest (depth − 0.01), and its striped back just over them (depth + 0.01). From behind, as we see them, a row of deckchairs shows the canvas with each guest's head and shoulders over it. The back's top meets a perched guest's shoulders (20 px up); for a guest sunk low in the canvas (`sip`, or the waiting `sit`) it is let down 5 px, and 2 px while they are halfway down (`crouch`), so their head still shows. It reads the frame's residents for that, and adds no draw calls.
 
@@ -40,7 +40,7 @@ Guests are seated (the deckchairs), so the planner crouches them sitting down an
 - Settled, each guest starts with two calm minutes perched, then takes runs of one pose, 4 to 8 minutes long by their own hash. Between `perch` and the low `sip` they pass through `crouch`, so nobody drops into the canvas in a single frame.
 - Waiting before a set they `sit` (the planner's waiting pose); when the band strikes up they sit up through a `crouch`.
 - **Applause:** in each set's last five minutes, a guest gets up (a `crouch`, then `cheer`) at a moment of their own, 2.5 to 5 minutes before the end, and cheers to the end. A guest who stays on afterwards sits back down for a last listen; one who leaves soon after stands until they go.
-- Every pose is held a minute at least, and the applause comes only in a set's last five minutes (`tests/bandstand.test.ts`).
+- Every pose is held a minute at least, and the applause comes only in a set's last five minutes.
 
 ## The peak lamp
 
@@ -71,4 +71,4 @@ Every district panel lists the people there the same way (`district/NeighborList
 
 ## Checking it
 
-`tests/manual/district.html?venue=bandstand` with the Bandstand's moments: the chairs going out, each band at teatime, the applause, tea on the steps, the sundown set, packing up, the chairs gathered in, the peak lamp lit, a star night with the lamp dark, and the seasons. `tests/district-render-bandstand.test.ts` holds the cache, the 40 px height, the caps for every band and hour, the chairs' depths and times, the lamp's wave and star nights, the amber budget and the fades; `tests/bandstand.test.ts` the poses, the players' evening, the panel and the arrangements.
+`tests/manual/district.html?venue=bandstand` with the Bandstand's moments: the chairs going out, each band at teatime, the applause, tea on the steps, the sundown set, packing up, the chairs gathered in, the peak lamp lit, a star night with the lamp dark, and the seasons.

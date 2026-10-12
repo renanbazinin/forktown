@@ -1,7 +1,6 @@
 // The Riverside's places: the four district venues, their grounds, spots and ways in, the
 // harvest props, the regatta course and the bandstand's furniture times. Frozen data for the
-// bigger town, checked by tests/district-places.test.ts. The district venues are defined here,
-// never in events.ts.
+// bigger town. The district venues are defined here, never in events.ts.
 // Pure: it value-imports only the world, the town config and the district calendar.
 import { MARKET_SITE } from './town-config.ts';
 import type { Point } from './world.ts';

@@ -1,0 +1,41 @@
+{
+  "id": "indigo-house",
+  "name": "Indigo House",
+  "creator": "avitoohband",
+  "plot": "D5",
+  "building": "studio",
+  "color": "#759BAF",
+  "decoration": "tree",
+  "story": "Indigo House is a Studio\\Workshop of Software\\Services and AI",
+  "design": {
+    "wall": "#c7d3f0",
+    "trim": "#856f57",
+    "floors": 2,
+    "roof": "flat",
+    "windows": "shutters",
+    "garden": "vegetables",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Avindigo",
+    "figure": "male",
+    "skin": "#766b7b",
+    "hair": "#42423d",
+    "outfit": "#444743",
+    "accessory": "glasses",
+    "greeting": "Kaku!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "home",
+      "evening": "stroll",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "<div style=\"background-color: #2A2A2A; color: #F2F2F2; text-align: center\"><strong style=\"font-size: 24px\">✿ INDIGO-HOUSE ✿</strong></div>"
+  }
+}

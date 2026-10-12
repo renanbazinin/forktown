@@ -43,4 +43,4 @@ Each layer keeps the same contract: deterministic from the clock and the publish
 3. **Town tales (v3).** Maintainer-reviewed files starring only town-owned characters, dated by the town calendar and validated in CI like places. `source: 'town'`.
 4. **Lantern Night.** On the full moon, the lanterns float from the Fork to hover over their own houses, with a countdown in the almanac.
 
-Run `npm run check` and `npm run format:check`. `tests/lanterns.test.ts` covers the rotation and the evening boundary; `tests/evening-copy.test.ts` covers every word. During development, open `/tests/manual/stories.html` to see the Fork card, the Events panel, place cards and the almanac at 12:00, 19:53, 20:05, 21:00 and 02:00, with and without arrival history, by day and at dusk.
+Run `npm run check` and `npm run format:check`. During development, open `/tests/manual/stories.html` to see the Fork card, the Events panel, place cards and the almanac at 12:00, 19:53, 20:05, 21:00 and 02:00, with and without arrival history, by day and at dusk.

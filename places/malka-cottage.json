@@ -1,0 +1,41 @@
+{
+  "id": "malka-cottage",
+  "name": "Daisy Cottage",
+  "creator": "malkamaryles-design",
+  "plot": "J9",
+  "building": "observatory",
+  "color": "#AD88AE",
+  "decoration": "flowers",
+  "story": "loves coding and solving problems. Her cozy home is where new ideas come to life.",
+  "design": {
+    "wall": "#f0c7ec",
+    "trim": "#855757",
+    "floors": 2,
+    "roof": "gable",
+    "windows": "shutters",
+    "garden": "vegetables",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Ivan",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

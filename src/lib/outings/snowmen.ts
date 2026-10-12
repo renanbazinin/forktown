@@ -93,7 +93,7 @@ export function snowmenBuilderPose(context: SnowmenContext): EventPose | undefin
 /**
  * Which way each builder faces the day's snowman (k = 0..3, from lunch seats 0 and 1): the
  * quarter its spot lies in from the seat (SNOWMAN_SPOTS; the green's seats at local (−0.55, 0)
- * and (0.35, 0)). tests/snowmen.test.ts checks the table against both.
+ * and (0.35, 0)). Keep the table in step with both.
  */
 type Facing = 'ne' | 'nw' | 'se' | 'sw';
 export const BUILDER_FACING: readonly (readonly [Facing, Facing])[] = [

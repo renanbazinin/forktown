@@ -3,8 +3,8 @@ import { DAYS_PER_YEAR } from './town-calendar';
 
 // The almanac's words for the turning year. seasons.ts holds the facts; this file holds the voice.
 // Each line names something a visitor can find in town that day, so the stages follow the model's
-// own schedules (tests/season-copy.test.ts holds them to it). They start at midnight, so the line
-// turns with the almanac's date and never flickers during a day.
+// own schedules. They start at midnight, so the line turns with the almanac's date and never
+// flickers during a day.
 
 export type SeasonStage = {
   /** The whole year day the stage starts on, 0..111. */

@@ -290,8 +290,6 @@ export function edgeTree(x: number, y: number) {
     seed,
   };
 }
-/** Where the edge tile (x, y) grows its tree, in world px, if it grows one (edgeTree). */
-export const edgeTreeAt = (x: number, y: number): Point | undefined => edgeTree(x, y)?.point;
 const trees = terrain.flatMap(({ x, y, point }) => {
   const seed = hash(`tree${x},${y}`);
   const result: { point: Point; depth: number; scale: number; seed: number }[] = [];

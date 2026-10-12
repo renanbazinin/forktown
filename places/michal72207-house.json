@@ -1,0 +1,41 @@
+{
+  "id": "michal72207-house",
+  "name": "Hazel Lodge",
+  "creator": "michal72207",
+  "plot": "M1",
+  "building": "bookshop",
+  "color": "#C97878",
+  "decoration": "tree",
+  "story": "A cozy little bookshop in town",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "vegetables",
+    "feature": "porch"
+  },
+  "resident": {
+    "name": "SHIRA",
+    "figure": "female",
+    "skin": "#dac98b",
+    "hair": "#60553e",
+    "outfit": "#78779c",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "WELLCOME!!🤩",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}

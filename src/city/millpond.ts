@@ -88,7 +88,7 @@ export type MillpondOptions = {
 };
 export type MillpondPart =
   'reeds' | 'posts' | 'boats' | 'fisher' | 'heron' | 'fish' | 'skaters' | 'mill' | 'wheel' | 'sign';
-/** A depth object, tagged with what it is and where it stands for the tests: `ground` is its
+/** A depth object, tagged with what it is and where it stands: `ground` is its
  * contact point and `slope` the screen slope of its footprint through it (0.5 along x for the
  * sign, -0.5 along y for the wheel, 0 for everything that stands on a point). */
 export type MillpondObject = {
@@ -2051,8 +2051,6 @@ const SIGN_POINT = project(MILLPOND_SIGN.x, MILLPOND_SIGN.y);
  * cut into strips, and its lettering is painted once.
  */
 export const MILLPOND_SIGN_DEPTH = MILLPOND_SIGN.x + MILLPOND_SIGN.y - SIGN.width / 2 / 38;
-/** The plaque's box on screen (world px), for tests. */
-export const MILLPOND_SIGN_BOX = { ...SIGN, point: SIGN_POINT };
 export function millpondSignHit(point: Point) {
   const x = point.x - SIGN_POINT.x;
   const y = point.y - SIGN_POINT.y - x * 0.5;

@@ -18,16 +18,18 @@
 // contributor's own file instead, moved to each plot checked.
 //
 // The plots: by default the free plot nearest to each of SAMPLE_ANCHORS, spread over the map;
-// `--plots` names them; `--all` takes every free house plot (hours, not minutes).
+// `--plots` names them; `--all` takes every free house plot (about a quarter of an hour on 16
+// processors).
 // The tests: every test file that reads places/ or the arrival order, itself or through its
 // imports; `--tests` names them instead.
 //
-// Too slow for CI: a few minutes a plot on a quiet machine, with several plots at once (by default
-// a quarter as many as there are processors, each with its share of workers). Run it before
-// merging a change to the simulation, the map or the venues, and with `--all` before the town
-// grows; with other test runs going on the same machine, use fewer `--shards`. It prints a line
-// per plot and a summary, and exits non-zero if any plot failed validation or a test that also
-// failed its retry. `--keep` leaves the temporary clones in place and prints where they are.
+// A local check, not run in CI: about 15 s a plot, with several plots at once (by default a
+// quarter as many as there are processors, each with its share of workers), so the default sample
+// takes under a minute on 16 processors. Run it before merging a change to the simulation, the
+// map or the venues, and with `--all` before the town grows; with other test runs going on the
+// same machine, use fewer `--shards`. It prints a line per plot and a summary, and exits non-zero
+// if any plot failed validation or a test that also failed its retry. `--keep` leaves the
+// temporary clones in place and prints where they are.
 import { spawn, spawnSync, type SpawnSyncOptions } from 'node:child_process';
 import {
   copyFileSync,
@@ -408,5 +410,5 @@ async function main() {
   process.exitCode = passed ? 0 : 1;
 }
 
-// Run as a script; tests import the helpers above without starting a check.
+// Run as a script; importing the helpers above never starts a check.
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

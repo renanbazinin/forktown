@@ -11,7 +11,7 @@ Moon Harvest Farm reserves S4–T9 (12 plots). Wheat, vegetables, pumpkins, path
 - **Scarecrow:** at 01:00 each town night, it makes an eight-second hop to the next plot. Its loop is S9 → S8 → S7 → S6 → S5 → S4 → T4 → T5 → T6 → T7 → T8 → T9 → S9. It stays put through the day. The fixed Unix-epoch phase determines its position even if nobody watched earlier nights.
 - **UFO:** town days divisible by ten, from 01:30 to 03:00. It approaches a house, hovers above its roof with a pale searchlight, and departs. Houses are sorted by stable file ID, and the UTC visit number selects the next house in that rotation. Every house is visited before the rotation repeats; a town with one house necessarily revisits it, and an empty town has no visit. The shared published house roster determines the rotation; local unsaved drafts do not affect it. Clients with the same roster and timestamp see the same target regardless of array order or timezone. This is every four real hours: 00:01:30–00:03:00 UTC, then the same interval at 04, 08, 12, 16, and 20 UTC, every date.
 
-`tests/town-secrets.test.ts` covers independent replay, time-zone offsets, missed cycles, midnight, exact event boundaries, the complete route, plot reservation, road access, and map selection. During development, `tests/manual/secrets.html` provides day/night, UFO, hop, and live UTC views without changing the production clock.
+During development, `tests/manual/secrets.html` provides day/night, UFO, hop, and live UTC views without changing the production clock.
 
 ## The Millpond
 
@@ -19,7 +19,7 @@ The Millpond keeps its secret for the almanac's three full-moon nights of winter
 
 `iceSecretAt(minutes, day)` keys on the almanac's whole date and the town minute, so it is a pure function of the UTC clock like everything else here. The dates are the almanac's own: as with the Fork's tales, the hours after midnight belong to the evening before, so 03:00 on Winter 15 is the small hours of the evening of Winter 14. The three nights come round once per town year, every 44 hours and 48 minutes of real time, and each night's window lasts 90 real seconds. In Year 3, Winter 15 at 03:00 falls at **2026-09-25 08:51 UTC**. Winter 14's window opens at 08:27 UTC and Winter 16's at 09:15 UTC the same morning, and the next winter's come 44 hours and 48 minutes later.
 
-`tests/millpond.test.ts` checks that it appears only on Winter 14, 15 and 16 at 03:00–04:30 in any year, exactly when the almanac says full moon. It also checks the exact boundaries, the crack, pulse and fade, the same answer for 08:51 UTC written with `+03:00` and `−07:00` offsets, and the same moment 1, 10 and 250 town years later. `tests/millpond-render.test.ts` checks that the silver glint is painted only inside the window, and never within two tiles of the moon's path. In `/tests/manual/millpond.html`, the **Secret and controls** row opens Winter 15 at 03:00, 03:04 and 03:40, with controls at Winter 13, 03:00 and Winter 15, 02:00. See [The Millpond](MILLPOND.md).
+In `/tests/manual/millpond.html`, the **Secret and controls** row opens Winter 15 at 03:00, 03:04 and 03:40, with controls at Winter 13, 03:00 and Winter 15, 02:00. See [The Millpond](MILLPOND.md).
 
 ## Out of sight
 

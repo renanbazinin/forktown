@@ -83,9 +83,6 @@ catch silence and clipping; they do not replace listening.
 For future music contributions, start with a score change and audition it there. Keep a tune
 a whole number of four-bar phrases long, leave space in the melody, and test the loop and mix
 levels. Do not add someone else's songs or recordings without an appropriate license.
-Automated checks live in `tests/music.test.ts` (notes, lengths, the day's turns),
-`tests/music-render.test.ts` (rendered audio) and `tests/music-player.test.ts` (playback and
-handoffs).
 
 # The Bandstand
 

@@ -120,7 +120,10 @@ export const TUBE_ALIGHT = 2;
  * floor of every pair's own threshold, tubeMinSaving).
  */
 export const TUBE_MIN_SAVING = 10;
-/** MAX_TRAVEL_SPEED_MULTIPLIER − 1 (tested equal): the share of a ride's fixed minutes it must save. */
+/**
+ * MAX_TRAVEL_SPEED_MULTIPLIER − 1, written out, so change the two together: the share of a ride's
+ * fixed minutes it must save.
+ */
 export const TUBE_SAVING_SHARE = 0.4;
 /**
  * The saving a ride between these two halts must clear: at least TUBE_MIN_SAVING, and at least
@@ -425,8 +428,8 @@ export const isTubeTreeGap = (x: number, y: number) =>
  * through them, but their trees would sort after it and stand in front of it on screen. The tile
  * one row south of each bank halt's gap, (W − 1, ⌊dock.y⌋ + 1), in front of that halt's pier and,
  * at Kingfisher Halt, of the regatta lane under its bridge; and (W − 1, 39), in front of the Boat
- * Landing's stage and its launch (REGATTA_COURSE.stage, y 37.6–39.5; the launch's row, which
- * tests/edge-loop.test.ts ties to it). In line order, then the Landing.
+ * Landing's stage and its launch (REGATTA_COURSE.stage, y 37.6–39.5; row 39 is the launch's row,
+ * ⌊REGATTA_COURSE.launch.y⌋, so move the two together). In line order, then the Landing.
  */
 export const RIVERSIDE_TREE_GAPS: readonly Point[] = [
   ...TUBE_STATIONS.filter(({ edge }) => edge === 'bank').map(({ dock }) => ({
