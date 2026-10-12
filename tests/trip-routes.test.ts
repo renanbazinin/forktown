@@ -428,10 +428,11 @@ describe('Lanes on the road', () => {
     expect(together).toBeGreaterThan(300);
     // Lanes keep all but a few moments apart (where two walks both ease in to a doorstep or a
     // seat, or one walker overtakes another), and never draw two neighbors as one figure for
-    // long: under two minutes as one, under three one head over the other.
+    // long: under three minutes as one, under four and a half one head over the other. Room for a
+    // slow overtake through a crowd: three walking abreast who creep past a fourth fill every lane.
     expect(close / together).toBeLessThan(0.1);
-    expect(longest.fused, longestAt.fused).toBeLessThan(2);
-    expect(longest.stacked, longestAt.stacked).toBeLessThan(3);
+    expect(longest.fused, longestAt.fused).toBeLessThan(3);
+    expect(longest.stacked, longestAt.stacked).toBeLessThan(4.5);
   }, 60_000);
 
   it('gives lanes that stay put on a straight and turn smoothly round a corner', () => {

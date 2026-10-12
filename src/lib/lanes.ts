@@ -345,7 +345,11 @@ function overlapWeight(x: number, y: number) {
   if (down >= 22 || across >= 10) return 0;
   if (across < 6 && down < 12) return across < 3 && down < 6 ? 16 : 8;
   // Within a stacked pair, prefer making room over lingering directly below the other head.
-  return across < 7 ? 3 + (3 * (7 - across)) / 7 : 0.5;
+  if (across < 7) return 3 + (3 * (7 - across)) / 7;
+  // Only just apart, the nearer the worse and ever more so: so three abreast stand a whole lane
+  // apart each (about 8 px), not seven eighths of one on one side and nine on the other.
+  const near = (10 - across) / 3;
+  return near * near;
 }
 
 /**
@@ -363,9 +367,10 @@ function choosePath(walk: LaneWalk, { cost, from }: Tables): LanePath {
     for (let i = 0; i < n; i++) cost[i * STATES + s] = pull;
   }
   for (const { other, d } of walk.near) {
-    if (other.path === undefined) continue;
+    // Anyone not placed yet keeps their own side, so the first placed already leave them room.
+    const path = other.path ?? laneSide(other.id);
     for (let t = 0; t < d.length; t += NEAR_STRIDE) {
-      const lane = laneAtSample(other.path, d[t]);
+      const lane = laneAtSample(path, d[t]);
       const x = d[t + 1] + lane * d[t + 5],
         y = d[t + 2] + lane * d[t + 6];
       const row = (d[t] - walk.k0) * STATES;
@@ -414,8 +419,9 @@ const byId = (a: LaneWalk, b: LaneWalk) => (a.id < b.id ? -1 : a.id > b.id ? 1 :
 /**
  * Give every walk its lanes. Anyone who walks alone keeps their own side all the way. Walkers who
  * walk near others the same way (within NEAR tiles, for half a minute or more) take, in time
- * order, the lanes that draw them over those already placed least (choosePath), then a few times
- * over the best beside everyone's latest, so a column settles side by side. Fixed walks keep
+ * order, the lanes that draw them over the others least (choosePath: those already placed, and
+ * the rest on their own sides), then a few times over the best beside everyone's latest, so a
+ * column settles side by side. Fixed walks keep
  * theirs. The town is placed before a previewed draft and never looks at it. Pure: the order of
  * `walks` does not matter.
  */
