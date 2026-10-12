@@ -74,6 +74,17 @@ type Period = (typeof periods)[number];
 /** An event a resident is invited to, with their seat and the routine period it belongs to. */
 type Candidate = { event: VisitEvent; seat: number; period: Period };
 const boundaries = [360, 720, 1080, 1320, 1800];
+/**
+ * Neighbors set out for an outing up to (SET_OFF_STEPS - 1) · SET_OFF_STEP minutes after their
+ * free time starts, and plan to be home as much before it ends, a step apart, drawn afresh each
+ * day and each way. Otherwise those who hurry at the top pace from homes as far up the road all
+ * leave on the stroke of the hour (and set off back to be home on it) and walk the whole way in
+ * step, more abreast than the road's lanes hold. A step is a third of a tile at that pace.
+ */
+const SET_OFF_STEP = 0.75;
+const SET_OFF_STEPS = 4;
+const setOff = (way: 'out' | 'home', home: Place, event: VisitEvent, day: number) =>
+  (hash(`set-${way}:${home.id}:${event.id}:${day}`) % SET_OFF_STEPS) * SET_OFF_STEP;
 const plans = new WeakMap<Place[], Map<number, Map<string, ResidentTrip[]>>>();
 
 /** The run of stroll periods around `period` (merged with its neighbours), to bedtime at night. */
@@ -239,7 +250,7 @@ export function planResidentTrips(
   const invite = (home: Place, candidate: Candidate) => {
     const before = days.get(home.id) ?? empty;
     const list = [...before.list, candidate].sort((a, b) => a.event.start - b.event.start);
-    const trips = planHome(home, list, tubeJourneys(home, list));
+    const trips = planHome(home, day, list, tubeJourneys(home, list));
     // A visit that costs an outing already planned would leave that seat empty. That rule alone
     // keeps every trip the walking-only plan makes: all of them are among the outings.
     if (trips.length < list.length) return false;
@@ -338,7 +349,7 @@ export function planResidentTrips(
   for (const home of places) {
     if (!getPlot(home.plot)) continue;
     const { list, trips } = days.get(home.id) ?? empty;
-    result.set(home.id, options.tube === false ? planHome(home, list) : trips);
+    result.set(home.id, options.tube === false ? planHome(home, day, list) : trips);
   }
   return result;
 }
@@ -353,6 +364,7 @@ const tubeJourneys = (home: Place, list: readonly Candidate[]) =>
  *  `journeys`, a candidate that has a tube journey rides it; without, everyone walks. */
 function planHome(
   home: Place,
+  day: number,
   list: readonly Candidate[],
   journeys?: ReadonlyMap<VisitEvent, TubeJourney | undefined>,
 ): ResidentTrip[] {
@@ -421,8 +433,8 @@ function planHome(
       fixed,
       event.start + arrival,
       end,
-      Math.max(window.availableFrom, previousReturn),
-      window.availableUntil,
+      Math.max(window.availableFrom + setOff('out', home, event, day), previousReturn),
+      window.availableUntil - setOff('home', home, event, day),
       event.depart,
       seat * 1.3,
     );

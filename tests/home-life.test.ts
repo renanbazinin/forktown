@@ -452,9 +452,15 @@ describe('Life at home: the front door, the garden and loops round the block', (
     }
     expect(early).toBeGreaterThan(5);
     expect(late).toBeGreaterThan(5);
-    // Before a 06:00 trip, stepping out reads the next plan day.
-    const trips = residentTrips(places, DAY);
-    const dawn = simulateResidents(places, 359.9, DAY).filter((state) =>
+    // Before a 06:00 trip, stepping out reads the next plan day (the first day of the week with
+    // one: most set out a step or more after 06:00).
+    const leavesAtSix = (day: number) =>
+      [...residentTrips(places, day).values()].some((trips) =>
+        trips.some((trip) => trip.depart === 360),
+      );
+    const dawnDay = Array.from({ length: 7 }, (_, d) => DAY + d).find(leavesAtSix) ?? DAY;
+    const trips = residentTrips(places, dawnDay);
+    const dawn = simulateResidents(places, 359.9, dawnDay).filter((state) =>
       trips.get(state.id)?.some((trip) => trip.depart === 360),
     );
     expect(dawn.length).toBeGreaterThan(0);
