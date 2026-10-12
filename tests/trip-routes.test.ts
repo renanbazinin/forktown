@@ -189,6 +189,38 @@ describe('Walking routes to the venues', () => {
 });
 
 describe('Lanes on the road', () => {
+  it('keeps three lockstep walkers apart on a straight and through a corner', () => {
+    // A third zoo visitor exposed this in the live roster. Keep the geometry fixed so the
+    // regression survives future arrivals, and test both input orders for the same plan.
+    const route = [
+      { x: 0.5, y: 0.5 },
+      { x: 10.5, y: 0.5 },
+      { x: 10.5, y: 10.5 },
+    ];
+    const ids = ['clover-nook', 'michal72207-house', 'willow-cottage'];
+    const plan = (order: string[]) => {
+      const walks = order.map((id) =>
+        laneWalk(id, 0, false, [{ route, start: 0, minutes: 40 }], 0, 40),
+      );
+      planLaneWalks(walks);
+      return new Map(walks.map((walk) => [walk.id, walk.path!]));
+    };
+    const lanes = plan(ids);
+    const reversed = plan([...ids].reverse());
+    for (let time = 3; time <= 37; time += 0.2) {
+      const drawn = ids.map((id) => {
+        expect(laneAt(lanes.get(id)!, time)).toBe(laneAt(reversed.get(id)!, time));
+        return residentGround(walkAlong(route, time / 40, laneAt(lanes.get(id)!, time)));
+      });
+      for (let i = 0; i < drawn.length; i++)
+        for (let j = i + 1; j < drawn.length; j++) {
+          const a = drawn[i],
+            b = drawn[j];
+          expect(Math.abs((a.x - a.y - b.x + b.y) * 38)).toBeGreaterThanOrEqual(8);
+        }
+    }
+  });
+
   it('keeps a paused walker in the same lane through the first step after the stop', () => {
     const route = [
       { x: 0, y: 0 },

@@ -154,19 +154,19 @@ export const LANE_SAMPLE = 0.25;
  * whole lanes apart (2 · LANE_SHIFT) and a figure's width along the street, with a little over.
  */
 const NEAR = 0.75;
-/** A planned lane moves in eighths of a lane, an eighth a sample at most. */
-const LANE_STEPS = 8;
+/** A planned lane moves in fifths of a lane, a fifth a sample at most. */
+const LANE_STEPS = 5;
 const STATES = 2 * LANE_STEPS + 1;
 const stateLane = (state: number) => state / LANE_STEPS - 1;
 /**
- * Lane units a planned lane drifts across in a minute at most: half a lane, a ninth of a tile,
- * so a walker making room for another edges over as they walk on.
+ * Lane units a planned lane drifts across in a minute at most: 0.8 lanes, 0.176 tiles,
+ * so a walker can make room for an overtaker without lingering underneath them.
  */
 export const LANE_DRIFT = 1 / (LANE_STEPS * LANE_SAMPLE);
 /** Rounds of lane planning: enough for a street's walkers to settle side by side. */
 const LANE_PASSES = 3;
 /**
- * What drifting an eighth of a lane costs, and what each sample a whole lane from one's own side
+ * What drifting a fifth of a lane costs, and what each sample a whole lane from one's own side
  * costs: a walker keeps to their side, and moves over only to walk clear of someone.
  */
 const DRIFT_COST = 0.1;
@@ -343,16 +343,19 @@ function overlapWeight(x: number, y: number) {
   const across = Math.abs((x - y) * 38),
     down = Math.abs((x + y) * 19);
   if (down >= 22 || across >= 10) return 0;
-  if (across < 6 && down < 12) return across < 3 && down < 6 ? 16 : 8;
-  // Within a stacked pair, prefer making room over lingering directly below the other head.
-  return across < 7 ? 3 + (3 * (7 - across)) / 7 : 0.5;
+
+  // Reward every bit of separation, including within fused pairs. Leave an 8-px margin before
+  // the soft near-overlap cost; a flat cost from 7 to 10 px let three walkers settle too close.
+  // The convex tail favors evenly shared room instead of squeezing one gap to widen another.
+  if (across < 6 && down < 12) return 8 + 2 * (6 - across);
+  return across < 8 ? 3 + (3 * (8 - across)) / 8 : ((10 - across) / 2) ** 2;
 }
 
 /**
  * The lanes, sample by sample, that draw `walk` over its neighbors (in the lanes they have now)
- * least: each sample's overlaps, plus a little for each eighth of a lane drifted and for each
+ * least: each sample's overlaps, plus a little for each quarter of a lane drifted and for each
  * sample away from the walker's own side, summed over the whole walk and made least (Viterbi).
- * So a walker keeps to their side, and edges over, at most half a lane a minute, only where
+ * So a walker keeps to their side, and edges over, at most 0.8 lanes a minute, only where
  * someone walks with them: beside a column, or round a neighbor they catch up with.
  */
 function choosePath(walk: LaneWalk, { cost, from }: Tables): LanePath {
