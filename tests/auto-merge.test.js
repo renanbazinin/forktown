@@ -30,6 +30,22 @@ const checkRun = (name, conclusion = 'success', extra = {}) => ({
   ...extra,
 });
 const CHECKS = [checkRun('check'), checkRun('Evaluate contribution')];
+const actionCheck = (id, run, conclusion = 'success', extra = {}) =>
+  checkRun('Evaluate contribution', conclusion, {
+    id,
+    app: { id: 15368, slug: 'github-actions' },
+    check_suite: { id: run + 1000 },
+    details_url: `https://github.com/o/r/actions/runs/${run}/job/${id}`,
+    ...extra,
+  });
+const workflowRun = (id, extra = {}) => ({
+  id,
+  workflow_id: 1,
+  check_suite_id: id + 1000,
+  head_sha: HEAD,
+  event: 'pull_request_target',
+  ...extra,
+});
 const STATUSES = [{ context: 'Contribution policy', state: 'success' }];
 const refused = (status, detail) =>
   Object.assign(new Error(`GitHub API request failed (${status})`), { status, detail });
@@ -46,6 +62,7 @@ function fakeGitHub({
   checkRuns = CHECKS,
   statuses = STATUSES,
   hiddenChecks = 0,
+  workflowRuns = {},
   reviews = [],
   comments = [],
   permissions = {},
@@ -92,6 +109,10 @@ function fakeGitHub({
     if (route === `/commits/${HEAD}/check-runs`)
       return { total_count: checkRuns.length + hiddenChecks, check_runs: checkRuns };
     if (route === `/commits/${HEAD}/status`) return { total_count: statuses.length, statuses };
+    if ((match = route.match(/^\/actions\/runs\/(\d+)$/))) {
+      if (workflowRuns[match[1]]) return workflowRuns[match[1]];
+      throw refused(404);
+    }
     if (route === '/git/ref/heads/main') return { object: { sha: mainSha } };
     if (route === `/compare/${TOWN}...${HEAD}`) return { behind_by: behindBy };
     throw new Error(`Unexpected API call ${path}`);
@@ -308,6 +329,107 @@ describe('Auto-merge for a new neighbor', () => {
       expect((await github.run())[0].state).toBe('success');
     }
   });
+
+  it.each(['cancelled', 'failure'])(
+    'merges when a newer successful workflow supersedes an earlier %s job',
+    async (conclusion) => {
+      const jobs = [actionCheck(10, 1, conclusion), actionCheck(20, 2)];
+      for (const checks of [jobs, [...jobs].reverse()]) {
+        const github = fakeGitHub({
+          checkRuns: [checkRun('check'), ...checks],
+          workflowRuns: { 1: workflowRun(1), 2: workflowRun(2) },
+        });
+        expect((await github.run())[0].state).toBe('success');
+        expect(github.merges()).toHaveLength(1);
+      }
+    },
+  );
+
+  it.each([
+    ['failure', {}],
+    ['cancelled', {}],
+    [null, { status: 'queued' }],
+    [null, { status: 'in_progress' }],
+  ])('blocks the latest %s job despite an older success', async (conclusion, extra) => {
+    const jobs = [actionCheck(10, 1), actionCheck(20, 2, conclusion, extra)];
+    for (const checks of [jobs, [...jobs].reverse()]) {
+      const github = fakeGitHub({
+        checkRuns: [checkRun('check'), ...checks],
+        workflowRuns: { 1: workflowRun(1), 2: workflowRun(2) },
+      });
+      expect((await github.run())[0]).toMatchObject({
+        state: 'pending',
+        description: expect.stringContaining('Evaluate contribution'),
+      });
+      expect(github.merges()).toEqual([]);
+    }
+  });
+
+  it('uses the latest attempt within a workflow execution', async () => {
+    const github = fakeGitHub({
+      checkRuns: [checkRun('check'), actionCheck(20, 1), actionCheck(10, 1, 'cancelled')],
+      workflowRuns: { 1: workflowRun(1) },
+    });
+    expect((await github.run())[0].state).toBe('success');
+  });
+
+  it('requires the latest required check to succeed rather than relying on an older success', async () => {
+    const github = fakeGitHub({
+      checkRuns: [
+        actionCheck(10, 1, 'success', { name: 'check' }),
+        actionCheck(20, 2, 'neutral', { name: 'check' }),
+      ],
+      workflowRuns: { 1: workflowRun(1), 2: workflowRun(2) },
+    });
+    expect((await github.run())[0]).toMatchObject({
+      state: 'pending',
+      description: expect.stringContaining('check'),
+    });
+    expect(github.merges()).toEqual([]);
+  });
+
+  it.each([{ workflow_id: 2 }, { event: 'pull_request' }])(
+    'keeps same-named checks from separate workflows or events enforced (%j)',
+    async (extra) => {
+      const github = fakeGitHub({
+        checkRuns: [checkRun('check'), actionCheck(10, 1, 'failure'), actionCheck(20, 2)],
+        workflowRuns: { 1: workflowRun(1), 2: workflowRun(2, extra) },
+      });
+      expect((await github.run())[0].state).toBe('pending');
+      expect(github.merges()).toEqual([]);
+    },
+  );
+
+  it.each([
+    { app: { id: 99, slug: 'another-app' } },
+    { details_url: 'https://example.com/checks/10' },
+  ])(
+    'keeps a same-named check from another app or unknown workflow enforced (%j)',
+    async (extra) => {
+      const github = fakeGitHub({
+        checkRuns: [checkRun('check'), actionCheck(10, 1, 'cancelled', extra), actionCheck(20, 2)],
+        workflowRuns: { 2: workflowRun(2) },
+      });
+      expect((await github.run())[0].state).toBe('pending');
+      expect(github.merges()).toEqual([]);
+    },
+  );
+
+  it.each([
+    {},
+    { 1: workflowRun(1, { head_sha: TOWN }) },
+    { 1: workflowRun(1, { check_suite_id: 0 }) },
+  ])(
+    'fails closed when duplicate check workflow details cannot be verified (%j)',
+    async (workflowRuns) => {
+      const github = fakeGitHub({
+        checkRuns: [checkRun('check'), actionCheck(10, 1, 'cancelled'), actionCheck(20, 2)],
+        workflowRuns,
+      });
+      expect((await github.run())[0].state).toBe('error');
+      expect(github.writes).toEqual([]);
+    },
+  );
 
   it('fails closed when GitHub lists only some of the checks', async () => {
     const github = fakeGitHub({ hiddenChecks: 1 });

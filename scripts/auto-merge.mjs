@@ -42,7 +42,53 @@ export function readTown(directory) {
   return { sha, creators };
 }
 
-// Every other check on a commit that hasn't passed yet, with the required ones when missing.
+// The checks API can return multiple workflow executions for the same job on one commit.
+// Resolve duplicate Actions jobs to their workflows before discarding superseded executions:
+// a newer success in another workflow (or app) must never hide a failing check with the same name.
+async function latestChecks(api, root, repo, head, checkRuns) {
+  const groups = new Map();
+  for (const check of checkRuns) {
+    const key = JSON.stringify([check.app?.id ?? check.app?.slug, check.name]);
+    groups.set(key, [...(groups.get(key) ?? []), check]);
+  }
+  const current = [];
+  const workflows = new Map();
+  for (const checks of groups.values()) {
+    const latest = new Map();
+    for (const check of checks) {
+      const prefix = `https://github.com/${repo}/actions/runs/`;
+      const match = check.details_url?.startsWith(prefix)
+        ? check.details_url.slice(prefix.length).match(/^(\d+)\/job\/\d+$/)
+        : undefined;
+      // Leave other apps, unique jobs and checks whose workflow is unknown fully enforced.
+      if (checks.length === 1 || check.app?.slug !== 'github-actions' || !match) {
+        current.push(check);
+        continue;
+      }
+      const id = Number(match[1]);
+      if (!workflows.has(id)) workflows.set(id, await api(`${root}/actions/runs/${id}`));
+      const workflow = workflows.get(id);
+      if (
+        workflow.id !== id ||
+        workflow.head_sha !== head ||
+        workflow.check_suite_id !== check.check_suite?.id ||
+        !Number.isSafeInteger(workflow.workflow_id) ||
+        !Number.isSafeInteger(check.id)
+      )
+        throw new Error('GitHub returned invalid check workflow details. Please retry.');
+      const key = JSON.stringify([workflow.workflow_id, workflow.event]);
+      const previous = latest.get(key);
+      // Run IDs order executions; check IDs order attempts within one execution. Start and
+      // completion times can be misleading when an older job waits longer for a runner.
+      if (!previous || id > previous.id || (id === previous.id && check.id > previous.check.id))
+        latest.set(key, { id, check });
+    }
+    current.push(...[...latest.values()].map(({ check }) => check));
+  }
+  return current;
+}
+
+// Every current check that hasn't passed yet, with the required ones when missing.
 function unfinishedChecks(checkRuns, statuses) {
   const others = statuses.filter((status) => status.context !== CONTEXT);
   const unfinished = [
@@ -176,7 +222,8 @@ async function consider({ api, root, repo, main, pr, town, permissionFor }) {
     combined.statuses.length !== combined.total_count
   )
     throw new Error('GitHub returned an incomplete list of checks. Please retry.');
-  const unfinished = unfinishedChecks(runs.check_runs, combined.statuses);
+  const checks = await latestChecks(api, root, repo, head, runs.check_runs);
+  const unfinished = unfinishedChecks(checks, combined.statuses);
   if (unfinished.length)
     return {
       state: 'pending',
