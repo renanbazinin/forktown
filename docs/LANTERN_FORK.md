@@ -37,7 +37,7 @@ Arrival order comes from Git history at build time. A shallow clone or a source 
 
 ## The D3 reservation
 
-The Fork is a public venue like the Little Stage and the Lunch Green. A house file on D3 fails validation with the usual reserved-venue message, and the builder and Explore skip it. The town has 230 house plots, and the tree has a place for a lantern on every one of them.
+The Fork is a public venue like the Little Stage and the Lunch Green. A house file on D3 fails validation with the usual reserved-venue message, and the builder and Explore skip it. The town has 226 house plots, and the tree has a place for a lantern on every one of them.
 
 ## Determinism
 

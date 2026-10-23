@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
     server: { port: 5173, strictPort: true },
     preview: { port: 4173, strictPort: true },
     test: {
-      // A few tests read or lay out every house of the 230 house plots, so they slow down as the
+      // A few tests read or lay out a house on every house plot, so they slow down as the
       // town grows, and a busy desktop or CI's shared runners can push them past Vitest's 5 s
       // default. Tests that start Git or Node set longer timeouts of their own; any other hung
       // test still stops within 20 s.

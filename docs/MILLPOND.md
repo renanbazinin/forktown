@@ -1,6 +1,6 @@
 # The Millpond
 
-Eight public plots, **H3, H4, H5, H6, I3, I4, I5, I6**, form one long pond south of the Meadow Ground. The internal streets are removed, while the perimeter roads remain connected and keep all their lamps. These eight plots are excluded from the builder and contribution validation, which, with the town's other public plots, leaves 230 house plots.
+Eight public plots, **H3, H4, H5, H6, I3, I4, I5, I6**, form one long pond south of the Meadow Ground. The internal streets are removed, while the perimeter roads remain connected and keep all their lamps. These eight plots are excluded from the builder and contribution validation, which, with the town's other public plots, leaves 226 house plots.
 
 A stone-footed watermill stands on the south-west bank, its wheel turning in a small bay. A wooden jetty runs out from the south shore, reeds grow thick in the east cove, and a worn path follows the south bank from a gate on the south road. Further east along that road, near the south-east corner, a small timber plaque on two short posts reads "The Millpond". The mill's windows stay dark: nobody lives there. Its wheel turns once every six town minutes, six real seconds, whenever the water is open. Open `#venue=millpond`, or click the water, the mill or the gate sign. The camera fits the pond beside the desktop panel or above the mobile panel, and the panel says what the water is doing now: the ice and skating times, the rowboats, the heron, the fisher, rising fish, and whatever the season has left on the water.
 

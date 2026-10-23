@@ -16,6 +16,7 @@ import { PLOTS, getPlot } from '../src/lib/world';
 import { HOUSE_PLOTS } from '../src/lib/events';
 import { FOOTBALL_PLOTS } from '../src/lib/football';
 import { CINEMA_PLOTS } from '../src/lib/cinema';
+import { SQUARE_PLOTS } from '../src/lib/square';
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -77,7 +78,7 @@ describe('The contribution contract', () => {
       'barley-house.json → plot: Plot R1 is reserved for Barley Halt on the Treeline, a public place. Pick an open plot such as Q1, R2 or S1.',
     ]);
     expect(errors('D7')).toEqual([
-      'barley-house.json → plot: Plot D7 is reserved for the Starlight Cinema, a public place. Pick an open plot such as C7, D8 or C6.',
+      'barley-house.json → plot: Plot D7 is reserved for the Starlight Cinema, a public place. Pick an open plot such as C7, C6 or C8.',
     ]);
     // Every plot that is no house plot names what stands there, in one sentence of its own.
     const houses = new Set(HOUSE_PLOTS.map((plot) => plot.id));
@@ -258,7 +259,7 @@ describe('The open plots a plot clash suggests', () => {
 });
 
 describe('The world stays predictable as people contribute', () => {
-  it('has unique plots with public venues, football ground, cinema, zoo, farm, millpond, the Riverside and tube halts reserved', () => {
+  it('has unique plots with public venues, football ground, cinema, Fountain Square, zoo, farm, millpond, the Riverside and tube halts reserved', () => {
     expect(new Set(PLOTS.map((plot) => plot.id)).size).toBe(PLOTS.length);
     for (const plot of PLOTS)
       expect(placeSchema.safeParse({ ...sample, plot: plot.id }).success).toBe(
@@ -268,6 +269,7 @@ describe('The world stays predictable as people contribute', () => {
           'D3',
           ...FOOTBALL_PLOTS,
           ...CINEMA_PLOTS,
+          ...SQUARE_PLOTS,
           ...ZOO_PLOTS,
           ...FARM_PLOTS,
           ...MILLPOND_PLOTS,

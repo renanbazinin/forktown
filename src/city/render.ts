@@ -41,6 +41,7 @@ import {
 import { drawTownCat } from './cat';
 import { drawDuck } from './ducks';
 import { drawCinema, cinemaScreenHit } from './cinema';
+import { drawSquare, drawSquareGround, squareObjectHit } from './square';
 import {
   drawTubeGround,
   drawTubeTraffic,
@@ -56,6 +57,7 @@ import { DISTRICT_PAINTERS, type DistrictPainter, type DistrictScene } from './d
 import { residentTrips, type ResidentTrip } from '../lib/resident-trips';
 import { tubeParcelsAt, type TubeParcelState } from '../lib/tube-traffic';
 import { insideCinema, isCinemaPlot, CINEMA_VENUE } from '../lib/cinema';
+import { insideSquare, isSquarePlot, SQUARE_VENUE } from '../lib/square';
 import { ducksAt } from '../lib/ducks';
 import { townCatAt, TOWN_CAT_ID } from '../lib/town-cat';
 import {
@@ -304,6 +306,7 @@ const trees = terrain.flatMap(({ x, y, point }) => {
     !insideZoo({ x, y }) &&
     !insideFarm({ x, y }) &&
     !insideMillpond({ x, y }) &&
+    !insideSquare({ x, y }) &&
     !reservedPlots.some((plot) => Math.abs(plot.x - x) <= 1 && Math.abs(plot.y - y) <= 1) &&
     x % BLOCK_SIZE === 0 &&
     y % BLOCK_SIZE === 2 &&
@@ -481,6 +484,7 @@ export function renderCity({
       isZooPlot(plot.id) ||
       isFarmPlot(plot.id) ||
       isMillpondPlot(plot.id) ||
+      isSquarePlot(plot.id) ||
       isDistrictPlot(plot.id)
     )
       return '';
@@ -606,6 +610,7 @@ export function renderCity({
         isZooPlot(plot.id) ||
         isFarmPlot(plot.id) ||
         isMillpondPlot(plot.id) ||
+        isSquarePlot(plot.id) ||
         isDistrictPlot(plot.id)
       )
         continue;
@@ -672,6 +677,8 @@ export function renderCity({
     // The Riverside's ground art (the harvest's stubble patch first): cached, so by the day only.
     for (const painter of PAINTERS)
       painter.ground?.(ctx, { night, season, groundDay: season.groundDay, visible: near });
+    // Fountain Square's paving, its shadows and the season's litter: by the day only.
+    drawSquareGround(ctx, night, season.groundDay, camera.zoom, near);
     drawMillpondGround(ctx, night, season, p.water, p.waterLight);
     drawTubeGround(ctx, tube);
   };
@@ -710,6 +717,17 @@ export function renderCity({
       season,
       visible,
     ),
+  );
+  // Fountain Square: its outline now, its fountain, benches and planters in the sort.
+  objects.push(
+    ...drawSquare(ctx, {
+      minutes,
+      night,
+      season,
+      selected: isSquarePlot(selectedPlot ?? '') || isSquarePlot(hoveredPlot ?? ''),
+      visible,
+      foliage: p,
+    }),
   );
   // The Millpond: flat water art now, under everyone on its banks; its uprights join the sort.
   const pond = {
@@ -977,6 +995,17 @@ export function cityHit(
   if (millpondSignHit(point) && MILLPOND_SIGN_DEPTH >= depth) {
     target = { kind: 'place', id: MILLPOND_VENUE.plot };
     depth = MILLPOND_SIGN_DEPTH;
+  }
+  // Fountain Square's paving, under any roof in front; its fountain, benches and planters by
+  // their own depth, so a neighbor behind the fountain is the fountain's.
+  if (insideSquare(unproject(point.x, point.y)) && depth < 0) {
+    target = { kind: 'place', id: SQUARE_VENUE.plot };
+    depth = -1;
+  }
+  const squareDepth = squareObjectHit(point);
+  if (squareDepth !== undefined && squareDepth >= depth) {
+    target = { kind: 'place', id: SQUARE_VENUE.plot };
+    depth = squareDepth;
   }
   const hitsZooSign = zooSignHit(point);
   if (insideZoo(unproject(point.x, point.y)) || hitsZooSign) {

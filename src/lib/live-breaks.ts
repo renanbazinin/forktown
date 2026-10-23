@@ -13,6 +13,7 @@ import { FOOTBALL_VENUE, MATCH, TEAMS } from './football';
 import { FORK_NAME, LANTERN_HOUR, lanternRegister, type LanternRegister } from './lanterns';
 import {
   districtAiring,
+  FLASH_MOB_SHOT,
   LANTERN_SHOT,
   liveDistrictShots,
   liveHighlights,
@@ -26,6 +27,7 @@ import { timeLabel } from './simulation';
 import { townCalendarAt } from './town-calendar';
 import { TOWN_DAY_MS, townDayAt, townMinutesAt, UTC_DAY_MS } from './town-time';
 import { getPlot, hash, plotCenter } from './world';
+import { flashMobDay, SQUARE_VENUE } from './square';
 
 // The live stream's breaks: one item every real half hour, deferred around the town's protected
 // moments, plus the welcome for a new neighbor. Pure and deterministic, in UTC ms only: every
@@ -61,7 +63,9 @@ export type MomentKind =
   | 'night'
   | 'cinema'
   /** The Riverside's moment of the day: a festival's shot, or the market or the teatime set. */
-  | 'district';
+  | 'district'
+  /** The flash mob on an even date: held clear of breaks, never billed (it is a town secret). */
+  | 'flashmob';
 /** A stretch of the broadcast no break may cover, in UTC ms. `announceAt` is when it's billed. */
 export type Moment = {
   kind: MomentKind;
@@ -250,6 +254,10 @@ function dayMoments(day: number, homes: boolean): readonly Moment[] {
       shot,
     });
   }
+  // The flash mob's window on an even date, held clear whether or not anyone dances: breaks never
+  // need the plan. It has no title, and comingUpAt never bills it.
+  if (homes && flashMobDay(day))
+    moments.push(moment('flashmob', FLASH_MOB_SHOT.from, FLASH_MOB_SHOT.to, '', SQUARE_VENUE.name));
   return remember(dayMomentCache, id, moments, 64);
 }
 
@@ -358,7 +366,11 @@ export function comingUpAt(ms: number, places: Place[], count = 3): ComingUpItem
   // moment whose window is still open may yet first air after `ms`.
   for (let day = today - 1; day <= today + count + 1; day++)
     for (const moment of dayMoments(day, homes))
-      if (moment.kind !== 'postcard' && (moment.shot ? moment.end : moment.announceAt) > ms)
+      if (
+        moment.kind !== 'postcard' &&
+        moment.kind !== 'flashmob' &&
+        (moment.shot ? moment.end : moment.announceAt) > ms
+      )
         upcoming.push(moment);
   const order = (a: Moment, b: Moment) =>
     a.announceAt - b.announceAt || a.start - b.start || a.end - b.end;

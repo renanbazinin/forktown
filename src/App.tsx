@@ -3,7 +3,11 @@ import { FARM, isFarmPlot } from './lib/farm';
 import { DISTRICT_PANELS, type DistrictPanelProps } from './components/district/cards';
 import GreenNote from './components/district/GreenNote';
 import MillpondInfo from './components/MillpondInfo';
+import SquareInfo from './components/SquareInfo';
 import { isMillpondPlot, MILLPOND_VENUE } from './lib/millpond';
+import { FLASH_MOB_ID } from './lib/square';
+import { flashMobSoundAt } from './lib/flash-mob-sound';
+import { FLASH_MOB_PREROLL } from './music/flash-mob-player';
 import { withPreview } from './lib/resident-trips';
 import TubeInfo from './components/TubeInfo';
 import { isTubePlot, TUBE_VENUE } from './lib/tubes';
@@ -154,6 +158,7 @@ export default function App() {
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const [cinemaListening, setCinemaListening] = useState({ gain: 0, pan: 0 });
   const [bandstandListening, setBandstandListening] = useState({ gain: 0, pan: 0 });
+  const [squareListening, setSquareListening] = useState({ gain: 0, pan: 0 });
   const cinema = useMemo(() => cinemaAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const selectedFootball = isFootballPlot(selectedPlot ?? '');
   const selectedFarm = isFarmPlot(selectedPlot ?? '');
@@ -180,6 +185,9 @@ export default function App() {
   const lanternTown = useLanternTown(places, clock.minutes, clock.day);
   const skaters = residents
     .filter((r) => r.event?.id === 'millpond' && r.event.phase === 'attending')
+    .map((r) => r.resident.name);
+  const dancers = residents
+    .filter((r) => r.event?.id === FLASH_MOB_ID && r.event.phase === 'attending')
     .map((r) => r.resident.name);
   // How many neighbors are at each event right now, for the live cards' counts.
   const attending = useMemo(() => {
@@ -420,6 +428,7 @@ export default function App() {
         onListening={setListening}
         onCinemaListening={setCinemaListening}
         onBandstandListening={setBandstandListening}
+        onSquareListening={setSquareListening}
         followed={followed}
         onStopFollowing={() => setFollowed(null)}
         onResidentSelect={follow}
@@ -520,6 +529,8 @@ export default function App() {
           cinema={cinema}
           cinemaListening={cinemaListening}
           bandstand={bandstandListening}
+          {...flashMobSoundAt(displayPlaces, clock.minutes, clock.day, FLASH_MOB_PREROLL)}
+          flashMobListening={squareListening}
         />
       </nav>
 
@@ -578,6 +589,8 @@ export default function App() {
               />
             ) : selectedVenue?.kind === 'cinema' ? (
               <CinemaInfo minutes={clock.minutes} day={clock.day} />
+            ) : selectedVenue?.kind === 'square' ? (
+              <SquareInfo dancers={dancers} />
             ) : selectedFootball ? (
               <FootballMatch
                 game={football}

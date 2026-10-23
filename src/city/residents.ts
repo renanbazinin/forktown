@@ -24,6 +24,120 @@ const STANDING_CHAT_LIFT = 5;
 export const BANDSTAND_NOTE: Pair = ['#5F7155', '#C9D2C2'];
 
 /**
+ * One moment of a flash-mob move (src/lib/flash-mob.ts), in the figure's own px before mirroring.
+ * An arm is a run of joints from the shoulder to the hand, x, y pairs drawn as stepped 2-px
+ * stamps like a carrying arm, its hand a 2-px fist at the last joint (3 px when `open`). `shift`
+ * moves the body sideways; `feet` are the far and near legs' left edges in the shifted frame.
+ * `land` bends the knees as the crouch does. A hop's lift is worked out apart (mobLift).
+ */
+type MobFrame = {
+  bob: number;
+  shift: number;
+  feet: readonly [number, number];
+  far: readonly number[];
+  near: readonly number[];
+  land?: boolean;
+  open?: boolean;
+  /** A pointing finger: one skin pixel past the near hand. */
+  tip?: readonly [number, number];
+};
+const FEET: readonly [number, number] = [-2, 1];
+/** Arms at rest, a little out from the body, and the far hand on the hip with the elbow out. */
+const NEAR_DOWN = [3, -11, 4, -6],
+  FAR_DOWN = [-4, -11, -5, -6],
+  FAR_HIP = [-4, -12, -7, -9, -5, -7];
+/**
+ * Both arms overhead, out in a V clear of the hair and a hat's brim; `s` leans them sideways.
+ * The far arm keeps to x ≤ −7 beside the head, where long hair falls behind the shoulders.
+ */
+const armsUp = (s: number) => ({
+  far: [-4, -12, -7, -16, -8 + s, -22],
+  near: [3, -12, 6, -16, 7 + s, -22],
+});
+/**
+ * The groove: a step-touch to the near side on beat A and back on beat B, a knee dip on each beat,
+ * the near fist pumping on A and the far one on B. Four half beats over two beats.
+ */
+const GROOVE: readonly MobFrame[] = [
+  { bob: 1, shift: 1, feet: [-3, 2], far: [-4, -11, -6, -7], near: [3, -12, 6, -12, 7, -18] },
+  { bob: 0, shift: 2, feet: FEET, far: [-4, -11, -6, -7], near: [3, -12, 6, -12, 7, -18] },
+  { bob: 1, shift: 1, feet: [-3, 2], far: [-4, -12, -7, -12, -8, -18], near: [3, -11, 5, -7] },
+  { bob: 0, shift: 0, feet: FEET, far: [-4, -12, -7, -12, -8, -18], near: [3, -11, 5, -7] },
+];
+/** The clap: hands together in front of the chest on the beat, apart at the sides off it. */
+const CLAP: readonly MobFrame[] = [
+  { bob: 0, shift: 0, feet: FEET, far: [-4, -12, 6, -11], near: [3, -12, 5, -8, 6, -10] },
+  { bob: 0, shift: 0, feet: FEET, far: [-4, -12, -7, -9, -9, -12], near: [3, -12, 6, -9, 9, -12] },
+];
+/** The point: the near arm thrown up and out on the beat, drawn back a little off it. */
+const POINT: readonly MobFrame[] = [
+  { bob: 0, shift: 0, feet: FEET, far: FAR_HIP, near: [3, -12, 6, -16, 9, -20], tip: [11, -21] },
+  { bob: 0, shift: 0, feet: FEET, far: FAR_HIP, near: [3, -12, 6, -15, 8, -18], tip: [10, -19] },
+];
+/** The wave: both arms overhead, swaying from side to side over two beats, the feet planted. */
+const WAVE: readonly MobFrame[] = [-1, 0, 1, 0].map((s) => ({
+  bob: 0,
+  shift: s,
+  feet: [-2 - s, 1 - s] as const,
+  ...armsUp(s),
+}));
+/** The spin: arms straight out, up on the toes in the first half of each beat as they turn. */
+const SPIN: readonly MobFrame[] = [-1, 0].map((bob) => ({
+  bob,
+  shift: 0,
+  feet: FEET,
+  far: [-4, -12, -12, -12],
+  near: [3, -12, 11, -12],
+}));
+/** The jump: in the air arms up for half its cycle, landing with bent knees, then standing. */
+const JUMP: readonly MobFrame[] = [
+  { bob: 0, shift: 0, feet: FEET, ...armsUp(0) },
+  { bob: 2, shift: 0, feet: FEET, far: [-4, -12, -7, -8], near: [3, -12, 6, -8], land: true },
+  { bob: 0, shift: 0, feet: FEET, far: FAR_DOWN, near: NEAR_DOWN },
+];
+/** Ta-da: the near arm high with the hand open, the far hand on the hip, feet apart. Held. */
+const TADA: MobFrame = {
+  bob: 0,
+  shift: 0,
+  feet: [-4, 3],
+  far: FAR_HIP,
+  near: [3, -12, 6, -17, 7, -23],
+  open: true,
+};
+/** Peak height of a flash-mob hop, in figure px. */
+const HOP = 7;
+/**
+ * A flash-mob move's frame at `phase` (the pose's walkPhase, 0 on the beat), or undefined for
+ * every other pose. The groove and the wave run over two beats (A then B), the clap, point and
+ * spin over one, the jump over its own cycle (airborne for the first half); ta-da is held.
+ */
+function mobMove(pose: string | undefined, phase: number): MobFrame | undefined {
+  const p = phase - Math.floor(phase);
+  switch (pose) {
+    case 'groove':
+      return GROOVE[Math.floor(p * 4)];
+    case 'clap':
+      return CLAP[p < 0.5 ? 0 : 1];
+    case 'point':
+      return POINT[p < 0.5 ? 0 : 1];
+    case 'wave':
+      return WAVE[Math.floor(p * 4)];
+    case 'spin':
+      return SPIN[p < 0.5 ? 0 : 1];
+    case 'jump':
+      return JUMP[p < 0.5 ? 0 : p < 0.75 ? 1 : 2];
+    case 'tada':
+      return TADA;
+  }
+  return undefined;
+}
+/** How high a flash-mob hop has risen at `phase`, in whole figure px. */
+function mobLift(pose: string | undefined, phase: number) {
+  const p = phase - Math.floor(phase);
+  return pose === 'jump' && p < 0.5 ? Math.round(HOP * Math.sin(p * 2 * Math.PI)) : 0;
+}
+
+/**
  * How far a figure, its props and its speech reach from its feet, in its own px before scaling,
  * with 2px to spare: sideways either way, above and below. A greeting may be any 40 characters,
  * some many times wider or taller than a letter, so it is measured on `ctx` as drawResident will
@@ -100,7 +214,10 @@ export function drawResident(
   const perched = state?.pose === 'perch' || state?.pose === 'tea';
   // The porch chair is lower than the bench, so its sitter's head stays under the porch roof.
   const sink = perched && state?.lot?.spot === 'porch' ? PORCH_SINK : 0;
-  const crouching = state?.pose === 'crouch' || (errand?.bend ?? 0) >= 2;
+  // A flash-mob move on the mob's beat (walkPhase). None of them sends up music notes.
+  const move = mobMove(state?.pose, state?.walkPhase ?? 0);
+  const lift = move ? mobLift(state?.pose, state?.walkPhase ?? 0) : 0;
+  const crouching = state?.pose === 'crouch' || (errand?.bend ?? 0) >= 2 || !!move?.land;
   const stretching = state?.pose === 'stretch';
   const watering = state?.pose === 'water';
   const sweeping = state?.pose === 'sweep';
@@ -110,6 +227,7 @@ export function drawResident(
   const swing = Math.round(stride * 2);
   const bob =
     errand?.bodyBob ??
+    move?.bob ??
     (seated
       ? 5
       : skating
@@ -165,6 +283,30 @@ export function drawResident(
     ctx.fillStyle = skin;
     ctx.fillRect(hand.x - 1, hand.y - 1, 2, 2);
   };
+  /** A flash-mob arm: stepped 2-px stamps joint to joint, then the hand (MobFrame). */
+  const mobArm = (joints: readonly number[], near: boolean) => {
+    ctx.fillStyle = near ? outfit : outfitShadow;
+    for (let j = 2; j < joints.length; j += 2) {
+      const ax = joints[j - 2],
+        ay = joints[j - 1],
+        dx = joints[j] - ax,
+        dy = joints[j + 1] - ay;
+      const steps = Math.max(Math.abs(dx), Math.abs(dy), 1);
+      for (let i = 0; i <= steps; i++)
+        ctx.fillRect(
+          Math.round(ax + (dx * i) / steps),
+          Math.round(ay + (dy * i) / steps) + bob,
+          2,
+          2,
+        );
+    }
+    const hx = joints[joints.length - 2],
+      hy = joints[joints.length - 1] + bob;
+    ctx.fillStyle = skin;
+    if (near && move?.open) ctx.fillRect(hx, hy - 1, 3, 3);
+    else ctx.fillRect(hx, hy, 2, 2);
+    if (near && move?.tip) ctx.fillRect(move.tip[0], move.tip[1] + bob, 1, 1);
+  };
   const carriedItem = () => {
     if (!carry || !carrySprite || !carried) return;
     ctx.save();
@@ -193,12 +335,14 @@ export function drawResident(
   if (options.shadow !== false) {
     ctx.fillStyle = '#23341B30';
     ctx.beginPath();
-    ctx.ellipse(0, 1, seated ? 7 : 5, 2, 0, 0, Math.PI * 2);
+    // A hopping figure's shadow stays on the ground and shrinks while they are in the air.
+    ctx.ellipse(0, 1, seated ? 7 : 5 - Math.round(lift / 3), 2, 0, 0, Math.PI * 2);
     ctx.fill();
   }
 
   ctx.save();
   if (left) ctx.scale(-1, 1);
+  if (move && (move.shift || lift)) ctx.translate(move.shift, -lift);
   if (skating) ctx.transform(1, 0, -0.16, 1, 0, 0);
   // A sitter's body sits back over the seat, behind the feet at the anchor.
   if (perched) ctx.translate(-3, 0);
@@ -209,6 +353,8 @@ export function drawResident(
   if (errand && errand.armReach > 0) {
     carryingArm(false);
     if (back) carryingHand(false);
+  } else if (move) {
+    mobArm(move.far, false);
   } else if (cheering || (disco && stride > 0)) {
     ctx.fillRect(-6, -15 + bob, 4, 4);
     ctx.fillRect(-7, -22 + bob - Math.max(0, swing), 3, 10);
@@ -254,6 +400,16 @@ export function drawResident(
     ctx.fillRect(4, -4, 2, 3);
     ctx.fillStyle = ink('#35413D');
     ctx.fillRect(3, -1, 4, 2);
+  } else if (move) {
+    // Standing legs, set apart or together for the move.
+    const [far, near] = move.feet;
+    ctx.fillStyle = ink('#3C4744');
+    ctx.fillRect(far, -6, 2, 6);
+    ctx.fillRect(far, -1, 4, 2);
+    ctx.fillStyle = ink('#53605A');
+    ctx.fillRect(near, -6, 2, 6);
+    ctx.fillStyle = ink('#35413D');
+    ctx.fillRect(near, -1, 4, 2);
   } else {
     ctx.fillStyle = ink('#3C4744');
     ctx.fillRect(-2 - footSwing, -6, 2, 6 - farLift);
@@ -307,6 +463,8 @@ export function drawResident(
     carryingArm(true);
   } else if (carried) {
     carryingArm(true, carried.anchor);
+  } else if (move) {
+    mobArm(move.near, true);
   } else if (cheering || (disco && stride <= 0)) {
     ctx.fillRect(3, -15 + bob, 4, 4);
     ctx.fillRect(5, -21 + bob + Math.min(0, swing), 3, 10);

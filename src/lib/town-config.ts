@@ -12,3 +12,5 @@ export const FARM_SITE = { row: 18, col: 3, rows: 2, columns: 6 } as const;
 export const MILLPOND_SITE = { row: 7, col: 2, rows: 2, columns: 4 } as const;
 // D14–E15: Market Square, on the duck street by the river. Its four plots share one square.
 export const MARKET_SITE = { row: 3, col: 13, rows: 2, columns: 2 } as const;
+// D8–E9: Fountain Square, east of the cinema across road x = 29. One paved square, one fountain.
+export const SQUARE_SITE = { row: 3, col: 7, rows: 2, columns: 2 } as const;

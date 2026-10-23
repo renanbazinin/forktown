@@ -1,6 +1,6 @@
 # Town secrets
 
-A few things in town happen only at certain moments, and nothing points to them. Moon Harvest Farm keeps two, and the Millpond keeps one.
+A few things in town happen only at certain moments, and nothing points to them. Moon Harvest Farm keeps two, the Millpond keeps one, and Fountain Square keeps one.
 
 All secret state is a pure function of the existing UTC epoch clock: `townDayAt(timestamp)` and `townMinutesAt(timestamp)`. A town day lasts 24 real minutes; a town minute lasts one real second. Refreshing, opening another browser, or running on localhost produces the same state for the same instant. No storage, random calls, or accumulated simulation steps are involved. As with the existing town clock, device clocks must be accurate; pausing freezes the view and resuming catches up.
 
@@ -21,8 +21,12 @@ The Millpond keeps its secret for the almanac's three full-moon nights of winter
 
 In `/tests/manual/millpond.html`, the **Secret and controls** row opens Winter 15 at 03:00, 03:04 and 03:40, with controls at Winter 13, 03:00 and Winter 15, 02:00. See [The Millpond](MILLPOND.md).
 
+## Fountain Square
+
+On every even date of every season, at 17:00, up to twelve neighbors dance a flash mob on Fountain Square (D8–E9). They are afternoon strollers chosen by the hash line `flash-mob:${day}` (anyone working or at home that afternoon stays in), and they skip everything else that afternoon. From about 16:40 they drift in and linger like anyone else: on the benches, on the fountain's rim, by the planters. At 17:00 one of them starts to dance alone; the rest join two beats apart, dance a routine to **Nothing to See Here**, freeze in a final pose at 18:24, drop their arms at 18:28 as if nothing happened and stroll home: by 20:00, unless they stroll on into the evening. The day's dancers come from `flashMobDancers(places, day)`; every frame from `flashMobFrame(seat, minute, day, arrive, leave)`. Even dates come every 48 real minutes: the mob dances 17 real minutes into every other 24-minute UTC cycle. See [Fountain Square](FOUNTAIN_SQUARE.md).
+
 ## Out of sight
 
-The secrets stay out of the scheduled events list. The farm has no map text or mystery hints in its panel. The Millpond's panel and its skating card say what the water is doing now, and never mention the crack or the glint.
+The secrets stay out of the scheduled events list. The farm has no map text or mystery hints in its panel. The Millpond's panel and its skating card say what the water is doing now, and never mention the crack or the glint. Fountain Square's panel says something is happening, and names the dancers, only while they dance; before and after, a dancer's card reads like any stroll. The flash mob is never in the events list or the almanac, and the live stream films it without billing it.
 
 Run `npm run check` and `npm run format:check`.

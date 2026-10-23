@@ -6,6 +6,7 @@ import {
   FARM_SITE,
   MILLPOND_SITE,
   MARKET_SITE,
+  SQUARE_SITE,
 } from './town-config.ts';
 import { createWorldLayout, type Point, type Plot } from './world-layout.ts';
 export { BLOCK_SIZE, ROAD_MIN } from './world-layout.ts';
@@ -19,6 +20,7 @@ export const WORLD = createWorldLayout(TOWN_SIZE, [
   FARM_SITE,
   MILLPOND_SITE,
   MARKET_SITE,
+  SQUARE_SITE,
 ]);
 export const PLOTS = WORLD.plots;
 export const STREETLIGHTS = WORLD.streetlights;

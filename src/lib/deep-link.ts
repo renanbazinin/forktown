@@ -1,4 +1,5 @@
 import { CINEMA_VENUE, isCinemaPlot } from './cinema';
+import { isSquarePlot, SQUARE_VENUE } from './square';
 import { VENUES } from './events';
 import { FARM, isFarmPlot } from './farm';
 import { FOOTBALL_VENUE, isFootballPlot } from './football';
@@ -21,6 +22,8 @@ const VENUE_LINKS = new Map<string, string>([
   ['tube', TUBE_VENUE.plot],
   ['zoo', ZOO_VENUE.plot],
   ['cinema', CINEMA_VENUE.plot],
+  ['square', SQUARE_VENUE.plot],
+  ['fountain', SQUARE_VENUE.plot],
   ['football', FOOTBALL_VENUE.plot],
   // The Riverside: Market Square, the Bandstand and the Boat Landing. Stargazing is on the
   // Bandstand's lawn and the regatta at the Landing, so their links are aliases.
@@ -70,6 +73,7 @@ const VENUE_OF: [string, (plot: string) => boolean][] = [
   ['tube', isTubePlot],
   ['football', isFootballPlot],
   ['cinema', isCinemaPlot],
+  ['square', isSquarePlot],
   ['zoo', isZooPlot],
   ['fork', (plot) => plot === FORK_PLOT],
   ['stage', (plot) => plot === STAGE_PLOT],

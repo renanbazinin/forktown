@@ -50,6 +50,7 @@ import {
   type ErrandVisual,
 } from './seasonal-errands';
 import { errandAction } from './errand-copy';
+import { FLASH_MOB_ID } from './square';
 export { roadPath, facingAlong } from './walking';
 
 export type ResidentState = {
@@ -122,6 +123,11 @@ function tubeLabel(transit: ResidentTransit, event: NonNullable<ResidentState['e
     return `Stepping off the tube at ${tubeStation(transit.to).name}`;
   const [to, from] = TUBE_PLACES[event.id] ?? [event.name, 'the event'];
   const verb = transit.stage === 'boarding' ? 'Boarding' : 'Riding';
+  // A flash-mob dancer's ride gives nothing away: just the halt, or home.
+  if (event.id === FLASH_MOB_ID)
+    return event.phase === 'returning'
+      ? `${verb} the tube home`
+      : `${verb} the tube to ${tubeStation(transit.to).name}`;
   return event.phase === 'returning'
     ? `${verb} the tube home from ${from}`
     : `${verb} the tube to ${to}`;
@@ -133,6 +139,13 @@ export function residentActivityLabel(state: ResidentState): string {
   // The Riverside's outings say what they are: walking to the square, browsing, home again.
   const outing = state.event && outingLabels(state.event.id);
   if (state.event && outing) return outing[state.event.phase];
+  // The flash mob keeps its secret until the dancing starts: before and after, just a stroll.
+  if (state.event?.id === FLASH_MOB_ID)
+    return state.event.phase === 'attending'
+      ? 'Dancing in a flash mob'
+      : state.event.phase === 'waiting'
+        ? 'Enjoying Fountain Square'
+        : 'Out for a stroll';
   if (state.event?.phase === 'waiting')
     return `Waiting for ${state.event.id === 'cinema' ? 'the film to start' : state.event.name}`;
   if (state.event?.id === 'zoo')
@@ -322,6 +335,23 @@ function memoFor(home: Place) {
   if (!memo) memos.set(home, (memo = { runs: strollRuns(home), day: NaN }));
   return memo;
 }
+/**
+ * A home's runs on a day with its trips: a run stretches to cover a trip that sets out within it
+ * and gets home after it ends (the flash mob's dancers, out until 20:00), so they step in through
+ * the door when they get home, as anyone does at a run's end. The same runs when nothing stretches.
+ */
+function runsWith(runs: Run[], trips: readonly Commitment[]): Run[] {
+  let stretched = runs;
+  for (const trip of trips) {
+    const index = stretched.findIndex(
+      (run) => trip.depart >= run.start && trip.depart < run.end && trip.homeBy > run.end,
+    );
+    if (index < 0) continue;
+    if (stretched === runs) stretched = runs.map((run) => ({ ...run }));
+    stretched[index].end = trip.homeBy;
+  }
+  return stretched;
+}
 /** The plan for a window, from the home's last one when it is the same window of the same day. */
 function planFor(home: Place, plot: Plot, day: number, window: FreeWindow): HomePlan {
   const memo = memoFor(home);
@@ -425,7 +455,7 @@ function dayLanes(
     const plot = getPlot(home.plot);
     if (!plot) continue;
     const trips = commitments.get(home.id) ?? [];
-    for (const run of memoFor(home).runs)
+    for (const run of runsWith(memoFor(home).runs, trips))
       for (const window of runWindows(run, trips)) {
         const plan = windowPlan(home, plot, planDay, window);
         for (const seg of plan.segs) {
@@ -521,7 +551,7 @@ function homeState(
   nextDay: () => ReadonlyMap<string, readonly Commitment[]>,
   lanes: (key: string) => LanePath | undefined,
 ): ResidentState {
-  const { runs } = memoFor(home);
+  const runs = runsWith(memoFor(home).runs, trips);
   const run = runs.find((run) => tripTime >= run.start && tripTime < run.end);
   let point: PlanPoint | undefined;
   if (run)

@@ -15,6 +15,7 @@ import { PLOT_COPY } from '../lib/brand';
 import { FollowErrandItem } from './ErrandItemPreview';
 import { venueAt, type TownEvent } from '../lib/events';
 import { CINEMA_FRAME, isCinemaPlot, cinemaAt, cinemaListening } from '../lib/cinema';
+import { isSquarePlot, SQUARE_FRAME, squareListening } from '../lib/square';
 import {
   BANDSTAND_VENUE,
   bandstandListening,
@@ -65,6 +66,8 @@ type Props = {
   onCinemaListening: (listening: { gain: number; pan: number }) => void;
   /** What the camera hears of the Bandstand (bandstandListening), for its band's set. */
   onBandstandListening?: (listening: { gain: number; pan: number }) => void;
+  /** What the camera hears of Fountain Square (squareListening), for the flash mob's music. */
+  onSquareListening?: (listening: { gain: number; pan: number }) => void;
   followed: string | null;
   onStopFollowing: () => void;
   onResidentSelect: (id: string) => void;
@@ -94,6 +97,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     onListening,
     onCinemaListening,
     onBandstandListening,
+    onSquareListening,
     followed,
     onStopFollowing,
     onResidentSelect,
@@ -157,6 +161,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     football: { gain: 0, pan: 0 },
     cinema: { gain: 0, pan: 0 },
     bandstand: { gain: 0, pan: 0 },
+    square: { gain: 0, pan: 0 },
   });
   useEffect(() => {
     const football = steadyListening(
@@ -176,6 +181,11 @@ const City = forwardRef<CityHandle, Props>(function City(
     if (cinema !== heard.current.cinema) onCinemaListening((heard.current.cinema = cinema));
     if (bandstand !== heard.current.bandstand)
       onBandstandListening?.((heard.current.bandstand = bandstand));
+    const square = steadyListening(
+      heard.current.square,
+      squareListening(renderedCamera, size.width, size.height),
+    );
+    if (square !== heard.current.square) onSquareListening?.((heard.current.square = square));
   }, [
     renderedCamera.x,
     renderedCamera.y,
@@ -185,6 +195,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     onListening,
     onCinemaListening,
     onBandstandListening,
+    onSquareListening,
   ]);
   const footballCamera = (width: number, height: number): Camera => {
     const pt = project(FOOTBALL_CENTER.x, FOOTBALL_CENTER.y);
@@ -299,6 +310,7 @@ const City = forwardRef<CityHandle, Props>(function City(
     if (isMillpondPlot(id)) return millpondCamera(width, height);
     if (isTubePlot(id)) return tubeCamera(width, height, id);
     if (isCinemaPlot(id)) return cinemaCamera(width, height);
+    if (isSquarePlot(id)) return frameCamera(SQUARE_FRAME, width, height);
     if (isFootballPlot(id)) return footballCamera(width, height);
     const district = districtFrameOf(id);
     if (district) return frameCamera(district, width, height);

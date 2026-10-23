@@ -22,6 +22,9 @@ import { useTownClock } from '../lib/use-town-clock';
 import { townTuneAt, trackForTown } from '../music/score';
 import { cinemaAt, cinemaListening } from '../lib/cinema';
 import { bandstandListening } from '../lib/district-places';
+import { squareListening } from '../lib/square';
+import { flashMobSoundAt } from '../lib/flash-mob-sound';
+import { FLASH_MOB_PREROLL } from '../music/flash-mob-player';
 import { townArrivalDates, townArrivals } from '../lib/arrivals';
 import { TOWN_DAY_MS } from '../lib/town-time';
 import { readLiveParams } from '../lib/live-params';
@@ -81,6 +84,7 @@ export default function LiveStream() {
   const [listening, setListening] = useState({ gain: 0, pan: 0 });
   const [cinemaField, setCinemaField] = useState({ gain: 0, pan: 0 });
   const [bandstandField, setBandstandField] = useState({ gain: 0, pan: 0 });
+  const [squareField, setSquareField] = useState({ gain: 0, pan: 0 });
   const cinema = useMemo(() => cinemaAt(clock.minutes, clock.day), [clock.minutes, clock.day]);
   const program = useMemo(() => liveProgram(places, clock.day), [clock.day]);
   // Tomorrow's program while idle in the last town hour (its plan first), so midnight never waits.
@@ -302,6 +306,9 @@ export default function LiveStream() {
     // The same steps the town's own view hears in, so both sound alike.
     setCinemaField((old) => steadyListening(old, screen));
     setBandstandField((old) => steadyListening(old, band));
+    // Fountain Square, for the flash mob's music: heard the same way.
+    const square = squareListening(camera.current, size.width, size.height);
+    setSquareField((old) => steadyListening(old, square));
     setListening((old) => steadyListening(old, field));
   }, [
     size,
@@ -381,6 +388,8 @@ export default function LiveStream() {
         cinema={cinema}
         cinemaListening={cinemaField}
         bandstand={bandstandField}
+        {...flashMobSoundAt(places, clock.minutes, clock.day, FLASH_MOB_PREROLL)}
+        flashMobListening={squareField}
         breakSound={breakSound}
         prepare={prepare}
         autoStart

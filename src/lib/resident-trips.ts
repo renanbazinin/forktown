@@ -40,6 +40,16 @@ import {
 } from './outings';
 import { MILLPOND_VENUE, SKATING, millpondRoute, millpondSkatingDay, skateGlide } from './millpond';
 import {
+  FLASH_MOB_DANCERS,
+  FLASH_MOB_ID,
+  FLASH_MOB_READY,
+  FLASH_MOB_TIMES,
+  flashMobDay,
+  SQUARE_VENUE,
+  squareApproach,
+} from './square';
+import { flashMobFrame } from './flash-mob';
+import {
   facingAlong,
   opposite,
   planJourney,
@@ -164,6 +174,7 @@ export function eventApproach(event: Pick<VisitEvent, 'venue' | 'outing'>, seat:
   }
   if (event.venue.kind === 'zoo') return zooRoute(eventSpot(event.venue, seat).position);
   if (event.venue.kind === 'millpond') return millpondRoute(seat);
+  if (event.venue.kind === 'square') return squareApproach(seat);
   return venueApproach(event.venue, seat);
 }
 
@@ -371,6 +382,38 @@ export const skatingVisit: VisitEvent = {
   // Whoever leaves last (stagger 5 × 1.3) is still off the ice by the posted 16:40.
   end: SKATING.end - 6.5,
 };
+
+/**
+ * The flash mob at Fountain Square, as the planner seats it on even dates. A town secret: it is
+ * never in the events list, and its dancers look like anyone else out on the square until 17:00.
+ */
+export const flashMobVisit: VisitEvent = {
+  id: FLASH_MOB_ID,
+  name: SQUARE_VENUE.name,
+  description: 'An afternoon on Fountain Square',
+  venue: SQUARE_VENUE,
+  period: 'afternoon',
+  ...FLASH_MOB_TIMES,
+};
+/**
+ * The routine's window for an event. The flash mob's dancers may stay out until 20:00 for it,
+ * past the end of an afternoon stroll: the dance runs to 18:30, and lantern hour waits for nobody.
+ */
+function eventWindow(home: Place, event: VisitEvent, period: Period) {
+  const window = availableWindow(home, period);
+  return event.id === FLASH_MOB_ID
+    ? { ...window, availableUntil: Math.max(window.availableUntil, FLASH_MOB_TIMES.homeBy) }
+    : window;
+}
+/** Today's flash-mob dancers, by seat (seat 0 starts it); none on an odd date or an empty town. */
+export function flashMobDancers(places: Place[], day: number): string[] {
+  if (!flashMobDay(day)) return [];
+  const dancers: { id: string; seat: number }[] = [];
+  for (const [id, trips] of residentTrips(places, day))
+    for (const trip of trips)
+      if (trip.event.id === FLASH_MOB_ID) dancers.push({ id, seat: trip.seat });
+  return dancers.sort((a, b) => a.seat - b.seat).map((dancer) => dancer.id);
+}
 
 const previews = new WeakMap<Place[], { roster: Place[]; newcomers: Place[] }>();
 
@@ -719,6 +762,19 @@ export function planResidentTrips(
   // A festival comes first in its afternoon: rare days are the point.
   outing('regatta');
   outing('harvest-fair');
+  // On even dates the flash mob, a town secret: up to twelve afternoon strollers who can be at
+  // Fountain Square by 16:58 and home by 20:00 (later if they stroll on into the evening) dance
+  // there at 17:00, and skip the rest of the afternoon's outings. Their routine still rules:
+  // nobody working or at home that afternoon is ever asked.
+  if (flashMobDay(day))
+    seated.set(
+      'flash-mob',
+      seat(
+        flashMobVisit,
+        sorted('afternoon', `flash-mob:${day}`, excluded('flash-mob')),
+        all(FLASH_MOB_DANCERS),
+      ),
+    );
   const picnic = program[0];
   seated.set(
     'green',
@@ -817,7 +873,7 @@ export function planHome(
 ): ResidentTrip[] {
   const trips: ResidentTrip[] = [];
   for (const { event, seat, period } of list) {
-    const window = availableWindow(home, period);
+    const window = eventWindow(home, event, period);
     const previous = trips.at(-1);
     const previousReturn = previous?.homeBy ?? window.availableFrom;
     // Unhurried tube legs when the ride saves time; walking trips never build any.
@@ -969,6 +1025,12 @@ export function planHome(
     // A regatta guest sets their boat down before the boatwright comes for it, a minute before
     // its launch: one who would be later passes the seat on.
     if (event.outing === 'regatta' && plan.arrive > event.start - REGATTA_HANDOVER) continue;
+    // A dancer is in place before the music starts and stays to the end of it.
+    if (
+      event.id === FLASH_MOB_ID &&
+      (plan.arrive > event.start - FLASH_MOB_READY || plan.leave < event.end)
+    )
+      continue;
     const legs = tube && paceLegs(tube.legs, plan.speedMultiplier);
     trips.push({
       route,
@@ -1120,8 +1182,10 @@ export function tripState(
   // show waits at their spot until it starts.
   const spec = event.outing ? outingOf(event.outing) : undefined;
   const skating = event.venue.kind === 'millpond';
+  const mob = event.id === FLASH_MOB_ID;
   const underway =
     skating ||
+    mob ||
     event.venue.kind === 'zoo' ||
     event.venue.kind === 'football' ||
     spec?.underway === true;
@@ -1141,6 +1205,17 @@ export function tripState(
       pose: 'skate',
       event: { id: event.id, name: event.name, phase },
     };
+  // A flash-mob dancer lingers like anyone else on the square, dances on the mob's beat, and
+  // lingers again until they leave: 'waiting' until the secret is out, 'attending' while dancing.
+  if (mob && phase === 'attending') {
+    const { dancing, pose, ...frame } = flashMobFrame(seat, time, day, arrive, leave);
+    return {
+      ...frame,
+      activity: 'stroll',
+      ...(pose ? { pose } : {}),
+      event: { id: event.id, name: event.name, phase: dancing ? 'attending' : 'waiting' },
+    };
+  }
   // Each walker keeps to a lane, apart from anyone walking with them, so they stay two.
   const lanes = phase === 'going' || phase === 'returning' ? lanesOf(trip, home.id) : undefined;
   const zoo =

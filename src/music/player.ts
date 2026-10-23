@@ -3,6 +3,7 @@ import { renderFootballTakes, renderTrack } from './synth';
 import { FOOTBALL_SOUND_TAKES, renderFootballSound } from './football-sound';
 import type { FootballSound } from '../lib/football';
 import { CinemaPlayer, type CinemaPlayback } from './cinema-player';
+import { FlashMobPlayer, type FlashMobPlayback } from './flash-mob-player';
 import type { Playable } from '../lib/break-cards';
 
 /** A looping track on air: its own gain, and for a band a pan toward the stand. */
@@ -32,6 +33,14 @@ export class TownPlayer {
   private output: GainNode;
   private music: GainNode;
   private cinema: CinemaPlayer;
+  /** Fountain Square's flash mob, on the clock like the cinema (flash-mob-player.ts). */
+  private mob: FlashMobPlayer;
+  /**
+   * How far the cinema and the flash mob each ask the town's music to duck (their gains). They
+   * share the music bus, so it follows the louder: neither undoes the other's duck.
+   */
+  private ducks = { cinema: 0, mob: 0 };
+  private ducked = 1;
   private current?: Playing;
   /** The town's own tune, kept playing under a Bandstand band (and never restarted for it). */
   private bed?: Playing;
@@ -55,13 +64,18 @@ export class TownPlayer {
     this.output.connect(this.context.destination);
     this.music = this.context.createGain();
     this.music.connect(this.output);
-    this.cinema = new CinemaPlayer(this.context, this.output, (gain) => {
-      this.music.gain.setTargetAtTime(
-        1 - Math.min(1, gain * 2.5) * 0.94,
-        this.context.currentTime,
-        0.12,
-      );
-    });
+    this.cinema = new CinemaPlayer(this.context, this.output, (gain) =>
+      this.duckFor('cinema', gain),
+    );
+    this.mob = new FlashMobPlayer(this.context, this.output, (gain) => this.duckFor('mob', gain));
+  }
+  /** Eases the town's music under the louder of the cinema and the flash mob (bedLevel's curve). */
+  private duckFor(source: 'cinema' | 'mob', gain: number) {
+    this.ducks[source] = gain;
+    const level = bedLevel(Math.max(this.ducks.cinema, this.ducks.mob));
+    if (level === this.ducked) return;
+    this.ducked = level;
+    this.music.gain.setTargetAtTime(level, this.context.currentTime, 0.12);
   }
   resume() {
     return this.context.resume().then(() => this.warmEffects());
@@ -69,6 +83,7 @@ export class TownPlayer {
   suspend() {
     this.silenceEffects();
     this.cinema.stop(true);
+    this.mob.stop(true);
     return this.context.suspend();
   }
   cinemaSound(state?: CinemaPlayback) {
@@ -80,6 +95,20 @@ export class TownPlayer {
   }
   get cinemaStatus() {
     return this.cinema.status;
+  }
+  /**
+   * Plays Fountain Square's flash mob in step with the clock at the camera's gain and pan, or
+   * stops it (no state). Never through play(): its music is not a loop and follows the clock.
+   */
+  mobSound(state?: FlashMobPlayback) {
+    this.mob.sync(state);
+  }
+  /** Renders the flash mob's music ahead (a few seconds' work), so it is ready at 17:00. */
+  mobPrepare() {
+    this.mob.prepare();
+  }
+  get mobStatus() {
+    return this.mob.status;
   }
   effect(kind: FootballSound['kind'], volume: number, pan: number) {
     if (this.disposed || volume <= 0 || this.context.state !== 'running') return;
@@ -330,6 +359,7 @@ export class TownPlayer {
   stop() {
     this.silenceEffects();
     this.cinema.stop();
+    this.mob.stop();
     ++this.revision;
     this.current = undefined;
     this.bed = undefined;
@@ -343,6 +373,7 @@ export class TownPlayer {
   }
   dispose() {
     this.cinema.dispose();
+    this.mob.dispose();
     this.silenceEffects();
     this.effectBuffers.clear();
     this.disposed = true;

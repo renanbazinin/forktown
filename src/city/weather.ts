@@ -4,6 +4,7 @@ import { insideFarm } from '../lib/farm';
 import { insideFootball } from '../lib/football';
 import { insideZoo } from '../lib/zoo';
 import { insideMillpond, MILLPOND_REEDS } from '../lib/millpond';
+import { insideSquare } from '../lib/square';
 import { insideDistrict } from '../lib/district-places';
 import { VENUES } from '../lib/events';
 import { hash, isRoad, PLOTS, project, WORLD_HEIGHT, WORLD_WIDTH, type Point } from '../lib/world';
@@ -49,8 +50,8 @@ const onGrass = (x: number, y: number) =>
   x < WORLD_WIDTH &&
   y < WORLD_HEIGHT &&
   !isRoad(Math.floor(x), Math.floor(y)) &&
-  ![insideCinema, insideZoo, insideFootball, insideFarm, insideMillpond].some((inside) =>
-    inside({ x, y }),
+  ![insideCinema, insideZoo, insideFootball, insideFarm, insideMillpond, insideSquare].some(
+    (inside) => inside({ x, y }),
   ) &&
   // The Riverside's grounds have their own art: the square, the Bandstand and the Landing.
   !(['market', 'bandstand', 'landing'] as const).some((kind) => insideDistrict(kind, { x, y }));

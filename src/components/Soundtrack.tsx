@@ -19,6 +19,9 @@ export default function Soundtrack({
   bandstand = { gain: 0, pan: 0 },
   breakSound = null,
   prepare = null,
+  flashMob = null,
+  flashMobListening = { gain: 0, pan: 0 },
+  flashMobSoon = false,
   autoStart = false,
   hideControls = false,
 }: {
@@ -38,6 +41,16 @@ export default function Soundtrack({
   breakSound?: { film: Playable; elapsed: number; key: string } | null;
   /** The next break's ad or card, rendered ahead so its sound starts on time. */
   prepare?: Playable | null;
+  /**
+   * Fountain Square's flash mob while it dances (a secret: only on a flash-mob day with dancers):
+   * `elapsed` is town minutes since 17:00 (from −FLASH_MOB_PREROLL, so its first beat lands on
+   * time, up to FLASH_MOB_SECONDS), `key` one per mob. Null otherwise.
+   */
+  flashMob?: { elapsed: number; key: string } | null;
+  /** What the camera hears of the square (squareListening). */
+  flashMobListening?: { gain: number; pan: number };
+  /** A flash mob is coming today: its music is rendered ahead (from about 16:00). */
+  flashMobSoon?: boolean;
   autoStart?: boolean;
   hideControls?: boolean;
 }) {
@@ -51,8 +64,24 @@ export default function Soundtrack({
   const request = useRef(0);
   const previousMatch = useRef<FootballState | null>(null);
   const audible = enabled && playing && !hidden && cinemaListening.gain >= 0.005;
-  const audibleFilm = audible ? (cinema.slot?.film ?? cinema.slot?.ad) : undefined;
-  const audibleTitle = cinema.slot?.film?.title ?? cinema.slot?.ad?.sponsor;
+  const { gain: mobGain, pan: mobPan } = flashMobListening;
+  // A film or an ad on the cinema's screen, when the camera can hear it.
+  const cinemaFilm = audible ? (cinema.slot?.film ?? cinema.slot?.ad) : undefined;
+  // The flash mob is named only while it is heard: from its first beat, near the square, unless a
+  // louder film is playing (the screen is dark at 17:00, so in practice it never is).
+  const audibleMob =
+    enabled &&
+    playing &&
+    !hidden &&
+    !breakSound &&
+    !!flashMob &&
+    flashMob.elapsed >= 0 &&
+    mobGain >= 0.005 &&
+    (!cinemaFilm || mobGain >= cinemaListening.gain);
+  const audibleFilm = audibleMob ? undefined : cinemaFilm;
+  const audibleTitle = audibleMob
+    ? TRACKS.flashmob.title
+    : (cinema.slot?.film?.title ?? cinema.slot?.ad?.sponsor);
   useEffect(() => {
     const film = cinema.slot?.film ?? cinema.slot?.ad;
     player.current?.cinemaSound(
@@ -74,6 +103,18 @@ export default function Soundtrack({
   useEffect(() => {
     if (enabled && prepare) player.current?.cinemaPrepare(prepare);
   }, [enabled, prepare]);
+  // The flash mob plays on the clock like a film, near the square, and not under a break.
+  useEffect(() => {
+    player.current?.mobSound(
+      enabled && playing && !hidden && !breakSound && flashMob
+        ? { ...flashMob, gain: mobGain, pan: mobPan }
+        : undefined,
+    );
+  }, [flashMob, mobGain, mobPan, enabled, playing, hidden, breakSound]);
+  const mobAhead = !!flashMob || flashMobSoon;
+  useEffect(() => {
+    if (enabled && mobAhead) player.current?.mobPrepare();
+  }, [enabled, mobAhead]);
   useEffect(() => {
     if (enabled && playing && !hidden && upcoming && upcoming !== track && upcoming !== bed)
       player.current?.prepare(upcoming);
@@ -192,7 +233,11 @@ export default function Soundtrack({
       <button
         aria-label="Town sound"
         aria-expanded={open}
-        title={enabled ? (audible && audibleTitle) || TRACKS[track].title : 'Turn on town sound'}
+        title={
+          enabled
+            ? ((audibleFilm || audibleMob) && audibleTitle) || TRACKS[track].title
+            : 'Turn on town sound'
+        }
         onClick={() => setOpen(!open)}
       >
         {enabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -214,13 +259,15 @@ export default function Soundtrack({
               <X size={14} />
             </button>
           </div>
-          <strong>{(audibleFilm && audibleTitle) || TRACKS[track].title}</strong>
+          <strong>{((audibleFilm || audibleMob) && audibleTitle) || TRACKS[track].title}</strong>
           <p>
-            {audibleFilm
-              ? cinema.slot?.ad
-                ? 'A word from around town'
-                : 'Original movie score and sound effects'
-              : TRACKS[track].subtitle}
+            {audibleMob
+              ? TRACKS.flashmob.subtitle
+              : audibleFilm
+                ? cinema.slot?.ad
+                  ? 'A word from around town'
+                  : 'Original movie score and sound effects'
+                : TRACKS[track].subtitle}
           </p>
           <p className="sound-field-note">
             Zoom into the cinema for movie music and sound effects, the football for kicks,
@@ -248,6 +295,11 @@ export default function Soundtrack({
           </label>
           <small role="status">
             {error ||
+              (audibleMob && player.current?.mobStatus === 'error'
+                ? 'This music could not load. Turn sound off and on to retry.'
+                : audibleMob && player.current?.mobStatus === 'preparing'
+                  ? 'Tuning in…'
+                  : '') ||
               (audibleFilm && player.current?.cinemaStatus === 'error'
                 ? 'Movie sound could not load. Turn sound off and on to retry.'
                 : audibleFilm && player.current?.cinemaStatus === 'preparing'

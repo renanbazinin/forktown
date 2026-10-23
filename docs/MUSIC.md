@@ -95,6 +95,27 @@ It plays over the town's own tune, which eases down as the band comes up (the ci
 curve) and comes back up, never restarted, when the set ends or the camera leaves: a band
 heard faintly from afar never leaves the town near silent. A live stage show plays first. See [Town events](TOWN_EVENTS.md#bandstand-evenings).
 
+# Fountain Square
+
+On the square's secret afternoons (17:00 on even dates, when there are dancers) a flash mob
+dances to **Nothing to See Here** (`src/music/flash-mob-track.ts`): 120 BPM, G major lifted to A
+for the finale, 180 beats (90 s), written beat for beat to the dance plan in
+`src/lib/flash-mob-beat.ts`: a solo groove, one music-box note for each dancer who joins (eleven, for a full mob of twelve) and a
+new layer every two bars, then a fresh figure for every 16-beat move (claps, stabs thrown left
+and right on the points, a bouncing bass, a harp sweep for the wave, a whirling marimba for the
+spin, big hits for the jumps), a finale build, and one hit on beat 168. After it nothing sounds
+but that hit's decay: the dancers hold their pose in silence. The claps are four brush taps a
+few milliseconds apart across the stereo field, with a whisper of snare.
+
+It is not one of the town's loops. `flash-mob-player.ts` plays it once, in step with the clock
+like a cinema film: it starts at the clock's offset when you arrive mid-way, schedules its first
+beat ahead from 16:59:58, allows for the device's output latency, and moves back in step only
+when it has drifted a sixteenth for half a second (a stale clock reading alone never moves it).
+It is heard only near the square, as the cinema is, and the town's tune ducks under it. It is
+rendered from 16:00 on a flash-mob day, so it is ready on the stroke of five. It is never in
+`TOWN_ROTATION`; the listening room shelves it under Fountain Square, where it can also be played
+on a pretend clock from 16:59:58 or from any part of the dance.
+
 # Football sounds
 
 The Meadow Ground adds original synthesized kick, whistle, and crowd effects to the same opt-in Town sound control. Effects follow the match's actual pass, shot, and goal moments; they fade with zoom and camera distance and pan toward the ground. Pausing, muting, hiding the tab, or moving away stops them. Resuming skips missed cues. See [Football at the Meadow Ground](FOOTBALL.md) for the sound and match preview.

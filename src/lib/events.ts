@@ -5,6 +5,7 @@ import { isMillpondPlot } from './millpond.ts';
 import { isTubePlot } from './tubes.ts';
 import { ZOO_VENUE, ZOO_SPOTS, isZooPlot, insideZoo } from './zoo.ts';
 import { CINEMA_VENUE, CINEMA_SEATS, isCinemaPlot, insideCinema, cinemaProgram } from './cinema.ts';
+import { FLASH_MOB_SPOTS, insideSquare, isSquarePlot, SQUARE_VENUE } from './square.ts';
 import { FORK_ID, FORK_NAME, FORK_PLOT } from './lanterns.ts';
 import {
   BANDSTAND_VENUE,
@@ -33,6 +34,8 @@ export const VENUES = [
   MARKET_VENUE,
   BANDSTAND_VENUE,
   LANDING_VENUE,
+  // Fountain Square (D8–E9), beside the cinema. Defined in square.ts.
+  SQUARE_VENUE,
   // The heart of town: one lantern for every neighbor. Drawn by src/city/lantern-fork.ts.
   // Add new venues before the Fork; eventsForDay reads VENUES[0] and VENUES[1].
   { id: FORK_ID, plot: FORK_PLOT, name: FORK_NAME, kind: 'fork' },
@@ -60,7 +63,22 @@ export type EventPose =
   /** Halfway between standing and sitting, for a moment on the way down or up. */
   | 'crouch'
   /** Arms up for a stretch, just out of the door in the morning. */
-  | 'stretch';
+  | 'stretch'
+  // The flash mob's moves (src/lib/flash-mob.ts), on its beat (flash-mob-beat.ts):
+  /** A side step on the beat, the arms pumping in turn. */
+  | 'groove'
+  /** Clapping on the beat. */
+  | 'clap'
+  /** One arm thrown up and out, the other hand on the hip. */
+  | 'point'
+  /** Both arms up, swaying overhead in a wave down the line. */
+  | 'wave'
+  /** Arms out, turning on the spot a quarter at a time. */
+  | 'spin'
+  /** A little jump, arms up. */
+  | 'jump'
+  /** The final pose: one arm high, the other on the hip, held. */
+  | 'tada';
 type EventSpot = { x: number; y: number; facing: 'se' | 'sw' | 'ne' | 'nw' };
 /** District spots are frozen in absolute tiles; EVENT_SPOTS keeps them round the anchor's centre. */
 function relativeTo(plotId: string, spots: readonly Spot[]): EventSpot[] {
@@ -99,6 +117,7 @@ export const EVENT_SPOTS: Record<Venue['kind'], readonly EventSpot[]> = {
   market: relativeTo(MARKET_VENUE.plot, DISTRICT_SPOTS.market),
   bandstand: relativeTo(BANDSTAND_VENUE.plot, DISTRICT_SPOTS.bandstand),
   landing: relativeTo(LANDING_VENUE.plot, DISTRICT_SPOTS.landing),
+  square: relativeTo(SQUARE_VENUE.plot, FLASH_MOB_SPOTS),
 };
 export function eventSpot(venue: Venue, index: number) {
   const plot = getPlot(venue.plot)!;
@@ -113,6 +132,7 @@ export function insideVenue(venue: Venue | DistrictVenue, point: { x: number; y:
   if (isDistrictVenue(venue)) return insideDistrict(venue.kind, point);
   if (venue.kind === 'zoo') return insideZoo(point);
   if (venue.kind === 'cinema') return insideCinema(point);
+  if (venue.kind === 'square') return insideSquare(point);
   const plot = getPlot(venue.plot)!;
   return Math.abs(point.x - plot.x - 0.5) <= 1.5 && Math.abs(point.y - plot.y - 0.5) <= 1.5;
 }
@@ -121,9 +141,11 @@ export const venueAt = (plot: string) =>
     ? ZOO_VENUE
     : isCinemaPlot(plot)
       ? CINEMA_VENUE
-      : (MARKET_PLOTS as readonly string[]).includes(plot)
-        ? MARKET_VENUE
-        : VENUES.find((venue) => venue.plot === plot);
+      : isSquarePlot(plot)
+        ? SQUARE_VENUE
+        : (MARKET_PLOTS as readonly string[]).includes(plot)
+          ? MARKET_VENUE
+          : VENUES.find((venue) => venue.plot === plot);
 export const HOUSE_PLOTS = PLOTS.filter(
   (plot) =>
     !venueAt(plot.id) &&

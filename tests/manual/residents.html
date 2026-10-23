@@ -28,7 +28,10 @@
     <p>
       Male and female figures in all four directions, with shared poses and accessories. The magenta
       dot is where each figure stands: a perched sitter's feet, with the seat behind them. The night
-      rows are dimmed as the map dims them after dark; greetings and a tea's steam stay bright.
+      rows are dimmed as the map dims them after dark; greetings and a tea's steam stay bright. The
+      flash mob's moves run on its beat: the groove and the wave over two beats, the clap, point and
+      spin over one, the jump over its own cycle; ta-da is held. Add <code>?phase=0.3</code> to hold
+      the animation at one phase.
     </p>
     <label
       >Accessory
@@ -40,8 +43,16 @@
     >
     <label>Skin <input id="skin" type="color" value="#D9B68B" /></label>
     <label>Hair <input id="hair" type="color" value="#675A48" /></label>
+    <label
+      >Scale
+      <select id="scale">
+        <option value="2">2</option>
+        <option value="1.25">1.25 (town zoom 1)</option>
+        <option value="2.25">2.25 (live zoom 1.8)</option>
+      </select></label
+    >
     <button id="play">Pause animation</button>
-    <canvas width="1440" height="2000" aria-label="Male and female figure comparison"></canvas>
+    <canvas width="1440" height="3480" aria-label="Male and female figure comparison"></canvas>
     <script type="module">
       import { drawResident } from '/src/city/residents.ts';
       import { DEFAULT_RESIDENT } from '/src/lib/schema.ts';
@@ -50,8 +61,10 @@
       const accessory = document.querySelector('#accessory');
       const skin = document.querySelector('#skin');
       const hair = document.querySelector('#hair');
-      let playing = true,
-        phase = 0,
+      const scale = document.querySelector('#scale');
+      const held = new URLSearchParams(location.search).get('phase');
+      let playing = held === null,
+        phase = Number(held ?? 0),
         previous = 0;
       document.querySelector('#play').onclick = (event) => {
         playing = !playing;
@@ -87,11 +100,28 @@
           'sweep',
           'crouch',
           'stretch',
+          // The flash mob's moves, on its beat (src/lib/flash-mob.ts).
+          'groove',
+          'clap',
+          'point',
+          'wave',
+          'spin',
+          'jump',
+          'tada',
           // After dark, beside the dimmed houses: out walking with a greeting, and tea on the porch.
           'night walk',
           'night tea',
+          // The flash mob at dusk, dimmed like the houses.
+          'night groove',
+          'night clap',
+          'night point',
+          'night wave',
+          'night spin',
+          'night jump',
+          'night tada',
         ];
         const night = (pose) => pose.startsWith('night ');
+        const base = (pose) => pose.replace(/^night /, '');
         const porchTea = (pose) => pose === 'porch tea' || pose === 'night tea';
         // The night rows' dark ground, from just under the row above, greeting room included.
         const first = poses.findIndex(night);
@@ -120,16 +150,16 @@
               },
               x,
               y,
-              2,
+              Number(scale.value),
               {
                 facing,
-                moving: pose === 'walk' || pose === 'night walk',
+                moving: base(pose) === 'walk',
                 walkPhase: phase,
-                pose: ['stand', 'walk', 'duckLove', 'night walk'].includes(pose)
+                pose: ['stand', 'walk', 'duckLove'].includes(base(pose))
                   ? undefined
                   : porchTea(pose)
                     ? 'tea'
-                    : pose,
+                    : base(pose),
                 lot: porchTea(pose) ? { spot: 'porch', stage: 'at' } : undefined,
                 duckLove: pose === 'duckLove',
                 greeting: pose === 'night walk',

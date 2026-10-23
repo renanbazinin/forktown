@@ -37,25 +37,26 @@ Neighbors set to `stroll` in an outing's period are eligible: morning for the ma
 
 The day is seated in one order. Each call leaves out the guests of the calls named in its last column, so nobody is in two places at once.
 
-| #   | Call                | Line                                                                      | Seats                   | Leaves out    | Days            |
-| --- | ------------------- | ------------------------------------------------------------------------- | ----------------------- | ------------- | --------------- |
-| 1   | Film                | `cinemaGuests(roster, day)`, forced, no backfill                          | min(12, ⌊eligible / 2⌋) | —             | daily           |
-| 2   | Football, morning   | hash `fans:${day}:morning`                                                | half(6)                 | —             | daily           |
-| 3   | Regatta             | turn tickets `regatta`; a launch per seat                                 | half(10)                | —             | Summer 10–16    |
-| 4   | Harvest Fair        | turn tickets `harvest-fair`                                               | half(12)                | #3            | Autumn 23–25    |
-| 5   | Lunch (green)       | hash `${day}:${choice.id}` (the hashed choice's id, also on snowmen days) | all(6)                  | #3–4          | daily           |
-| 6   | Zoo                 | hash `zoo:${day}`                                                         | half(12)                | #3–5          | daily           |
-| 7   | Football, afternoon | hash `fans:${day}:afternoon`                                              | half(6)                 | #3–6          | daily           |
-| 8   | Skating             | hash `skate:${day}`                                                       | half(6)                 | #3–7          | Winter 9–19     |
-| 9   | Long Table          | turn tickets `long-table`                                                 | all(16)                 | film          | Autumn 23–25    |
-| 10  | Concert             | hash `${day}:${choice.id}`                                                | all(8)                  | film, #9      | daily           |
-| 11  | Stargazing          | turn tickets `stargazing`                                                 | half(8)                 | film          | new-moon nights |
-| 12  | Disco               | turn tickets `night-party`                                                | all(8)                  | #11           | daily           |
-| 13  | Market              | turn tickets `market`; each home's own window                             | half(12)                | #2            | daily           |
-| 14  | Bandstand teatime   | turn tickets `bandstand-tea`                                              | all(8)                  | #3–8          | daily           |
-| 15  | Bandstand sundown   | turn tickets `bandstand-sundown`                                          | all(8)                  | film, #9, #10 | daily           |
+| #   | Call                | Line                                                                      | Seats                   | Leaves out         | Days            |
+| --- | ------------------- | ------------------------------------------------------------------------- | ----------------------- | ------------------ | --------------- |
+| 1   | Film                | `cinemaGuests(roster, day)`, forced, no backfill                          | min(12, ⌊eligible / 2⌋) | —                  | daily           |
+| 2   | Football, morning   | hash `fans:${day}:morning`                                                | half(6)                 | —                  | daily           |
+| 3   | Regatta             | turn tickets `regatta`; a launch per seat                                 | half(10)                | —                  | Summer 10–16    |
+| 4   | Harvest Fair        | turn tickets `harvest-fair`                                               | half(12)                | #3                 | Autumn 23–25    |
+| 5   | Flash mob           | hash `flash-mob:${day}`; in place by 16:58, may stay out until 20:00      | all(12)                 | #3–4               | even dates      |
+| 6   | Lunch (green)       | hash `${day}:${choice.id}` (the hashed choice's id, also on snowmen days) | all(6)                  | #3–5               | daily           |
+| 7   | Zoo                 | hash `zoo:${day}`                                                         | half(12)                | #3–6               | daily           |
+| 8   | Football, afternoon | hash `fans:${day}:afternoon`                                              | half(6)                 | #3–7               | daily           |
+| 9   | Skating             | hash `skate:${day}`                                                       | half(6)                 | #3–8               | Winter 9–19     |
+| 10  | Long Table          | turn tickets `long-table`                                                 | all(16)                 | film               | Autumn 23–25    |
+| 11  | Concert             | hash `${day}:${choice.id}`                                                | all(8)                  | film, #10          | daily           |
+| 12  | Stargazing          | turn tickets `stargazing`                                                 | half(8)                 | film               | new-moon nights |
+| 13  | Disco               | turn tickets `night-party`                                                | all(8)                  | #12                | daily           |
+| 14  | Market              | turn tickets `market`; each home's own window                             | half(12)                | #2                 | daily           |
+| 15  | Bandstand teatime   | turn tickets `bandstand-tea`                                              | all(8)                  | #3–9               | daily           |
+| 16  | Bandstand sundown   | turn tickets `bandstand-sundown`                                          | all(8)                  | film, #5, #10, #11 | daily           |
 
-- **Why this order.** A festival goes first in its period, because rare days are the point. The town's older daily outings keep their order and their lines. The Riverside's daily outings come last of all, so on a day without a festival they never change anyone else's guest list. On festival days the older lists change by design (see [Measured](#measured)).
+- **Why this order.** A festival goes first in its period, because rare days are the point. The flash mob at Fountain Square comes next (a [town secret](TOWN_SECRETS.md#fountain-square), never in the events list): its dancers skip the rest of the afternoon. The town's older daily outings keep their order and their lines. The Riverside's daily outings come last of all, so on a day without a festival they never change anyone else's guest list. On festival days the older lists change by design (see [Measured](#measured)).
 - **Hops.** A film guest may still walk straight from the cinema aisle to the disco. There is no hop from the stars to the disco: the Bandstand's gate to the stage's is 238 unhurried minutes.
 - **A previewed draft** joins every line behind the whole town, on the call's own hash key, and never holds a ticket. It only takes a spot the town leaves free, so it never changes anyone else's day.
 
@@ -65,11 +66,11 @@ A **hash line** is today's: the eligible neighbors, sorted by ``hash(`${key}:${i
 
 **Turn tickets** are fair turns that stay put when the town grows. Every Riverside outing and the disco use them. The outing's active days (every day for the daily ones, its own days for a festival, the new-moon nights for the stars) are dealt in blocks of P = ⌈L / spots⌉, where L is the number of house plots. In each block every house plot holds exactly one ticket day, by a hash of the outing, the block and the plot, and no day has more tickets than spots. On its ticket day a home goes to the front of the line; behind the ticket holders the rest of the line is today's hash line. So every eligible home is at the front once a block, whoever else lives in town.
 
-| Outing         | Spots | P (days in a block, 230 house plots) |
+| Outing         | Spots | P (days in a block, 226 house plots) |
 | -------------- | ----- | ------------------------------------ |
-| Market         | 12    | 20                                   |
+| Market         | 12    | 19                                   |
 | Regatta        | 10    | 23                                   |
-| Harvest Fair   | 12    | 20                                   |
+| Harvest Fair   | 12    | 19                                   |
 | Long Table     | 16    | 15                                   |
 | Stargazing     | 8     | 29                                   |
 | Bandstand sets | 8     | 29 each                              |
@@ -112,19 +113,19 @@ No arrival moves more than six minutes earlier, no leave passes its cap, and eve
 
 ### Personal windows
 
-- **The market.** Each home has its own browsing hour. It starts at 08:00 plus ten minutes times `hash('market-browse:' + id) % 13`, and lasts 60 to 90 minutes (`hash('market-stay:' + id) % 31` more than an hour), ending by 11:30. A home that can't make its own hour takes one it can make: of the n starts it can make, it takes number `hash('market-browse:' + id) % n`, counting from the earliest at 0. With none, it keeps the nominal 08:00–11:30. With 230 house plots, 47 morning-only plots move to an hour they can make, and then every plot can make the hour it has. Stays run 44–90 minutes in the real town and 33–90 in a full one.
+- **The market.** Each home has its own browsing hour. It starts at 08:00 plus ten minutes times `hash('market-browse:' + id) % 13`, and lasts 60 to 90 minutes (`hash('market-stay:' + id) % 31` more than an hour), ending by 11:30. A home that can't make its own hour takes one it can make: of the n starts it can make, it takes number `hash('market-browse:' + id) % n`, counting from the earliest at 0. With none, it keeps the nominal 08:00–11:30. On the 230-plot town (measured before Fountain Square), 47 morning-only plots moved to an hour they could make, and then every plot could make the hour it had. Stays run 44–90 minutes in the real town and 33–90 in a full one.
 - **The regatta.** Seat k's own start is 14:00 plus 6k minutes, when the boatwright launches their boat. A guest arrives in time to set the boat down a minute before its launch, or the seat passes on.
 
 ### One outing at a time
 
-| Period    | At most one of                                                                          | Also                                             |
-| --------- | --------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Morning   | morning football, the market                                                            |                                                  |
-| Afternoon | the lunch, the zoo, afternoon football, skating, the regatta, the fair, the teatime set |                                                  |
-| Evening   | the concert, the Long Table, the sundown set                                            | A film guest has none of them, and no stargazing |
-| Night     | the disco, stargazing                                                                   |                                                  |
+| Period    | At most one of                                                                                         | Also                                                                         |
+| --------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Morning   | morning football, the market                                                                           |                                                                              |
+| Afternoon | the lunch, the zoo, afternoon football, skating, the regatta, the fair, the teatime set, the flash mob | A dancer may stay out until 20:00, or as late as their evening stroll allows |
+| Evening   | the concert, the Long Table, the sundown set                                                           | A film guest has none of them, and no stargazing                             |
+| Night     | the disco, stargazing                                                                                  |                                                                              |
 
-No Bandstand spot is held by two guests whose visits overlap, across the teatime set, the sundown set and the stars. Every trip keeps fifteen minutes at the event at least, is home by the routine's end or by bedtime at night, leaves by its cap, never turns straight back on its route, and joins the venue's own approach where the road first meets it.
+No Bandstand spot is held by two guests whose visits overlap, across the teatime set, the sundown set and the stars. Every trip keeps fifteen minutes at the event at least, is home by the routine's end (a flash-mob dancer by 20:00, or later on an evening stroll) or by bedtime at night, leaves by its cap, never turns straight back on its route, and joins the venue's own approach where the road first meets it.
 
 ## Getting there and back
 
@@ -389,7 +390,7 @@ Run `npm run check`, `npm run format:check` and `npm run check:full-town`, which
 
 When you change events or outings, keep the selection stable across UTC rollover and the event boundaries exact, respect reserved plots and attendance limits, and keep guests on the roads, with no route that turns back on itself and no teleporting at arrival or departure, festival days included. Guests walk together side by side, crouch at their seats, hold each pose a minute at least as they settle in and get up to go, turn through a quarter at their spots and on the doorstep, and wait at their spots when they arrive early. Neighbors at work or home stay indoors.
 
-Even in a full town of 230 houses, over a town year, every seat is filled when enough neighbors can make it, a film seat stays empty only for a guest who can't reach the film and be home by bedtime, no spot is ever shared or over capacity, the tube never costs a trip made on foot, every trip keeps to its window and bedtime while rides and parcels never share the tube, seats go round the town, every night owl who can dance alone dances on some nights, every trip is worth the walk and keeps two minutes apart at every door and gate, a previewed draft never moves anyone, and the draw is the same in every browser language and roster order.
+Even in a full town, with a house on every house plot, over a town year, every seat is filled when enough neighbors can make it, a film seat stays empty only for a guest who can't reach the film and be home by bedtime, no spot is ever shared or over capacity, the tube never costs a trip made on foot, every trip keeps to its window and bedtime while rides and parcels never share the tube, seats go round the town, every night owl who can dance alone dances on some nights, every trip is worth the walk and keeps two minutes apart at every door and gate, a previewed draft never moves anyone, and the draw is the same in every browser language and roster order.
 
 The Riverside fills every seat on each of its days and none off them, with one outing a period and no Bandstand spot shared. On a day without a festival it changes no other guest list. Every guest stays inside their venue's ground, every regatta guest is at the water for their own boat, and a builder is there for every snowman stage. After changing routes or venues, compare the worst trips and the narrowest routines' reach with [Measured](#measured).
 

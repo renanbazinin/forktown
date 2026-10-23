@@ -4,12 +4,16 @@ import { BAND_COPY } from '../lib/district-copy';
 import { BANDSTAND_TRACKS, composeBandstand } from './bandstand-tracks';
 import type { Instrument } from './instruments';
 import { composeTune, isTune, TOWN_TUNES, type TuneId } from './tunes';
+import { composeFlashMob, FLASH_MOB_TRACK } from './flash-mob-track';
 
 /**
  * The town's own tunes (the day and night theme and the tunes of each hour, tunes/), the stage's
- * shows, and the Bandstand's three bands (bandstand-tracks.ts).
+ * shows, the Bandstand's three bands (bandstand-tracks.ts), and the flash mob's music at
+ * Fountain Square (flash-mob-track.ts: played once on the clock by flash-mob-player.ts, never in
+ * the rotation).
  */
-export type TrackId = 'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | Band | TuneId;
+export type TrackId =
+  'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | 'flashmob' | Band | TuneId;
 export type Voice = 'bell' | 'keys' | 'pluck' | 'lead' | 'pad' | 'bass' | 'kick' | 'snare' | 'hat';
 export type Note = {
   beat: number;
@@ -78,6 +82,7 @@ export const TRACKS: Record<TrackId, TrackInfo> = {
     bpm: 112,
     instruments: 'Plucked lead, offbeat keys, octave bass, four-on-the-floor kick',
   },
+  flashmob: FLASH_MOB_TRACK,
   ...BANDSTAND_TRACKS,
   ...TOWN_TUNES,
 };
@@ -437,6 +442,7 @@ export function compose(track: TrackId): Note[] {
   // A band plays its own arrangement; until it has one, today's acoustic notes.
   if (isBandTrack(track)) return composeBandstand(track) ?? compose('acoustic');
   if (isTune(track)) return composeTune(track);
+  if (track === 'flashmob') return composeFlashMob();
   const notes: Note[] = [];
   const add = (
     beat: number,

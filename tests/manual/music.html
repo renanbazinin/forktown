@@ -748,6 +748,24 @@
         }
       }
 
+      /* ---- Fountain Square: the flash mob on a pretend clock ---- */
+      .rehearsal {
+        display: grid;
+        gap: 10px;
+        margin-top: 16px;
+        padding: 16px;
+        background: var(--card);
+        border: 1px dashed var(--line);
+        border-radius: 18px;
+      }
+      .rehearsal .row {
+        flex-wrap: wrap;
+      }
+      .rehearsal output {
+        font: 13px var(--mono);
+        font-variant-numeric: tabular-nums;
+      }
+
       /* ---- Check all mixes ---- */
       .table-wrap {
         margin-top: 18px;
@@ -1223,6 +1241,7 @@
         teatime: ['#bf8489', '❦'],
         goldenhour: ['#c4843f', '❂'],
         lamplight: ['#87694d', '✶'],
+        flashmob: ['#6f93a8', '❋'],
       };
       const STAGE_SHOWS = ['rock', 'acoustic', 'jazz', 'party'];
       const DAY = 1440;
@@ -1334,6 +1353,12 @@
           blurb: 'Heard only near the stand by the river, during its teatime and sundown sets.',
           tracks: Object.keys(TRACKS).filter(isBandTrack),
         },
+        {
+          title: 'Fountain Square',
+          blurb:
+            'A secret: the flash mob at 17:00 on even dates, heard only near the square and in step with the dancers.',
+          tracks: ['flashmob'].filter((track) => track in TRACKS),
+        },
       ];
       const shelved = new Set(GROUPS.flatMap((group) => group.tracks));
       const unshelved = Object.keys(TRACKS).filter((track) => !shelved.has(track));
@@ -1417,6 +1442,7 @@
             badge: today && 'Today',
           };
         }
+        if (track === 'flashmob') return { text: 'Fountain Square · 17:00 on even dates' };
         const shows = events.filter(isStage);
         const tonight = shows.find((show) => trackForTown(show.start, events) === track);
         const concert = shows.find((show) => show.period === 'evening');
@@ -1477,6 +1503,8 @@
 
       /** Made on the first click: browsers start sound only from a gesture. */
       let player;
+      /** The flash mob played on a pretend clock (Fountain Square's shelf); timer 0 when off. */
+      const rehearsal = { timer: 0, from: 0, startedAt: 0, key: '' };
       /** Each listen() takes a ticket; a newer one makes an older one's result stale. */
       let request = 0;
       const state = {
@@ -1510,6 +1538,7 @@
       /** Plays a record: at once ('now'), or at the end of the playing tune's phrase ('phrase'). */
       async function listen(track, mode, handoff = 'now') {
         const ticket = ++request;
+        endRehearsal();
         Object.assign(state, { mode, track, loading: true, waiting: false });
         player ??= new TownPlayer();
         player.volume(volumeLevel());
@@ -1557,6 +1586,7 @@
       }
       function stopAll(message = 'Music stopped.') {
         ++request;
+        endRehearsal();
         player?.stop();
         Object.assign(state, {
           mode: 'idle',
@@ -1921,6 +1951,111 @@
         ),
       );
 
+      // ---------- Fountain Square: the flash mob on a pretend clock ----------
+
+      /**
+       * Plays the flash mob's music the way the town does (TownPlayer.mobSound, in step with a
+       * clock), from 16:59:58 or from any part of the dance, naming each part as it comes: so the
+       * music can be checked against the dance plan, and joining mid-way heard.
+       */
+      const MOB_PARTS = [
+        ['Solo', 0],
+        ['Join', 16],
+        ['Clap', 40],
+        ['Point', 56],
+        ['Groove', 72],
+        ['Wave', 88],
+        ['Spin', 104],
+        ['Jump', 120],
+        ['Finale', 136],
+        ['Build', 152],
+        ['Hit and freeze', 168],
+        ['As if nothing happened', 176],
+      ];
+      const mobPart = (beat) =>
+        beat < 0 ? 'Waiting…' : (MOB_PARTS.findLast(([, from]) => beat >= from)?.[0] ?? '');
+      const mobUi = {
+        status: el('output', {}, 'Not playing.'),
+        stop: el('button', { type: 'button', class: 'ghost small', disabled: true }, 'Stop'),
+      };
+      function endRehearsal() {
+        if (!rehearsal.timer) return;
+        clearInterval(rehearsal.timer);
+        rehearsal.timer = 0;
+        player?.mobSound();
+        mobUi.stop.disabled = true;
+        setText(mobUi.status, 'Not playing.');
+      }
+      function rehearsalTick() {
+        const elapsed = rehearsal.from + (performance.now() - rehearsal.startedAt) / 1000;
+        if (elapsed >= 90.5) {
+          endRehearsal();
+          return;
+        }
+        player?.mobSound({ elapsed, key: rehearsal.key, gain: 1, pan: 0 });
+        const beat = elapsed * 2;
+        const clock = 17 * 3600 + Math.floor(elapsed);
+        const time = `${pad(Math.floor(clock / 3600))}:${pad(Math.floor((clock % 3600) / 60))}:${pad(clock % 60)}`;
+        setText(
+          mobUi.status,
+          `${time} · beat ${beat.toFixed(1)} · ${mobPart(beat)} · ${player?.mobStatus ?? ''}`,
+        );
+      }
+      async function rehearse(fromBeat) {
+        stopAll(`The flash mob, from ${mobPart(Math.max(0, fromBeat)).toLowerCase()}.`);
+        player ??= new TownPlayer();
+        player.volume(volumeLevel());
+        try {
+          await player.resume();
+        } catch (error) {
+          announce(`Could not start sound: ${error?.message ?? error}`);
+          return;
+        }
+        player.mobPrepare();
+        // A new key each time, so every rehearsal starts the track afresh.
+        Object.assign(rehearsal, {
+          from: fromBeat / 2,
+          startedAt: performance.now(),
+          key: `rehearsal:${performance.now()}`,
+        });
+        rehearsal.timer = setInterval(rehearsalTick, 33);
+        mobUi.stop.disabled = false;
+        rehearsalTick();
+      }
+      mobUi.stop.addEventListener('click', () => stopAll('The flash mob stopped.'));
+      document
+        .querySelector('#record-flashmob')
+        ?.closest('.library-group')
+        ?.append(
+          el(
+            'div',
+            { class: 'rehearsal', role: 'group', 'aria-label': 'Play the flash mob on the clock' },
+            el(
+              'p',
+              { class: 'muted' },
+              'On the clock, as the town plays it: the track follows a pretend 17:00 and joins mid-way where you ask. The record above loops instead.',
+            ),
+            el(
+              'div',
+              { class: 'row' },
+              el(
+                'button',
+                { type: 'button', class: 'small', onclick: () => void rehearse(-4) },
+                'From 16:59:58',
+              ),
+              MOB_PARTS.slice(1, -1).map(([name, from]) =>
+                el(
+                  'button',
+                  { type: 'button', class: 'ghost small', onclick: () => void rehearse(from) },
+                  name,
+                ),
+              ),
+              mobUi.stop,
+            ),
+            mobUi.status,
+          ),
+        );
+
       // ---------- Painting ----------
 
       function modeLabel() {
@@ -2140,7 +2275,7 @@
       // Silent while the tab is hidden; gone with the page.
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) void player?.suspend();
-        else if (state.heard || state.loading) void player?.resume();
+        else if (state.heard || state.loading || rehearsal.timer) void player?.resume();
       });
       window.addEventListener('pagehide', () => {
         ++request;

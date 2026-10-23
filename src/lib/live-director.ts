@@ -19,6 +19,7 @@ import {
   type OutingId,
 } from './district-calendar';
 import { DISTRICT_COPY } from './district-copy';
+import { FLASH_MOB_ID, SQUARE_FRAME } from './square';
 import {
   BANDSTAND_FRAME,
   HARVEST_FRAME,
@@ -65,6 +66,8 @@ export type LiveProgram = {
   /** When guests of the day's five away from the stage are planned to be attending, judged from
    *  the plan as `district` is, in event and time order (districtShotAirs). */
   attending: readonly { event: string; from: number; to: number }[];
+  /** Whether anyone dances in today's flash mob (even dates; never billed, it is a secret). */
+  flashMob: boolean;
 };
 const cycle = (value: number, length: number) => ((value % length) + length) % length;
 export const SCENERY_START = 300;
@@ -85,6 +88,12 @@ export const liveCenterLift = (state: Lifted) => Math.max(22, state?.transit?.al
 export const liveLabelLift = (state: Lifted) => Math.max(43, (state?.transit?.altitude ?? 0) + 14);
 /** Lantern hour on air: two seconds of dark tree, the lanterns, then the first lamps. */
 export const LANTERN_SHOT = { start: 1198, end: 1224 };
+/**
+ * The flash mob on air on a day it has dancers: the camera comes to Fountain Square three seconds
+ * before the first dancer starts at 17:00 and stays until arms are down at 18:28, plus a moment of
+ * everyone strolling off as if nothing happened. Clear of every district shot's window.
+ */
+export const FLASH_MOB_SHOT = { from: 1017, to: 1112 };
 const FORK_CENTER = plotCenter(getPlot(FORK_PLOT)!);
 
 /**
@@ -193,6 +202,9 @@ function followable(program: LiveProgram, residents: ResidentState[], time: numb
     // A skater on the Millpond is no show the lineup could skip (the pond has no event shot, and a
     // selected afternoon is filmed at its own venues), so they stay followable out on the ice.
     if (resident.event.id === 'millpond') return true;
+    // A flash-mob dancer is followed, except while the mob's own shot films them all.
+    if (resident.event.id === FLASH_MOB_ID)
+      return !(program.flashMob && time >= FLASH_MOB_SHOT.from && time < FLASH_MOB_SHOT.to);
     // A Riverside guest is followed, except while their own outing's shot is on air: then the
     // shot itself films them. No district period ever reaches the lineup's highlights.
     if (isOutingId(resident.event.id))
@@ -279,6 +291,7 @@ function programOf(
       .sort((a, b) =>
         a.event < b.event ? -1 : a.event > b.event ? 1 : a.from - b.from || a.to - b.to,
       ),
+    flashMob: trips.some((trip) => trip.event.id === FLASH_MOB_ID),
   };
 }
 
@@ -410,6 +423,14 @@ export function liveShotAt(
   // A festival on the Riverside comes next, before the day's own events.
   const district = liveDistrictShot(program, time);
   if (district?.festival) return districtLiveShot(program, district);
+  // The flash mob, unannounced, before the day's own events (it only ever meets the zoo's end).
+  if (program.flashMob && time >= FLASH_MOB_SHOT.from && time < FLASH_MOB_SHOT.to)
+    return {
+      id: `flashmob:${program.day}`,
+      kind: 'event',
+      label: 'Fountain Square',
+      ...SQUARE_FRAME,
+    };
   const event = program.events.find(
     (event) =>
       event.id !== 'cinema' &&
