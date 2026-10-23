@@ -32,3 +32,15 @@ export const flashMobBeat = (minutes: number) =>
   ((((minutes % 1440) + 1440) % 1440) - FLASH_MOB_START) * (FLASH_MOB_BPM / 60);
 /** The town minute a beat falls on. */
 export const minuteOfBeat = (beat: number) => FLASH_MOB_START + (beat * 60) / FLASH_MOB_BPM;
+
+/**
+ * The mob's four records, one for each week of a season, which is also a quarter of the moon
+ * (the town's moon keeps to the dates): new moon to first quarter on dates 2–6, first quarter to
+ * full on 8–14, full to last quarter on 16–20, and last quarter to new on 22–28. Every one keeps
+ * the same beat and cues, so the one dance fits them all. TrackIds in src/music/score.ts.
+ */
+export const FLASH_MOB_TRACKS = ['flashmob', 'flashmob-2', 'flashmob-3', 'flashmob-4'] as const;
+export type FlashMobTrack = (typeof FLASH_MOB_TRACKS)[number];
+/** The record for a date of the season (1–28): its week's. */
+export const flashMobTrackOn = (date: number): FlashMobTrack =>
+  FLASH_MOB_TRACKS[Math.min(3, Math.max(0, Math.floor((date - 1) / 7)))];

@@ -4,6 +4,7 @@ import { FOOTBALL_SOUND_TAKES, renderFootballSound } from './football-sound';
 import type { FootballSound } from '../lib/football';
 import { CinemaPlayer, type CinemaPlayback } from './cinema-player';
 import { FlashMobPlayer, type FlashMobPlayback } from './flash-mob-player';
+import type { FlashMobTrack } from '../lib/flash-mob-beat';
 import type { Playable } from '../lib/break-cards';
 
 /** A looping track on air: its own gain, and for a band a pan toward the stand. */
@@ -104,8 +105,8 @@ export class TownPlayer {
     this.mob.sync(state);
   }
   /** Renders the flash mob's music ahead (a few seconds' work), so it is ready at 17:00. */
-  mobPrepare() {
-    this.mob.prepare();
+  mobPrepare(track: FlashMobTrack) {
+    this.mob.prepare(track);
   }
   get mobStatus() {
     return this.mob.status;

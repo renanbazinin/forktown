@@ -5,6 +5,10 @@ import { BANDSTAND_TRACKS, composeBandstand } from './bandstand-tracks';
 import type { Instrument } from './instruments';
 import { composeTune, isTune, TOWN_TUNES, type TuneId } from './tunes';
 import { composeFlashMob, FLASH_MOB_TRACK } from './flash-mob-track';
+import { composeFlashMob2, FLASH_MOB_TRACK_2 } from './flash-mob-track-2';
+import { composeFlashMob3, FLASH_MOB_TRACK_3 } from './flash-mob-track-3';
+import { composeFlashMob4, FLASH_MOB_TRACK_4 } from './flash-mob-track-4';
+import type { FlashMobTrack } from '../lib/flash-mob-beat';
 
 /**
  * The town's own tunes (the day and night theme and the tunes of each hour, tunes/), the stage's
@@ -13,7 +17,7 @@ import { composeFlashMob, FLASH_MOB_TRACK } from './flash-mob-track';
  * the rotation).
  */
 export type TrackId =
-  'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | 'flashmob' | Band | TuneId;
+  'town' | 'night' | 'rock' | 'acoustic' | 'jazz' | 'party' | FlashMobTrack | Band | TuneId;
 export type Voice = 'bell' | 'keys' | 'pluck' | 'lead' | 'pad' | 'bass' | 'kick' | 'snare' | 'hat';
 export type Note = {
   beat: number;
@@ -83,6 +87,9 @@ export const TRACKS: Record<TrackId, TrackInfo> = {
     instruments: 'Plucked lead, offbeat keys, octave bass, four-on-the-floor kick',
   },
   flashmob: FLASH_MOB_TRACK,
+  'flashmob-2': FLASH_MOB_TRACK_2,
+  'flashmob-3': FLASH_MOB_TRACK_3,
+  'flashmob-4': FLASH_MOB_TRACK_4,
   ...BANDSTAND_TRACKS,
   ...TOWN_TUNES,
 };
@@ -443,6 +450,9 @@ export function compose(track: TrackId): Note[] {
   if (isBandTrack(track)) return composeBandstand(track) ?? compose('acoustic');
   if (isTune(track)) return composeTune(track);
   if (track === 'flashmob') return composeFlashMob();
+  if (track === 'flashmob-2') return composeFlashMob2();
+  if (track === 'flashmob-3') return composeFlashMob3();
+  if (track === 'flashmob-4') return composeFlashMob4();
   const notes: Note[] = [];
   const add = (
     beat: number,

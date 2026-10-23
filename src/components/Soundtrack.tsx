@@ -6,6 +6,7 @@ import { footballSoundsBetween } from '../music/football-sound';
 import type { FootballState } from '../lib/football';
 import type { cinemaAt } from '../lib/cinema';
 import type { Playable } from '../lib/break-cards';
+import type { FlashMobTrack } from '../lib/flash-mob-beat';
 
 export default function Soundtrack({
   track,
@@ -22,6 +23,7 @@ export default function Soundtrack({
   flashMob = null,
   flashMobListening = { gain: 0, pan: 0 },
   flashMobSoon = false,
+  flashMobTrack,
   autoStart = false,
   hideControls = false,
 }: {
@@ -44,13 +46,15 @@ export default function Soundtrack({
   /**
    * Fountain Square's flash mob while it dances (a secret: only on a flash-mob day with dancers):
    * `elapsed` is town minutes since 17:00 (from −FLASH_MOB_PREROLL, so its first beat lands on
-   * time, up to FLASH_MOB_SECONDS), `key` one per mob. Null otherwise.
+   * time, up to FLASH_MOB_SECONDS), `key` one per mob, `track` the day's record. Null otherwise.
    */
-  flashMob?: { elapsed: number; key: string } | null;
+  flashMob?: { elapsed: number; key: string; track: FlashMobTrack } | null;
   /** What the camera hears of the square (squareListening). */
   flashMobListening?: { gain: number; pan: number };
   /** A flash mob is coming today: its music is rendered ahead (from about 16:00). */
   flashMobSoon?: boolean;
+  /** Today's flash-mob record (its week's), to render ahead. */
+  flashMobTrack?: FlashMobTrack;
   autoStart?: boolean;
   hideControls?: boolean;
 }) {
@@ -80,7 +84,7 @@ export default function Soundtrack({
     (!cinemaFilm || mobGain >= cinemaListening.gain);
   const audibleFilm = audibleMob ? undefined : cinemaFilm;
   const audibleTitle = audibleMob
-    ? TRACKS.flashmob.title
+    ? TRACKS[flashMob.track].title
     : (cinema.slot?.film?.title ?? cinema.slot?.ad?.sponsor);
   useEffect(() => {
     const film = cinema.slot?.film ?? cinema.slot?.ad;
@@ -111,9 +115,9 @@ export default function Soundtrack({
         : undefined,
     );
   }, [flashMob, mobGain, mobPan, enabled, playing, hidden, breakSound]);
-  const mobAhead = !!flashMob || flashMobSoon;
+  const mobAhead = (!!flashMob || flashMobSoon) && flashMobTrack;
   useEffect(() => {
-    if (enabled && mobAhead) player.current?.mobPrepare();
+    if (enabled && mobAhead) player.current?.mobPrepare(mobAhead);
   }, [enabled, mobAhead]);
   useEffect(() => {
     if (enabled && playing && !hidden && upcoming && upcoming !== track && upcoming !== bed)
@@ -262,7 +266,7 @@ export default function Soundtrack({
           <strong>{((audibleFilm || audibleMob) && audibleTitle) || TRACKS[track].title}</strong>
           <p>
             {audibleMob
-              ? TRACKS.flashmob.subtitle
+              ? TRACKS[flashMob.track].subtitle
               : audibleFilm
                 ? cinema.slot?.ad
                   ? 'A word from around town'

@@ -1,4 +1,4 @@
-import { FLASH_MOB_SECONDS } from '../lib/flash-mob-beat';
+import { FLASH_MOB_SECONDS, type FlashMobTrack } from '../lib/flash-mob-beat';
 import { renderTrack } from './synth';
 
 /** What the camera hears of Fountain Square's flash mob at this moment. */
@@ -10,6 +10,8 @@ export type FlashMobPlayback = {
   elapsed: number;
   /** One mob: a new key (another day) starts the track afresh. */
   key: string;
+  /** The day's record: its week's (flashMobTrackOn). */
+  track: FlashMobTrack;
   /** How loud, 0..1 (squareListening). */
   gain: number;
   /** Where the square sits on screen, −1..1. */
@@ -29,7 +31,7 @@ const FADE_IN = 0.012,
   FADE_OUT = 0.03;
 
 /**
- * Plays the flash mob's music ('flashmob', flash-mob-track.ts) in step with the town clock, like
+ * Plays the flash mob's music (the day's record, FLASH_MOB_TRACKS) in step with the town clock, like
  * the cinema's films: one non-looping buffer, started at the clock's offset (mid-way too) and
  * moved back in step when it drifts, at the camera's gain and pan. While it plays it asks the
  * town's music to duck under it (`duck`), as the cinema does. Shares the town's AudioContext.
@@ -37,6 +39,8 @@ const FADE_IN = 0.012,
 export class FlashMobPlayer {
   private gain: GainNode;
   private pan: StereoPannerNode;
+  /** The record rendered (or rendering), and its render: one at a time, the day's. */
+  private track?: FlashMobTrack;
   private rendering?: Promise<AudioBuffer>;
   private buffer?: AudioBuffer;
   private latest?: FlashMobPlayback & { sampledAt: number };
@@ -97,7 +101,7 @@ export class FlashMobPlayer {
       this.duck(now >= this.current.origin ? state.gain : 0);
       return;
     }
-    if (this.buffer) {
+    if (this.buffer && this.track === state.track) {
       this.start(this.buffer, now);
       return;
     }
@@ -106,7 +110,7 @@ export class FlashMobPlayer {
     if (this.pending === state.key) return;
     const key = state.key;
     this.pending = key;
-    this.render()
+    this.render(state.track)
       .then((buffer) => {
         if (this.pending !== key) return;
         this.pending = undefined;
@@ -180,15 +184,20 @@ export class FlashMobPlayer {
     this.duck(now >= origin ? latest.gain : 0);
   }
   /**
-   * Renders the track ahead (it takes a few seconds), so it is ready at 17:00. One render, kept;
-   * a failed one is forgotten, so a later call tries again.
+   * Renders the day's record ahead (it takes a few seconds), so it is ready at 17:00. One render,
+   * kept until another record is asked for; a failed one is forgotten, so a later call tries again.
    */
-  prepare() {
-    if (!this.disposed) this.render().catch(() => {});
+  prepare(track: FlashMobTrack) {
+    if (!this.disposed) this.render(track).catch(() => {});
   }
-  private render() {
+  private render(track: FlashMobTrack) {
+    if (this.track !== track) {
+      this.track = track;
+      this.rendering = undefined;
+      this.buffer = undefined;
+    }
     if (!this.rendering) {
-      const rendering = renderTrack('flashmob');
+      const rendering = renderTrack(track);
       this.rendering = rendering;
       rendering.then(
         (buffer) => {

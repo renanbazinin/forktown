@@ -49,7 +49,7 @@ While they dance, a dancer's card says "Dancing in a flash mob". Before and afte
 
 ### Music
 
-**Nothing to See Here**: 90 seconds at 120 BPM, written beat for beat to the dance, played in step with the clock and heard only near the square. See [Music](MUSIC.md#fountain-square). A day with no dancers stays silent.
+Four records, one for each week of the season (and quarter of the moon): **Nothing to See Here** on dates 2–6, **Somebody Brought a Tuba** on 8–14, **Moon in the Fountain** on 16–20 and **Thin Moon Disco** on 22–28. Each is 90 seconds at 120 BPM, written beat for beat to the same dance, played in step with the clock and heard only near the square. See [Music](MUSIC.md#fountain-square). A day with no dancers stays silent.
 
 ### On the live stream
 

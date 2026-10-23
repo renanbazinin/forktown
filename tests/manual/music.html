@@ -1242,6 +1242,9 @@
         goldenhour: ['#c4843f', '❂'],
         lamplight: ['#87694d', '✶'],
         flashmob: ['#6f93a8', '❋'],
+        'flashmob-2': ['#b0844a', '◐'],
+        'flashmob-3': ['#8a6fa8', '○'],
+        'flashmob-4': ['#4f7f78', '◑'],
       };
       const STAGE_SHOWS = ['rock', 'acoustic', 'jazz', 'party'];
       const DAY = 1440;
@@ -1357,7 +1360,9 @@
           title: 'Fountain Square',
           blurb:
             'A secret: the flash mob at 17:00 on even dates, heard only near the square and in step with the dancers.',
-          tracks: ['flashmob'].filter((track) => track in TRACKS),
+          tracks: ['flashmob', 'flashmob-2', 'flashmob-3', 'flashmob-4'].filter(
+            (track) => track in TRACKS,
+          ),
         },
       ];
       const shelved = new Set(GROUPS.flatMap((group) => group.tracks));
@@ -1442,7 +1447,14 @@
             badge: today && 'Today',
           };
         }
-        if (track === 'flashmob') return { text: 'Fountain Square · 17:00 on even dates' };
+        const mobDates = {
+          flashmob: '2, 4 and 6',
+          'flashmob-2': '8, 10, 12 and 14',
+          'flashmob-3': '16, 18 and 20',
+          'flashmob-4': '22, 24, 26 and 28',
+        };
+        if (track in mobDates)
+          return { text: `Fountain Square · 17:00 on dates ${mobDates[track]} of each season` };
         const shows = events.filter(isStage);
         const tonight = shows.find((show) => trackForTown(show.start, events) === track);
         const concert = shows.find((show) => show.period === 'evening');
@@ -1504,7 +1516,7 @@
       /** Made on the first click: browsers start sound only from a gesture. */
       let player;
       /** The flash mob played on a pretend clock (Fountain Square's shelf); timer 0 when off. */
-      const rehearsal = { timer: 0, from: 0, startedAt: 0, key: '' };
+      const rehearsal = { timer: 0, from: 0, startedAt: 0, key: '', track: 'flashmob' };
       /** Each listen() takes a ticket; a newer one makes an older one's result stale. */
       let request = 0;
       const state = {
@@ -1974,7 +1986,15 @@
       ];
       const mobPart = (beat) =>
         beat < 0 ? 'Waiting…' : (MOB_PARTS.findLast(([, from]) => beat >= from)?.[0] ?? '');
+      const MOB_RECORDS = ['flashmob', 'flashmob-2', 'flashmob-3', 'flashmob-4'].filter(
+        (track) => track in TRACKS,
+      );
       const mobUi = {
+        record: el(
+          'select',
+          { 'aria-label': 'Which flash-mob record' },
+          MOB_RECORDS.map((track) => el('option', { value: track }, TRACKS[track].title)),
+        ),
         status: el('output', {}, 'Not playing.'),
         stop: el('button', { type: 'button', class: 'ghost small', disabled: true }, 'Stop'),
       };
@@ -1992,7 +2012,7 @@
           endRehearsal();
           return;
         }
-        player?.mobSound({ elapsed, key: rehearsal.key, gain: 1, pan: 0 });
+        player?.mobSound({ elapsed, key: rehearsal.key, track: rehearsal.track, gain: 1, pan: 0 });
         const beat = elapsed * 2;
         const clock = 17 * 3600 + Math.floor(elapsed);
         const time = `${pad(Math.floor(clock / 3600))}:${pad(Math.floor((clock % 3600) / 60))}:${pad(clock % 60)}`;
@@ -2011,9 +2031,11 @@
           announce(`Could not start sound: ${error?.message ?? error}`);
           return;
         }
-        player.mobPrepare();
+        const track = mobUi.record.value;
+        player.mobPrepare(track);
         // A new key each time, so every rehearsal starts the track afresh.
         Object.assign(rehearsal, {
+          track,
           from: fromBeat / 2,
           startedAt: performance.now(),
           key: `rehearsal:${performance.now()}`,
@@ -2038,6 +2060,7 @@
             el(
               'div',
               { class: 'row' },
+              mobUi.record,
               el(
                 'button',
                 { type: 'button', class: 'small', onclick: () => void rehearse(-4) },

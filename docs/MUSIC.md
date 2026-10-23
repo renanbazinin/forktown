@@ -98,23 +98,37 @@ heard faintly from afar never leaves the town near silent. A live stage show pla
 # Fountain Square
 
 On the square's secret afternoons (17:00 on even dates, when there are dancers) a flash mob
-dances to **Nothing to See Here** (`src/music/flash-mob-track.ts`): 120 BPM, G major lifted to A
-for the finale, 180 beats (90 s), written beat for beat to the dance plan in
-`src/lib/flash-mob-beat.ts`: a solo groove, one music-box note for each dancer who joins (eleven, for a full mob of twelve) and a
+dances to one of four records, one for each week of the season. The town's moon keeps to the
+dates, so each week is also a quarter of the moon (`FLASH_MOB_TRACKS` and `flashMobTrackOn` in
+`src/lib/flash-mob-beat.ts`):
+
+| Dates          | Moon                  | Record                      | Style                                                                                                    |
+| -------------- | --------------------- | --------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 2, 4, 6        | new to first quarter  | **Nothing to See Here**     | Warm pop: flute, marimba, electric piano, harp, music box. G, lifted to A                                |
+| 8, 10, 12, 14  | first quarter to full | **Somebody Brought a Tuba** | A street brass band: trumpets, trombones, tuba, glockenspiel, marching snare. F, lifted to G             |
+| 16, 18, 20     | full to last quarter  | **Moon in the Fountain**    | A warm Latin dance: clave, congas, nylon guitar montuno, flute, kalimba. D, lifted to E                  |
+| 22, 24, 26, 28 | last quarter to new   | **Thin Moon Disco**         | A gentle disco-funk: four on the floor, octave bass, string runs, vibraphone. A minor, lifted to B minor |
+
+Each record has the square for a week of the season, 2 hours 48 minutes of real time: three or
+four mobs, one every 48 real minutes. Then it hands over to the next. All four keep one beat and
+one set of cues, so the one dance fits them all: 120 BPM, 180 beats (90 s), at the same level
+(−26.4 dB RMS over the whole record). The first, **Nothing to See Here**
+(`src/music/flash-mob-track.ts`), shows the pattern; `flash-mob-track-2.ts` to `-4.ts` follow it.
+Each is written beat for beat to the dance plan in `src/lib/flash-mob-beat.ts`: a solo groove, one cue note for each dancer who joins (eleven, for a full mob of twelve) and a
 new layer every two bars, then a fresh figure for every 16-beat move (claps, stabs thrown left
 and right on the points, a bouncing bass, a harp sweep for the wave, a whirling marimba for the
-spin, big hits for the jumps), a finale build, and one hit on beat 168. After it nothing sounds
+spin, big hits for the jumps; each record in its own voices), a finale build, and one hit on beat 168. After it nothing sounds
 but that hit's decay: the dancers hold their pose in silence. The claps are four brush taps a
 few milliseconds apart across the stereo field, with a whisper of snare.
 
-It is not one of the town's loops. `flash-mob-player.ts` plays it once, in step with the clock
+A record is not one of the town's loops. `flash-mob-player.ts` plays the day's once, in step with the clock
 like a cinema film: it starts at the clock's offset when you arrive mid-way, schedules its first
 beat ahead from 16:59:58, allows for the device's output latency, and moves back in step only
 when it has drifted a sixteenth for half a second (a stale clock reading alone never moves it).
 It is heard only near the square, as the cinema is, and the town's tune ducks under it. It is
 rendered from 16:00 on a flash-mob day, so it is ready on the stroke of five. It is never in
-`TOWN_ROTATION`; the listening room shelves it under Fountain Square, where it can also be played
-on a pretend clock from 16:59:58 or from any part of the dance.
+`TOWN_ROTATION`; the listening room shelves all four under Fountain Square, where any of them can
+also be played on a pretend clock from 16:59:58 or from any part of the dance.
 
 # Football sounds
 
