@@ -10,7 +10,7 @@
 
 Open the [live site](https://renanbazinin.github.io/forktown/) and click **Find your way in**. You’ll see **Pick an open plot** and **Fork on GitHub**:
 
-<img src="docs/images/contribute-live.jpg" alt="Live site: Make yourself at home shows the three contribution steps and a Fork on GitHub button." width="640">
+<img src="docs/images/contribute-live.jpg" alt="Live site: Make yourself at home shows the three contribution steps with Pick an open plot and Fork on GitHub buttons." width="640">
 
 **Why can’t I build here?** The published town saves nothing, so there are two ways in:
 
@@ -43,7 +43,7 @@ Leave that terminal running. Open [localhost:5173](http://localhost:5173) and cl
 
 Click **Build a place**. Enter your real GitHub username, then customize **Home**, **Neighbor**, and **Outdoor sign**. Scroll down to choose an open plot, add a story, and check your **File id**.
 
-<img src="docs/images/contribute-builder.jpg" alt="Local builder: Willow Lodge preview beside the Home, Neighbor, and Outdoor sign tabs, username field, house styles, and colors." width="800">
+<img src="docs/images/contribute-builder.jpg" alt="Local builder: Juniper Nook preview beside the Home, Neighbor, and Outdoor sign tabs, username field, house styles, and colors." width="800">
 
 Names and plots in these screenshots are examples. **One new house + one neighbor per pull request.** Choosing a plot does not reserve it.
 
