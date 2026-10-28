@@ -2,15 +2,9 @@
 
 **A little town, built one pull request at a time.** Design a home and a neighbor; contribute one JSON file. Every house hangs a lantern on the Lantern Fork.
 
-[Visit the town](https://renanbazinin.github.io/forktown/) · [Watch it live on YouTube](https://www.youtube.com/@renanbazinin/live) · [Detailed contributor guide](CONTRIBUTING.md)
+[Visit the town](https://renanbazinin.github.io/forktown/) · [Watch it live on YouTube](https://www.youtube.com/@renanbazinin/live) · [The whole guide in one picture](docs/images/contribute-infographic.webp) · [Detailed contributor guide](CONTRIBUTING.md)
 
 <img src="public/og-image.png" alt="Forktown on an autumn evening: houses around the Lantern Fork, a football match at the Meadow Ground and a concert at the Little Stage." width="800">
-
-## The whole guide in one picture
-
-<img src="docs/images/contribute-infographic.webp" alt="The whole contribution guide as one picture. Both ways start at Find your way in, top right of the live town. Way 1, in your browser: pick an open plot, type your GitHub username, choose Create my house file on GitHub, replace the placeholder story with your own, then choose Commit changes, Propose changes and Create pull request. Way 2, in your own copy: fork the town, clone it, run npm ci and npm run dev, choose Build a place at localhost:5173, save to your project, then run npm run validate, commit your file, run npm run check:pr, push and open a pull request to renanbazinin/forktown main. Both ways meet at the pull request: once every check passes, a first house that changes nothing else merges automatically, and you move in with a lantern on the Lantern Fork. One new house and one neighbor per pull request." width="800">
-
-Prefer words? The same steps follow, with screenshots and commands to copy.
 
 ## 1. Start in the live town
 
