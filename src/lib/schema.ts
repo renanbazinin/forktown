@@ -48,6 +48,8 @@ export const designSchema = z
     floors: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     roof: z.enum(['classic', 'flat', 'gable']),
     windows: z.enum(['cross', 'round', 'shutters']),
+    // The window frames' paint. Without it they match the trim.
+    windowsColor: color.optional(),
     garden: z.enum(['wildflowers', 'paving', 'vegetables']),
     feature: z.enum(['none', 'porch', 'balcony']),
   })
@@ -262,6 +264,16 @@ export function plotProblem(plot: string, taken: ReadonlySet<string>): string | 
   return `Plot ${plot} is reserved for ${place}, a public place. ${open.length ? `Pick an open plot such as ${orList(open)}.` : OPEN_PLOTS_COPY.full}`;
 }
 
+// A roof color written into the design, like "roofColor". The roof takes the top-level "color".
+const ROOF_COLOR_KEY = /^roof[-_]?colou?r$/i;
+
+/** What a house file hears for a roof color in its design: where the roof's color goes instead. */
+function roofColorProblem(data: unknown, key: string) {
+  const value = color.safeParse((data as { design?: Record<string, unknown> }).design?.[key]);
+  const fix = value.success ? `Set "color" to "${value.data}"` : 'Set your roof color there';
+  return `The roof takes its color from the top-level "color". ${fix} and remove "${key}".`;
+}
+
 export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
   const errors: string[] = [];
   const places: Place[] = [];
@@ -289,6 +301,18 @@ export function validatePlaces(entries: PlaceEntry[]): ValidationResult {
         if (path === 'plot' && plotMessage) {
           if (!plotTold) errors.push(`${file} → plot: ${plotMessage}`);
           plotTold = true;
+        } else if (
+          path === 'design' &&
+          issue.code === 'unrecognized_keys' &&
+          issue.keys.some((key) => ROOF_COLOR_KEY.test(key))
+        ) {
+          // One line for each key, so a roof color is told where it belongs.
+          for (const key of issue.keys)
+            errors.push(
+              ROOF_COLOR_KEY.test(key)
+                ? `${file} → design.${key}: ${roofColorProblem(data, key)}`
+                : `${file} → design: Unrecognized key: "${key}"`,
+            );
         } else errors.push(`${file} → ${path}: ${issue.message}`);
       }
       continue;

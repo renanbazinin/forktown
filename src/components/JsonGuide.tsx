@@ -23,7 +23,10 @@ export default function JsonGuide() {
         <dt>building / color / decoration</dt>
         <dd>The building family, roof color, and item in your garden.</dd>
         <dt>design</dt>
-        <dd>Wall and trim colors, floors, roof, windows, garden, and extra house details.</dd>
+        <dd>
+          Wall, trim and window frame colors, floors, roof, windows, garden, and extra house
+          details.
+        </dd>
         <dt>resident / routine</dt>
         <dd>
           Your one neighbor's appearance, greeting, and daily activities. At night, choose sleep or

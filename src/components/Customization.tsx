@@ -61,6 +61,12 @@ export function HomeDetails({
       <div className="paint-row">
         <Color label="Walls" value={draft.design.wall} onChange={(v) => change('wall', v)} />
         <Color label="Doors & trim" value={draft.design.trim} onChange={(v) => change('trim', v)} />
+        {/* Until it is picked, the window frames match the trim and the file leaves it out. */}
+        <Color
+          label="Window frames"
+          value={draft.design.windowsColor ?? draft.design.trim}
+          onChange={(v) => change('windowsColor', v)}
+        />
       </div>
       <div className="field-row">
         <label className="field">
