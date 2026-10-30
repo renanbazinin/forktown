@@ -4,31 +4,31 @@
   "creator": "bunvin",
   "plot": "H2",
   "building": "cafe",
-  "color": "#BE8E68",
-  "decoration": "bench",
+  "color": "#8B4513",
+  "decoration": "tree",
   "story": "We don't usually serve customers, but when we do... its horrible. \nRate us as low as possible and GoAway.",
   "design": {
-    "wall": "#967f5f",
-    "trim": "#846C56",
+    "wall": "#3B9679",
+    "trim": "#8B4513",
     "floors": 1,
-    "roof": "classic",
+    "roof": "gable",
     "windows": "round",
     "garden": "vegetables",
-    "feature": "none"
+    "feature": "balcony"
   },
   "resident": {
-    "name": "Zerubbabel",
+    "name": "Zrubabella",
     "figure": "female",
     "skin": "#D9B68B",
-    "hair": "#d19547",
-    "outfit": "#8f3353",
+    "hair": "#99004D",
+    "outfit": "#000000",
     "accessory": "glasses",
     "greeting": "I'm tired, go away",
     "routine": {
       "morning": "work",
-      "afternoon": "stroll",
-      "evening": "home",
-      "night": "sleep"
+      "afternoon": "work",
+      "evening": "stroll",
+      "night": "stroll"
     }
   },
   "sign": {
@@ -36,6 +36,6 @@
     "text": "HELLO",
     "color": "#FFF4D4",
     "background": "#35554A",
-    "html": "<div style=\"background-color: #35554A; color: #FFF4D4; text-align: center\">\n  <strong style=\"font-size: 24px\">GoAway</strong>\n  <p style=\"font-size: 12px\">Cafe</div>"
+    "html": "<div style=\"background-color: #35554A; color: #FFF4D4; text-align: center\">\n  <strong style=\"font-size: 24px\">GoAway</strong>\n  <p style=\"font-size: 12px\">☕ Cafe ☕</div>"  
   }
 }
