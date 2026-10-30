@@ -341,6 +341,15 @@
     background: var(--surface);
     cursor: pointer;
   }
+  .frames-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .frames-field .text-button {
+    min-height: 30px;
+    font-size: 10px;
+  }
   .panel-intro,
   .sign-help {
     font-size: 11px;
