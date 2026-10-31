@@ -1,3 +1,4 @@
+import { useRef, type Ref } from 'react';
 import type { Place } from '../lib/schema';
 import { compileSign, SIGN_EXAMPLE } from '../lib/sign';
 import SignPreview from './SignPreview';
@@ -30,14 +31,17 @@ function Color({
   label,
   value,
   onChange,
+  ref,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  ref?: Ref<HTMLInputElement>;
 }) {
   return (
     <label className="paint-field">
       <input
+        ref={ref}
         type="color"
         aria-label={label}
         value={value}
@@ -54,13 +58,49 @@ export function HomeDetails({
   draft: Place;
   update: (value: Place['design']) => void;
 }) {
+  const frames = useRef<HTMLInputElement>(null);
   const change = <K extends keyof Place['design']>(key: K, value: Place['design'][K]) =>
     update({ ...draft.design, [key]: value });
+  const followTrim = () => {
+    const { windowsColor, ...design } = draft.design;
+    update(design);
+  };
+  // The trim's own colour, in any case, keeps the frames following the trim. A cancelled pick
+  // sends back the colour the picker opened with, and that must not save a copy of the trim.
+  const pickFrames = (color: string) => {
+    if (color.toLowerCase() === draft.design.trim.toLowerCase()) followTrim();
+    else change('windowsColor', color);
+  };
+  // The button goes away once pressed, so focus on it moves to the picker it reset. Only then:
+  // Safari never focuses a tapped button, and focusing the picker on an iPhone may open it.
+  const matchTrim = (button: HTMLButtonElement) => {
+    followTrim();
+    if (document.activeElement === button) frames.current?.focus();
+  };
   return (
     <div className="customization-fields">
       <div className="paint-row">
         <Color label="Walls" value={draft.design.wall} onChange={(v) => change('wall', v)} />
         <Color label="Doors & trim" value={draft.design.trim} onChange={(v) => change('trim', v)} />
+        {/* Until it is picked, the window frames match the trim and the file leaves it out.
+            Match trim goes back to that. */}
+        <span className="frames-field">
+          <Color
+            ref={frames}
+            label="Window frames"
+            value={draft.design.windowsColor ?? draft.design.trim}
+            onChange={pickFrames}
+          />
+          {draft.design.windowsColor && (
+            <button
+              type="button"
+              className="text-button"
+              onClick={(e) => matchTrim(e.currentTarget)}
+            >
+              Match trim
+            </button>
+          )}
+        </span>
       </div>
       <div className="field-row">
         <label className="field">

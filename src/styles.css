@@ -341,13 +341,23 @@
     background: var(--surface);
     cursor: pointer;
   }
+  .frames-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .frames-field .text-button {
+    min-height: 30px;
+    font-size: 10px;
+  }
   .panel-intro,
   .sign-help {
     font-size: 11px;
     line-height: 1.8;
     color: var(--muted);
   }
-  .field small {
+  .field small,
+  .color-picker legend small {
     font-size: 10px;
     font-weight: 400;
     color: var(--muted);

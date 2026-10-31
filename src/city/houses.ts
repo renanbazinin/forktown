@@ -664,7 +664,8 @@ export function drawHouse(
     { height: h } = houseBounds(place);
   const roof = tint(place.color, night ? -35 : 0),
     wall = tint(d.wall, night ? -55 : 0),
-    trim = tint(d.trim, night ? -25 : 0);
+    trim = tint(d.trim, night ? -25 : 0),
+    frame = d.windowsColor ? tint(d.windowsColor, night ? -25 : 0) : trim;
   const { seed, awakeInside, windowsLit, snow, onDoorstep, ripe } = houseMoment(place, night, life);
   const snowTop = pick(SNOW.top, night),
     snowShade = pick(SNOW.shade, night);
@@ -827,16 +828,16 @@ export function drawHouse(
           ctx.fillStyle = glass;
           ctx.fill();
           silhouette(-2, top + 3);
-          ctx.strokeStyle = trim;
+          ctx.strokeStyle = frame;
           ctx.lineWidth = 2;
           ctx.stroke();
-          box(ctx, 5.5, top + 1, 1, bottom - top - 1, trim);
+          box(ctx, 5.5, top + 1, 1, bottom - top - 1, frame);
         } else {
-          box(ctx, 0, top, 12, 15, trim);
+          box(ctx, 0, top, 12, 15, frame);
           box(ctx, 1, top + 1, 10, 14, glass);
           silhouette(-2, top + 3);
-          box(ctx, 5, top, 2, 15, trim);
-          if (d.windows === 'cross') box(ctx, 0, top + 5, 12, 1, trim);
+          box(ctx, 5, top, 2, 15, frame);
+          if (d.windows === 'cross') box(ctx, 0, top + 5, 12, 1, frame);
           else {
             box(ctx, -4, top - 1, 3, 17, roof);
             box(ctx, 13, top - 1, 3, 17, roof);
@@ -848,15 +849,15 @@ export function drawHouse(
         ctx.fillStyle = windowsLit ? '#F1D68F' : night ? '#4E6461' : '#8EBCBF';
         ctx.fill();
         silhouette();
-        ctx.strokeStyle = trim;
+        ctx.strokeStyle = frame;
         ctx.lineWidth = 2;
         ctx.stroke();
       } else {
-        box(ctx, 0, 0, 12, 12, trim);
+        box(ctx, 0, 0, 12, 12, frame);
         box(ctx, 1, 1, 10, 10, glass);
         silhouette();
-        box(ctx, 5, 0, 2, 12, trim);
-        if (d.windows === 'cross') box(ctx, 0, 5, 12, 2, trim);
+        box(ctx, 5, 0, 2, 12, frame);
+        if (d.windows === 'cross') box(ctx, 0, 5, 12, 2, frame);
         else {
           box(ctx, -4, -1, 3, 14, roof);
           box(ctx, 13, -1, 3, 14, roof);

@@ -396,7 +396,9 @@ const Contribute = memo(function Contribute({
               </fieldset>
               <div className="field-row">
                 <fieldset className="color-picker">
-                  <legend>A splash of color</legend>
+                  <legend>
+                    A splash of color <small>for the roof and shutters</small>
+                  </legend>
                   <div>
                     {COLORS.map((color) => (
                       <button
@@ -415,7 +417,7 @@ const Contribute = memo(function Contribute({
                       <Paintbrush size={14} />
                       <input
                         type="color"
-                        aria-label="Custom building color"
+                        aria-label="Custom roof color"
                         value={draft.color}
                         onChange={(event) => update('color', event.target.value)}
                       />
