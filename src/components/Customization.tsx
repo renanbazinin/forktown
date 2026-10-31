@@ -61,11 +61,21 @@ export function HomeDetails({
   const frames = useRef<HTMLInputElement>(null);
   const change = <K extends keyof Place['design']>(key: K, value: Place['design'][K]) =>
     update({ ...draft.design, [key]: value });
-  // The button goes away once pressed, so focus moves to the picker it reset.
-  const matchTrim = () => {
+  const followTrim = () => {
     const { windowsColor, ...design } = draft.design;
     update(design);
-    frames.current?.focus();
+  };
+  // The trim's own colour, in any case, keeps the frames following the trim. A cancelled pick
+  // sends back the colour the picker opened with, and that must not save a copy of the trim.
+  const pickFrames = (color: string) => {
+    if (color.toLowerCase() === draft.design.trim.toLowerCase()) followTrim();
+    else change('windowsColor', color);
+  };
+  // The button goes away once pressed, so focus on it moves to the picker it reset. Only then:
+  // Safari never focuses a tapped button, and focusing the picker on an iPhone may open it.
+  const matchTrim = (button: HTMLButtonElement) => {
+    followTrim();
+    if (document.activeElement === button) frames.current?.focus();
   };
   return (
     <div className="customization-fields">
@@ -79,10 +89,14 @@ export function HomeDetails({
             ref={frames}
             label="Window frames"
             value={draft.design.windowsColor ?? draft.design.trim}
-            onChange={(v) => change('windowsColor', v)}
+            onChange={pickFrames}
           />
           {draft.design.windowsColor && (
-            <button type="button" className="text-button" onClick={matchTrim}>
+            <button
+              type="button"
+              className="text-button"
+              onClick={(e) => matchTrim(e.currentTarget)}
+            >
               Match trim
             </button>
           )}
