@@ -1,0 +1,41 @@
+{
+  "id": "climbing-place",
+  "name": "Climbing place",
+  "creator": "IlayBacil1999",
+  "plot": "C7",
+  "building": "studio",
+  "color": "#271507",
+  "decoration": "tree",
+  "story": "A small spot for climbers. Good coffee, a bench, and a view of the wall.",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 1,
+    "roof": "classic",
+    "windows": "cross",
+    "garden": "wildflowers",
+    "feature": "none"
+  },
+  "resident": {
+    "name": "Juniper",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#675A48",
+    "outfit": "#789B76",
+    "accessory": "none",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "sleep"
+    }
+  },
+  "sign": {
+    "mode": "text",
+    "text": "HELLO",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": ""
+  }
+}
