@@ -1,0 +1,41 @@
+{
+  "id": "loot-a-sleeping-giant-on-roblox",
+  "name": "LOOT A SLEEPING GIANT ON ROBLOX",
+  "creator": "roiegold",
+  "plot": "H7",
+  "building": "cafe",
+  "color": "#BE8E68",
+  "decoration": "flowers",
+  "story": "Creator of Loot A Sleeping Giant on roblox \n\nhttps://www.roblox.com/share?code=561fc007a66bb84995da609db31938c4&type=ExperienceDetails&stamp=1794613628237",
+  "design": {
+    "wall": "#F0E5C8",
+    "trim": "#846C56",
+    "floors": 2,
+    "roof": "classic",
+    "windows": "shutters",
+    "garden": "wildflowers",
+    "feature": "balcony"
+  },
+  "resident": {
+    "name": "Roie",
+    "figure": "male",
+    "skin": "#D9B68B",
+    "hair": "#24221e",
+    "outfit": "#b02727",
+    "accessory": "hat",
+    "greeting": "Hello!",
+    "routine": {
+      "morning": "work",
+      "afternoon": "stroll",
+      "evening": "home",
+      "night": "stroll"
+    }
+  },
+  "sign": {
+    "mode": "html",
+    "text": "",
+    "color": "#FFF4D4",
+    "background": "#35554A",
+    "html": "ROBLOX DEV"
+  }
+}
